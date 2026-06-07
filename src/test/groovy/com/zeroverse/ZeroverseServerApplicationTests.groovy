@@ -1,4 +1,4 @@
-package com.example.zeroverse_server
+package com.zeroverse
 
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.context.SpringBootTest

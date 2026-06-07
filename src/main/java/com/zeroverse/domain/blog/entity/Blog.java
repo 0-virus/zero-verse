@@ -10,21 +10,16 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-@Table(
-    uniqueConstraints = {
-        @UniqueConstraint(columnNames = "url_slug")
-    }
-)
 public class Blog {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
+    @JoinColumn(name = "user_id", nullable = false)
     private User user;
     @Column(nullable = false, length = 50)
     private String title;
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true)
     private String urlSlug;
     @Column(columnDefinition = "TEXT")
     private String description;

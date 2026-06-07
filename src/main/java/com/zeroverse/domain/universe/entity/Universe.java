@@ -15,6 +15,11 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
+@Table(
+    uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"from_user_id", "to_user_id"})
+    }
+)
 public class Universe {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

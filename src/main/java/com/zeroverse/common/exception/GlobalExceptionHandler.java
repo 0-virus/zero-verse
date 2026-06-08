@@ -1,12 +1,14 @@
 package com.zeroverse.common.exception;
 
 import com.zeroverse.common.response.ApiResponse;
+import com.zeroverse.common.response.ErrorDetail;
+import com.zeroverse.common.response.ErrorResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.util.stream.Collectors;
+import java.util.List;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -17,25 +19,33 @@ public class GlobalExceptionHandler {
         ErrorCode errorCode = e.getErrorCode();
         return ResponseEntity
                 .status(errorCode.getStatus())
-                .body(ApiResponse.fail(errorCode.getCode() + ": " + errorCode.getMessage()));
+                .body(ApiResponse.fail(ErrorResponse.of(errorCode)));
     }
 
     // @Valid 검증 실패
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Void>> handleValidationException(MethodArgumentNotValidException e) {
-        String message = e.getBindingResult().getFieldErrors().stream()
-                .map(error -> error.getField() + ": " + error.getDefaultMessage())
-                .collect(Collectors.joining(", "));
+        ErrorCode errorCode = ErrorCode.INVALID_INPUT;
+
+        List<ErrorDetail> details = e.getBindingResult().getFieldErrors().stream()
+                .map(error -> ErrorDetail.of(
+                        error.getField(),
+                        error.getDefaultMessage()
+                ))
+                .toList();
+
         return ResponseEntity
-                .badRequest()
-                .body(ApiResponse.fail("CMN_002: " + message));
+                .status(errorCode.getStatus())
+                .body(ApiResponse.fail(ErrorResponse.of(errorCode, details)));
     }
 
     // 그 외 예상치 못한 예외
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleException(Exception e) {
+        ErrorCode errorCode = ErrorCode.INTERNAL_SERVER_ERROR;
+
         return ResponseEntity
-                .internalServerError()
-                .body(ApiResponse.fail("서버 오류가 발생했습니다."));
+                .status(errorCode.getStatus())
+                .body(ApiResponse.fail(ErrorResponse.of(errorCode)));
     }
 }

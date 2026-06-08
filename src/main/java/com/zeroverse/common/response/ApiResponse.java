@@ -1,6 +1,5 @@
 package com.zeroverse.common.response;
 
-import com.zeroverse.common.exception.ErrorResponse;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

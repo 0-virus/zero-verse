@@ -1,4 +1,4 @@
-package com.zeroverse.common.exception;
+package com.zeroverse.common.response;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;

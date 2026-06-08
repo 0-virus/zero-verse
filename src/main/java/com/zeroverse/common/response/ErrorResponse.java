@@ -1,5 +1,6 @@
-package com.zeroverse.common.exception;
+package com.zeroverse.common.response;
 
+import com.zeroverse.common.exception.ErrorCode;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;

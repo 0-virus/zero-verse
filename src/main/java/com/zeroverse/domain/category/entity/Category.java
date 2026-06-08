@@ -1,5 +1,6 @@
 package com.zeroverse.domain.category.entity;
 
+import com.zeroverse.common.entity.BaseEntity;
 import com.zeroverse.domain.blog.entity.Blog;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -16,7 +17,7 @@ import lombok.Setter;
         @UniqueConstraint(columnNames = {"blog_id", "parent_id", "display_order"})
     }
 )
-public class Category {
+public class Category extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -35,4 +36,6 @@ public class Category {
     private Integer displayOrder;
     @Column(nullable = false)
     private boolean isDefault = false;
+    @Column(nullable = false)
+    private boolean isDeleted = false;
 }

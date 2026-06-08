@@ -1,5 +1,6 @@
 package com.zeroverse.domain.blog.entity;
 
+import com.zeroverse.common.entity.BaseEntity;
 import com.zeroverse.domain.user.entity.User;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -10,7 +11,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-public class Blog {
+public class Blog extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

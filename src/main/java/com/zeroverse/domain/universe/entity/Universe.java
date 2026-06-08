@@ -1,5 +1,6 @@
 package com.zeroverse.domain.universe.entity;
 
+import com.zeroverse.common.entity.BaseEntity;
 import com.zeroverse.domain.user.entity.User;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -14,13 +15,12 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @NoArgsConstructor
-@EntityListeners(AuditingEntityListener.class)
 @Table(
     uniqueConstraints = {
         @UniqueConstraint(columnNames = {"from_user_id", "to_user_id"})
     }
 )
-public class Universe {
+public class Universe extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -33,7 +33,4 @@ public class Universe {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private UniverseStatus status;
-    @CreatedDate
-    @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt;
 }

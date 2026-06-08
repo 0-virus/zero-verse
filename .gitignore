@@ -1,4 +1,4 @@
-HELP.md
+README.md
 .gradle
 build/
 !gradle/wrapper/gradle-wrapper.jar
@@ -42,3 +42,7 @@ log.md
 
 ### Document ###
 REQUIREMENTS.md
+
+### Environment Variables ###
+.env
+.env.local

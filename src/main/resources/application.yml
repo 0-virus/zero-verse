@@ -1,6 +1,6 @@
 spring:
   application:
-    name: zeroverse-server
+    name: zeroverse
 
   profiles:
     active: local # application-local.yml을 추가로 읽음
@@ -14,7 +14,7 @@ spring:
         format_sql: true  # SQL 콘솔 출력 시 sql을 정렬하여 출력
 
 server:
-  port: 8080
+  port: 8000
 
 logging:
   level:

@@ -1,5 +1,6 @@
 package com.zeroverse.common.response;
 
+import com.zeroverse.common.exception.ErrorResponse;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -11,7 +12,7 @@ import java.time.LocalDateTime;
 public class ApiResponse<T> {
     private boolean success;
     private T data;
-    private String error;
+    private ErrorResponse error;
     private LocalDateTime timestamp;
 
     public static <T> ApiResponse<T> ok(T data) {
@@ -23,7 +24,7 @@ public class ApiResponse<T> {
         return response;
     }
 
-    public static <T> ApiResponse<T> fail(String error) {
+    public static <T> ApiResponse<T> fail(ErrorResponse error) {
         ApiResponse<T> response = new ApiResponse<>();
         response.success = false;
         response.data = null;

@@ -3,6 +3,7 @@ package com.zeroverse.domain.auth.controller;
 import com.zeroverse.common.response.ApiResponse;
 import com.zeroverse.domain.auth.dto.AuthResponse;
 import com.zeroverse.domain.auth.dto.LoginRequest;
+import com.zeroverse.domain.auth.dto.LoginResponse;
 import com.zeroverse.domain.auth.dto.RegisterRequest;
 import com.zeroverse.domain.auth.service.AuthService;
 import jakarta.validation.Valid;
@@ -24,7 +25,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ApiResponse<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+    public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         return ApiResponse.ok(authService.login(request));
     }
 }

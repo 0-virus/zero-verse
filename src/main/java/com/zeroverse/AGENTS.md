@@ -102,7 +102,7 @@ Required for nullable columns to distinguish null from 0:
 public class User extends BaseSoftDeleteEntity {
     @Column(name = "email", nullable = false, unique = true)
     private String email;
-    
+
     @Column(name = "view_count", nullable = false)
     private Integer viewCount = 0;
 }
@@ -170,7 +170,7 @@ List<User> findAllActive();
 @Service
 public class PostQueryService {
     private final JPAQueryFactory queryFactory;
-    
+
     public List<Post> searchPosts(String keyword) {
         QPost post = QPost.post;
         return queryFactory.selectFrom(post)

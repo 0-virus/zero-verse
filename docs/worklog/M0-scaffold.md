@@ -95,4 +95,20 @@ PR: https://github.com/0-virus/zero-verse/pull/1 · **verdict: 수정 후 머지
 
 **fix pass 종합**: 블로킹 7건(BE1~3,7 / FE4~6) + 계획 누락분(PostCard, 백엔드 AGENTS.md, 테스트 강화) 반영. 최종 검증 — BE `./gradlew test` 11/11 ✓, FE `npm run build`+`vitest` 7/7 ✓.
 
+### 재리뷰 (Codex · 2026-07-01, 커밋 dc1c865)
+
+**verdict: 수정 후 머지.** 블로킹 7건 중 4건 완전 해결(#1 응답 직렬화, #2 users.name NOT NULL, #5 UNIVERSE→"친구", #7 Security 401/403), 3건 부분:
+- #3 AWS env명이 `AWS_ACCESS_KEY`/`AWS_SECRET_KEY`(표준 `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`와 불일치). 커밋된 비밀 없음 ✓.
+- #4 `apiClient.test.ts`가 token store set/get만 검증 — 실제 Bearer 헤더 e2e 없음(구현은 동작).
+- #6 `SettingsPostsPage.tsx`에 `[DEFAULT] Uncategorized`/`[GENERAL] General` 하드코딩 잔존(FE 1차 지시 누락).
+비블로킹: AGENTS.md trailing whitespace, Security 핸들러 테스트 부재.
+
+### 수정 2차 (fix pass #2, 오케스트레이터 직접)
+
+- #3: `application.yml` AWS env명 표준화 `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`.
+- #4: `apiClient.test.ts`에 e2e 테스트 3건 추가(토큰 있을 때 Bearer 부착 / 없을 때 미부착 / 401→refresh→새 토큰으로 재시도).
+- #6: `SettingsPostsPage.tsx` 하드코딩(`[DEFAULT] Uncategorized` 등) 제거 → placeholder.
+- 비블로킹: 백엔드 `AGENTS.md` trailing whitespace 제거.
+- **재검증: FE build+vitest 10/10 ✓, BE `./gradlew test` 11/11 BUILD SUCCESSFUL ✓.** → 블로킹 7건 전부 해결.
+
 ## [머지]

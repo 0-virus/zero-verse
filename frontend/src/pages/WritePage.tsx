@@ -81,7 +81,7 @@ export default function WritePage() {
               className="w-full px-2 py-1 bg-bg-input border-2 border-border-cyan-dark text-text-primary"
             >
               <option value="PUBLIC">Public</option>
-              <option value="UNIVERSE">Friends</option>
+              <option value="UNIVERSE">친구</option>
               <option value="PRIVATE">Private</option>
             </select>
           </div>

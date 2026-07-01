@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# OMC runtime state (operational artifacts)
+.omc/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

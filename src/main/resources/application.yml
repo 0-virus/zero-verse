@@ -32,16 +32,16 @@ cors:
   allowed-origins: http://localhost:5173,http://localhost:3000
 
 jwt:
-  secret: ${JWT_SECRET:your-secret-key-change-in-production-environment}
+  secret: ${JWT_SECRET}
   access-token-expiry: 3600
   refresh-token-expiry: 1209600
 
 aws:
   s3:
-    bucket-name: ${AWS_S3_BUCKET:zeroverse-local}
-    region: ${AWS_REGION:us-east-1}
-    access-key: ${AWS_ACCESS_KEY:minioadmin}
-    secret-key: ${AWS_SECRET_KEY:minioadmin}
+    bucket-name: ${AWS_S3_BUCKET}
+    region: ${AWS_REGION}
+    access-key: ${AWS_ACCESS_KEY}
+    secret-key: ${AWS_SECRET_KEY}
     endpoint: ${AWS_ENDPOINT:}
     use-path-style: ${AWS_USE_PATH_STYLE:false}
 

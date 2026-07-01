@@ -19,4 +19,10 @@ aws:
     use-path-style: true
 
 jwt:
-  secret: local-development-secret-key-not-for-production
+  secret: your-local-jwt-secret-key-keep-private
+
+# 환경변수로도 설정 가능:
+# export JWT_SECRET="your-secret-key"
+# export AWS_S3_BUCKET="zeroverse-local"
+# export AWS_ACCESS_KEY="minioadmin"
+# export AWS_SECRET_KEY="minioadmin"

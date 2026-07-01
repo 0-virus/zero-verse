@@ -21,3 +21,12 @@ jwt:
 
 cors:
   allowed-origins: http://localhost:5173
+
+aws:
+  s3:
+    bucket-name: zeroverse-test
+    region: us-east-1
+    access-key: test-access-key
+    secret-key: test-secret-key
+    endpoint: http://localhost:4566
+    use-path-style: true

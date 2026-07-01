@@ -28,26 +28,7 @@ export default function SettingsUniversePage() {
 
         {/* Content */}
         <div className="bg-bg-panel border-2 border-border-cyan-dark p-6 shadow-card">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b-2 border-border-purple-dark">
-                <th className="text-left text-text-primary py-2">User</th>
-                <th className="text-left text-text-primary py-2">Relation</th>
-                <th className="text-left text-text-primary py-2">Blog</th>
-                <th className="text-left text-text-primary py-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="border-b border-border-purple-dark">
-                <td className="py-2 text-text-body-cyan">Sample User</td>
-                <td className="py-2 text-text-body-cyan">Friend</td>
-                <td className="py-2 text-text-body-cyan">sample-blog</td>
-                <td className="py-2">
-                  <button className="px-3 py-1 bg-bg-button-danger border-2 border-border-danger text-text-primary mr-2">Remove</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <p className="text-text-muted">Relationship list coming soon...</p>
         </div>
       </div>
     </AppShell>

@@ -5,7 +5,7 @@ CREATE TABLE users (
   status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
   email VARCHAR(255) NOT NULL UNIQUE,
   password VARCHAR(255) NOT NULL,
-  name VARCHAR(100),
+  name VARCHAR(100) NOT NULL,
   nickname VARCHAR(100) NOT NULL UNIQUE,
   birth_date DATE,
   bio TEXT,

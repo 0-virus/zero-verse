@@ -37,29 +37,8 @@ export default function NotificationsPage() {
         </div>
 
         {/* Notifications List */}
-        <div className="bg-bg-panel border-2 border-border-cyan-dark shadow-card">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b-2 border-border-purple-dark">
-                <th className="text-left text-text-primary py-3 px-4">Type</th>
-                <th className="text-left text-text-primary py-3 px-4">Content</th>
-                <th className="text-left text-text-primary py-3 px-4">Date</th>
-                <th className="text-left text-text-primary py-3 px-4">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="border-b border-border-purple-dark">
-                <td className="py-3 px-4 text-text-body-cyan">Comment</td>
-                <td className="py-3 px-4 text-text-body-cyan">Someone commented on your post</td>
-                <td className="py-3 px-4 text-text-muted">2h ago</td>
-                <td className="py-3 px-4">
-                  <button className="px-2 py-1 bg-bg-button-neutral border border-border-cyan-dark text-text-primary text-sm mr-2">
-                    View
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div className="bg-bg-panel border-2 border-border-cyan-dark shadow-card p-6">
+          <p className="text-text-muted">Notifications coming soon...</p>
         </div>
       </div>
     </AppShell>

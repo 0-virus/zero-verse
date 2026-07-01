@@ -13,24 +13,7 @@ export default function AdminUserPage() {
           {/* User Info */}
           <div className="bg-bg-panel border-2 border-border-cyan-dark p-6 shadow-card">
             <h3 className="font-display text-text-primary mb-4">User Information</h3>
-            <div className="space-y-3">
-              <div>
-                <p className="text-text-muted text-sm">Email</p>
-                <p className="text-text-primary">user@example.com</p>
-              </div>
-              <div>
-                <p className="text-text-muted text-sm">Nickname</p>
-                <p className="text-text-primary">sample-user</p>
-              </div>
-              <div>
-                <p className="text-text-muted text-sm">Name</p>
-                <p className="text-text-primary">Sample User</p>
-              </div>
-              <div>
-                <p className="text-text-muted text-sm">Joined</p>
-                <p className="text-text-primary">2024-01-01</p>
-              </div>
-            </div>
+            <p className="text-text-muted">User details coming soon...</p>
           </div>
 
           {/* Admin Actions */}
@@ -63,21 +46,6 @@ export default function AdminUserPage() {
           </div>
         </div>
 
-        {/* Statistics */}
-        <div className="mt-6 grid grid-cols-3 gap-4">
-          <div className="bg-bg-panel border-2 border-border-purple-dark p-4 text-center shadow-card">
-            <p className="text-text-muted text-sm">Blogs</p>
-            <p className="font-display text-3xl text-text-primary">1</p>
-          </div>
-          <div className="bg-bg-panel border-2 border-border-purple-dark p-4 text-center shadow-card">
-            <p className="text-text-muted text-sm">Posts</p>
-            <p className="font-display text-3xl text-text-primary">5</p>
-          </div>
-          <div className="bg-bg-panel border-2 border-border-purple-dark p-4 text-center shadow-card">
-            <p className="text-text-muted text-sm">Comments</p>
-            <p className="font-display text-3xl text-text-primary">12</p>
-          </div>
-        </div>
       </div>
     </AppShell>
   )

@@ -15,3 +15,6 @@ export { default as Pagination } from './Pagination'
 export { default as TagInput } from './TagInput'
 
 export { default as FormField } from './FormField'
+
+export { default as PostCard } from './PostCard'
+export type { PostCardProps } from './PostCard'

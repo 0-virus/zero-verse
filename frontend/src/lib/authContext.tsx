@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
-import { apiClient } from './apiClient'
+import { apiClient, setAccessToken as setApiAccessToken } from './apiClient'
 
 export interface User {
   id: string
@@ -69,7 +69,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         body: JSON.stringify({ email, password }),
       })
       if (response.success && response.data) {
-        setAccessToken(response.data.accessToken)
+        const token = response.data.accessToken
+        // Update React state
+        setAccessToken(token)
+        // Sync with apiClient token store (CRITICAL for Bearer header)
+        setApiAccessToken(token)
         await loadUserInfo()
       } else {
         throw new Error(response.error?.message || 'Signin failed')
@@ -89,6 +93,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setUser(null)
       setAccessToken(null)
+      // Sync with apiClient token store
+      setApiAccessToken(null)
     }
   }, [])
 
@@ -98,7 +104,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         method: 'POST',
       })
       if (response.success && response.data?.accessToken) {
-        setAccessToken(response.data.accessToken)
+        const token = response.data.accessToken
+        // Update React state
+        setAccessToken(token)
+        // Sync with apiClient token store (CRITICAL for Bearer header)
+        setApiAccessToken(token)
         return true
       }
       return false
@@ -106,6 +116,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Token refresh failed:', error)
       setUser(null)
       setAccessToken(null)
+      // Sync with apiClient token store
+      setApiAccessToken(null)
       return false
     }
   }, [])

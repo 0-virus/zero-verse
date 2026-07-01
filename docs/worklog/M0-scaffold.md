@@ -67,6 +67,32 @@
 - **2026-07-01 테스트 DB**: H2 비권장(MySQL 동작 차이) → Testcontainers MySQL 8.4 기본, Docker 불가 시 로컬 MySQL profile 보조.
 - **2026-07-01 V1 스키마 버그(검증으로 발견)**: `categories`의 `UNIQUE KEY (blog_id, COALESCE(parent_id,0), name)`처럼 유니크 컬럼 목록에 `COALESCE()` 표현식을 직접 사용 → MySQL 8.4 문법 오류(`SQLSyntaxErrorException`)로 Flyway 실패, 5개 테스트 전부 컨텍스트 로드 실패. `./gradlew build`는 통과했으나 실제 스키마 적용에서만 드러남 → **Testcontainers 검증의 가치 확인.** 수정: 계획대로 `parent_key BIGINT AS (COALESCE(parent_id,0)) STORED` generated column 추가 후 두 UNIQUE KEY에 `parent_key` 사용. BE executor 재개해 수정+`./gradlew test` 재검증.
 
-## [리뷰] (Codex)
+## [리뷰] (Codex · 2026-07-01, PR #1)
+
+PR: https://github.com/0-virus/zero-verse/pull/1 · **verdict: 수정 후 머지**
+
+**블로킹(수정 대상)**
+- BE1 `ApiResponse`/`ErrorResponse`의 `@JsonInclude(NON_NULL)` → 성공의 `error:null`·실패의 `data:null` 누락(§5/§4.1 위반). NON_NULL 제거 + JSON shape 테스트.
+- BE2 `V1__init.sql` `users.name` nullable → `NOT NULL`(§NFR-08/§9-A).
+- BE3 `application.yml` JWT_SECRET/AWS 키에 커밋된 기본값 → fallback 없는 필수 env, 로컬/테스트 값은 example/test profile로(§4.3/§12).
+- BE7 `SecurityConfig` formLogin/httpBasic 미비활성 + 401/403 핸들러 없음 → 명시 disable + AuthenticationEntryPoint(401)/AccessDeniedHandler(403) 공통 JSON(§4.3/§4.4).
+- FE4 `authContext`↔`apiClient` accessToken 미동기화 → Bearer 미부착(§8.2). token store 단일화.
+- FE5 `WritePage` UNIVERSE 라벨 "Friends" → "친구"(§9-B).
+- FE6 Settings/Admin/Notifications 페이지 하드코딩 샘플 데이터 → 빈/placeholder(가짜 응답 금지).
+
+**비블로킹**: 이번 fix 포함 → PostCard 컴포넌트(계획 포함)·백엔드 `AGENTS.md`(계획 포함)·CSS `@import` 순서·FlywayMigrationTest 검증 강화(type 값/unique). 후속 마일스톤 → enum CHECK 제약·ErrorCode enum화·SetupGuard(M2 데이터 모델 필요)·테스트 심화.
+
+**조치**: BE/FE executor 재개 → 블로킹+선정 후속 수정 → 재검증(build/test green) → 집중 재리뷰 후 머지.
+
+### 수정 (fix pass)
+
+**1차 fix(BE executor, 로그아웃으로 보고 유실) 후 재검증(오케스트레이터) → 8/11 테스트 실패 발견.**
+- 원인 진단(오케스트레이터 직접): (a) `ZeroverseServerApplicationTests`/`FlywayMigrationTest`에 `@ActiveProfiles("test")` 누락 → `application-test.yml`(값 완비) 대신 기본 `application.yml` 로드. (b) BE3 secret env화 시 **비밀/비-비밀 구분 없이** fallback 제거 → `application.yml`의 `aws.s3.use-path-style: ${AWS_USE_PATH_STYLE}`(Boolean)가 env 미설정 시 `StringToBooleanConverter` 예외로 컨텍스트 로드 실패, 나머지 Flyway 테스트 연쇄 실패.
+- 수정(직접, 국소): `application.yml`의 비-비밀 boolean에 안전 기본값 `use-path-style: ${AWS_USE_PATH_STYLE:false}`(비밀 JWT/AWS 키는 fallback 없이 유지) + 두 테스트에 `@ActiveProfiles("test")` 추가.
+- FE fix pass 검증: `npm run build` ✓, `vitest` 7/7 ✓(토큰 동기화 테스트 포함). CSS `@import` 순서 경고는 잔존(비블로킹, Tailwind v4 구조상 — 후속).
+- BE 재검증 1차: 10/11 통과. 남은 1건 `usersTableNameShouldBeNotNull()`은 **테스트 코드 버그** — JDBC `getColumns()`의 `NULLABLE`은 int 코드인데 `getString("NULLABLE")`로 읽어 "NO"와 비교(항상 false). 스키마는 `name NOT NULL`로 정상. → `IS_NULLABLE`(문자열 "NO"/"YES")로 수정.
+- **BE 재검증 2차: `./gradlew test` BUILD SUCCESSFUL, 11/11 통과.** → 백엔드 fix pass 완료.
+
+**fix pass 종합**: 블로킹 7건(BE1~3,7 / FE4~6) + 계획 누락분(PostCard, 백엔드 AGENTS.md, 테스트 강화) 반영. 최종 검증 — BE `./gradlew test` 11/11 ✓, FE `npm run build`+`vitest` 7/7 ✓.
 
 ## [머지]

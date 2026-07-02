@@ -1,7 +1,7 @@
 // Settings API types
 
 export interface UserSettingsResponse {
-  id: number
+  userId: number
   email: string
   nickname: string
   name: string
@@ -28,7 +28,7 @@ export interface ChangePasswordRequest {
 }
 
 export interface BlogSettingsResponse {
-  id: number
+  blogId: number
   title: string
   urlSlug: string
   description?: string
@@ -58,7 +58,7 @@ export interface OwnerInfo {
 }
 
 export interface BlogPublicResponse {
-  id: number
+  blogId: number
   title: string
   urlSlug: string
   description?: string

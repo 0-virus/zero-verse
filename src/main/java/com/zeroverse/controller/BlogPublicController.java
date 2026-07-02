@@ -3,6 +3,10 @@ package com.zeroverse.controller;
 import com.zeroverse.common.response.ApiResponse;
 import com.zeroverse.domain.blog.service.BlogService;
 import com.zeroverse.dto.blog.BlogPublicResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -10,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/blogs/slug")
+@Tag(name = "Blog Public", description = "공개 블로그 조회 API")
 public class BlogPublicController {
     private final BlogService blogService;
 
@@ -18,6 +23,11 @@ public class BlogPublicController {
     }
 
     @GetMapping("/{urlSlug}")
+    @Operation(summary = "공개 블로그 조회", description = "URL slug를 이용하여 공개 블로그 정보를 조회합니다. (인증 불필요)")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공", content = @Content(mediaType = "application/json")),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "블로그를 찾을 수 없음 또는 삭제됨")
+    })
     public ResponseEntity<ApiResponse<BlogPublicResponse>> getPublicBlog(
         @PathVariable String urlSlug) {
         BlogPublicResponse response = blogService.getPublicBlog(urlSlug);

@@ -231,7 +231,7 @@ public class UserServiceTest extends IntegrationTestSupport {
         assertThatThrownBy(() -> userService.changePassword(testUser.getId(), request))
             .isInstanceOf(BusinessException.class)
             .extracting(ex -> ((BusinessException) ex).getErrorCode())
-            .isEqualTo(ErrorCode.AUTH_001);
+            .isEqualTo(ErrorCode.USER_007);
     }
 
     @Test

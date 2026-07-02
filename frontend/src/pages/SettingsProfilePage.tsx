@@ -2,12 +2,15 @@ import { useState, useEffect } from 'react'
 import AppShell from '../components/layout/AppShell'
 import { useAuth } from '../lib/authContext'
 import { useUserSettings } from '../hooks/useUserSettings'
-import type { UserSettingsRequest, ChangePasswordRequest } from '../types/settings'
+import { useBlogSettings } from '../hooks/useBlogSettings'
+import type { UserSettingsRequest, ChangePasswordRequest, BlogSettingsRequest } from '../types/settings'
 
 export default function SettingsProfilePage() {
   const { user } = useAuth()
-  const { updateProfile, changePassword } = useUserSettings()
+  const { getMe: getUserInfo, updateProfile, changePassword } = useUserSettings()
+  const { getBlogMe, updateBlog: updateBlogSettings } = useBlogSettings()
   const [activeTab, setActiveTab] = useState('profile')
+  const [initialLoading, setInitialLoading] = useState(true)
 
   // Profile form
   const [profileData, setProfileData] = useState<UserSettingsRequest>({
@@ -31,18 +34,48 @@ export default function SettingsProfilePage() {
   const [passwordSuccess, setPasswordSuccess] = useState(false)
   const [passwordError, setPasswordError] = useState('')
 
-  // Initialize profile form with user data
+  // Blog form
+  const [blogData, setBlogData] = useState<BlogSettingsRequest>({
+    title: '',
+    urlSlug: '',
+    description: '',
+  })
+  const [blogLoading, setBlogLoading] = useState(false)
+  const [blogSuccess, setBlogSuccess] = useState(false)
+  const [blogError, setBlogError] = useState('')
+
+  // Initialize data on mount
   useEffect(() => {
-    if (user) {
-      setProfileData({
-        name: user.name || '',
-        nickname: user.nickname || '',
-        bio: '',
-        birthDate: user.birthDate || '',
-        profileImageUrl: user.profileImageUrl || '',
-      })
+    const loadData = async () => {
+      try {
+        const userInfo = await getUserInfo()
+        if (userInfo) {
+          setProfileData({
+            name: userInfo.name || '',
+            nickname: userInfo.nickname || '',
+            bio: userInfo.bio || '',
+            birthDate: userInfo.birthDate || '',
+            profileImageUrl: userInfo.profileImageUrl || '',
+          })
+        }
+
+        const blogInfo = await getBlogMe()
+        if (blogInfo) {
+          setBlogData({
+            title: blogInfo.title || '',
+            urlSlug: blogInfo.urlSlug || '',
+            description: blogInfo.description || '',
+          })
+        }
+      } catch (error) {
+        console.error('Failed to load settings data:', error)
+      } finally {
+        setInitialLoading(false)
+      }
     }
-  }, [user])
+
+    loadData()
+  }, [])
 
   const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -128,6 +161,55 @@ export default function SettingsProfilePage() {
     }
   }
 
+  const handleBlogChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target
+    setBlogData((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const handleBlogSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setBlogError('')
+    setBlogSuccess(false)
+    setBlogLoading(true)
+
+    try {
+      const result = await updateBlogSettings(blogData)
+      if (result) {
+        setBlogSuccess(true)
+        setTimeout(() => setBlogSuccess(false), 3000)
+      } else {
+        // Error message mapping
+        const errorMessage =
+          blogData.urlSlug && blogData.urlSlug !== '' ? 'URL Slug를 확인해주세요.' :
+          '블로그 설정 수정에 실패했습니다.'
+        setBlogError(errorMessage)
+      }
+    } catch (err: any) {
+      // Check error code for slug issues
+      const errorMsg = err.message || '블로그 설정 수정에 실패했습니다.'
+      if (errorMsg.includes('BLOG_002')) {
+        setBlogError('유효하지 않은 URL Slug 형식입니다.')
+      } else if (errorMsg.includes('BLOG_003')) {
+        setBlogError('이미 사용 중인 URL Slug입니다.')
+      } else {
+        setBlogError(errorMsg)
+      }
+    } finally {
+      setBlogLoading(false)
+    }
+  }
+
+  if (initialLoading) {
+    return (
+      <AppShell showSidebar={true}>
+        <div className="p-6">
+          <h1 className="font-display text-3xl text-text-primary mb-6">Settings</h1>
+          <p className="text-text-muted">로딩 중...</p>
+        </div>
+      </AppShell>
+    )
+  }
+
   return (
     <AppShell showSidebar={true}>
       <div className="p-6">
@@ -144,6 +226,16 @@ export default function SettingsProfilePage() {
             }`}
           >
             Profile
+          </button>
+          <button
+            onClick={() => setActiveTab('blog')}
+            className={`px-4 py-2 font-display transition ${
+              activeTab === 'blog'
+                ? 'border-b-4 border-border-cyan-dark text-text-primary'
+                : 'text-text-muted hover:text-text-primary'
+            }`}
+          >
+            Blog
           </button>
           <button
             onClick={() => setActiveTab('password')}
@@ -246,6 +338,71 @@ export default function SettingsProfilePage() {
                 className="px-6 py-2 bg-bg-button-primary border-2 border-border-cyan-dark text-text-primary font-display hover:bg-opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {profileLoading ? 'Saving...' : 'Save'}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* Blog Tab */}
+        {activeTab === 'blog' && (
+          <div className="bg-bg-panel border-2 border-border-cyan-dark p-6 shadow-card max-w-2xl">
+            <h2 className="font-display text-text-primary mb-6">Blog Settings</h2>
+            <form onSubmit={handleBlogSubmit} className="space-y-4">
+              <div>
+                <label className="block text-text-primary mb-2 text-sm">URL Slug</label>
+                <input
+                  type="text"
+                  name="urlSlug"
+                  value={blogData.urlSlug}
+                  onChange={handleBlogChange}
+                  disabled={blogLoading}
+                  className="w-full px-4 py-2 bg-bg-input border-2 border-border-cyan-dark text-text-primary disabled:opacity-50"
+                />
+                <p className="text-text-muted text-xs mt-1">
+                  블로그 URL 경로에 사용됩니다 (예: zeroverse.com/blog/my-blog)
+                </p>
+              </div>
+              <div>
+                <label className="block text-text-primary mb-2 text-sm">Title</label>
+                <input
+                  type="text"
+                  name="title"
+                  value={blogData.title}
+                  onChange={handleBlogChange}
+                  disabled={blogLoading}
+                  className="w-full px-4 py-2 bg-bg-input border-2 border-border-cyan-dark text-text-primary disabled:opacity-50"
+                />
+              </div>
+              <div>
+                <label className="block text-text-primary mb-2 text-sm">Description</label>
+                <textarea
+                  name="description"
+                  value={blogData.description}
+                  onChange={handleBlogChange}
+                  disabled={blogLoading}
+                  className="w-full px-4 py-2 bg-bg-input border-2 border-border-cyan-dark text-text-primary disabled:opacity-50"
+                  rows={3}
+                />
+              </div>
+
+              {blogSuccess && (
+                <div className="bg-green-900 bg-opacity-20 border-2 border-green-500 p-3 text-green-400 text-sm">
+                  ✓ 블로그 설정이 수정되었습니다.
+                </div>
+              )}
+
+              {blogError && (
+                <div className="bg-border-danger bg-opacity-10 border-2 border-border-danger p-3 text-border-danger text-sm">
+                  {blogError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={blogLoading}
+                className="px-6 py-2 bg-bg-button-primary border-2 border-border-cyan-dark text-text-primary font-display hover:bg-opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {blogLoading ? 'Saving...' : 'Save'}
               </button>
             </form>
           </div>

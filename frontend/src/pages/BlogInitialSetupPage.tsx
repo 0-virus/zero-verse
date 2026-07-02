@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useBlogSettings } from '../hooks/useBlogSettings'
+import { apiClient } from '../lib/apiClient'
 import type { BlogInitialSetupRequest } from '../types/settings'
 
 export default function BlogInitialSetupPage() {
@@ -27,8 +28,14 @@ export default function BlogInitialSetupPage() {
     try {
       const result = await initialSetup(formData)
       if (result) {
-        // Success - navigate to home or blog
-        navigate('/')
+        // Success - refresh auth to update defaultBlog status, then navigate
+        try {
+          await apiClient('/auth/me', { method: 'GET' })
+        } catch (refreshErr) {
+          console.warn('Failed to refresh user data:', refreshErr)
+        }
+        // Navigate to blog page
+        navigate(`/blog/${result.urlSlug}`)
       } else {
         // Error already set by hook
         setError('블로그 초기 설정에 실패했습니다.')

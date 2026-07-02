@@ -241,9 +241,10 @@ public class UserSettingsControllerTest extends IntegrationTestSupport {
             .header("Authorization", getAuthHeader(testUser))
             .contentType("application/json")
             .content(objectMapper.writeValueAsString(request)))
-            .andExpect(status().isUnauthorized())
+            .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.error.code").value("AUTH_001"));
+            .andExpect(jsonPath("$.error.code").value("USER_007"))
+            .andExpect(jsonPath("$.error.message").exists());
     }
 
     @Test

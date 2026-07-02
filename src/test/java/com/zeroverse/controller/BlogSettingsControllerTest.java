@@ -173,7 +173,8 @@ public class BlogSettingsControllerTest extends IntegrationTestSupport {
             .contentType("application/json")
             .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isConflict())
-            .andExpect(jsonPath("$.error.code").value("BLOG_002"));
+            .andExpect(jsonPath("$.error.code").value("BLOG_002"))
+            .andExpect(jsonPath("$.error.message").exists());
     }
 
     @Test
@@ -191,7 +192,8 @@ public class BlogSettingsControllerTest extends IntegrationTestSupport {
             .contentType("application/json")
             .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.error.code").value("BLOG_003"));
+            .andExpect(jsonPath("$.error.code").value("BLOG_003"))
+            .andExpect(jsonPath("$.error.message").exists());
     }
 
     @Test
@@ -221,7 +223,8 @@ public class BlogSettingsControllerTest extends IntegrationTestSupport {
             .contentType("application/json")
             .content(objectMapper.writeValueAsString(secondRequest)))
             .andExpect(status().isConflict())
-            .andExpect(jsonPath("$.error.code").value("BLOG_004"));
+            .andExpect(jsonPath("$.error.code").value("BLOG_004"))
+            .andExpect(jsonPath("$.error.message").exists());
     }
 
     @Test
@@ -270,7 +273,8 @@ public class BlogSettingsControllerTest extends IntegrationTestSupport {
             .contentType("application/json")
             .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isConflict())
-            .andExpect(jsonPath("$.error.code").value("BLOG_004"));
+            .andExpect(jsonPath("$.error.code").value("BLOG_004"))
+            .andExpect(jsonPath("$.error.message").exists());
     }
 
     @Test
@@ -313,7 +317,8 @@ public class BlogSettingsControllerTest extends IntegrationTestSupport {
             .contentType("application/json")
             .content(objectMapper.writeValueAsString(updateRequest)))
             .andExpect(status().isConflict())
-            .andExpect(jsonPath("$.error.code").value("BLOG_002"));
+            .andExpect(jsonPath("$.error.code").value("BLOG_002"))
+            .andExpect(jsonPath("$.error.message").exists());
     }
 
     @Test
@@ -343,7 +348,8 @@ public class BlogSettingsControllerTest extends IntegrationTestSupport {
             .contentType("application/json")
             .content(objectMapper.writeValueAsString(updateRequest)))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.error.code").value("BLOG_003"));
+            .andExpect(jsonPath("$.error.code").value("BLOG_003"))
+            .andExpect(jsonPath("$.error.message").exists());
     }
 
     @Test

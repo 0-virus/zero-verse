@@ -60,7 +60,7 @@ public class UserService {
 
         // Verify current password
         if (!passwordEncoder.matches(request.currentPassword(), user.getPassword())) {
-            throw new BusinessException(ErrorCode.AUTH_001);
+            throw new BusinessException(ErrorCode.USER_007);
         }
 
         // Encode and set new password

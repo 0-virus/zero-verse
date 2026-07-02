@@ -128,7 +128,8 @@ public class BlogPublicControllerTest extends IntegrationTestSupport {
         mockMvc.perform(get("/api/v1/blogs/slug/nonexistent"))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.error.code").value("BLOG_001"));
+            .andExpect(jsonPath("$.error.code").value("BLOG_001"))
+            .andExpect(jsonPath("$.error.message").exists());
     }
 
     @Test
@@ -166,7 +167,8 @@ public class BlogPublicControllerTest extends IntegrationTestSupport {
         // When/Then
         mockMvc.perform(get("/api/v1/blogs/slug/test-blog"))
             .andExpect(status().isNotFound())
-            .andExpect(jsonPath("$.error.code").value("BLOG_001"));
+            .andExpect(jsonPath("$.error.code").value("BLOG_001"))
+            .andExpect(jsonPath("$.error.message").exists());
     }
 
     @Test

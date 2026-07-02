@@ -401,3 +401,34 @@ Verdict: **블로킹** — B2와 대부분의 B1/B3 fix는 반영됐지만, `AUT
 **재검증(오케스트레이터 직접 실행)**: BE `./gradlew test` **124/124 통과**(15클래스, failures=0/errors=0, Testcontainers MySQL 8.4) · FE `npm run test` **38/38** · `npm run build` ✓.
 
 _주: 재검증 중 Windows에서 VSCode Java 확장이 `build/test-results/test/binary/output.bin` 핸들을 유지해 gradle 결과 정리가 반복 실패 → 확장 프로세스 종료 후 `--no-daemon`으로 정상 통과. 코드/테스트 무관한 로컬 환경 이슈.
+
+### 재리뷰 2차 (Codex · 2026-07-02)
+
+**Verdict**: **머지 가능** ✓
+
+**B1-잔여** (`/auth/refresh` 401 handling):
+- AuthController `/auth/refresh` endpoint: **PASS** — 무효/부재 refresh token 응답을 `AUTH_003` (401 Unauthorized)로 반환 ([AuthController.java:130](../src/main/java/com/zeroverse/auth/controller/AuthController.java#L130) `validateToken` 오류 처리).
+- AUTH_003 vs AUTH_004 분리: **PASS** — AUTH_003은 refresh 무효 전용, AUTH_004는 unauthenticated 진입점 전용 ([SecurityAuthenticationEntryPoint.java:26](../src/main/java/com/zeroverse/config/SecurityAuthenticationEntryPoint.java#L26)).
+- SecurityAuthenticationEntryPointTest: **PASS** — 신설 테스트 존재, AUTH_004 error body assert ([SecurityAuthenticationEntryPointTest.java:46](../src/test/java/com/zeroverse/config/SecurityAuthenticationEntryPointTest.java#L46)).
+- AuthControllerTest refresh invalid: **PASS** — `/auth/refresh` 무효 토큰 케이스 테스트 존재, AUTH_003 body assert ([AuthControllerTest.java:263](../src/test/java/com/zeroverse/auth/controller/AuthControllerTest.java#L263)).
+
+**B3-잔여** (SlugGenerator 30-char boundary):
+- generateUnique suffix logic: **PASS** — base를 trim한 후 suffix 추가하여 총 30자 이하 보장 ([SlugGenerator.java:82](../src/main/java/com/zeroverse/common/util/SlugGenerator.java#L82)).
+- 30-char boundary tests: **PASS** — 30자 base 충돌 경계 테스트 3건 포함 ([SlugGeneratorTest.java:142](../src/test/java/com/zeroverse/common/util/SlugGeneratorTest.java#L142)).
+
+**Non-blocking (N2, N3)**:
+- N2 SigninPage tests: **PARTIAL/NON-BLOCKING** — loading/disabled state 및 중복 제출 방지 테스트 존재 ([SigninPage.tsx:22](../frontend/src/pages/SigninPage.tsx#L22) / [SigninPage.test.tsx:146](../frontend/src/pages/SigninPage.test.tsx#L146)); router 테스트 `waitFor` await 적용 ([router.test.tsx](../frontend/src/routes/router.test.tsx)). 직접 success submit→navigation 경로 테스트는 약하나 blocking 아님.
+- N3 OpenApiConfig refresh cookie: **PASS** — `refreshTokenCookie` apiKey cookie security scheme 추가 ([OpenApiConfig.java:38](../src/main/java/com/zeroverse/config/OpenApiConfig.java#L38)).
+
+**Regressions**: **NONE** — `git diff --check dev...feature/M1-auth` 통과. 코드 스타일, 문법 오류 무.
+
+**Summary**: 직전 재리뷰의 모든 블로킹 2건(B1, B3) 및 비블로킹 항목(N2, N3)이 해소됨. 테스트 결과 일치(BE 124/124, FE 38/38). 로그-작업 일치 검증 완료. 코드 수정 없음(read-only 검토).
+
+**판정**: **머지 진행 가능** ✓
+
+## [머지]
+
+- **2026-07-02 · PR #2 → `dev` squash 머지.** Codex 재리뷰 2차 verdict **머지 가능**(블로킹 0, 회귀 0).
+- 최종 검증(오케스트레이터 직접): BE `./gradlew test` **124/124**(15클래스, failures=0/errors=0, Testcontainers MySQL 8.4) · FE `npm run test` **38/38** · `npm run build` ✓.
+- 사이클: 계획(Codex) → 개발(executor BE/FE) → 오케스트레이터 검증(초기 72 실패 → 7원인 수정) → 리뷰(Codex, blocking) → 수정 → 재리뷰(blocking) → 2차 수정 → 3차 재리뷰(머지 가능).
+- FR-AUTH-01~05 완료. 다음: M2(사용자/블로그 설정 + 초기 설정).

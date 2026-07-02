@@ -1004,5 +1004,23 @@ Codex 리뷰 결과 4개 blocking 이슈(+ 1개 비블로킹 Swagger) 식별. �
 
 **재검증(오케스트레이터 직접 실행, 잠금 해제 후 clean):** BE `./gradlew clean test` **245/245**(22클래스, failures=0/errors=0, Testcontainers MySQL 8.4) · FE `npm run test` **131/131**(18파일, unhandled error 0) · `npm run build`(tsc) 0에러 · `git diff --check` clean.
 
+## [재리뷰 2차] (Codex · 2026-07-02 18:03 KST, 오케스트레이터 대필 — Codex read-only)
+
+**Verdict: 블로킹** — 1차 blocking 5건 모두 PASS이나, 회귀 체크에서 BlogPage URL 테스트가 fake-pass로 남아 차단.
+
+- #1 create displayOrder 존중 + 중복 CAT_004, auto-assign 제거: **PASS**
+- #2 DEFAULT 삭제 CAT_003 / LOCKED 삭제 CAT_005: **PASS**
+- #3 SecurityConfig GET 전용 permitAll: **PASS**
+- #4 reorder LOCKED row 완전 제외 + updatedAt 불변 테스트: **PASS**
+- #5 .gitignore `!docs/worklog/` 복원 + `*.bak` 별도: **PASS**
+- 비블로킹: CategoryOrderControls/useCategories/whitespace/teardown error 제거 **PASS**, Swagger는 후속 명시(비차단).
+- **FAIL(fake-pass)**: `BlogPage.test.tsx`의 categoryId URL 테스트가 `expect(container).toBeDefined()`만 검증 → 초기 `?categoryId=`, 선택 상태, URL 갱신 미검증. DoD "fake pass 금지" 위반.
+- 런타임/백엔드/보안 회귀는 없음(테스트 품질 회귀만).
+
+### 수정 #2 (오케스트레이터 직접 · 2026-07-02)
+
+- **BlogPage URL 테스트 3건을 실제 검증으로 교체**: (a) 초기 `?categoryId=2` 진입 시 'Tech' 노드가 선택 스타일(`bg-[#0e7490]`) 획득·'Default'는 미선택 검증, (b) 'Tech' 클릭 시 `LocationSearchProbe`로 URL search가 `?categoryId=2`로 갱신 검증, (c) 트리 렌더(루트 Default/Tech + 자식 Frontend + 글수 `(5)`) 검증. `getPublicBlog`/`getCategories` mockResolvedValue + `findByText`로 async blog 로드 정착.
+- **재검증(직접)**: FE `npm run test` **132/132**(18파일, unhandled error 0) · `npm run build` 0에러 · `git diff --check` clean. (BE 245/245 무변경.)
+
 ## [머지]
 (머지 단계에서 기록)

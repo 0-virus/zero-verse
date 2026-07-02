@@ -11,6 +11,7 @@ export interface AuthContextValue {
   signin: (email: string, password: string) => Promise<void>
   signout: () => Promise<void>
   refreshAccessToken: () => Promise<boolean>
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -137,6 +138,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signin,
     signout,
     refreshAccessToken,
+    refreshUser: loadUserInfo,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

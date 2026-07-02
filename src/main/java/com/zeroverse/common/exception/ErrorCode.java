@@ -16,11 +16,13 @@ public enum ErrorCode {
     USER_004("USER_004", "이미 존재하는 이메일입니다.", HttpStatus.CONFLICT),
     USER_005("USER_005", "이미 가입된 이메일입니다.", HttpStatus.CONFLICT),
     USER_006("USER_006", "이미 사용 중인 닉네임입니다.", HttpStatus.CONFLICT),
+    USER_007("USER_007", "현재 비밀번호가 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
 
     // Blog
     BLOG_001("BLOG_001", "블로그를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
     BLOG_002("BLOG_002", "이미 존재하는 블로그 URL입니다.", HttpStatus.CONFLICT),
     BLOG_003("BLOG_003", "블로그 URL 형식이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
+    BLOG_004("BLOG_004", "블로그 설정이 이미 완료되었습니다.", HttpStatus.CONFLICT),
 
     // Post
     POST_001("POST_001", "게시글을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),

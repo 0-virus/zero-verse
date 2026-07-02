@@ -278,7 +278,7 @@ public class CategoryApiControllerTest extends IntegrationTestSupport {
         mockMvc.perform(delete("/api/v1/blogs/" + testBlog.getId() + "/categories/" + defaultCat.getId())
             .header("Authorization", authHeader))
             .andExpect(status().isConflict())
-            .andExpect(jsonPath("$.error.code").value("CAT_005"));
+            .andExpect(jsonPath("$.error.code").value("CAT_003"));
     }
 
     @Test

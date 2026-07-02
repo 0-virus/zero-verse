@@ -18,6 +18,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+
 import java.time.LocalDate;
 import java.util.List;
 
@@ -171,17 +173,18 @@ public class CategoryServiceTest extends IntegrationTestSupport {
 
     @Test
     void shouldRejectDuplicateOrderInRootCategories() {
-        // Given
+        // Given - root category with order 1
         Category cat = new Category(testBlog, "개발", CategoryType.GENERAL, 1);
         categoryRepository.save(cat);
 
-        // When - client requests duplicate order, but server auto-assigns next available
+        // When - client requests same order
         CreateCategoryRequest request = new CreateCategoryRequest(null, "디자인", CategoryType.GENERAL, 1);
-        CategoryResponse response = categoryService.createCategory(testBlog.getId(), testUser.getId(), request);
 
-        // Then - server safely assigned unique order (2, not 1)
-        assertThat(response.name()).isEqualTo("디자인");
-        assertThat(response.displayOrder()).isEqualTo(2);
+        // Then - duplicate order rejected with CAT_004
+        assertThatThrownBy(() -> categoryService.createCategory(testBlog.getId(), testUser.getId(), request))
+            .isInstanceOf(BusinessException.class)
+            .extracting(ex -> ((BusinessException) ex).getErrorCode())
+            .isEqualTo(ErrorCode.CAT_004);
     }
 
     @Test
@@ -298,7 +301,7 @@ public class CategoryServiceTest extends IntegrationTestSupport {
         assertThatThrownBy(() -> categoryService.deleteCategory(testBlog.getId(), defaultCategory.getId(), testUser.getId()))
             .isInstanceOf(BusinessException.class)
             .extracting(ex -> ((BusinessException) ex).getErrorCode())
-            .isEqualTo(ErrorCode.CAT_005);
+            .isEqualTo(ErrorCode.CAT_003);
     }
 
     @Test
@@ -414,6 +417,33 @@ public class CategoryServiceTest extends IntegrationTestSupport {
         // Then
         assertThat(response.get(0).displayOrder()).isEqualTo(0);
         assertThat(response.get(1).displayOrder()).isEqualTo(1);
+    }
+
+    @Test
+    void shouldNotUpdateLockedCategoryDuringReorder() {
+        // Given - LOCKED category that should not be updated
+        Category locked = new Category(testBlog, "Locked", CategoryType.LOCKED, 1);
+        Category saved_locked = categoryRepository.save(locked);
+
+        // Get the original updatedAt timestamp
+        Category locked_before = categoryRepository.findById(saved_locked.getId()).orElseThrow();
+        LocalDateTime updatedAt_before = locked_before.getUpdatedAt();
+
+        // Create another GENERAL category
+        Category general = new Category(testBlog, "General", CategoryType.GENERAL, 2);
+        Category saved_general = categoryRepository.save(general);
+
+        // When - attempt to reorder all root categories, keeping LOCKED at same position
+        // Current state: DEFAULT=0, LOCKED=1, GENERAL=2
+        // Request: [DEFAULT=0, LOCKED=1, GENERAL=2] - no change, but reorder called
+        ReorderCategoriesRequest request = new ReorderCategoriesRequest(null,
+            List.of(defaultCategory.getId(), saved_locked.getId(), saved_general.getId()));
+        categoryService.reorderCategories(testBlog.getId(), testUser.getId(), request);
+
+        // Then - LOCKED row should not be updated (updatedAt unchanged, displayOrder stays 1)
+        Category locked_after = categoryRepository.findById(saved_locked.getId()).orElseThrow();
+        assertThat(locked_after.getUpdatedAt()).isEqualTo(updatedAt_before);
+        assertThat(locked_after.getDisplayOrder()).isEqualTo(1); // LOCKED stays at position 1
     }
 
     @Test

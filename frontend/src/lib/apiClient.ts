@@ -50,7 +50,6 @@ const performRefresh = async (): Promise<boolean> => {
     }
     return false
   } catch (error) {
-    console.error('Token refresh failed:', error)
     return false
   }
 }

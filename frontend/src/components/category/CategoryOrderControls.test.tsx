@@ -195,4 +195,83 @@ describe('CategoryOrderControls', () => {
 
     expect(mockReorder).toHaveBeenCalledWith(1, [3, 2])
   })
+
+  it('disables move buttons for LOCKED category', () => {
+    const mockReorder = vi.fn()
+    const lockedCategories: CategoryTreeNode[] = [
+      {
+        categoryId: 1,
+        blogId: 10,
+        parentId: null,
+        name: 'Default',
+        type: 'DEFAULT',
+        displayOrder: 0,
+        postCount: 0,
+        draftPostCount: 0,
+        children: [],
+      },
+      {
+        categoryId: 2,
+        blogId: 10,
+        parentId: null,
+        name: 'LockedCat',
+        type: 'LOCKED',
+        displayOrder: 1,
+        postCount: 0,
+        draftPostCount: 0,
+        children: [],
+      },
+    ]
+
+    render(
+      <CategoryOrderControls
+        categories={lockedCategories}
+        selectedCategoryId={2}
+        onReorder={mockReorder}
+      />
+    )
+
+    expect(screen.getByText('LOCKED categories cannot be reordered')).toBeInTheDocument()
+    expect(screen.queryByText('Move Up')).not.toBeInTheDocument()
+    expect(screen.queryByText('Move Down')).not.toBeInTheDocument()
+  })
+
+  it('allows move buttons for DEFAULT category', () => {
+    const mockReorder = vi.fn()
+    const categoriesWithDefault: CategoryTreeNode[] = [
+      {
+        categoryId: 1,
+        blogId: 10,
+        parentId: null,
+        name: 'Default',
+        type: 'DEFAULT',
+        displayOrder: 0,
+        postCount: 0,
+        draftPostCount: 0,
+        children: [],
+      },
+      {
+        categoryId: 2,
+        blogId: 10,
+        parentId: null,
+        name: 'Tech',
+        type: 'GENERAL',
+        displayOrder: 1,
+        postCount: 0,
+        draftPostCount: 0,
+        children: [],
+      },
+    ]
+
+    render(
+      <CategoryOrderControls
+        categories={categoriesWithDefault}
+        selectedCategoryId={1}
+        onReorder={mockReorder}
+      />
+    )
+
+    // DEFAULT should allow move buttons - specifically Move Down should be enabled
+    expect(screen.getByText('Move Down')).not.toBeDisabled()
+  })
 })

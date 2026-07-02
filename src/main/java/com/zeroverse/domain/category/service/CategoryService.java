@@ -72,30 +72,24 @@ public class CategoryService {
             }
         }
 
-        // Check for duplicate name
+        // Check for duplicate name and displayOrder
         if (parent == null) {
             if (categoryRepository.existsDuplicateNameByBlogRoot(blogId, request.name(), -1L)) {
+                throw new BusinessException(ErrorCode.CAT_004);
+            }
+            if (categoryRepository.existsDuplicateOrderByBlogRoot(blogId, request.displayOrder(), -1L)) {
                 throw new BusinessException(ErrorCode.CAT_004);
             }
         } else {
             if (categoryRepository.existsDuplicateNameByBlogAndParent(blogId, parent.getId(), request.name(), -1L)) {
                 throw new BusinessException(ErrorCode.CAT_004);
             }
+            if (categoryRepository.existsDuplicateOrderByBlogAndParent(blogId, parent.getId(), request.displayOrder(), -1L)) {
+                throw new BusinessException(ErrorCode.CAT_004);
+            }
         }
 
-        // Auto-assign displayOrder to avoid uniqueness conflicts
-        Integer actualDisplayOrder;
-        if (parent == null) {
-            List<Category> roots = categoryRepository.findActiveRoots(blogId);
-            int maxOrder = roots.stream().mapToInt(Category::getDisplayOrder).max().orElse(-1);
-            actualDisplayOrder = maxOrder + 1;
-        } else {
-            List<Category> siblings = categoryRepository.findActiveChildrenByParent(blogId, parent.getId());
-            int maxOrder = siblings.stream().mapToInt(Category::getDisplayOrder).max().orElse(-1);
-            actualDisplayOrder = maxOrder + 1;
-        }
-
-        Category category = Category.create(blog, parent, request.name(), request.type(), actualDisplayOrder);
+        Category category = Category.create(blog, parent, request.name(), request.type(), request.displayOrder());
         Category saved = categoryRepository.save(category);
         return CategoryResponse.from(saved);
     }
@@ -189,7 +183,10 @@ public class CategoryService {
         }
 
         // DEFAULT and LOCKED categories cannot be deleted
-        if (category.isDefault() || category.isLocked()) {
+        if (category.isDefault()) {
+            throw new BusinessException(ErrorCode.CAT_003);
+        }
+        if (category.isLocked()) {
             throw new BusinessException(ErrorCode.CAT_005);
         }
 
@@ -281,20 +278,29 @@ public class CategoryService {
         // Update display order for all siblings (2-phase to avoid UNIQUE constraint violation)
         Map<Long, Category> siblingMap = siblings.stream().collect(Collectors.toMap(Category::getId, c -> c));
 
-        // Phase 1: Assign temporary high order values to avoid conflicts
-        int maxOrder = siblings.stream().mapToInt(Category::getDisplayOrder).max().orElse(-1);
-        int tempBaseOffset = maxOrder + 1000;
+        // Build list of non-LOCKED categories to update
+        List<Integer> updateIndices = new ArrayList<>();
         for (int i = 0; i < request.orderedCategoryIds().size(); i++) {
             Category cat = siblingMap.get(request.orderedCategoryIds().get(i));
-            cat.update(cat.getName(), cat.getType(), tempBaseOffset + i);
+            if (!cat.isLocked()) {
+                updateIndices.add(i);
+            }
+        }
+
+        // Phase 1: Assign temporary high order values to avoid conflicts (non-LOCKED only)
+        int maxOrder = siblings.stream().mapToInt(Category::getDisplayOrder).max().orElse(-1);
+        int tempBaseOffset = maxOrder + 1000;
+        for (Integer idx : updateIndices) {
+            Category cat = siblingMap.get(request.orderedCategoryIds().get(idx));
+            cat.update(cat.getName(), cat.getType(), tempBaseOffset + idx);
             categoryRepository.save(cat);
         }
         categoryRepository.flush();
 
-        // Phase 2: Assign final order values
-        for (int i = 0; i < request.orderedCategoryIds().size(); i++) {
-            Category cat = siblingMap.get(request.orderedCategoryIds().get(i));
-            cat.update(cat.getName(), cat.getType(), i);
+        // Phase 2: Assign final order values (non-LOCKED only)
+        for (Integer idx : updateIndices) {
+            Category cat = siblingMap.get(request.orderedCategoryIds().get(idx));
+            cat.update(cat.getName(), cat.getType(), idx);
             categoryRepository.save(cat);
         }
         categoryRepository.flush();

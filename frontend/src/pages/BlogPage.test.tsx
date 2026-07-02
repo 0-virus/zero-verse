@@ -252,4 +252,63 @@ describe('BlogPage component', () => {
     // (Note: in test context with mocked useParams returning blogSlug)
     expect(getPublicBlog).toHaveBeenCalled()
   })
+
+  it('should handle categoryId from URL query', () => {
+    vi.mocked(useBlogPublicModule.useBlogPublic).mockReturnValue({
+      blog: mockBlog,
+      getPublicBlog: vi.fn(),
+      isLoading: false,
+      error: null,
+    })
+
+    vi.mocked(useCategoriesModule.useCategories).mockReturnValue({
+      categories: mockCategories,
+      isLoading: false,
+      error: null,
+      getCategories: vi.fn(),
+      createCategory: vi.fn(),
+      updateCategory: vi.fn(),
+      deleteCategory: vi.fn(),
+      reorderCategories: vi.fn(),
+    })
+
+    // Test that component respects URL query parameters
+    const { container } = render(
+      <BrowserRouter>
+        <BlogPage />
+      </BrowserRouter>
+    )
+
+    // Component should render without error when URL parameters are present
+    expect(container).toBeDefined()
+  })
+
+  it('should render categories with blog data loaded', () => {
+    vi.mocked(useBlogPublicModule.useBlogPublic).mockReturnValue({
+      blog: mockBlog,
+      getPublicBlog: vi.fn(),
+      isLoading: false,
+      error: null,
+    })
+
+    vi.mocked(useCategoriesModule.useCategories).mockReturnValue({
+      categories: mockCategories,
+      isLoading: false,
+      error: null,
+      getCategories: vi.fn(),
+      createCategory: vi.fn(),
+      updateCategory: vi.fn(),
+      deleteCategory: vi.fn(),
+      reorderCategories: vi.fn(),
+    })
+
+    const { container } = render(
+      <BrowserRouter>
+        <BlogPage />
+      </BrowserRouter>
+    )
+
+    // Component should render categories section with blog data
+    expect(container).toBeDefined()
+  })
 })

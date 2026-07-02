@@ -69,6 +69,15 @@ export default function CategoryOrderControls({
     return null
   }
 
+  // LOCKED categories cannot be reordered (per PRD §9-H)
+  if (selected.type === 'LOCKED') {
+    return (
+      <div className="p-3 bg-[#3b0718] border-2 border-border-danger rounded">
+        <p className="text-text-primary text-sm">LOCKED categories cannot be reordered</p>
+      </div>
+    )
+  }
+
   const { siblings, parentId } = siblingInfo
   const currentIndex = siblings.findIndex((cat) => cat.categoryId === selectedCategoryId)
 

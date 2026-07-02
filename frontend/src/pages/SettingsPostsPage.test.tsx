@@ -2,13 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BrowserRouter } from 'react-router-dom'
-import { AuthProvider } from '../lib/authContext'
 import SettingsPostsPage from './SettingsPostsPage'
 import * as useBlogSettingsModule from '../hooks/useBlogSettings'
 import * as useCategoriesModule from '../hooks/useCategories'
 
 vi.mock('../hooks/useBlogSettings')
 vi.mock('../hooks/useCategories')
+vi.mock('../lib/authContext', () => ({
+  AuthProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  useAuth: () => ({ user: null, signIn: vi.fn(), signOut: vi.fn() }),
+}))
 vi.mock('../components/layout/AppShell', () => ({
   default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
@@ -89,9 +92,7 @@ describe('SettingsPostsPage', () => {
   const renderPage = () => {
     return render(
       <BrowserRouter>
-        <AuthProvider>
-          <SettingsPostsPage />
-        </AuthProvider>
+        <SettingsPostsPage />
       </BrowserRouter>
     )
   }

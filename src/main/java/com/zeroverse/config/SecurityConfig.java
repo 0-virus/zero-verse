@@ -3,6 +3,7 @@ package com.zeroverse.config;
 import com.zeroverse.auth.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -56,10 +57,10 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/auth/me").authenticated()
                 .requestMatchers(
                     "/api/v1/blogs/slug/**",
-                    "/api/v1/blogs/*/categories",
                     "/api/v1/feed/public",
                     "/api/v1/search"
                 ).permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/blogs/*/categories").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

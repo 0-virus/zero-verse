@@ -33,13 +33,18 @@ describe('useCategories', () => {
 
     const { result } = renderHook(() => useCategories())
 
-    const categories = await result.current.getCategories(10)
+    const categories = await result.current.getCategories(10, false)
 
     await waitFor(() => {
       expect(result.current.categories).toEqual(mockCategories)
     })
 
     expect(categories).toEqual(mockCategories)
+
+    // Verify apiClient was called with correct GET request
+    expect(apiClient).toHaveBeenCalledWith('/blogs/10/categories?includeDrafts=false', {
+      method: 'GET',
+    })
   })
 
   it('should handle fetch error', async () => {
@@ -82,14 +87,22 @@ describe('useCategories', () => {
 
     const { result } = renderHook(() => useCategories())
 
-    const category = await result.current.createCategory(10, {
+    const request = {
       parentId: null,
       name: 'Tech',
-      type: 'GENERAL',
+      type: 'GENERAL' as const,
       displayOrder: 1,
-    })
+    }
+
+    const category = await result.current.createCategory(10, request)
 
     expect(category).toEqual(mockCategory)
+
+    // Verify apiClient was called with correct POST request
+    expect(apiClient).toHaveBeenCalledWith('/blogs/10/categories', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    })
   })
 
   it('should update category successfully', async () => {
@@ -114,14 +127,22 @@ describe('useCategories', () => {
 
     const { result } = renderHook(() => useCategories())
 
-    const category = await result.current.updateCategory(10, 2, {
+    const request = {
       parentId: null,
       name: 'Technology',
-      type: 'GENERAL',
+      type: 'GENERAL' as const,
       displayOrder: 1,
-    })
+    }
+
+    const category = await result.current.updateCategory(10, 2, request)
 
     expect(category).toEqual(mockCategory)
+
+    // Verify apiClient was called with correct PUT request
+    expect(apiClient).toHaveBeenCalledWith('/blogs/10/categories/2', {
+      method: 'PUT',
+      body: JSON.stringify(request),
+    })
   })
 
   it('should delete category successfully', async () => {
@@ -142,6 +163,11 @@ describe('useCategories', () => {
     const response = await result.current.deleteCategory(10, 2)
 
     expect(response).toEqual(mockResponse)
+
+    // Verify apiClient was called with correct DELETE request
+    expect(apiClient).toHaveBeenCalledWith('/blogs/10/categories/2', {
+      method: 'DELETE',
+    })
   })
 
   it('should reorder categories successfully', async () => {
@@ -176,12 +202,20 @@ describe('useCategories', () => {
 
     const { result } = renderHook(() => useCategories())
 
-    const categories = await result.current.reorderCategories(10, {
+    const request = {
       parentId: null,
       orderedCategoryIds: [1, 2],
-    })
+    }
+
+    const categories = await result.current.reorderCategories(10, request)
 
     expect(categories).toEqual(mockCategories)
+
+    // Verify apiClient was called with PUT method (not PATCH) per spec
+    expect(apiClient).toHaveBeenCalledWith('/blogs/10/categories/order', {
+      method: 'PUT',
+      body: JSON.stringify(request),
+    })
   })
 
   it('should handle reorder error', async () => {

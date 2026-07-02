@@ -39,4 +39,5 @@ out/
 
 ### Docs — 스펙 문서는 무시, worklog만 추적 ###
 docs/*
-!docs/worklog/*.bak
+!docs/worklog/
+docs/worklog/*.bak

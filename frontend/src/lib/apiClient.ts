@@ -1,5 +1,8 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 
+// Public auth endpoints that should not trigger automatic refresh on 401
+const PUBLIC_AUTH_ENDPOINTS = ['/auth/signin', '/auth/register', '/auth/signout']
+
 export interface ApiResponse<T> {
   success: boolean
   data?: T
@@ -10,14 +13,23 @@ export interface ApiResponse<T> {
   timestamp: string
 }
 
+export interface ApiClientOptions extends RequestInit {
+  skipAuthRefresh?: boolean
+}
+
 let refreshPromise: Promise<boolean> | null = null
 let accessToken: string | null = null
+let onUnauthorized: (() => void) | null = null
 
 export const setAccessToken = (token: string | null) => {
   accessToken = token
 }
 
 export const getAccessToken = () => accessToken
+
+export const setOnUnauthorized = (callback: (() => void) | null) => {
+  onUnauthorized = callback
+}
 
 const performRefresh = async (): Promise<boolean> => {
   try {
@@ -45,9 +57,11 @@ const performRefresh = async (): Promise<boolean> => {
 
 export const apiClient = async <T = any>(
   endpoint: string,
-  options: RequestInit = {}
+  options: ApiClientOptions = {}
 ): Promise<ApiResponse<T>> => {
-  const headers = new Headers(options.headers || {})
+  const { skipAuthRefresh: forceSkipRefresh = false, ...fetchOptions } = options
+
+  const headers = new Headers(fetchOptions.headers || {})
   headers.set('Content-Type', 'application/json')
 
   if (accessToken) {
@@ -55,13 +69,18 @@ export const apiClient = async <T = any>(
   }
 
   let response = await fetch(`${API_BASE_URL}/api/v1${endpoint}`, {
-    ...options,
+    ...fetchOptions,
     headers,
     credentials: 'include',
   })
 
   // Handle 401 - try to refresh and retry once
-  if (response.status === 401) {
+  // Skip refresh for: /auth/refresh itself, public auth endpoints, or explicit skipAuthRefresh option
+  const shouldSkipRefresh = forceSkipRefresh ||
+    endpoint === '/auth/refresh' ||
+    PUBLIC_AUTH_ENDPOINTS.includes(endpoint)
+
+  if (response && response.status === 401 && !shouldSkipRefresh) {
     if (!refreshPromise) {
       refreshPromise = performRefresh()
     }
@@ -74,14 +93,18 @@ export const apiClient = async <T = any>(
       retryHeaders.set('Authorization', `Bearer ${accessToken}`)
 
       response = await fetch(`${API_BASE_URL}/api/v1${endpoint}`, {
-        ...options,
+        ...fetchOptions,
         headers: retryHeaders,
         credentials: 'include',
       })
     } else {
       // Refresh failed, need to re-authenticate
       setAccessToken(null)
-      window.location.href = '/signin'
+      if (onUnauthorized) {
+        onUnauthorized()
+      } else {
+        window.location.href = '/signin'
+      }
       return {
         success: false,
         error: {

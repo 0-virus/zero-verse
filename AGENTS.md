@@ -10,23 +10,23 @@ ZeroVerse Blog MVP의 명세 저장소. 개인 블로그 플랫폼으로, 사용
 
 핵심 명세는 모두 `docs/`에 있다(스펙 문서는 gitignore, `docs/worklog/`만 추적). 코드 작성 전 반드시 참조한다.
 
-| Path | Description |
-|------|--------------|
-| `docs/REQUIREMENTS.md` | MVP 전체 요구사항 명세(v2.1). 도메인 모델, API 규칙, FR-*/NFR-*, 프론트 라우트, 엔드포인트 목록, 에픽 초안. **요구사항 정본**(단, `docs/PRD.md` §9 사용자 결정이 override하는 부분 제외). |
-| `docs/PRD.md` | 요구사항 + Figma 와이어프레임(11개 화면) + 사용자 결정을 통합한 **구현 실행 명세**. 아키텍처/패키지 구조, 화면-API 매핑, 디자인 시스템 토큰, 결정 로그(§9), 마일스톤 순서(§10), 테스트 전략, DoD. 실제 구현의 로드맵. |
-| `docs/log.md` | 개발 학습/작업 로그(과거 JPA·Security·JWT 메모). 현재 소스와 동기화 보장 안 됨(참고용). |
-| `AGENTS.md` | (이 파일, 루트) 저장소 최상위 AI 에이전트 안내. git 추적 대상. |
-| `.gitignore` | 표준 Spring/Gradle/IDE ignore + `docs/*` 무시(단 `!docs/worklog/`는 추적) + `application-local.yml` 제외. |
+| Path                   | Description                                                                                                                                                                                                           |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/REQUIREMENTS.md` | MVP 전체 요구사항 명세(v2.1). 도메인 모델, API 규칙, FR-_/NFR-_, 프론트 라우트, 엔드포인트 목록, 에픽 초안. **요구사항 정본**(단, `docs/PRD.md` §9 사용자 결정이 override하는 부분 제외).                             |
+| `docs/PRD.md`          | 요구사항 + Figma 와이어프레임(11개 화면) + 사용자 결정을 통합한 **구현 실행 명세**. 아키텍처/패키지 구조, 화면-API 매핑, 디자인 시스템 토큰, 결정 로그(§9), 마일스톤 순서(§10), 테스트 전략, DoD. 실제 구현의 로드맵. |
+| `docs/log.md`          | 개발 학습/작업 로그(과거 JPA·Security·JWT 메모). 현재 소스와 동기화 보장 안 됨(참고용).                                                                                                                               |
+| `AGENTS.md`            | (이 파일, 루트) 저장소 최상위 AI 에이전트 안내. git 추적 대상.                                                                                                                                                        |
+| `.gitignore`           | 표준 Spring/Gradle/IDE ignore + `docs/*` 무시(단 `!docs/worklog/`는 추적) + `application-local.yml` 제외.                                                                                                             |
 
 ## Subdirectories
 
-| Directory | Purpose |
-|-----------|---------|
-| `docs/` | 요구사항·PRD·과거 로그. 스펙 문서(REQUIREMENTS/PRD/log)는 gitignore. 구현 전 반드시 읽는다. `docs/AGENTS.md` 참고. |
-| `docs/worklog/` | 마일스톤별 개발 로그(`M{n}-<slug>.md`). **git 추적됨**(`!docs/worklog/`). "개발 프로세스" 섹션 참조. |
-| `.claude/` | Claude Code 프로젝트 설정(`CLAUDE.md`)과 oh-my-claudecode 스킬. AI 오케스트레이션용, 앱 코드 아님. |
-| `.agents/` | 비어있음. |
-| `.omc/` | oh-my-claudecode 런타임 상태. 무시 대상 운영 아티팩트. |
+| Directory       | Purpose                                                                                                            |
+| --------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `docs/`         | 요구사항·PRD·과거 로그. 스펙 문서(REQUIREMENTS/PRD/log)는 gitignore. 구현 전 반드시 읽는다. `docs/AGENTS.md` 참고. |
+| `docs/worklog/` | 마일스톤별 개발 로그(`M{n}-<slug>.md`). **git 추적됨**(`!docs/worklog/`). "개발 프로세스" 섹션 참조.               |
+| `.claude/`      | Claude Code 프로젝트 설정(`CLAUDE.md`)과 oh-my-claudecode 스킬. AI 오케스트레이션용, 앱 코드 아님.                 |
+| `.agents/`      | 비어있음.                                                                                                          |
+| `.omc/`         | oh-my-claudecode 런타임 상태. 무시 대상 운영 아티팩트.                                                             |
 
 ## Planned Architecture (구현 예정, 미착수)
 
@@ -47,34 +47,37 @@ ZeroVerse Blog MVP의 명세 저장소. 개인 블로그 플랫폼으로, 사용
 - soft delete는 `deleted_at`(Universe/Like/PostTag 등 재생성 가능 관계는 hard delete).
 - Access Token=프론트 메모리, Refresh Token=HttpOnly Secure SameSite 쿠키 + rotation 필수.
 - 공통 응답(success/data/error/timestamp) + `Pageable` offset 페이징을 모든 API가 따른다.
-- 에러코드 도메인 prefix(AUTH_/USER_/BLOG_/POST_/CAT_/UNI_/COM_/LIKE_/NOT_/ADMIN_/UPLOAD_) — REQUIREMENTS NFR-04.
+- 에러코드 도메인 prefix(AUTH*/USER*/BLOG*/POST*/CAT*/UNI*/COM*/LIKE*/NOT*/ADMIN*/UPLOAD\_) — REQUIREMENTS NFR-04.
 
 ## 개발 프로세스 (마일스톤 파이프라인)
 
 모든 구현은 `docs/PRD.md`의 마일스톤(M0~M10) 단위로 진행하며, Codex(계획·리뷰) ↔ Claude(개발)를 오가는 아래 사이클을 마일스톤마다 반복한다.
 
 ### 브랜치 전략
+
 - `main` — 릴리스(안정) 브랜치.
 - `dev` — 통합 브랜치. 모든 마일스톤 PR의 base.
 - `feature/M{n}-<slug>` — 마일스톤마다 `dev`에서 분기(예: `feature/M1-auth`). 완료 후 `dev`로 머지.
 - **사전 1회**: baseline를 `main`에 커밋 → `dev` 분기 → `codex:setup`으로 Codex CLI 확인 → `gh auth status`.
 
 ### 사이클 (단계 · 담당 · 도구)
-| 단계 | 담당 | 도구/스킬 |
-|------|------|-----------|
-| 0. 분기 | Claude | Bash git / `git-master` 에이전트 |
-| 1. 계획 | **Codex** | `codex:rescue` 스킬(또는 `Agent(subagent_type="codex:codex-rescue")`) — `docs/PRD.md` + `docs/worklog/*`를 읽고 현재 마일스톤 파악 + 세부 작업계획 제안 → 워크로그 `[계획]` 기록 |
-| 2. 개발 | **Claude(Sonnet)** | `Agent(subagent_type="oh-my-claudecode:executor", model="sonnet")` — PRD+계획 기반 구현 + 테스트(PRD §11, TDD) |
-| 점검 | Claude | `verifier` 에이전트 / 빌드·테스트 — 자체 통과 확인(자기 승인 아님, 최종 리뷰는 Codex) |
-| 3a. 커밋·PR | Claude | `git-master` / Bash+`gh` — 원자적 커밋(OMC 커밋 규약, co-author 라인) → `gh pr create --base dev` |
-| 3b. 리뷰 | **Codex** | `codex:rescue` — diff(`dev...feature/M{n}`) + 워크로그로 충돌/코드 꼬임/로그-작업 일치/테스트 적정성 리뷰 → 워크로그 `[리뷰]` 기록 |
-| 수정 루프 | Claude(Sonnet) | executor — 리뷰 반영 → 재리뷰, 클린될 때까지 반복 |
-| 4. 머지 | Claude | `gh pr merge` / `git-master` — `dev`로 머지 → 워크로그 `[머지]` 기록 |
+
+| 단계        | 담당               | 도구/스킬                                                                                                                                                                        |
+| ----------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0. 분기     | Claude             | Bash git / `git-master` 에이전트                                                                                                                                                 |
+| 1. 계획     | **Codex**          | `codex:rescue` 스킬(또는 `Agent(subagent_type="codex:codex-rescue")`) — `docs/PRD.md` + `docs/worklog/*`를 읽고 현재 마일스톤 파악 + 세부 작업계획 제안 → 워크로그 `[계획]` 기록 |
+| 2. 개발     | **Claude(Sonnet)** | `Agent(subagent_type="oh-my-claudecode:executor", model="sonnet")` — PRD+계획 기반 구현 + 테스트(PRD §11, TDD)                                                                   |
+| 점검        | Claude             | `verifier` 에이전트 / 빌드·테스트 — 자체 통과 확인(자기 승인 아님, 최종 리뷰는 Codex)                                                                                            |
+| 3a. 커밋·PR | Claude             | `git-master` / Bash+`gh` — 원자적 커밋(OMC 커밋 규약, co-author 라인) → `gh pr create --base dev`                                                                                |
+| 3b. 리뷰    | **Codex**          | `codex:rescue` — diff(`dev...feature/M{n}`) + 워크로그로 충돌/코드 꼬임/로그-작업 일치/테스트 적정성 리뷰 → 워크로그 `[리뷰]` 기록                                               |
+| 수정 루프   | Claude(Sonnet)     | executor — 리뷰 반영 → 재리뷰, 클린될 때까지 반복                                                                                                                                |
+| 4. 머지     | Claude             | `gh pr merge` / `git-master` — `dev`로 머지 → 워크로그 `[머지]` 기록                                                                                                             |
 
 - **저자(Claude)와 검토자(Codex)는 항상 분리** — 같은 컨텍스트에서 자기 승인 금지(OMC 원칙).
 - 사이클 동안 `TaskCreate`/`TaskUpdate`로 세부 작업을 추적한다.
 
 ### 워크로그 규약
+
 - 위치: `docs/worklog/M{n}-<slug>.md` — **마일스톤당 Markdown 1파일**. `docs/`는 gitignore이나 `!docs/worklog/`로 worklog만 추적됨(PR diff에 로그 포함).
 - 기록: 파일 내부에 timestamp 항목을 **append**(새 파일 남발 금지).
 - 고정 섹션: `[계획]`(Codex) → `[개발 기록]`(Claude, 시각별) → `[이슈·결정]` → `[리뷰]`(Codex) → `[머지]`.
@@ -88,7 +91,7 @@ ZeroVerse Blog MVP의 명세 저장소. 개인 블로그 플랫폼으로, 사용
 
 0. **사용자의 명시적 결정** — `docs/PRD.md` **§9 결정 로그**에 기록된 확정 사항은 아래 문서를 **override**한다. (예: 카테고리 타입 재정의 §9-H, 공개범위 화면 라벨 §9-B, `나를 발견한` 피드 탭 제거 §9-G, 데스크톱 전용 §9-I.)
 1. **`docs/REQUIREMENTS.md`** — 데이터 모델·API 계약·규칙·에러코드의 최종 권위(§9로 override되지 않은 범위).
-2. **Figma 와이어프레임** (`GdWn01gB35uT1mebKXGIx6`, page `94:7`, *Requirements 2.1 Web App Wireframes*) — 레이아웃/시각/인터랙션 참조. 데이터·규칙이 요구사항과 다르면 요구사항이 이긴다. 정확한 디자인 값이 필요하면 Figma MCP(`get_design_context`/`get_screenshot`)로 노드 재확인.
+2. **Figma 와이어프레임** (`GdWn01gB35uT1mebKXGIx6`, page `94:7`, _Requirements 2.1 Web App Wireframes_) — 레이아웃/시각/인터랙션 참조. 데이터·규칙이 요구사항과 다르면 요구사항이 이긴다. 정확한 디자인 값이 필요하면 Figma MCP(`get_design_context`/`get_screenshot`)로 노드 재확인.
 3. **`docs/PRD.md` 본문** — 위를 통합한 실행 계획.
 
 > 새 충돌 사례를 발견하면 임의 진행하지 말고 PRD §9 표에 추가한 뒤 사용자에게 확인한다. **S3/이미지 업로드는 로컬 LocalStack + S3 직접 URL로 확정(PRD §13.1)** — 실제 버킷·리전 값만 M4 착수 시 제공 필요.

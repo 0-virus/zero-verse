@@ -608,5 +608,19 @@ FR-BLOG-02 `GET /blogs/slug/{urlSlug}/posts`는 **Post 도메인에 의존**하�
 - **formatting**: worklog 전체 trailing whitespace 제거 → `git diff --check` 통과.
 - 재검증(직접 실행): FE `npm run test` 통과, `git diff --check` 통과.
 
+## [재리뷰 3차] (Codex · 2026-07-02 14:25 KST, 오케스트레이터 대필 — Codex 샌드박스 read-only)
+
+**Verdict: 머지 가능** ✓ — 재리뷰 2차 잔여 blocking #4 + formatting 해소, 회귀 없음.
+
+- **#4 (초기설정 후 authContext 스테일)**: **PASS** — `AuthContextValue.refreshUser`가 노출되어 기존 `loadUserInfo`(`/auth/me` 호출 + `setUser`)에 매핑됨. `BlogInitialSetupPage`가 `initialSetup` 성공 후 `await refreshUser()` → `/blog/{urlSlug}` 이동. 회귀 가드 테스트가 성공 시 refreshUser+navigate 호출, 실패 시 미호출을 assert.
+- **formatting**: **PASS** — `git diff --check dev...feature/M2-settings` clean.
+- **회귀**: **없음** — FE 테스트 82개, skip/only/fake-assert 스캔 clean. `SettingsProfilePage.test.tsx` typed mock에 `refreshUser` 포함. read-only `tsc -p tsconfig.app.json`/`tsconfig.node.json` 통과. (참고: Codex 샌드박스에서 `npm run test`/`build`는 EPERM으로 미완 → 오케스트레이터가 이미 직접 실행: FE 82/82, build tsc 0에러.)
+- **이전 blocking #1/#2/#3/#5 + 비블로킹**: **PASS** — `2e0c89c..HEAD` 델타가 worklog/auth/setup FE + settings-profile 테스트 mock만 건드림, 백엔드 #5(USER_007+400) 무변경.
+- **비블로킹 위생**: `SignupPage.test.tsx`의 untyped partial `useAuth` mock에 `refreshUser` 없음(페이지는 `signin`만 사용, tsc 통과 → 비블로킹).
+
 ## [머지]
-(머지 단계에서 기록)
+
+- **2026-07-02 · PR #3 → `dev` squash 머지.** Codex 재리뷰 3차 verdict **머지 가능**(블로킹 0, 회귀 0).
+- 최종 검증(오케스트레이터 직접): BE `./gradlew test --rerun-tasks` **191/191**(20클래스, failures=0/errors=0, Testcontainers MySQL 8.4) · FE `npm run test` **82/82**(13파일) · `npm run build`(tsc) 0에러 · `git diff --check` clean.
+- 사이클: 계획(Codex) → 개발(executor BE/FE) → 오케스트레이터 검증(BE Controller 테스트·FE 신규 테스트 누락 보완) → 리뷰(Codex, blocking 5) → 수정 → 재리뷰(blocking #4+formatting) → 수정 → 3차 재리뷰(머지 가능).
+- FR-SETTINGS-01~04 + FR-BLOG-01 완료. FR-BLOG-02(공개 게시글 목록)는 Post 도메인 의존으로 M4 연기. 다음: M3(카테고리).

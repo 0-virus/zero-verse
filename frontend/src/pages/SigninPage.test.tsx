@@ -142,4 +142,95 @@ describe('SigninPage', () => {
       expect(screen.getByText('이메일 또는 비밀번호가 올바르지 않습니다.')).toBeInTheDocument()
     })
   })
+
+  it('disables button and shows loading text during signin', async () => {
+    // Create a promise that we can control
+    let resolveSignin: (value: any) => void
+    const signinPromise = new Promise((resolve) => {
+      resolveSignin = resolve
+    })
+
+    mockApiClient.mockReturnValue(signinPromise)
+
+    render(
+      <BrowserRouter>
+        <AuthProvider>
+          <SigninPage />
+        </AuthProvider>
+      </BrowserRouter>
+    )
+
+    const emailInput = screen.getByPlaceholderText('Email')
+    const passwordInput = screen.getByPlaceholderText('Password')
+    const submitButton = screen.getByRole('button', { name: /sign in/i })
+
+    fireEvent.change(emailInput, { target: { value: 'test@example.com' } })
+    fireEvent.change(passwordInput, { target: { value: 'Password!1' } })
+
+    // Button should not be disabled before submit
+    expect(submitButton).not.toBeDisabled()
+
+    // Submit the form
+    fireEvent.click(submitButton)
+
+    // Button should be disabled and show "Signing in..." during request
+    await waitFor(() => {
+      expect(submitButton).toBeDisabled()
+      expect(screen.getByText('Signing in...')).toBeInTheDocument()
+    })
+
+    // Resolve the promise
+    resolveSignin!({
+      success: true,
+      data: {
+        accessToken: 'token',
+        tokenType: 'Bearer',
+        expiresIn: 3600,
+      },
+    })
+
+    // Button should be re-enabled after request completes
+    await waitFor(() => {
+      expect(submitButton).not.toBeDisabled()
+    })
+  })
+
+  it('prevents double submission - button is disabled during request', async () => {
+    let resolveSignin: (value: any) => void
+    const signinPromise = new Promise((resolve) => {
+      resolveSignin = resolve
+    })
+
+    // Reset mock to avoid initial refresh calls
+    mockApiClient.mockClear()
+    mockApiClient.mockReturnValue(signinPromise)
+
+    render(
+      <BrowserRouter>
+        <AuthProvider>
+          <SigninPage />
+        </AuthProvider>
+      </BrowserRouter>
+    )
+
+    const emailInput = screen.getByPlaceholderText('Email')
+    const passwordInput = screen.getByPlaceholderText('Password')
+    const submitButton = screen.getByRole('button', { name: /sign in/i })
+
+    fireEvent.change(emailInput, { target: { value: 'test@example.com' } })
+    fireEvent.change(passwordInput, { target: { value: 'Password!1' } })
+
+    // Initially button should be enabled
+    expect(submitButton).not.toBeDisabled()
+
+    fireEvent.click(submitButton)
+
+    // Verify button becomes disabled during request (preventing double-submission)
+    await waitFor(() => {
+      expect(submitButton).toBeDisabled()
+    })
+
+    // Clean up
+    resolveSignin!({ success: false })
+  })
 })

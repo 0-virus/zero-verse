@@ -128,12 +128,12 @@ public class AuthController {
         String refreshToken = getRefreshTokenFromCookie(request);
 
         if (refreshToken == null || refreshToken.isEmpty()) {
-            throw new BusinessException(ErrorCode.AUTH_004);
+            throw new BusinessException(ErrorCode.AUTH_003);
         }
 
         // Validate refresh token
         if (!refreshTokenService.validateRefreshToken(refreshToken)) {
-            throw new BusinessException(ErrorCode.AUTH_004);
+            throw new BusinessException(ErrorCode.AUTH_003);
         }
 
         // Extract user ID from token

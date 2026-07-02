@@ -70,7 +70,7 @@ public class SlugGenerator {
      *
      * @param input Raw user input
      * @param existingSlugChecker Functional interface to check if a slug already exists
-     * @return Unique slug with optional suffix (-2, -3, etc.)
+     * @return Unique slug with optional suffix (-2, -3, etc.), respecting MAX_LENGTH of 30 chars
      */
     public static String generateUnique(String input, SlugExistsChecker existingSlugChecker) {
         String baseSlug = normalize(input);
@@ -79,16 +79,42 @@ public class SlugGenerator {
             return baseSlug;
         }
 
-        // Add suffix for collision
+        // Add suffix for collision, ensuring total length <= MAX_LENGTH
         for (int i = 2; i <= 100; i++) {
-            String candidate = baseSlug + "-" + i;
+            String suffix = "-" + i;
+            String candidate;
+
+            if (baseSlug.length() + suffix.length() > MAX_LENGTH) {
+                // Trim baseSlug to make room for suffix, ensuring minimum 3 chars total
+                int maxBaseLength = MAX_LENGTH - suffix.length();
+                if (maxBaseLength < 1) {
+                    // Edge case: suffix itself is too long, use baseSlug as-is
+                    candidate = baseSlug + suffix;
+                } else {
+                    String trimmedBase = baseSlug.substring(0, maxBaseLength).replaceAll("-+$", "");
+                    // Ensure trimmed base is not empty
+                    if (trimmedBase.isEmpty()) {
+                        candidate = baseSlug + suffix;
+                    } else {
+                        candidate = trimmedBase + suffix;
+                    }
+                }
+            } else {
+                candidate = baseSlug + suffix;
+            }
+
             if (!existingSlugChecker.exists(candidate)) {
                 return candidate;
             }
         }
 
-        // Fallback (should rarely happen)
-        return baseSlug + "-" + System.currentTimeMillis();
+        // Fallback (should rarely happen) - use timestamp suffix with base truncation if needed
+        String timestampSuffix = "-" + System.currentTimeMillis();
+        if (baseSlug.length() + timestampSuffix.length() > MAX_LENGTH) {
+            int maxBaseLength = Math.max(MIN_LENGTH, MAX_LENGTH - timestampSuffix.length());
+            baseSlug = baseSlug.substring(0, maxBaseLength).replaceAll("-+$", "");
+        }
+        return baseSlug + timestampSuffix;
     }
 
     @FunctionalInterface

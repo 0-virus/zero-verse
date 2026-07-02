@@ -6,6 +6,7 @@ export default function SigninPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
   const [signinSuccess, setSigninSuccess] = useState(false)
   const { signin, user } = useAuth()
   const navigate = useNavigate()
@@ -21,12 +22,15 @@ export default function SigninPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setIsLoading(true)
     try {
       await signin(email, password)
       setSigninSuccess(true)
     } catch (err: any) {
       // Generic error message that doesn't reveal account existence
       setError('이메일 또는 비밀번호가 올바르지 않습니다.')
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -56,9 +60,10 @@ export default function SigninPage() {
           {error && <p className="text-border-danger text-sm">{error}</p>}
           <button
             type="submit"
-            className="w-full px-4 py-2 bg-bg-button-primary border-2 border-border-cyan-dark text-text-primary font-display hover:bg-opacity-80"
+            disabled={isLoading}
+            className="w-full px-4 py-2 bg-bg-button-primary border-2 border-border-cyan-dark text-text-primary font-display hover:bg-opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Sign In
+            {isLoading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
         <p className="text-text-muted text-center mt-4">

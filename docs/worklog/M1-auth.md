@@ -371,3 +371,33 @@ Codex [리뷰] blocking 3건 + 비블로킹 4건 반영:
 **재검증(오케스트레이터 직접 실행)**: BE `./gradlew test` **116/116 통과**(failures=0/errors=0, Testcontainers MySQL 8.4) · FE `npm run test` **36/36** · `npm run build` ✓.
 
 **노트**: 리뷰 지적된 `.claude/**`·`CLAUDE.md`·`AGENTS.md`는 M1 인증과 무관한 별도 커밋(chore/docs)으로 이미 분리됨 — 의도된 PR 내용.
+
+### 재리뷰 (Codex · 2026-07-02 10:21 KST)
+
+Verdict: **블로킹** — B2와 대부분의 B1/B3 fix는 반영됐지만, `AUTH_003` refresh 무효 응답이 실제 production path에서 사용되지 않고, slug 충돌 suffix가 30자 제한을 깨는 잔여 blocking이 남아 있음.
+
+**Blocking 검증:**
+- B1: **fail** — `ErrorCode` enum 자체는 `AUTH_001`/`AUTH_002`/`AUTH_003`/`AUTH_004`와 `USER_003`로 복원됐고(`src/main/java/com/zeroverse/common/exception/ErrorCode.java`), `SecurityAuthenticationEntryPoint`는 401 body에 `AUTH_004` code/message를 쓴다. 비밀번호 정책도 `RegisterRequest` Bean Validation 400으로 내려간다. 다만 `/auth/refresh`에서 cookie 없음/무효 refresh token 모두 `AUTH_004`를 던지고(`src/main/java/com/zeroverse/auth/controller/AuthController.java`), `AUTH_003`은 enum 선언 외 production/test 사용처가 없다. `SecurityAuthenticationEntryPointTest.java`도 존재하지 않으며, 일부 401 테스트는 body code/message를 assert하지 않는다.
+- B2: **pass** — `AuthService.signin`은 email 조회 후 비밀번호 검증을 정지 상태 확인보다 먼저 수행한다. 없는 email, 틀린 비밀번호, 정지+틀린 비밀번호는 `AUTH_001`이고, 정지+정상 비밀번호만 `USER_003`이다. `AuthServiceTest`와 `SecurityConfigAuthTest`에 해당 경로 assert가 존재한다.
+- B3: **fail** — `AuthService.register`가 `SlugGenerator.generateUnique(request.nickname(), blogRepository::existsByUrlSlug)`를 호출하는 점은 반영됐다. `SlugGenerator`도 소문자/특수문자/하이픈 정리/예약어/충돌 테스트가 있다. 그러나 base slug가 30자인 상태에서 충돌하면 `baseSlug + "-2"`를 그대로 반환해 32자가 되므로 PRD §4.5의 3~30자 제한과 충돌 suffix 정책을 동시에 만족하지 못한다. 이 경계 테스트도 없다.
+
+**비블로킹 확인:**
+- N1: **반영됨** — `frontend/src/lib/apiClient.ts`에 401 refresh single-flight 및 원 요청 1회 재시도 로직이 있고, `/auth/signin`/`/auth/register`는 refresh 대상에서 제외된다. `frontend/src/lib/apiClient.test.ts`에 관련 테스트가 있다.
+- N2 (FE 잔여): **major** — `frontend/src/pages/SigninPage.tsx`는 submit 중 loading/disabled 상태가 없고, redirect는 `useEffect`에서 `navigate(destination)`를 호출만 한다. `frontend/src/routes/router.test.tsx`의 보호 라우트 테스트 하나는 `waitFor`를 await하지 않는다. 이전 리뷰의 FE router await/signin submit 보강 잔여가 그대로 남아 있다.
+- N3: **부분 반영** — `src/main/java/com/zeroverse/config/OpenApiConfig.java`에 bearer scheme과 auth flow 설명은 추가됐다. 하지만 요청된 `@OpenApiDefinition`, cookie security scheme, path/operation 단위 문서화는 확인되지 않는다. auth endpoint는 SpringDoc 자동 노출은 가능하지만 문서화 보강은 미흡하다.
+- N4: **반영됨** — refresh cookie read/write가 `AuthCookieProperties.name`과 `RefreshTokenCookieFactory`를 통해 같은 설정값을 사용한다. 기존 하드코딩 read 문제는 해소됐다.
+
+**최종 권고:**
+머지 전 fix 재요청. 최소 수정 범위는 `/auth/refresh`의 무효 refresh token 응답을 `AUTH_003`로 맞추고 controller/security 테스트에서 code/message를 assert하는 것, `SlugGenerator.generateUnique`가 suffix 포함 30자를 넘지 않도록 base를 잘라 `-2`/`-3`를 붙이는 것이다. N2는 blocking은 아니지만 명시 잔여이므로 같은 pass에서 정리하는 편이 좋다.
+
+### 수정 2차 (fix pass #2 · Codex 재리뷰 반영 · 2026-07-02)
+
+재리뷰 잔여 블로킹 2건 + N2/N3:
+- **B1-잔여**: `/auth/refresh` 무효/부재 refresh token 응답을 `AUTH_004`→**`AUTH_003`**(Refresh 무효, 401)로. `AUTH_004`는 access token 미인증 진입점 전용 유지. `SecurityAuthenticationEntryPointTest` 신설, `AuthControllerTest`에 refresh 무효 케이스(AUTH_003 body) 추가.
+- **B3-잔여**: `SlugGenerator.generateUnique`가 suffix 포함 30자 초과하던 문제 → base를 잘라 `-2/-3` 포함 총 30자 이하 보장. 30자 base 충돌 경계 테스트 3건 추가.
+- **N2(FE 잔여)**: `SigninPage` submit 중 loading/버튼 disabled(중복 제출 방지) + 테스트, `router.test` `waitFor` await 수정.
+- **N3**: `OpenApiConfig`에 refresh_token cookie apiKey security scheme + 라이프사이클 문서.
+
+**재검증(오케스트레이터 직접 실행)**: BE `./gradlew test` **124/124 통과**(15클래스, failures=0/errors=0, Testcontainers MySQL 8.4) · FE `npm run test` **38/38** · `npm run build` ✓.
+
+_주: 재검증 중 Windows에서 VSCode Java 확장이 `build/test-results/test/binary/output.bin` 핸들을 유지해 gradle 결과 정리가 반복 실패 → 확장 프로세스 종료 후 `--no-daemon`으로 정상 통과. 코드/테스트 무관한 로컬 환경 이슈.

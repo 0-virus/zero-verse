@@ -34,6 +34,13 @@ public class OpenApiConfig {
                     .bearerFormat("JWT")
                     .description("JWT Bearer Token for authenticated endpoints. " +
                         "Obtained from /auth/signin or /auth/refresh. " +
-                        "Include in Authorization header as 'Bearer <token>'.")));
+                        "Include in Authorization header as 'Bearer <token>'."))
+                .addSecuritySchemes("refreshTokenCookie", new SecurityScheme()
+                    .type(SecurityScheme.Type.APIKEY)
+                    .in(SecurityScheme.In.COOKIE)
+                    .name("refresh_token")
+                    .description("Refresh Token stored as HttpOnly Secure SameSite cookie. " +
+                        "Automatically included in /auth/refresh and /auth/signout requests. " +
+                        "Valid for 2 weeks, rotates on each /auth/refresh call.")));
     }
 }

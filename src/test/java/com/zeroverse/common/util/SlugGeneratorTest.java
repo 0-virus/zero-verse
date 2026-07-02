@@ -138,4 +138,41 @@ class SlugGeneratorTest {
         String slug = SlugGenerator.generateUnique("TestUser", s -> s.equals("testuser"));
         assertThat(slug).isEqualTo("testuser-2");
     }
+
+    @Test
+    void shouldRespect30CharLimitWithSuffixCollision() {
+        // Create a 30-character base slug that requires a suffix
+        String base30Chars = "a".repeat(30);
+        String slug = SlugGenerator.generateUnique(base30Chars, s -> s.equals(base30Chars));
+
+        // Result should be <= 30 chars even with suffix
+        assertThat(slug).hasSizeLessThanOrEqualTo(30);
+        // Should contain a suffix like -2, -3
+        assertThat(slug).contains("-");
+        // Should be a valid slug format
+        assertThat(slug).matches("[a-z0-9-]+");
+    }
+
+    @Test
+    void shouldRespect30CharLimitWithMultipleSuffixCollisions() {
+        // Test multiple collisions with 30-char base
+        String base30Chars = "b".repeat(30);
+        String slug = SlugGenerator.generateUnique(base30Chars, s ->
+            s.equals(base30Chars) || s.matches(base30Chars.substring(0, 28) + ".*"));
+
+        // Result should be <= 30 chars
+        assertThat(slug).hasSizeLessThanOrEqualTo(30);
+        // Should be valid slug
+        assertThat(slug).matches("[a-z0-9-]+");
+    }
+
+    @Test
+    void shouldGenerateValidSlugWhen30CharBaseCollides() {
+        // Verify suffix is properly trimmed
+        String slug = SlugGenerator.generateUnique("zzzzzzzzzzzzzzzzzzzzzzzzzzzz", // 30 'z's
+            s -> s.equals("zzzzzzzzzzzzzzzzzzzzzzzzzzzz"));
+
+        assertThat(slug).hasSizeLessThanOrEqualTo(30);
+        assertThat(slug.length()).isGreaterThanOrEqualTo(3);
+    }
 }

@@ -76,7 +76,7 @@ describe('Router', () => {
     expect(container).toBeDefined()
   })
 
-  it('protects routes that require authentication', () => {
+  it('protects routes that require authentication', async () => {
     mockApiClient.mockResolvedValue({
       success: false,
       error: { code: 'UNAUTHORIZED', message: 'No token' },
@@ -86,7 +86,7 @@ describe('Router', () => {
     renderWithAuth()
 
     // Should navigate to /signin when accessing protected route without auth
-    waitFor(() => {
+    await waitFor(() => {
       expect(router.state.location.pathname).toBe('/signin')
     })
   })

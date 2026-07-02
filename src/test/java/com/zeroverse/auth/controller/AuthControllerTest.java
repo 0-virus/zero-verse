@@ -11,6 +11,7 @@ import com.zeroverse.common.response.ApiResponse;
 import com.zeroverse.domain.blog.entity.Blog;
 import com.zeroverse.domain.blog.repository.BlogRepository;
 import com.zeroverse.domain.user.entity.User;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -256,5 +257,27 @@ public class AuthControllerTest extends IntegrationTestSupport {
         assertThat(blog).isNotNull();
         assertThat(blog.getTitle()).contains("bloguser");
         assertThat(blog.getIsSetupCompleted()).isFalse();
+    }
+
+    @Test
+    void shouldReturnAuth003WhenRefreshTokenMissing() throws Exception {
+        // When/Then - refresh without cookie
+        mockMvc.perform(post("/api/v1/auth/refresh")
+            .contentType("application/json"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error.code").value("AUTH_003"))
+            .andExpect(jsonPath("$.error.message").value("Refresh Token이 무효합니다."));
+    }
+
+    @Test
+    void shouldReturnAuth003WhenRefreshTokenInvalid() throws Exception {
+        // When/Then - refresh with invalid token
+        mockMvc.perform(post("/api/v1/auth/refresh")
+            .contentType("application/json")
+            .cookie(new Cookie("refresh_token", "invalid.token.here")))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error.code").value("AUTH_003"));
     }
 }

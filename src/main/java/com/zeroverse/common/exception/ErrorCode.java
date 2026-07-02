@@ -33,6 +33,11 @@ public enum ErrorCode {
     CAT_001("CAT_001", "카테고리를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
     CAT_002("CAT_002", "카테고리 깊이 제한을 초과했습니다.", HttpStatus.BAD_REQUEST),
     CAT_003("CAT_003", "기본 카테고리는 삭제할 수 없습니다.", HttpStatus.CONFLICT),
+    CAT_004("CAT_004", "같은 부모 아래 카테고리명 또는 표시 순서가 중복되었습니다.", HttpStatus.CONFLICT),
+    CAT_005("CAT_005", "기본 또는 잠금 카테고리는 변경 또는 삭제할 수 없습니다.", HttpStatus.CONFLICT),
+    CAT_006("CAT_006", "카테고리 순서 변경 요청이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
+    CAT_007("CAT_007", "카테고리 타입이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
+    CAT_008("CAT_008", "카테고리 관리 권한이 없습니다.", HttpStatus.FORBIDDEN),
 
     // Universe
     UNI_001("UNI_001", "자기 자신에게 신청할 수 없습니다.", HttpStatus.BAD_REQUEST),

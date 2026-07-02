@@ -56,6 +56,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/auth/me").authenticated()
                 .requestMatchers(
                     "/api/v1/blogs/slug/**",
+                    "/api/v1/blogs/*/categories",
                     "/api/v1/feed/public",
                     "/api/v1/search"
                 ).permitAll()

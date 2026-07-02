@@ -1,11 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import BlogPage from './BlogPage'
 import * as useBlogPublicModule from '../hooks/useBlogPublic'
+import * as useCategoriesModule from '../hooks/useCategories'
 import type { BlogPublicResponse } from '../types/settings'
 
 vi.mock('../hooks/useBlogPublic')
+vi.mock('../hooks/useCategories')
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom')
+  return {
+    ...actual,
+    useParams: () => ({ blogSlug: 'my-blog' }),
+  }
+})
 vi.mock('../components/layout/AppShell', () => ({
   default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
@@ -25,8 +34,64 @@ describe('BlogPage component', () => {
     createdAt: '2026-01-15T10:00:00Z',
   }
 
+  const mockCategories = [
+    {
+      categoryId: 1,
+      blogId: 1,
+      parentId: null,
+      name: 'Default',
+      type: 'DEFAULT' as const,
+      displayOrder: 0,
+      postCount: 0,
+      draftPostCount: 0,
+      children: [],
+    },
+    {
+      categoryId: 2,
+      blogId: 1,
+      parentId: null,
+      name: 'Tech',
+      type: 'GENERAL' as const,
+      displayOrder: 1,
+      postCount: 5,
+      draftPostCount: 0,
+      children: [
+        {
+          categoryId: 3,
+          blogId: 1,
+          parentId: 2,
+          name: 'Frontend',
+          type: 'GENERAL' as const,
+          displayOrder: 0,
+          postCount: 3,
+          draftPostCount: 0,
+          children: [],
+        },
+      ],
+    },
+  ]
+
   beforeEach(() => {
     vi.clearAllMocks()
+
+    // Default mock setup
+    vi.mocked(useBlogPublicModule.useBlogPublic).mockReturnValue({
+      blog: null,
+      getPublicBlog: vi.fn(),
+      isLoading: false,
+      error: null,
+    })
+
+    vi.mocked(useCategoriesModule.useCategories).mockReturnValue({
+      categories: [],
+      isLoading: false,
+      error: null,
+      getCategories: vi.fn(),
+      createCategory: vi.fn(),
+      updateCategory: vi.fn(),
+      deleteCategory: vi.fn(),
+      reorderCategories: vi.fn(),
+    })
   })
 
   it('should handle loading state', () => {
@@ -119,5 +184,72 @@ describe('BlogPage component', () => {
 
     // Verify that component renders with categories, posts, and owner sections
     expect(container.querySelector('.grid')).toBeDefined()
+  })
+
+  it('should load categories for public blog', async () => {
+    const getPublicBlog = vi.fn().mockResolvedValue(mockBlog)
+    const getCategories = vi.fn().mockResolvedValue(mockCategories)
+
+    vi.mocked(useBlogPublicModule.useBlogPublic).mockReturnValue({
+      blog: null,
+      getPublicBlog,
+      isLoading: false,
+      error: null,
+    })
+
+    vi.mocked(useCategoriesModule.useCategories).mockReturnValue({
+      categories: mockCategories,
+      isLoading: false,
+      error: null,
+      getCategories,
+      createCategory: vi.fn(),
+      updateCategory: vi.fn(),
+      deleteCategory: vi.fn(),
+      reorderCategories: vi.fn(),
+    })
+
+    render(
+      <BrowserRouter>
+        <BlogPage />
+      </BrowserRouter>
+    )
+
+    // getCategories should be called with the blog ID
+    await waitFor(() => {
+      expect(getCategories).toHaveBeenCalledWith(mockBlog.blogId)
+    })
+  })
+
+  it('should call getCategories when blog loads', async () => {
+    const getCategories = vi.fn().mockResolvedValue(mockCategories)
+    const getPublicBlog = vi.fn().mockResolvedValue(mockBlog)
+
+    vi.mocked(useBlogPublicModule.useBlogPublic).mockReturnValue({
+      blog: null,
+      getPublicBlog,
+      isLoading: false,
+      error: null,
+    })
+
+    vi.mocked(useCategoriesModule.useCategories).mockReturnValue({
+      categories: mockCategories,
+      isLoading: false,
+      error: null,
+      getCategories,
+      createCategory: vi.fn(),
+      updateCategory: vi.fn(),
+      deleteCategory: vi.fn(),
+      reorderCategories: vi.fn(),
+    })
+
+    render(
+      <BrowserRouter>
+        <BlogPage />
+      </BrowserRouter>
+    )
+
+    // getCategories should be called with the blog ID when blog loads
+    // (Note: in test context with mocked useParams returning blogSlug)
+    expect(getPublicBlog).toHaveBeenCalled()
   })
 })

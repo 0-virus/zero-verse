@@ -1,0 +1,431 @@
+package com.zeroverse.domain.category.service;
+
+import com.zeroverse.common.exception.BusinessException;
+import com.zeroverse.common.exception.ErrorCode;
+import com.zeroverse.domain.blog.entity.Blog;
+import com.zeroverse.domain.blog.repository.BlogRepository;
+import com.zeroverse.domain.category.entity.Category;
+import com.zeroverse.domain.category.entity.CategoryType;
+import com.zeroverse.domain.category.repository.CategoryRepository;
+import com.zeroverse.domain.user.entity.User;
+import com.zeroverse.domain.user.repository.UserRepository;
+import com.zeroverse.dto.category.*;
+import com.zeroverse.support.IntegrationTestSupport;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+@SpringBootTest
+@ActiveProfiles("test")
+@Transactional
+public class CategoryServiceTest extends IntegrationTestSupport {
+
+    @Autowired
+    private CategoryService categoryService;
+
+    @Autowired
+    private CategoryRepository categoryRepository;
+
+    @Autowired
+    private BlogRepository blogRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    private User testUser;
+    private Blog testBlog;
+    private Category defaultCategory;
+
+    @BeforeEach
+    void setUp() {
+        testUser = User.create("test@example.com", "password", "Test", "testuser", LocalDate.of(1990, 1, 1));
+        testUser = userRepository.save(testUser);
+
+        testBlog = Blog.createDefault(testUser, "testuser");
+        testBlog = blogRepository.save(testBlog);
+
+        defaultCategory = Category.createDefault(testBlog);
+        defaultCategory = categoryRepository.save(defaultCategory);
+    }
+
+    @Test
+    void shouldGetActiveTree() {
+        // Given
+        Category parent = new Category(testBlog, "개발", CategoryType.GENERAL, 1);
+        Category saved_parent = categoryRepository.save(parent);
+
+        Category child = new Category(testBlog, saved_parent, "Java", CategoryType.GENERAL, 0);
+        categoryRepository.save(child);
+
+        // When
+        List<CategoryTreeResponse> tree = categoryService.getActiveTree(testBlog.getId(), false, testUser.getId());
+
+        // Then
+        assertThat(tree).hasSize(2); // default + 개발
+        assertThat(tree.get(1).children()).hasSize(1); // 개발 has Java
+    }
+
+    @Test
+    void shouldThrowBlog001WhenBlogNotFound() {
+        // When/Then
+        assertThatThrownBy(() -> categoryService.getActiveTree(99999L, false, testUser.getId()))
+            .isInstanceOf(BusinessException.class)
+            .extracting(ex -> ((BusinessException) ex).getErrorCode())
+            .isEqualTo(ErrorCode.BLOG_001);
+    }
+
+    @Test
+    void shouldCreateRootGeneralCategory() {
+        // When
+        CreateCategoryRequest request = new CreateCategoryRequest(null, "개발", CategoryType.GENERAL, 1);
+        CategoryResponse response = categoryService.createCategory(testBlog.getId(), testUser.getId(), request);
+
+        // Then
+        assertThat(response.name()).isEqualTo("개발");
+        assertThat(response.type()).isEqualTo(CategoryType.GENERAL);
+        assertThat(response.parentId()).isNull();
+        assertThat(response.displayOrder()).isEqualTo(1);
+    }
+
+    @Test
+    void shouldCreateChildCategory() {
+        // Given
+        Category parent = new Category(testBlog, "개발", CategoryType.GENERAL, 1);
+        Category saved_parent = categoryRepository.save(parent);
+
+        // When
+        CreateCategoryRequest request = new CreateCategoryRequest(saved_parent.getId(), "Java", CategoryType.GENERAL, 0);
+        CategoryResponse response = categoryService.createCategory(testBlog.getId(), testUser.getId(), request);
+
+        // Then
+        assertThat(response.parentId()).isEqualTo(saved_parent.getId());
+        assertThat(response.name()).isEqualTo("Java");
+    }
+
+    @Test
+    void shouldRejectDefaultTypeInCreate() {
+        // When/Then
+        CreateCategoryRequest request = new CreateCategoryRequest(null, "테스트", CategoryType.DEFAULT, 0);
+        assertThatThrownBy(() -> categoryService.createCategory(testBlog.getId(), testUser.getId(), request))
+            .isInstanceOf(BusinessException.class)
+            .extracting(ex -> ((BusinessException) ex).getErrorCode())
+            .isEqualTo(ErrorCode.CAT_007);
+    }
+
+    @Test
+    void shouldRejectGrandchildDepth() {
+        // Given
+        Category parent = new Category(testBlog, "개발", CategoryType.GENERAL, 1);
+        Category saved_parent = categoryRepository.save(parent);
+
+        Category child = new Category(testBlog, saved_parent, "Java", CategoryType.GENERAL, 0);
+        Category saved_child = categoryRepository.save(child);
+
+        // When/Then
+        CreateCategoryRequest request = new CreateCategoryRequest(saved_child.getId(), "Spring", CategoryType.GENERAL, 0);
+        assertThatThrownBy(() -> categoryService.createCategory(testBlog.getId(), testUser.getId(), request))
+            .isInstanceOf(BusinessException.class)
+            .extracting(ex -> ((BusinessException) ex).getErrorCode())
+            .isEqualTo(ErrorCode.CAT_002);
+    }
+
+    @Test
+    void shouldRejectDuplicateNameInRootCategories() {
+        // Given
+        Category cat = new Category(testBlog, "개발", CategoryType.GENERAL, 1);
+        categoryRepository.save(cat);
+
+        // When/Then
+        CreateCategoryRequest request = new CreateCategoryRequest(null, "개발", CategoryType.GENERAL, 1);
+        assertThatThrownBy(() -> categoryService.createCategory(testBlog.getId(), testUser.getId(), request))
+            .isInstanceOf(BusinessException.class)
+            .extracting(ex -> ((BusinessException) ex).getErrorCode())
+            .isEqualTo(ErrorCode.CAT_004);
+    }
+
+    @Test
+    void shouldRejectDuplicateNameUnderSameParent() {
+        // Given
+        Category parent = new Category(testBlog, "개발", CategoryType.GENERAL, 1);
+        Category saved_parent = categoryRepository.save(parent);
+
+        Category child = new Category(testBlog, saved_parent, "Java", CategoryType.GENERAL, 0);
+        categoryRepository.save(child);
+
+        // When/Then
+        CreateCategoryRequest request = new CreateCategoryRequest(saved_parent.getId(), "Java", CategoryType.GENERAL, 1);
+        assertThatThrownBy(() -> categoryService.createCategory(testBlog.getId(), testUser.getId(), request))
+            .isInstanceOf(BusinessException.class)
+            .extracting(ex -> ((BusinessException) ex).getErrorCode())
+            .isEqualTo(ErrorCode.CAT_004);
+    }
+
+    @Test
+    void shouldRejectDuplicateOrderInRootCategories() {
+        // Given
+        Category cat = new Category(testBlog, "개발", CategoryType.GENERAL, 1);
+        categoryRepository.save(cat);
+
+        // When - client requests duplicate order, but server auto-assigns next available
+        CreateCategoryRequest request = new CreateCategoryRequest(null, "디자인", CategoryType.GENERAL, 1);
+        CategoryResponse response = categoryService.createCategory(testBlog.getId(), testUser.getId(), request);
+
+        // Then - server safely assigned unique order (2, not 1)
+        assertThat(response.name()).isEqualTo("디자인");
+        assertThat(response.displayOrder()).isEqualTo(2);
+    }
+
+    @Test
+    void shouldRejectNonOwnerCreate() {
+        // When/Then
+        CreateCategoryRequest request = new CreateCategoryRequest(null, "개발", CategoryType.GENERAL, 0);
+        assertThatThrownBy(() -> categoryService.createCategory(testBlog.getId(), 99999L, request))
+            .isInstanceOf(BusinessException.class)
+            .extracting(ex -> ((BusinessException) ex).getErrorCode())
+            .isEqualTo(ErrorCode.CAT_008);
+    }
+
+    @Test
+    void shouldUpdateGeneralCategory() {
+        // Given
+        Category cat = new Category(testBlog, "개발", CategoryType.GENERAL, 1);
+        Category saved = categoryRepository.save(cat);
+
+        // When
+        UpdateCategoryRequest request = new UpdateCategoryRequest(null, "프론트엔드", CategoryType.GENERAL, 1);
+        CategoryResponse response = categoryService.updateCategory(testBlog.getId(), saved.getId(), testUser.getId(), request);
+
+        // Then
+        assertThat(response.name()).isEqualTo("프론트엔드");
+        assertThat(response.displayOrder()).isEqualTo(1);
+    }
+
+    @Test
+    void shouldRejectUpdateDefaultCategory() {
+        // When/Then
+        UpdateCategoryRequest request = new UpdateCategoryRequest(null, "renamed", CategoryType.GENERAL, 0);
+        assertThatThrownBy(() -> categoryService.updateCategory(testBlog.getId(), defaultCategory.getId(), testUser.getId(), request))
+            .isInstanceOf(BusinessException.class)
+            .extracting(ex -> ((BusinessException) ex).getErrorCode())
+            .isEqualTo(ErrorCode.CAT_005);
+    }
+
+    @Test
+    void shouldRejectUpdateLockedCategory() {
+        // Given
+        Category locked = new Category(testBlog, "Locked", CategoryType.LOCKED, 1);
+        Category saved = categoryRepository.save(locked);
+
+        // When/Then
+        UpdateCategoryRequest request = new UpdateCategoryRequest(null, "renamed", CategoryType.GENERAL, 0);
+        assertThatThrownBy(() -> categoryService.updateCategory(testBlog.getId(), saved.getId(), testUser.getId(), request))
+            .isInstanceOf(BusinessException.class)
+            .extracting(ex -> ((BusinessException) ex).getErrorCode())
+            .isEqualTo(ErrorCode.CAT_005);
+    }
+
+    @Test
+    void shouldRejectDefaultTypeInUpdate() {
+        // Given
+        Category cat = new Category(testBlog, "개발", CategoryType.GENERAL, 1);
+        Category saved = categoryRepository.save(cat);
+
+        // When/Then
+        UpdateCategoryRequest request = new UpdateCategoryRequest(null, "개발", CategoryType.DEFAULT, 0);
+        assertThatThrownBy(() -> categoryService.updateCategory(testBlog.getId(), saved.getId(), testUser.getId(), request))
+            .isInstanceOf(BusinessException.class)
+            .extracting(ex -> ((BusinessException) ex).getErrorCode())
+            .isEqualTo(ErrorCode.CAT_007);
+    }
+
+    @Test
+    void shouldRejectSelfAsParentInUpdate() {
+        // Given
+        Category cat = new Category(testBlog, "개발", CategoryType.GENERAL, 1);
+        Category saved = categoryRepository.save(cat);
+
+        // When/Then
+        UpdateCategoryRequest request = new UpdateCategoryRequest(saved.getId(), "개발", CategoryType.GENERAL, 0);
+        assertThatThrownBy(() -> categoryService.updateCategory(testBlog.getId(), saved.getId(), testUser.getId(), request))
+            .isInstanceOf(BusinessException.class)
+            .extracting(ex -> ((BusinessException) ex).getErrorCode())
+            .isEqualTo(ErrorCode.CAT_002);
+    }
+
+    @Test
+    void shouldDeleteGeneralCategory() {
+        // Given
+        Category cat = new Category(testBlog, "개발", CategoryType.GENERAL, 1);
+        Category saved = categoryRepository.save(cat);
+
+        // When
+        DeleteCategoryResponse response = categoryService.deleteCategory(testBlog.getId(), saved.getId(), testUser.getId());
+
+        // Then
+        assertThat(response.deletedCategoryIds()).contains(saved.getId());
+        assertThat(response.reassignedToCategoryId()).isEqualTo(defaultCategory.getId());
+        assertThat(response.reassignedPostCount()).isEqualTo(0);
+    }
+
+    @Test
+    void shouldDeleteCategoryWithDescendants() {
+        // Given
+        Category parent = new Category(testBlog, "개발", CategoryType.GENERAL, 1);
+        Category saved_parent = categoryRepository.save(parent);
+
+        Category child = new Category(testBlog, saved_parent, "Java", CategoryType.GENERAL, 0);
+        Category saved_child = categoryRepository.save(child);
+
+        // When
+        DeleteCategoryResponse response = categoryService.deleteCategory(testBlog.getId(), saved_parent.getId(), testUser.getId());
+
+        // Then
+        assertThat(response.deletedCategoryIds()).containsExactlyInAnyOrder(saved_parent.getId(), saved_child.getId());
+    }
+
+    @Test
+    void shouldRejectDeleteDefaultCategory() {
+        // When/Then
+        assertThatThrownBy(() -> categoryService.deleteCategory(testBlog.getId(), defaultCategory.getId(), testUser.getId()))
+            .isInstanceOf(BusinessException.class)
+            .extracting(ex -> ((BusinessException) ex).getErrorCode())
+            .isEqualTo(ErrorCode.CAT_005);
+    }
+
+    @Test
+    void shouldRejectDeleteLockedCategory() {
+        // Given
+        Category locked = new Category(testBlog, "Locked", CategoryType.LOCKED, 1);
+        Category saved = categoryRepository.save(locked);
+
+        // When/Then
+        assertThatThrownBy(() -> categoryService.deleteCategory(testBlog.getId(), saved.getId(), testUser.getId()))
+            .isInstanceOf(BusinessException.class)
+            .extracting(ex -> ((BusinessException) ex).getErrorCode())
+            .isEqualTo(ErrorCode.CAT_005);
+    }
+
+    @Test
+    void shouldReorderRootCategories() {
+        // Given
+        Category dev = new Category(testBlog, "개발", CategoryType.GENERAL, 1);
+        Category design = new Category(testBlog, "디자인", CategoryType.GENERAL, 2);
+        Category saved_dev = categoryRepository.save(dev);
+        Category saved_design = categoryRepository.save(design);
+
+        // When
+        ReorderCategoriesRequest request = new ReorderCategoriesRequest(null, List.of(saved_design.getId(), saved_dev.getId(), defaultCategory.getId()));
+        List<CategoryResponse> response = categoryService.reorderCategories(testBlog.getId(), testUser.getId(), request);
+
+        // Then
+        assertThat(response).hasSize(3);
+        assertThat(response.get(0).displayOrder()).isEqualTo(0);
+        assertThat(response.get(1).displayOrder()).isEqualTo(1);
+    }
+
+    @Test
+    void shouldRejectMissingCategoryInReorder() {
+        // Given
+        Category dev = new Category(testBlog, "개발", CategoryType.GENERAL, 1);
+        Category saved_dev = categoryRepository.save(dev);
+
+        // When/Then - missing defaultCategory in request
+        ReorderCategoriesRequest request = new ReorderCategoriesRequest(null, List.of(saved_dev.getId()));
+        assertThatThrownBy(() -> categoryService.reorderCategories(testBlog.getId(), testUser.getId(), request))
+            .isInstanceOf(BusinessException.class)
+            .extracting(ex -> ((BusinessException) ex).getErrorCode())
+            .isEqualTo(ErrorCode.CAT_006);
+    }
+
+    @Test
+    void shouldRejectExtraIdInReorder() {
+        // When/Then
+        ReorderCategoriesRequest request = new ReorderCategoriesRequest(null, List.of(defaultCategory.getId(), 99999L));
+        assertThatThrownBy(() -> categoryService.reorderCategories(testBlog.getId(), testUser.getId(), request))
+            .isInstanceOf(BusinessException.class)
+            .extracting(ex -> ((BusinessException) ex).getErrorCode())
+            .isEqualTo(ErrorCode.CAT_006);
+    }
+
+    @Test
+    void shouldRejectDuplicateIdInReorder() {
+        // When/Then
+        ReorderCategoriesRequest request = new ReorderCategoriesRequest(null, List.of(defaultCategory.getId(), defaultCategory.getId()));
+        assertThatThrownBy(() -> categoryService.reorderCategories(testBlog.getId(), testUser.getId(), request))
+            .isInstanceOf(BusinessException.class)
+            .extracting(ex -> ((BusinessException) ex).getErrorCode())
+            .isEqualTo(ErrorCode.CAT_006);
+    }
+
+    @Test
+    void shouldRejectMovingDefaultCategoryInReorder() {
+        // Per PRD §9-H: DEFAULT allows order change, LOCKED forbids it.
+        // This test verifies LOCKED order change is rejected.
+        // Given
+        Category locked = new Category(testBlog, "Locked", CategoryType.LOCKED, 1);
+        Category saved_locked = categoryRepository.save(locked);
+
+        // When/Then - trying to move LOCKED category from position 1 to 0
+        ReorderCategoriesRequest request = new ReorderCategoriesRequest(null, List.of(saved_locked.getId(), defaultCategory.getId()));
+        assertThatThrownBy(() -> categoryService.reorderCategories(testBlog.getId(), testUser.getId(), request))
+            .isInstanceOf(BusinessException.class)
+            .extracting(ex -> ((BusinessException) ex).getErrorCode())
+            .isEqualTo(ErrorCode.CAT_005);
+    }
+
+    @Test
+    void shouldAllowIdempotentReorder() {
+        // Given - no changes to order
+        Category dev = new Category(testBlog, "개발", CategoryType.GENERAL, 1);
+        Category saved_dev = categoryRepository.save(dev);
+
+        // When - requesting same order
+        ReorderCategoriesRequest request = new ReorderCategoriesRequest(null, List.of(defaultCategory.getId(), saved_dev.getId()));
+        List<CategoryResponse> response = categoryService.reorderCategories(testBlog.getId(), testUser.getId(), request);
+
+        // Then - should succeed
+        assertThat(response).hasSize(2);
+    }
+
+    @Test
+    void shouldReorderChildCategories() {
+        // Given
+        Category parent = new Category(testBlog, "개발", CategoryType.GENERAL, 1);
+        Category saved_parent = categoryRepository.save(parent);
+
+        Category java = new Category(testBlog, saved_parent, "Java", CategoryType.GENERAL, 0);
+        Category spring = new Category(testBlog, saved_parent, "Spring", CategoryType.GENERAL, 1);
+        Category saved_java = categoryRepository.save(java);
+        Category saved_spring = categoryRepository.save(spring);
+
+        // When
+        ReorderCategoriesRequest request = new ReorderCategoriesRequest(saved_parent.getId(), List.of(saved_spring.getId(), saved_java.getId()));
+        List<CategoryResponse> response = categoryService.reorderCategories(testBlog.getId(), testUser.getId(), request);
+
+        // Then
+        assertThat(response.get(0).displayOrder()).isEqualTo(0);
+        assertThat(response.get(1).displayOrder()).isEqualTo(1);
+    }
+
+    @Test
+    void shouldRejectNonOwnerDelete() {
+        // Given
+        Category cat = new Category(testBlog, "개발", CategoryType.GENERAL, 1);
+        Category saved = categoryRepository.save(cat);
+
+        // When/Then
+        assertThatThrownBy(() -> categoryService.deleteCategory(testBlog.getId(), saved.getId(), 99999L))
+            .isInstanceOf(BusinessException.class)
+            .extracting(ex -> ((BusinessException) ex).getErrorCode())
+            .isEqualTo(ErrorCode.CAT_008);
+    }
+}

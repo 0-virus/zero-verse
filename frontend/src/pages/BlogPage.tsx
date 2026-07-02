@@ -1,28 +1,49 @@
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import AppShell from '../components/layout/AppShell'
 import { BlogHeader } from '../components/BlogHeader'
 import { OwnerProfileCard } from '../components/OwnerProfileCard'
 import { useBlogPublic } from '../hooks/useBlogPublic'
+import { useCategories } from '../hooks/useCategories'
+import CategoryTree from '../components/category/CategoryTree'
 import type { BlogPublicResponse } from '../types/settings'
+import type { CategoryTreeNode } from '../types/category'
 
 export default function BlogPage() {
   const { blogSlug } = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { getPublicBlog, isLoading, error } = useBlogPublic()
+  const { categories, getCategories } = useCategories()
   const [blog, setBlog] = useState<BlogPublicResponse | null>(null)
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null)
 
   useEffect(() => {
+    const loadBlog = async () => {
+      if (!blogSlug) return
+      const result = await getPublicBlog(blogSlug)
+      if (result) {
+        setBlog(result)
+        // Load categories for this blog
+        await getCategories(result.blogId)
+      }
+    }
     if (blogSlug) {
       loadBlog()
     }
-  }, [blogSlug])
+  }, [blogSlug, getPublicBlog, getCategories])
 
-  const loadBlog = async () => {
-    if (!blogSlug) return
-    const result = await getPublicBlog(blogSlug)
-    if (result) {
-      setBlog(result)
+  // Sync selectedCategoryId with URL query parameter
+  useEffect(() => {
+    const catIdParam = searchParams.get('categoryId')
+    if (catIdParam) {
+      setSelectedCategoryId(Number(catIdParam))
     }
+  }, [searchParams])
+
+  const handleSelectCategory = (category: CategoryTreeNode) => {
+    setSelectedCategoryId(category.categoryId)
+    // Preserve selection in URL
+    setSearchParams({ categoryId: category.categoryId.toString() })
   }
 
   if (isLoading) {
@@ -58,7 +79,15 @@ export default function BlogPage() {
           {/* Categories - Left */}
           <div className="bg-bg-panel border-2 border-border-purple-dark p-4 shadow-card h-fit">
             <h3 className="font-display text-text-primary mb-4">Categories</h3>
-            <p className="text-text-muted text-sm">카테고리 (M4)</p>
+            {categories.length === 0 ? (
+              <p className="text-text-muted text-sm">No categories</p>
+            ) : (
+              <CategoryTree
+                categories={categories}
+                selectedCategoryId={selectedCategoryId ?? undefined}
+                onSelectCategory={handleSelectCategory}
+              />
+            )}
           </div>
 
           {/* Posts - Center */}

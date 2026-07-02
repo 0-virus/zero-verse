@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../lib/authContext'
 
@@ -6,16 +6,27 @@ export default function SigninPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  const { signin } = useAuth()
+  const [signinSuccess, setSigninSuccess] = useState(false)
+  const { signin, user } = useAuth()
   const navigate = useNavigate()
+
+  // Redirect after successful signin
+  useEffect(() => {
+    if (signinSuccess && user) {
+      const destination = user.defaultBlog?.isSetupCompleted === false ? '/blog/setup' : '/'
+      navigate(destination)
+    }
+  }, [signinSuccess, user, navigate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError('')
     try {
       await signin(email, password)
-      navigate('/')
+      setSigninSuccess(true)
     } catch (err: any) {
-      setError(err.message || 'Sign in failed')
+      // Generic error message that doesn't reveal account existence
+      setError('이메일 또는 비밀번호가 올바르지 않습니다.')
     }
   }
 

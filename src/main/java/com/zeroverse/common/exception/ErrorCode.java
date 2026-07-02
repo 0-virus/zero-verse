@@ -4,15 +4,19 @@ import org.springframework.http.HttpStatus;
 
 public enum ErrorCode {
     // Auth
-    AUTH_001("AUTH_001", "로그인에 실패했습니다.", HttpStatus.UNAUTHORIZED),
-    AUTH_002("AUTH_002", "토큰이 만료되었습니다.", HttpStatus.UNAUTHORIZED),
-    AUTH_003("AUTH_003", "유효하지 않은 토큰입니다.", HttpStatus.UNAUTHORIZED),
+    AUTH_001("AUTH_001", "비밀번호 정책을 만족하지 않습니다.", HttpStatus.BAD_REQUEST),
+    AUTH_002("AUTH_002", "이메일 또는 비밀번호가 올바르지 않습니다.", HttpStatus.UNAUTHORIZED),
+    AUTH_003("AUTH_003", "정지된 계정입니다.", HttpStatus.FORBIDDEN),
+    AUTH_004("AUTH_004", "토큰이 만료되었습니다.", HttpStatus.UNAUTHORIZED),
+    AUTH_005("AUTH_005", "인증이 필요합니다.", HttpStatus.UNAUTHORIZED),
 
     // User
     USER_001("USER_001", "사용자를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
     USER_002("USER_002", "이미 존재하는 닉네임입니다.", HttpStatus.CONFLICT),
     USER_003("USER_003", "정지된 사용자입니다.", HttpStatus.FORBIDDEN),
     USER_004("USER_004", "이미 존재하는 이메일입니다.", HttpStatus.CONFLICT),
+    USER_005("USER_005", "이미 가입된 이메일입니다.", HttpStatus.CONFLICT),
+    USER_006("USER_006", "이미 사용 중인 닉네임입니다.", HttpStatus.CONFLICT),
 
     // Blog
     BLOG_001("BLOG_001", "블로그를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),

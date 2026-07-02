@@ -9,6 +9,7 @@ vi.mock('../lib/apiClient', () => ({
   apiClient: vi.fn(),
   setAccessToken: vi.fn(),
   getAccessToken: vi.fn(() => null),
+  setOnUnauthorized: vi.fn(),
 }))
 
 describe('MainPage', () => {

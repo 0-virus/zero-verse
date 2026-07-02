@@ -15,9 +15,17 @@ spring:
     locations: classpath:db/migration
 
 jwt:
-  secret: test-secret-key
+  secret: zeroverse-test-secret-key-hs512-minimum-length-please-change-0123456789
   access-token-expiry: 3600
   refresh-token-expiry: 1209600
+
+auth:
+  cookie:
+    name: refresh_token
+    path: /api/v1/auth
+    secure: false
+    same-site: Strict
+    max-age: 1209600
 
 cors:
   allowed-origins: http://localhost:5173

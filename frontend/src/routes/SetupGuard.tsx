@@ -17,7 +17,10 @@ export default function SetupGuard({ children }: SetupGuardProps) {
     return <Navigate to="/signin" replace />
   }
 
-  // TODO: Check if setup is completed
-  // For now, just allow access
+  // Only allow access if setup is not completed
+  if (user.defaultBlog?.isSetupCompleted === true) {
+    return <Navigate to="/" replace />
+  }
+
   return children
 }

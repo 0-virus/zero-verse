@@ -36,6 +36,14 @@ jwt:
   access-token-expiry: 3600
   refresh-token-expiry: 1209600
 
+auth:
+  cookie:
+    name: refresh_token
+    path: /api/v1/auth
+    secure: true
+    same-site: Strict
+    max-age: 1209600
+
 aws:
   s3:
     bucket-name: ${AWS_S3_BUCKET}

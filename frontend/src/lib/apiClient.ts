@@ -12,12 +12,17 @@ export interface ApiResponse<T> {
 
 let refreshPromise: Promise<boolean> | null = null
 let accessToken: string | null = null
+let onUnauthorized: (() => void) | null = null
 
 export const setAccessToken = (token: string | null) => {
   accessToken = token
 }
 
 export const getAccessToken = () => accessToken
+
+export const setOnUnauthorized = (callback: (() => void) | null) => {
+  onUnauthorized = callback
+}
 
 const performRefresh = async (): Promise<boolean> => {
   try {
@@ -60,8 +65,8 @@ export const apiClient = async <T = any>(
     credentials: 'include',
   })
 
-  // Handle 401 - try to refresh and retry once
-  if (response.status === 401) {
+  // Handle 401 - try to refresh and retry once (but never for refresh endpoint itself)
+  if (response && response.status === 401 && endpoint !== '/auth/refresh') {
     if (!refreshPromise) {
       refreshPromise = performRefresh()
     }
@@ -81,7 +86,11 @@ export const apiClient = async <T = any>(
     } else {
       // Refresh failed, need to re-authenticate
       setAccessToken(null)
-      window.location.href = '/signin'
+      if (onUnauthorized) {
+        onUnauthorized()
+      } else {
+        window.location.href = '/signin'
+      }
       return {
         success: false,
         error: {

@@ -14,7 +14,9 @@ export default function GuestOnlyRoute({ children }: GuestOnlyRouteProps) {
   }
 
   if (user) {
-    return <Navigate to="/" replace />
+    // If user is authenticated, redirect based on setup status
+    const destination = user.defaultBlog?.isSetupCompleted === false ? '/blog/setup' : '/'
+    return <Navigate to={destination} replace />
   }
 
   return children

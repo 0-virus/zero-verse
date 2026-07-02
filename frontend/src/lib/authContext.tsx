@@ -1,17 +1,8 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
-import { apiClient, setAccessToken as setApiAccessToken } from './apiClient'
+import { apiClient, setAccessToken as setApiAccessToken, setOnUnauthorized } from './apiClient'
+import type { AuthUser } from '../types/auth'
 
-export interface User {
-  id: string
-  email: string
-  nickname: string
-  name: string
-  birthDate?: string
-  profileImageUrl?: string
-  role: 'USER' | 'ADMIN'
-  status: 'ACTIVE' | 'SUSPENDED'
-  createdAt: string
-}
+export interface User extends AuthUser {}
 
 export interface AuthContextValue {
   user: User | null
@@ -28,6 +19,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null)
   const [accessToken, setAccessToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+
+  // Clear auth on unauthorized (callback from apiClient)
+  const handleUnauthorized = useCallback(() => {
+    setUser(null)
+    setAccessToken(null)
+    setApiAccessToken(null)
+    // Redirect to signin is handled by apiClient or manually if needed
+    window.location.href = '/signin'
+  }, [])
+
+  // Set up unauthorized callback
+  useEffect(() => {
+    setOnUnauthorized(handleUnauthorized)
+    return () => {
+      setOnUnauthorized(null)
+    }
+  }, [handleUnauthorized])
 
   // Initialize auth on mount
   useEffect(() => {

@@ -53,4 +53,23 @@ public class Blog extends BaseSoftDeleteEntity {
     public void updateSetupCompleted(Boolean isSetupCompleted) {
         this.isSetupCompleted = isSetupCompleted;
     }
+
+    public void updateBlogInfo(String title, String urlSlug, String description) {
+        if (title != null) {
+            this.title = title;
+        }
+        if (urlSlug != null) {
+            this.urlSlug = urlSlug;
+        }
+        if (description != null) {
+            this.description = description;
+        }
+    }
+
+    public void setupBlog(String title, String urlSlug, String description) {
+        this.title = title;
+        this.urlSlug = urlSlug;
+        this.description = description;
+        this.isSetupCompleted = true;
+    }
 }

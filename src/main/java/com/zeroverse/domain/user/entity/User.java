@@ -79,4 +79,26 @@ public class User extends BaseSoftDeleteEntity {
     public void suspend() {
         this.status = UserStatus.SUSPENDED;
     }
+
+    public void updateProfile(String name, String nickname, LocalDate birthDate, String bio, String profileImageUrl) {
+        if (name != null) {
+            this.name = name;
+        }
+        if (nickname != null) {
+            this.nickname = nickname;
+        }
+        if (birthDate != null) {
+            this.birthDate = birthDate;
+        }
+        if (bio != null) {
+            this.bio = bio;
+        }
+        if (profileImageUrl != null) {
+            this.profileImageUrl = profileImageUrl;
+        }
+    }
+
+    public void updatePassword(String newPassword) {
+        this.password = newPassword;
+    }
 }

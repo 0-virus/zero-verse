@@ -21,6 +21,8 @@ import java.time.LocalDate;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.hamcrest.Matchers.equalTo;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -110,9 +112,11 @@ public class SecurityConfigAuthTest extends IntegrationTestSupport {
 
     @Test
     void shouldRequireAuthenticationForAuthMe() throws Exception {
-        // When/Then - No Bearer token
+        // When/Then - No Bearer token should return AUTH_004 (authentication required)
         mockMvc.perform(get("/api/v1/auth/me"))
-            .andExpect(status().isUnauthorized());
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.error.code", equalTo("AUTH_004")))
+            .andExpect(jsonPath("$.error.message", equalTo("인증이 필요합니다.")));
     }
 
     @Test
@@ -121,6 +125,80 @@ public class SecurityConfigAuthTest extends IntegrationTestSupport {
         mockMvc.perform(get("/api/v1/auth/me")
             .header("Authorization", "Bearer " + validAccessToken))
             .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldReturnAUTH_001OnSigninWithWrongPassword() throws Exception {
+        // Given
+        SigninRequest request = new SigninRequest("test@example.com", "WrongPassword!123");
+
+        // When/Then - Wrong password should return AUTH_001 (login failure)
+        mockMvc.perform(post("/api/v1/auth/signin")
+            .contentType("application/json")
+            .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.error.code", equalTo("AUTH_001")))
+            .andExpect(jsonPath("$.error.message", equalTo("이메일 또는 비밀번호가 올바르지 않습니다.")));
+    }
+
+    @Test
+    void shouldReturnAUTH_001OnSigninWithNonexistentEmail() throws Exception {
+        // Given
+        SigninRequest request = new SigninRequest("nonexistent@example.com", "Password!123");
+
+        // When/Then - Nonexistent email should return AUTH_001 (same as wrong password, no enumeration)
+        mockMvc.perform(post("/api/v1/auth/signin")
+            .contentType("application/json")
+            .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.error.code", equalTo("AUTH_001")))
+            .andExpect(jsonPath("$.error.message", equalTo("이메일 또는 비밀번호가 올바르지 않습니다.")));
+    }
+
+    @Test
+    void shouldReturnUSER_003OnSigninWithSuspendedAccountAndCorrectPassword() throws Exception {
+        // Given: Create and suspend a user
+        RegisterRequest registerRequest = new RegisterRequest(
+            "suspended@example.com",
+            "Password!123",
+            "suspendeduser",
+            "Suspended User",
+            LocalDate.of(1990, 1, 1)
+        );
+        var user = authService.register(registerRequest);
+        user.suspend();
+
+        // When/Then - Suspended account with correct password should return USER_003
+        SigninRequest signinRequest = new SigninRequest("suspended@example.com", "Password!123");
+        mockMvc.perform(post("/api/v1/auth/signin")
+            .contentType("application/json")
+            .content(objectMapper.writeValueAsString(signinRequest)))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.error.code", equalTo("USER_003")))
+            .andExpect(jsonPath("$.error.message", equalTo("정지된 사용자입니다.")));
+    }
+
+    @Test
+    void shouldReturnAUTH_001OnSigninWithSuspendedAccountAndWrongPassword() throws Exception {
+        // Given: Create and suspend a user
+        RegisterRequest registerRequest = new RegisterRequest(
+            "suspended2@example.com",
+            "Password!123",
+            "suspendeduser2",
+            "Suspended User 2",
+            LocalDate.of(1990, 1, 1)
+        );
+        var user = authService.register(registerRequest);
+        user.suspend();
+
+        // When/Then - Suspended account with wrong password should return AUTH_001 (no account enumeration)
+        SigninRequest signinRequest = new SigninRequest("suspended2@example.com", "WrongPassword!123");
+        mockMvc.perform(post("/api/v1/auth/signin")
+            .contentType("application/json")
+            .content(objectMapper.writeValueAsString(signinRequest)))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.error.code", equalTo("AUTH_001")))
+            .andExpect(jsonPath("$.error.message", equalTo("이메일 또는 비밀번호가 올바르지 않습니다.")));
     }
 
     @Test

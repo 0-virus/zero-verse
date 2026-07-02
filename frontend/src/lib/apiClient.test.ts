@@ -120,6 +120,55 @@ describe('apiClient request', () => {
     expect(result.success).toBe(false)
   })
 
+  it('does not trigger refresh for public auth endpoint signin on 401', async () => {
+    setAccessToken('stale-token')
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      // Only 1 call: original signin request -> 401 (no refresh triggered)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: async () => ({
+          success: false,
+          error: { code: 'AUTH_001', message: '이메일 또는 비밀번호가 올바르지 않습니다.' },
+          timestamp: 'now',
+        }),
+      } as unknown as Response)
+
+    const result = await apiClient('/auth/signin', {
+      method: 'POST',
+      body: JSON.stringify({ email: 'test@example.com', password: 'wrong' }),
+    })
+
+    // Should have only 1 call (no refresh, no retry)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(result.success).toBe(false)
+  })
+
+  it('does not trigger refresh for public auth endpoint register on 401', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      // Only 1 call: original register request -> 401 (no refresh triggered)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: async () => ({
+          success: false,
+          error: { code: 'AUTH_004', message: '인증이 필요합니다.' },
+          timestamp: 'now',
+        }),
+      } as unknown as Response)
+
+    const result = await apiClient('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ email: 'test@example.com', password: 'Password!123', nickname: 'test' }),
+    })
+
+    // Should have only 1 call (no refresh, no retry)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(result.success).toBe(false)
+  })
+
   it('calls onUnauthorized callback when refresh fails', async () => {
     setAccessToken('stale-token')
     const onUnauthorizedMock = vi.fn()

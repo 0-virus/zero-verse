@@ -299,3 +299,75 @@ executor 코드를 Testcontainers MySQL 8.4로 실제 실행 → **초기 72/90 
 ### 검증 종합
 - BE `./gradlew test` 91/91 ✓ (Testcontainers MySQL 8.4) · FE `npm run test` 34/34 ✓ · FE `npm run build` ✓ · BE 컴파일/assemble ✓.
 - 저자(executor)와 검증(오케스트레이터 직접 실행) 분리. 최종 리뷰는 Codex(3b) 예정.
+
+## [리뷰] (Codex · 2026-07-02 09:32 KST)
+
+Verdict: **blocking**
+
+### Blocking issues
+
+1. **High · spec violation/security · AUTH error-code contract regressed and unauthenticated 401 body is wrong**
+   - Location: `src/main/java/com/zeroverse/common/exception/ErrorCode.java:7-11`, `src/main/java/com/zeroverse/config/SecurityAuthenticationEntryPoint.java:26-29`; spec: `docs/REQUIREMENTS.md:883-888`, `docs/PRD.md:204-206`.
+   - What code does: `AUTH_001` is now password-policy `400`, `AUTH_002` is login failure, and `AUTH_003` is suspended-account `403`, while NFR-04 defines `AUTH_001`=login failure, `AUTH_002`=token expired, `AUTH_003`=Refresh Token invalid. The Spring Security entry point still emits `AUTH_001`, so unauthenticated `/api/v1/auth/me` returns the password-policy error body.
+   - Fix requirement: restore the NFR-04 meanings or add non-conflicting new codes without reusing them; update all auth call sites. The security entry point must emit the authentication-required/failure code and message, and controller/security tests must assert the error code/message body, not only HTTP status.
+
+2. **High · security/spec violation · suspended signin leaks account existence/status**
+   - Location: `src/main/java/com/zeroverse/auth/service/AuthService.java:92-101`, `src/main/java/com/zeroverse/common/exception/ErrorCode.java:8-10`; spec: `docs/REQUIREMENTS.md:399-406`, `docs/PRD.md:199-201`, `docs/PRD.md:230-231`.
+   - What code does: `findByEmail()` succeeds, then `user.isSuspended()` is checked before password verification. Any password for a suspended email returns `403 정지된 계정입니다.`, exposing that the account exists and is suspended. FR-AUTH-02 requires login failure responses to avoid exposing account existence.
+   - Fix requirement: make nonexistent email, wrong password, and suspended login follow the approved non-enumerating response policy unless a new explicit decision overrides it. Add service/controller tests for suspended users with wrong and correct passwords.
+
+3. **Medium · spec violation · default blog `urlSlug` is raw nickname, not a valid slug**
+   - Location: `src/main/java/com/zeroverse/auth/service/AuthService.java:65-82`, `src/main/java/com/zeroverse/auth/dto/RegisterRequest.java:16-18`; spec: `docs/PRD.md:208-210`.
+   - What code does: nickname only has length validation, then `urlSlug = request.nickname()` is stored directly. Nicknames can produce invalid/reserved slugs, including Korean text, uppercase, spaces/special characters, `admin`, or 2-character values that violate the 3-character slug minimum. The duplicate suffix loop also works on the raw nickname rather than normalized slug candidates.
+   - Fix requirement: generate the default blog slug through the PRD §4.5 slug rules: lowercase alphanumeric/hyphen, invalid chars normalized, reserved words avoided, 3-30 chars enforced, and `-2`, `-3` suffixes applied after normalization. Add tests for non-ASCII/special/reserved/short/collision inputs.
+
+### Non-blocking issues
+
+1. **Medium · security/test gap · public auth endpoints trigger refresh-on-401**
+   - Location: `frontend/src/lib/apiClient.ts:68-75`, `frontend/src/lib/authContext.tsx:73-85`.
+   - What code does: every `401` except `/auth/refresh` starts refresh single-flight. Because `signin()` uses `apiClient('/auth/signin')`, a failed public signin can call `/auth/refresh`, potentially rehydrate an old cookie-backed session, then retry signin.
+   - Fix requirement: restrict auto-refresh to authenticated requests, or add a `skipAuthRefresh` option/exclusion list for `/auth/signin`, `/auth/register`, and other public endpoints. Add a test that `/auth/signin` 401 does not call refresh.
+
+2. **Medium · test gap · M1 tests miss required auth/security assertions**
+   - Location: `src/test/java/com/zeroverse/config/SecurityConfigAuthTest.java:111-154`, `src/test/java/com/zeroverse/auth/security/JwtProviderTest.java:36-148`, `src/test/java/com/zeroverse/auth/service/RefreshTokenServiceTest.java:73-99`, `frontend/src/routes/router.test.tsx:79-91`, `frontend/src/pages/SigninPage.test.tsx:84-117`.
+   - Gaps: 401 tests assert status only, not NFR-04 error code/body; no backend 403/access-denied handler coverage was found; JWT expiry is not asserted in `JwtProviderTest`; refresh service tests cover revoked/hash mismatch but not expired-token validation through the service/controller path; router protection test does not `await` `waitFor`; the signin redirect test does not submit or assert navigation.
+   - Fix requirement: add focused assertions for 401/403 body, expired access/refresh tokens, refresh reuse rejection through `/auth/refresh`, suspended signin, and the FE route/signin flows.
+
+3. **Low · spec/docs gap · refresh cookie auth is absent from OpenAPI config**
+   - Location: `src/main/java/com/zeroverse/config/OpenApiConfig.java:20-25`.
+   - What code does: OpenAPI registers only `bearerAuth`; the PRD/worklog require documenting Bearer access token and refresh cookie flow.
+   - Fix requirement: add an API key cookie security scheme for `refresh_token` and describe the refresh/signout cookie flow.
+
+4. **Low · config consistency · refresh cookie name is configurable on write but hard-coded on read**
+   - Location: `src/main/java/com/zeroverse/auth/controller/AuthController.java:79-99`, `src/main/java/com/zeroverse/auth/support/RefreshTokenCookieFactory.java:15-34`.
+   - What code does: cookies are written with `AuthCookieProperties.name`, but `@CookieValue(name = "refresh_token")` hard-codes the read side. Changing `auth.cookie.name` silently breaks refresh/signout.
+   - Fix requirement: use the same property for reading and writing cookies, or remove the configurability.
+
+### Implementation notes
+
+- Worklog `[계획]`/`[이슈·결정]`/`[개발 기록]` generally matches the auth implementation. Extra non-auth metadata/config files in the PR diff (`.claude/**`, root `CLAUDE.md`, `AGENTS.md`) are not described in the M1 worklog; confirm they are intentional PR contents or split/document them.
+- Decision overrides checked: register returns no token (`AuthController.java:51-55`); FE does register then signin (`SignupPage.tsx:99-103`); `birth_date` is DTO-required while entity remains nullable (`RegisterRequest.java:23-24`, `User.java:44-45`); refresh reuse is simple 401 with the requested future revoke-all TODO (`RefreshTokenService.java:56-60`); `defaultBlog` response is minimal (`DefaultBlogResponse.java:6-20`).
+- Refresh cookie attributes are set through `ResponseCookie` with `HttpOnly`, `Secure`, `SameSite`, path, and max-age (`RefreshTokenCookieFactory.java:15-34`). FE access token storage is module/React memory only; no `localStorage`, `sessionStorage`, or `document.cookie` usage was found for auth tokens.
+- `RefreshTokenHasher` uses SHA-256 and constant-time comparison via `MessageDigest.isEqual` (`RefreshTokenHasher.java:18-37`). `JwtProvider.validateToken()` catches `JwtException | IllegalArgumentException` (`JwtProvider.java:56-68`); no JwtProvider exception-handling TODO/stub remains.
+- TODO/stub/skip scan: no `@Disabled`/`test.skip`/`it.skip` found. The only M1 auth TODO is the required refresh-reuse expansion point in `RefreshTokenService.java:59`; an existing `WritePage.tsx` TODO is outside M1 auth scope.
+- Secret scan: no committed runtime JWT/AWS secrets found. Runtime config uses env vars in `application.yml`; concrete values are limited to `application-test.yml` and `application-local.example.yml`.
+- Verification attempted during review: `git diff --check dev...feature/M1-auth` passed; `npm.cmd run test -- --run` passed 34/34; `npm.cmd run build` passed with existing CSS `@import` ordering warnings. Backend tests were not reproducible in this sandbox: `./gradlew test` attempted to download Gradle and network was denied; direct cached Gradle 8.10 started but could not resolve uncached Spring Boot Gradle plugin `3.5.15` under network restriction.
+
+### 수정 (fix pass · Claude executor+오케스트레이터 검증 · 2026-07-02)
+
+Codex [리뷰] blocking 3건 + 비블로킹 4건 반영:
+
+**블로킹**
+- **B1 ErrorCode NFR-04 복원**: `AUTH_001`=로그인 실패(401)/`AUTH_002`=토큰 만료/`AUTH_003`=Refresh 무효, 미인증 진입점은 신규 비충돌 `AUTH_004`=인증 필요(401) emit. 비밀번호 정책은 `RegisterRequest` @Pattern → Bean Validation 400. `SecurityConfigAuthTest`가 401 body의 error.code/message까지 assert.
+- **B2 정지계정 열거 누출 제거**: `AuthService.signin`을 비밀번호 검증 우선으로 변경 — 없는 email/틀린 비번/정지+틀린비번은 모두 generic `AUTH_001`, 비밀번호 일치 후에만 정지 확인 → `USER_003`(403). 서비스+컨트롤러 테스트 추가.
+- **B3 slug §4.5 규칙**: `common/util/SlugGenerator` 신설(영소문자/비허용문자→하이픈/앞뒤·연속 하이픈 제거/3~30자/예약어 회피/중복 -2,-3). `AuthService.register`가 사용. `SlugGeneratorTest`(한글/예약어/특수문자/짧음/충돌).
+
+**비블로킹**
+- N1: `apiClient` PUBLIC_AUTH_ENDPOINTS(`/auth/signin`,`/auth/register`) 401은 refresh 미트리거 + 테스트.
+- N3: `OpenApiConfig` 인증 흐름/토큰 라이프사이클 문서 보강.
+- N4: `AuthController` cookie 읽기를 `getRefreshTokenFromCookie()`로 일원화(cookieProperties.name 사용).
+- N2: BE 401/403 error.code·정지 signin 케이스 보강. **FE router await/signin submit 보강은 이번 패스 미반영(잔여, 재리뷰 확인 대상).**
+
+**재검증(오케스트레이터 직접 실행)**: BE `./gradlew test` **116/116 통과**(failures=0/errors=0, Testcontainers MySQL 8.4) · FE `npm run test` **36/36** · `npm run build` ✓.
+
+**노트**: 리뷰 지적된 `.claude/**`·`CLAUDE.md`·`AGENTS.md`는 M1 인증과 무관한 별도 커밋(chore/docs)으로 이미 분리됨 — 의도된 PR 내용.

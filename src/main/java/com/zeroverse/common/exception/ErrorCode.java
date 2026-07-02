@@ -3,12 +3,11 @@ package com.zeroverse.common.exception;
 import org.springframework.http.HttpStatus;
 
 public enum ErrorCode {
-    // Auth
-    AUTH_001("AUTH_001", "비밀번호 정책을 만족하지 않습니다.", HttpStatus.BAD_REQUEST),
-    AUTH_002("AUTH_002", "이메일 또는 비밀번호가 올바르지 않습니다.", HttpStatus.UNAUTHORIZED),
-    AUTH_003("AUTH_003", "정지된 계정입니다.", HttpStatus.FORBIDDEN),
-    AUTH_004("AUTH_004", "토큰이 만료되었습니다.", HttpStatus.UNAUTHORIZED),
-    AUTH_005("AUTH_005", "인증이 필요합니다.", HttpStatus.UNAUTHORIZED),
+    // Auth (NFR-04 정본)
+    AUTH_001("AUTH_001", "이메일 또는 비밀번호가 올바르지 않습니다.", HttpStatus.UNAUTHORIZED),
+    AUTH_002("AUTH_002", "토큰이 만료되었습니다.", HttpStatus.UNAUTHORIZED),
+    AUTH_003("AUTH_003", "Refresh Token이 무효합니다.", HttpStatus.UNAUTHORIZED),
+    AUTH_004("AUTH_004", "인증이 필요합니다.", HttpStatus.UNAUTHORIZED),
 
     // User
     USER_001("USER_001", "사용자를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),

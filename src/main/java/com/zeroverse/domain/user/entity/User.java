@@ -75,4 +75,8 @@ public class User extends BaseSoftDeleteEntity {
     public boolean isAdmin() {
         return this.role == UserRole.ADMIN;
     }
+
+    public void suspend() {
+        this.status = UserStatus.SUSPENDED;
+    }
 }

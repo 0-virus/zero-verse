@@ -1,5 +1,6 @@
 package com.zeroverse.auth.controller;
 
+import com.zeroverse.auth.config.AuthCookieProperties;
 import com.zeroverse.auth.dto.*;
 import com.zeroverse.auth.security.JwtAuthenticationFilter;
 import com.zeroverse.auth.security.JwtProvider;
@@ -15,6 +16,8 @@ import com.zeroverse.domain.blog.entity.Blog;
 import com.zeroverse.domain.blog.repository.BlogRepository;
 import com.zeroverse.domain.user.entity.User;
 import com.zeroverse.domain.user.repository.UserRepository;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +34,7 @@ public class AuthController {
     private final RefreshTokenService refreshTokenService;
     private final JwtProvider jwtProvider;
     private final RefreshTokenCookieFactory cookieFactory;
+    private final AuthCookieProperties cookieProperties;
     private final BlogRepository blogRepository;
     private final UserRepository userRepository;
 
@@ -38,14 +42,32 @@ public class AuthController {
                         RefreshTokenService refreshTokenService,
                         JwtProvider jwtProvider,
                         RefreshTokenCookieFactory cookieFactory,
+                        AuthCookieProperties cookieProperties,
                         BlogRepository blogRepository,
                         UserRepository userRepository) {
         this.authService = authService;
         this.refreshTokenService = refreshTokenService;
         this.jwtProvider = jwtProvider;
         this.cookieFactory = cookieFactory;
+        this.cookieProperties = cookieProperties;
         this.blogRepository = blogRepository;
         this.userRepository = userRepository;
+    }
+
+    /**
+     * Helper method to extract refresh token from request cookies using configured cookie name.
+     */
+    private String getRefreshTokenFromCookie(HttpServletRequest request) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies == null) {
+            return null;
+        }
+        for (Cookie cookie : cookies) {
+            if (cookieProperties.getName().equals(cookie.getName())) {
+                return cookie.getValue();
+            }
+        }
+        return null;
     }
 
     @PostMapping("/register")
@@ -76,8 +98,11 @@ public class AuthController {
     }
 
     @PostMapping("/signout")
-    public ResponseEntity<ApiResponse<Void>> signout(@CookieValue(name = "refresh_token", required = false) String refreshToken,
+    public ResponseEntity<ApiResponse<Void>> signout(HttpServletRequest request,
                                                       HttpServletResponse response) {
+        // Get refresh token from cookie using configured name
+        String refreshToken = getRefreshTokenFromCookie(request);
+
         // Revoke refresh token if present
         if (refreshToken != null && !refreshToken.isEmpty()) {
             try {
@@ -96,11 +121,14 @@ public class AuthController {
 
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<AuthTokenResponse>> refresh(
-        @CookieValue(name = "refresh_token", required = false) String refreshToken,
+        HttpServletRequest request,
         HttpServletResponse response) {
 
+        // Get refresh token from cookie using configured name
+        String refreshToken = getRefreshTokenFromCookie(request);
+
         if (refreshToken == null || refreshToken.isEmpty()) {
-            throw new BusinessException(ErrorCode.AUTH_005);
+            throw new BusinessException(ErrorCode.AUTH_004);
         }
 
         // Validate refresh token
@@ -138,7 +166,7 @@ public class AuthController {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
         if (authentication == null || !(authentication.getPrincipal() instanceof ZeroverseUserPrincipal)) {
-            throw new BusinessException(ErrorCode.AUTH_005);
+            throw new BusinessException(ErrorCode.AUTH_004);
         }
 
         ZeroverseUserPrincipal principal = (ZeroverseUserPrincipal) authentication.getPrincipal();

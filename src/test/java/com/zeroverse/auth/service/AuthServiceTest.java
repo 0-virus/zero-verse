@@ -164,22 +164,6 @@ public class AuthServiceTest extends IntegrationTestSupport {
     }
 
     @Test
-    void shouldRejectWeakPassword() {
-        // When/Then - Missing special character
-        RegisterRequest request = new RegisterRequest(
-            "test@example.com",
-            "Password123",
-            "testuser",
-            "Test User",
-            LocalDate.of(1990, 1, 1)
-        );
-        assertThatThrownBy(() -> authService.register(request))
-            .isInstanceOf(BusinessException.class)
-            .extracting(ex -> ((BusinessException) ex).getErrorCode())
-            .isEqualTo(ErrorCode.AUTH_001);
-    }
-
-    @Test
     void shouldSigninWithCorrectCredentials() {
         // Given
         RegisterRequest registerRequest = new RegisterRequest(
@@ -211,12 +195,12 @@ public class AuthServiceTest extends IntegrationTestSupport {
         );
         authService.register(registerRequest);
 
-        // When/Then
+        // When/Then - Wrong password should return AUTH_001 (login failure)
         SigninRequest signinRequest = new SigninRequest("test@example.com", "WrongPassword!123");
         assertThatThrownBy(() -> authService.signin(signinRequest))
             .isInstanceOf(BusinessException.class)
             .extracting(ex -> ((BusinessException) ex).getErrorCode())
-            .isEqualTo(ErrorCode.AUTH_002);
+            .isEqualTo(ErrorCode.AUTH_001);
     }
 
     @Test
@@ -226,7 +210,51 @@ public class AuthServiceTest extends IntegrationTestSupport {
         assertThatThrownBy(() -> authService.signin(signinRequest))
             .isInstanceOf(BusinessException.class)
             .extracting(ex -> ((BusinessException) ex).getErrorCode())
-            .isEqualTo(ErrorCode.AUTH_002);
+            .isEqualTo(ErrorCode.AUTH_001);
+    }
+
+    @Test
+    void shouldRejectSigninWithSuspendedAccountAndWrongPassword() {
+        // Given: Suspended user
+        RegisterRequest registerRequest = new RegisterRequest(
+            "suspended@example.com",
+            "Password!123",
+            "suspendeduser",
+            "Suspended User",
+            LocalDate.of(1990, 1, 1)
+        );
+        User user = authService.register(registerRequest);
+        user.suspend();
+        userRepository.save(user);
+
+        // When/Then: Wrong password should return generic AUTH_001 (account existence not exposed)
+        SigninRequest signinRequest = new SigninRequest("suspended@example.com", "WrongPassword!123");
+        assertThatThrownBy(() -> authService.signin(signinRequest))
+            .isInstanceOf(BusinessException.class)
+            .extracting(ex -> ((BusinessException) ex).getErrorCode())
+            .isEqualTo(ErrorCode.AUTH_001);
+    }
+
+    @Test
+    void shouldRejectSigninWithSuspendedAccountAndCorrectPassword() {
+        // Given: Suspended user with correct password
+        RegisterRequest registerRequest = new RegisterRequest(
+            "suspended@example.com",
+            "Password!123",
+            "suspendeduser",
+            "Suspended User",
+            LocalDate.of(1990, 1, 1)
+        );
+        User user = authService.register(registerRequest);
+        user.suspend();
+        userRepository.save(user);
+
+        // When/Then: Correct password should return USER_003 (account is authenticated but suspended)
+        SigninRequest signinRequest = new SigninRequest("suspended@example.com", "Password!123");
+        assertThatThrownBy(() -> authService.signin(signinRequest))
+            .isInstanceOf(BusinessException.class)
+            .extracting(ex -> ((BusinessException) ex).getErrorCode())
+            .isEqualTo(ErrorCode.USER_003);
     }
 
     @Test

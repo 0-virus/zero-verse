@@ -24,8 +24,8 @@ public class SecurityAuthenticationEntryPoint implements AuthenticationEntryPoin
         response.setContentType("application/json;charset=UTF-8");
 
         ErrorResponse errorResponse = ErrorResponse.of(
-            ErrorCode.AUTH_001.getCode(),
-            ErrorCode.AUTH_001.getMessage()
+            ErrorCode.AUTH_004.getCode(),
+            ErrorCode.AUTH_004.getMessage()
         );
         ApiResponse<Object> apiResponse = ApiResponse.error(errorResponse);
 

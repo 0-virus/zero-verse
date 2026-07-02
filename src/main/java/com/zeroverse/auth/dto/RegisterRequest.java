@@ -11,6 +11,10 @@ public record RegisterRequest(
 
     @NotBlank(message = "password는 필수입니다")
     @Size(min = 8, message = "password는 최소 8자 이상이어야 합니다")
+    @Pattern(
+        regexp = "^(?=.*[a-zA-Z])(?=.*[0-9])(?=.*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?]).*$",
+        message = "password는 영문, 숫자, 특수문자를 모두 포함해야 합니다"
+    )
     String password,
 
     @NotBlank(message = "nickname은 필수입니다")

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useBlogSettings } from '../hooks/useBlogSettings'
-import { apiClient } from '../lib/apiClient'
+import { useAuth } from '../lib/authContext'
 import type { BlogInitialSetupRequest } from '../types/settings'
 
 export default function BlogInitialSetupPage() {
@@ -14,6 +14,7 @@ export default function BlogInitialSetupPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const navigate = useNavigate()
   const { initialSetup } = useBlogSettings()
+  const { refreshUser } = useAuth()
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -28,9 +29,10 @@ export default function BlogInitialSetupPage() {
     try {
       const result = await initialSetup(formData)
       if (result) {
-        // Success - refresh auth to update defaultBlog status, then navigate
+        // Success - refresh authContext so defaultBlog.isSetupCompleted updates
+        // (prevents SetupGuard from bouncing back to /blog/setup), then navigate
         try {
-          await apiClient('/auth/me', { method: 'GET' })
+          await refreshUser()
         } catch (refreshErr) {
           console.warn('Failed to refresh user data:', refreshErr)
         }

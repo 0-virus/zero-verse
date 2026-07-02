@@ -496,19 +496,19 @@ FR-BLOG-02 `GET /blogs/slug/{urlSlug}/posts`는 **Post 도메인에 의존**하�
 **수정사항**:
 1. **ErrorCode.java** (line 18):
    - USER_007 추가: `"현재 비밀번호가 올바르지 않습니다.", HttpStatus.BAD_REQUEST`
-   
+
 2. **UserService.changePassword** (line 63):
    - `throw new BusinessException(ErrorCode.AUTH_001)` → `throw new BusinessException(ErrorCode.USER_007)`
-   
+
 3. **UserServiceTest** (line 234):
    - 기대값: `ErrorCode.USER_007` (기존 AUTH_001)
-   
+
 4. **UserSettingsControllerTest** (line 244, 246-247):
    - HTTP 상태: `isUnauthorized()` → `isBadRequest()` (401 → 400)
    - 에러코드: `"AUTH_001"` → `"USER_007"`
    - 추가 검증: `.andExpect(jsonPath("$.error.message").exists())`
 
-**영향**: 
+**영향**:
 - 현재 비밀번호 오류 시 HTTP 400 응답 (401 아님)
 - FE apiClient가 401이 아니므로 refresh 트리거 회피
 - 사용자에게 "현재 비밀번호가 올바르지 않습니다" 에러메시지만 표시
@@ -589,6 +589,24 @@ FR-BLOG-02 `GET /blogs/slug/{urlSlug}/posts`는 **Post 도메인에 의존**하�
 - ✓ NFR-04 (에러코드 정본): USER_007 도메인 prefix + BAD_REQUEST 상태
 - ✓ 공통 응답 계약: ApiResponse<T> 래퍼, success/data/error/timestamp 모두 검증
 - ✓ 테스트 DoD: placeholder/stub 금지, 실제 상태코드 + 에러메시지 이중 검증
+
+## [재리뷰 2차] (Codex · 2026-07-02, 오케스트레이터 대필 — Codex 샌드박스 read-only)
+
+**Verdict: 블로킹** — 1차 blocking 5건 중 4건 PASS, #4만 FAIL + formatting 1건.
+
+- #1 FE 페이지 테스트 스텁 제거: **PASS** (`expect(true)`/`.skip`/`.only` 제거, 실제 렌더/DOM 단언).
+- #2 SettingsProfilePage 블로그 탭 + `/blogs/me` 연동: **PASS**.
+- #3 프로필 폼 `GET /users/me` hydrate: **PASS** (authContext 역쓰기 없음, email readonly).
+- #4 초기설정 authContext 갱신: **FAIL** — `BlogInitialSetupPage`가 `apiClient('/auth/me')` 응답을 폐기하고 `setUser` 미호출 → `defaultBlog` 스테일 유지.
+- #5 현재 비번 `USER_007`+400: **PASS** (apiClient는 401만 refresh, 400 제외).
+- 비블로킹(필드명 id→userId/blogId, error.message assert, Swagger): **모두 PASS**.
+- formatting: `git diff --check` 실패 — worklog trailing whitespace 4줄.
+
+### 수정 3차 (오케스트레이터 직접 · 2026-07-02)
+
+- **#4 해소**: `authContext`에 `refreshUser`(기존 `loadUserInfo` 재사용, `setUser` 수행) 노출. `BlogInitialSetupPage`가 원시 `/auth/me` 호출 대신 `await refreshUser()`로 authContext 갱신 후 `/blog/{urlSlug}` 이동. 성공 플로우/실패 회귀 가드 테스트 2건 추가(initialSetup+refreshUser 호출 및 navigate 검증).
+- **formatting**: worklog 전체 trailing whitespace 제거 → `git diff --check` 통과.
+- 재검증(직접 실행): FE `npm run test` 통과, `git diff --check` 통과.
 
 ## [머지]
 (머지 단계에서 기록)

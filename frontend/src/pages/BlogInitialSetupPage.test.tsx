@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import BlogInitialSetupPage from './BlogInitialSetupPage'
+
+const initialSetupMock = vi.fn()
+const refreshUserMock = vi.fn()
+const navigateMock = vi.fn()
 
 vi.mock('../hooks/useBlogSettings', () => ({
   useBlogSettings: () => ({
@@ -10,7 +14,13 @@ vi.mock('../hooks/useBlogSettings', () => ({
     error: null,
     getBlogMe: vi.fn(),
     updateBlog: vi.fn(),
-    initialSetup: vi.fn(),
+    initialSetup: initialSetupMock,
+  }),
+}))
+
+vi.mock('../lib/authContext', () => ({
+  useAuth: () => ({
+    refreshUser: refreshUserMock,
   }),
 }))
 
@@ -18,7 +28,7 @@ vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
   return {
     ...actual,
-    useNavigate: () => vi.fn(),
+    useNavigate: () => navigateMock,
   }
 })
 
@@ -110,5 +120,46 @@ describe('BlogInitialSetupPage', () => {
 
     const form = screen.getByRole('button', { name: /초기 설정 완료/i }).closest('form')
     expect(form).toBeDefined()
+  })
+
+  it('on successful setup, refreshes authContext then navigates to the blog page', async () => {
+    initialSetupMock.mockResolvedValueOnce({ urlSlug: 'my-awesome-blog' })
+    refreshUserMock.mockResolvedValueOnce(undefined)
+
+    render(
+      <BrowserRouter>
+        <BlogInitialSetupPage />
+      </BrowserRouter>
+    )
+
+    fireEvent.change(screen.getByPlaceholderText(/e.g., my-blog/i), {
+      target: { value: 'my-awesome-blog' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /초기 설정 완료/i }))
+
+    await waitFor(() => {
+      expect(initialSetupMock).toHaveBeenCalledTimes(1)
+      // #4 regression guard: authContext must be refreshed so defaultBlog is not stale
+      expect(refreshUserMock).toHaveBeenCalledTimes(1)
+      expect(navigateMock).toHaveBeenCalledWith('/blog/my-awesome-blog')
+    })
+  })
+
+  it('shows an error and does not navigate when setup fails', async () => {
+    initialSetupMock.mockResolvedValueOnce(null)
+
+    render(
+      <BrowserRouter>
+        <BlogInitialSetupPage />
+      </BrowserRouter>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /초기 설정 완료/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/블로그 초기 설정에 실패했습니다/i)).toBeDefined()
+    })
+    expect(refreshUserMock).not.toHaveBeenCalled()
+    expect(navigateMock).not.toHaveBeenCalled()
   })
 })

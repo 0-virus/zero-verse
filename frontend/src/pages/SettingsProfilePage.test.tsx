@@ -56,6 +56,7 @@ describe('SettingsProfilePage component', () => {
       signin: vi.fn(),
       signout: vi.fn(),
       refreshAccessToken: vi.fn(),
+      refreshUser: vi.fn(),
     })
 
     vi.mocked(useUserSettingsModule.useUserSettings).mockReturnValue({

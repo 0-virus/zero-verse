@@ -54,8 +54,34 @@ public class Category extends BaseSoftDeleteEntity {
         this.displayOrder = displayOrder;
     }
 
+    public Category(Blog blog, Category parent, String name, CategoryType type, Integer displayOrder) {
+        this.blog = blog;
+        this.parent = parent;
+        this.name = name;
+        this.type = type;
+        this.displayOrder = displayOrder;
+    }
+
     public static Category createDefault(Blog blog) {
         return new Category(blog, "미분류", CategoryType.DEFAULT, 0);
+    }
+
+    public static Category create(Blog blog, Category parent, String name, CategoryType type, Integer displayOrder) {
+        return new Category(blog, parent, name, type, displayOrder);
+    }
+
+    public void update(String name, CategoryType type, Integer displayOrder) {
+        this.name = name;
+        this.type = type;
+        this.displayOrder = displayOrder;
+    }
+
+    public void moveToParent(Category newParent) {
+        this.parent = newParent;
+    }
+
+    public void softDelete() {
+        this.deletedAt = java.time.LocalDateTime.now();
     }
 
     public boolean isDefault() {
@@ -64,5 +90,9 @@ public class Category extends BaseSoftDeleteEntity {
 
     public boolean isLocked() {
         return this.type == CategoryType.LOCKED;
+    }
+
+    public boolean isActive() {
+        return this.deletedAt == null;
     }
 }

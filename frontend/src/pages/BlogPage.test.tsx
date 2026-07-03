@@ -145,23 +145,25 @@ describe('BlogPage component', () => {
     expect(screen.getByText('블로그를 찾을 수 없습니다.')).toBeDefined()
   })
 
-  it('should render blog when data is provided and loaded', () => {
-    // Mock the hook to provide blog data with isLoading false
+  it('should render blog header (title/description) after load', async () => {
     vi.mocked(useBlogPublicModule.useBlogPublic).mockReturnValue({
-      blog: mockBlog,
-      getPublicBlog: vi.fn(),
+      blog: null,
+      getPublicBlog: vi.fn().mockResolvedValue(mockBlog),
       isLoading: false,
       error: null,
     })
 
-    const { container } = render(
+    render(
       <BrowserRouter>
         <BlogPage />
       </BrowserRouter>
     )
 
-    // Verify component renders without crashing
-    expect(container).toBeDefined()
+    // blog 은 async 로드 → 헤더의 제목/설명이 실제 렌더되는지 검증
+    expect(await screen.findByText('My Blog')).toBeDefined()
+    expect(screen.getByText('This is my blog')).toBeDefined()
+    // Not Found 상태가 아님을 확인
+    expect(screen.queryByText('블로그를 찾을 수 없습니다.')).toBeNull()
   })
 
   it('should call getPublicBlog from hook on mount', () => {
@@ -184,10 +186,10 @@ describe('BlogPage component', () => {
     expect(screen.getByText('블로그 로딩 중...')).toBeDefined()
   })
 
-  it('should render blog content sections when data is loaded', () => {
+  it('should render blog content sections (grid layout) when data is loaded', async () => {
     vi.mocked(useBlogPublicModule.useBlogPublic).mockReturnValue({
-      blog: mockBlog,
-      getPublicBlog: vi.fn(),
+      blog: null,
+      getPublicBlog: vi.fn().mockResolvedValue(mockBlog),
       isLoading: false,
       error: null,
     })
@@ -198,8 +200,9 @@ describe('BlogPage component', () => {
       </BrowserRouter>
     )
 
-    // Verify that component renders with categories, posts, and owner sections
-    expect(container.querySelector('.grid')).toBeDefined()
+    // blog 로드 완료 후 grid 레이아웃(카테고리/게시글/소유자 섹션)이 실제로 존재
+    await screen.findByText('My Blog')
+    expect(container.querySelector('.grid')).not.toBeNull()
   })
 
   it('should load categories for public blog', async () => {

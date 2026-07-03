@@ -1070,5 +1070,15 @@ Codex 리뷰 결과 4개 blocking 이슈(+ 1개 비블로킹 Swagger) 식별. �
 
 **후속 항목(비차단, 이번 PR 범위 밖)**: `frontend/src/routes/router.test.tsx`에 `expect(container).toBeDefined()` fake-pass 4건이 M1 유산으로 남아있음(M3 diff 미포함). M3 PR diff 최소화를 위해 이번엔 건드리지 않고, 별도 테스트 위생 정리 작업으로 분리한다.
 
+## [재리뷰 4차] (Codex · 2026-07-03 09:10:10)
+
+- BlogPage fake-pass 재검증: PASS. `should render blog header`는 `findByText('My Blog')`로 실제 비동기 렌더를 검증하고, `should render blog content sections`는 blog 로드 대기 후 `.grid`를 `not.toBeNull()`로 검증한다.
+- M3 diff 내 변경 테스트 파일 전체 fake-pass scan: PASS. `expect(container).toBeDefined()`, `querySelector(...).toBeDefined()`, `expect(true)`, `.skip`, `.only`, `@Disabled` 잔존 없음.
+- `frontend/src/routes/router.test.tsx`: M3 diff 미포함. 기존 fake-pass는 M1 legacy로 확인되어 M3 blocking 아님.
+- Regression check: PASS. 변경 테스트 선언 수 감소 없음; BlogPage 5 -> 10, 신규/확장 category 테스트 증가 확인.
+
+**Verdict**: MERGEABLE
+
+
 ## [머지]
 (머지 단계에서 기록)

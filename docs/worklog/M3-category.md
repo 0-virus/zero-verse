@@ -1022,5 +1022,53 @@ Codex 리뷰 결과 4개 blocking 이슈(+ 1개 비블로킹 Swagger) 식별. �
 - **BlogPage URL 테스트 3건을 실제 검증으로 교체**: (a) 초기 `?categoryId=2` 진입 시 'Tech' 노드가 선택 스타일(`bg-[#0e7490]`) 획득·'Default'는 미선택 검증, (b) 'Tech' 클릭 시 `LocationSearchProbe`로 URL search가 `?categoryId=2`로 갱신 검증, (c) 트리 렌더(루트 Default/Tech + 자식 Frontend + 글수 `(5)`) 검증. `getPublicBlog`/`getCategories` mockResolvedValue + `findByText`로 async blog 로드 정착.
 - **재검증(직접)**: FE `npm run test` **132/132**(18파일, unhandled error 0) · `npm run build` 0에러 · `git diff --check` clean. (BE 245/245 무변경.)
 
+## [재리뷰 3차] (Codex · 2026-07-02 18:23 KST)
+
+**Verdict: 블로킹** — 잔여 categoryId URL 테스트 자체는 실검증으로 개선됐지만, 같은 `BlogPage.test.tsx` 안에 fake-pass assertion이 아직 남아 최종 머지 승인 불가.
+
+### 재검증 결과
+
+- `BlogPage.test.tsx` categoryId URL 테스트: **PASS**.
+  - 초기 `/blogs/my-blog?categoryId=2` 진입 후 `Tech` label을 `findByText`로 기다리고, 선택 스타일 조상(`bg-[#0e7490]`) 존재 및 `Default` 미선택을 검증.
+  - `LocationSearchProbe`로 실제 `location.search`를 노출하고, `Tech` 클릭 후 `?categoryId=2`로 갱신되는지 검증.
+  - `Default`, `Tech`, 자식 `Frontend`, post count `(5)` 렌더를 실제 DOM으로 검증.
+  - `getPublicBlog`/`getCategories`는 `mockResolvedValue` + `findByText`/`waitFor`로 async 로드 대기 처리.
+- 1차 blocking 5건 재확인: **PASS**.
+  - create `displayOrder` 존중 및 중복 `CAT_004`, DEFAULT 삭제 `CAT_003`, GET 전용 `permitAll`, LOCKED reorder row 제외, `.gitignore` `!docs/worklog/` 복원 유지.
+- 비블로킹 재확인: CategoryOrderControls/useCategories/whitespace/teardown error 항목은 회귀 없음. Swagger 보강은 후속 명시 유지.
+
+### Blocking
+
+1. **`frontend/src/pages/BlogPage.test.tsx:164`, `:202` — fake-pass assertion 잔존**
+   - `expect(container).toBeDefined()`는 렌더 결과가 무엇이든 통과한다.
+   - `expect(container.querySelector('.grid')).toBeDefined()`는 `querySelector`가 `null`을 반환해도 통과하므로 grid 렌더를 검증하지 않는다.
+   - 현재 `BlogPage`는 hook의 `blog` 반환값을 직접 사용하지 않고 `getPublicBlog()` 결과로 local state를 채운다. 그런데 두 테스트는 `getPublicBlog: vi.fn()`만 넣고 resolve 값을 주지 않으므로, 테스트 이름과 달리 블로그 본문이 아니라 Not Found 상태를 렌더할 수 있다. 이 회귀를 위 assertion들이 숨긴다.
+   - 최소 수정: 해당 두 테스트를 `getPublicBlog.mockResolvedValue(mockBlog)` 기반 async 테스트로 바꾸고 `BlogHeader` 제목/설명, `Categories`, `Posts`, owner nickname, 또는 `.grid` 존재를 `toBeInTheDocument()`/`not.toBeNull()`로 실제 검증.
+
+### Fake-pass/skip scan
+
+- `rg` scan 결과: `describe.only`/`it.only`/`test.only`/`skip`/`@Disabled`/`expect(true).toBe(true)` 없음.
+- 잔존 컨테이너 fake-pass:
+  - `BlogPage.test.tsx:164`, `BlogPage.test.tsx:202` — 이번 M3에서 수정 대상 파일이므로 blocking.
+  - `routes/router.test.tsx:43/:54/:65/:76` — 기존 라우터 smoke test의 약한 assertion으로 확인. M3 직접 변경 범위는 아니지만 추후 정리 권장.
+
+### 실행 검증
+
+- `git diff --check dev...feature/M3-category`: PASS.
+- `npm.cmd run test`: **18 files / 132 tests PASS**.
+- `cmd /c npm run build`: **PASS**. CSS `@import` 순서 warning 2건은 기존 구조성 warning으로 비차단.
+- `npm.cmd run lint`: exit 0, 기존 warning만 출력.
+- `npx.cmd tsc -b`: PASS.
+- BE `.\gradlew.bat test` / `cmd /c .\gradlew.bat test`: Gradle 8.10 wrapper distribution 다운로드가 네트워크 제한(`Permission denied: getsockopt`)에 막혀 실행 불가. 정적 리뷰와 FE 검증으로 대체.
+
+### 수정 #3 (오케스트레이터 직접 · 2026-07-03)
+
+재리뷰 3차가 지적한 BlogPage 잔여 fake-pass 2건을 실제 검증으로 교체:
+- `should render blog ...`: `expect(container).toBeDefined()` → `getPublicBlog.mockResolvedValue(mockBlog)` + `findByText('My Blog')`로 헤더 title/description 실제 렌더 검증, Not Found 아님 확인.
+- `should render blog content sections ...`: `querySelector('.grid').toBeDefined()`(null도 통과하는 fake) → blog 로드 대기 후 `.grid`가 `not.toBeNull`.
+- **재검증(직접)**: FE `npm run test` **132/132**(unhandled error 0) · `npm run build` 0에러 · `git diff --check` clean. (BE 245/245 무변경.)
+
+**후속 항목(비차단, 이번 PR 범위 밖)**: `frontend/src/routes/router.test.tsx`에 `expect(container).toBeDefined()` fake-pass 4건이 M1 유산으로 남아있음(M3 diff 미포함). M3 PR diff 최소화를 위해 이번엔 건드리지 않고, 별도 테스트 위생 정리 작업으로 분리한다.
+
 ## [머지]
 (머지 단계에서 기록)

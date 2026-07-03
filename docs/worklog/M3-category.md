@@ -1081,4 +1081,10 @@ Codex 리뷰 결과 4개 blocking 이슈(+ 1개 비블로킹 Swagger) 식별. �
 
 
 ## [머지]
-(머지 단계에서 기록)
+
+- **2026-07-03 · PR #4 → `dev` squash 머지.** Codex 재리뷰 4차 verdict **머지 가능**(블로킹 0, 회귀 0).
+- 최종 검증(오케스트레이터 직접, 잠금 해제 후 clean): BE `./gradlew clean test` **245/245**(22클래스, failures=0/errors=0, Testcontainers MySQL 8.4) · FE `npm run test` **132/132**(18파일, unhandled error 0) · `npm run build`(tsc) 0에러 · `git diff --check` clean.
+- 사이클: 계획(Codex) → 개발(executor BE/FE) → 오케스트레이터 검증(BE 29→0 실패 수렴: 픽스처 order 중복·reorder 중간충돌·DEFAULT 순서규칙·테스트 의도; FE SettingsPostsPage 테스트 보완) → 리뷰(Codex, blocking 5) → 수정 → 재리뷰(fake-pass 1) → 수정 → 재리뷰(fake-pass 2) → 수정 → 재리뷰 4차(머지 가능).
+- FR-CAT-01~05 완료. Post 의존(글 수 실집계·삭제 시 글 이동·BlogPage 필터링)은 M4 연기. 순서변경 method는 정본대로 PUT.
+- **후속 항목**: (1) Swagger operationId/parameter/schema 보강(비블로킹 #4), (2) `router.test.tsx` fake-pass 4건 정리(M1 유산). 별도 테스트/문서 위생 작업으로 분리.
+- 다음: M4(게시글 + 콘텐츠 부가 + S3 업로드).

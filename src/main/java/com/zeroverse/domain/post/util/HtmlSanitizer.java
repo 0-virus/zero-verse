@@ -10,10 +10,13 @@ import org.jsoup.safety.Safelist;
  */
 public class HtmlSanitizer {
 
-    private static final Safelist SAFELIST = Safelist.basic()
-        .addTags("h1", "h2", "h3", "blockquote", "pre", "code")
+    private static final Safelist SAFELIST = Safelist.none()
+        .addTags("p", "br", "strong", "em", "ul", "ol", "li", "blockquote", "pre", "code",
+                 "h1", "h2", "h3", "a", "img")
         .addAttributes("a", "href")
-        .addAttributes("img", "src", "alt");
+        .addAttributes("img", "src", "alt")
+        .addProtocols("a", "href", "http", "https")
+        .addProtocols("img", "src", "http", "https");
 
     public static String sanitize(String html) {
         if (html == null || html.isEmpty()) {

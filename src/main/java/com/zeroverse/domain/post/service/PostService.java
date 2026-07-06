@@ -97,6 +97,9 @@ public class PostService {
             throw new BusinessException(ErrorCode.POST_005);
         }
 
+        // 이미지 검증
+        validateImages(request.images());
+
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_001));
 
@@ -159,6 +162,9 @@ public class PostService {
             throw new BusinessException(ErrorCode.POST_005);
         }
 
+        // 이미지 검증
+        validateImages(request.images());
+
         // HTML sanitize
         String sanitizedHtml = HtmlSanitizer.sanitize(request.contentHtml());
 
@@ -214,8 +220,9 @@ public class PostService {
 
     /**
      * 게시글 상세 조회 및 조회수 증가.
+     * 조회수 증가는 쓰기 작업이므로 readOnly=false로 설정.
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public PostDetailResponse getPost(Long postId, Long userId, String ipHash) {
         Post post = postRepository.findByIdWithDetails(postId)
             .orElseThrow(() -> new BusinessException(ErrorCode.POST_001));
@@ -272,12 +279,19 @@ public class PostService {
             builder.and(qPost.category.id.eq(categoryId));
         }
 
-        // 접근제어: 소유자가 아닌 경우 published PUBLIC만 반환
-        boolean isOwner = blog.getUser().getId().equals(userId);
+        // 접근제어: 승인 매트릭스 적용
+        boolean isOwner = userId != null && blog.getUser().getId().equals(userId);
         if (!isOwner) {
-            // 비소유자: published PUBLIC 글만
+            // 비소유자: 발행된 글만
             builder.and(qPost.publishedAt.isNotNull());
-            builder.and(qPost.visibility.eq(Visibility.PUBLIC));
+
+            // 익명(userId=null): PUBLIC만
+            // 로그인 비소유자: PUBLIC 또는 UNIVERSE
+            if (userId == null) {
+                builder.and(qPost.visibility.eq(Visibility.PUBLIC));
+            } else {
+                builder.and(qPost.visibility.in(Visibility.PUBLIC, Visibility.UNIVERSE));
+            }
         } else {
             // 소유자: visibility 필터 적용 (없으면 모든 visibility)
             if (visibility != null) {
@@ -387,17 +401,8 @@ public class PostService {
         // 작성자 검증
         accessControlService.canModify(post, userId);
 
-        // 이미지 요청 검증
-        if (request.images() != null) {
-            for (PostImageRequest imgReq : request.images()) {
-                if (imgReq.imageUrl() == null || imgReq.imageUrl().isEmpty()) {
-                    throw new BusinessException(ErrorCode.POST_006);
-                }
-                if (imgReq.displayOrder() == null) {
-                    throw new BusinessException(ErrorCode.POST_006);
-                }
-            }
-        }
+        // 이미지 요청 검증 (일관화된 검증)
+        validateImages(request.images());
 
         syncImages(post, request.images());
         Post updated = postRepository.save(post);
@@ -435,10 +440,20 @@ public class PostService {
 
     /**
      * Image 동기화 헬퍼.
+     * soft delete 사용으로 unique(post_id, display_order) 충돌 가능성이 있으므로:
+     * 1. 기존 이미지의 displayOrder를 오프셋(+10000)
+     * 2. soft delete (deleted_at 세팅)
+     * 3. 새 이미지 추가
      */
     private void syncImages(Post post, List<PostImageRequest> images) {
-        // 기존 이미지 제거 (즉시 DELETE 실행)
+        // 기존 이미지의 displayOrder를 오프셋하여 unique constraint 회피
+        postImageRepository.offsetDisplayOrderByPostId(post.getId());
+
+        // 기존 이미지 soft delete
         postImageRepository.deleteActiveByPostId(post.getId());
+
+        // DB에 반영
+        entityManager.flush();
 
         // 새 이미지 추가
         if (images == null || images.isEmpty()) {
@@ -448,6 +463,32 @@ public class PostService {
         for (PostImageRequest imgReq : images) {
             PostImage image = PostImage.create(post, imgReq.imageUrl(), imgReq.altText(), imgReq.displayOrder());
             postImageRepository.save(image);
+        }
+    }
+
+    /**
+     * 이미지 요청 검증 (create/update/sync 공통).
+     * - 빈 imageUrl 제거
+     * - null displayOrder 제거
+     * - 중복된 displayOrder 제거
+     */
+    private void validateImages(List<PostImageRequest> images) {
+        if (images == null || images.isEmpty()) {
+            return;
+        }
+
+        Set<Integer> seenOrders = new HashSet<>();
+        for (PostImageRequest imgReq : images) {
+            if (imgReq.imageUrl() == null || imgReq.imageUrl().isEmpty()) {
+                throw new BusinessException(ErrorCode.POST_006);
+            }
+            if (imgReq.displayOrder() == null) {
+                throw new BusinessException(ErrorCode.POST_006);
+            }
+            // 중복 displayOrder 검사
+            if (!seenOrders.add(imgReq.displayOrder())) {
+                throw new BusinessException(ErrorCode.POST_006);
+            }
         }
     }
 }

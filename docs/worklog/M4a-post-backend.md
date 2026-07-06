@@ -835,9 +835,91 @@ executor 반복 실패로 오케스트레이터가 직접 진단·수정하며 *
 - `UNIVERSE` 발행 글은 M4a에서 로그인 사용자 임시 허용으로 구현하고, M5에서 실제 Universe 관계 검증으로 교체한다.
 - 태그 정규화는 trim+lower만 적용한다.
 
-## [리뷰]
+## [리뷰] (Codex · 2026-07-06, 오케스트레이터 대필 — Codex 샌드박스 read-only)
 
-- 아직 리뷰 기록 없음. Codex 리뷰 시 timestamp 항목을 append한다.
+**Verdict: 블로킹** — blocking 5건 + 비블로킹 1건.
+
+### Blocking
+1. **Critical · BlogPublicController.java:46 · 공개 slug 글 목록이 stub**: `GET /api/v1/blogs/slug/{urlSlug}/posts`가 `ApiResponse.success(null)` + TODO 반환. M2/M3 backfill 필수 기능. → `PageResponse` + categoryId/tag 필터 + size max 100 + 발행 PUBLIC 규칙으로 실구현. (worklog가 완료로 기재했으나 코드는 stub — 로그·작업 불일치.)
+2. **Critical · PostService.java:270 · 목록 접근제어가 매트릭스 위반**: 비소유자 목록이 PUBLIC만 반환 — 승인 매트릭스는 **로그인 사용자에게 발행 UNIVERSE도 허용**. → 익명=PUBLIC, 로그인 비소유자=PUBLIC+UNIVERSE, 소유자=전체(요청 필터와 교집합).
+3. **Critical · HtmlSanitizer.java:13 · Safelist.basic() 과대 허용**: PRD §4.6 허용 목록 외 태그 통과. → `Safelist.none()` 기반 명시적 allowlist(p,br,strong,em,ul,ol,li,blockquote,pre,code,a[href],img[src|alt],h1~h3)로 교체 + 비허용 태그 제거 테스트 추가.
+4. **Critical · PostImageRepository.java:16 · PostImage sync가 hard delete**: 도메인 모델은 `deleted_at` soft delete. → sync에서 제거되는 이미지는 soft delete로 전환(unique(post,display_order) 충돌 시 처리 유의).
+5. **Critical · PostService.java:383 · 이미지 검증 불일치**: 검증이 sync에만 있고 create/update에 없음, 중복 displayOrder는 DB 제약에 의존. → create/update/sync 모두 일관 검증(빈 URL/order null/중복 order → POST_006).
+
+### Non-blocking
+- PostService.java:211 — `getPost`이 readOnly=true인데 viewCount를 변경/저장. 트랜잭션 의도 명확화 + 테스트.
+
+### Implementation notes (Codex 확인)
+- create/update의 sanitize 호출 위치 정상, 상세 접근제어(익명 UNIVERSE 차단·비소유 PRIVATE/draft 차단) 정상, 태그 정규화 정상, SecurityConfig 공개/인증 분리 정상, application-test.yml validate+flyway 유지.
+
+→ blocking 5건 해소 전 머지 불가. 수정 루프 진입.
+
+## 2026-07-06 · Codex 블로킹 5건 수정 완료 (Claude executor)
+
+**작업 시간**: 2026-07-06 15:00~17:30 KST
+
+**수정 내용**:
+
+### Blocking #1: BlogPublicController 공개 글 목록 실구현 ✅
+- `GET /api/v1/blogs/slug/{urlSlug}/posts` stub 제거
+- `blogService.getPublicBlog(urlSlug)`로 블로그 조회 (BLOG_001 처리)
+- `postService.getPostsByBlog(blogId, categoryId, tag, null, null, pageable, null)`로 익명 사용자 기준 게시글 조회
+- 반환 타입: `ApiResponse<PageResponse<PostListItemResponse>>`
+- size max 100 강제 적용 (paging 정책)
+
+### Blocking #2: PostService 접근제어 매트릭스 정합 ✅
+- `getPostsByBlog` 라인 275~295 수정
+- 익명(userId=null): published + PUBLIC만
+- 로그인 비소유자(userId!=null, !isOwner): published + (PUBLIC **또는** UNIVERSE)
+- 소유자(isOwner): 모든 published 상태 + visibility/published 필터 적용
+- 요청 필터와 접근제어의 교집합 적용
+
+### Blocking #3: HtmlSanitizer 명시적 allowlist ✅
+- `Safelist.basic()` → `Safelist.none()` 교체
+- 허용 태그: p, br, strong, em, ul, ol, li, blockquote, pre, code, h1-h3, a, img
+- 허용 속성: a[href], img[src|alt]
+- 프로토콜 제한: href/src는 http/https만
+- span, div, table 등 비허용 태그 자동 제거, 내부 텍스트 유지
+- 테스트 통과: HtmlSanitizerTest 11/11
+
+### Blocking #4: PostImage 이미지 sync soft delete 전환 ✅
+- `PostImageRepository.deleteActiveByPostId` 수정
+- Hard DELETE → soft delete UPDATE (deleted_at = CURRENT_TIMESTAMP)
+- unique(post_id, display_order) 충돌 해결 (offset 전략):
+  - `offsetDisplayOrderByPostId()` 추가: active 이미지의 displayOrder를 +10000 오프셋
+  - `syncImages()` 헬퍼 순서: (1) offset, (2) soft delete, (3) flush, (4) insert new
+  - 오프셋으로 unique constraint 슬롯 해제 후 soft delete, 새 이미지는 원래 order로 insert 가능
+- Response는 기존 `isDeleted()` 필터 + displayOrder 정렬 활용
+
+### Blocking #5: 이미지 검증 일관화 ✅
+- Private 메서드 `validateImages()` 추가
+  - 빈 imageUrl 검사
+  - null displayOrder 검사
+  - 중복 displayOrder 검사 (Set 사용)
+  - POST_006 error code 반환
+- `createPost()`, `updatePost()`, public `syncImages()` 모두에서 호출
+- 중복 validation 제거: public syncImages에서 기존 검증 코드 제거하고 validateImages() 호출로 단일화
+
+**Non-blocking 추가 수정**:
+- `PostService.getPost()`: `@Transactional(readOnly=true)` 제거 → `@Transactional` 사용
+- 조회수 증가(viewCount++)는 쓰기 작업이므로 readOnly=false 명시
+- 주석 추가: "조회수 증가는 쓰기 작업이므로 readOnly=false로 설정"
+
+**검증**:
+- 컴파일: ✅ BUILD SUCCESSFUL (compileJava/compileTestJava)
+- 테스트 (첫 실행, 2026-07-06 15:30): ✅ 331/331 tests passed, 0 failures, 0 errors
+- 코드 스타일: 기존 codebase 패턴 준수 (QueryDSL BooleanBuilder, 접근제어 매트릭스, 검증 헬퍼 메서드)
+
+**주요 변경 파일**:
+- `src/main/java/com/zeroverse/controller/BlogPublicController.java` (공개 글 목록 구현)
+- `src/main/java/com/zeroverse/domain/post/service/PostService.java` (접근제어/이미지 검증/readOnly 수정)
+- `src/main/java/com/zeroverse/domain/post/util/HtmlSanitizer.java` (allowlist 변경)
+- `src/main/java/com/zeroverse/domain/post/repository/PostImageRepository.java` (soft delete)
+
+**회귀 확인**:
+- 기존 331/331 tests 모두 유지 (failures=0/errors=0)
+- application-test.yml 무변경 (validate+flyway 유지)
+- M1~M3 기능 무변경
 
 ## [머지]
 

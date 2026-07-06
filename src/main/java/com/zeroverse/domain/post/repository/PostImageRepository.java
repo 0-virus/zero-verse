@@ -14,6 +14,10 @@ public interface PostImageRepository extends JpaRepository<PostImage, Long> {
     List<PostImage> findActiveByPostIdOrderByDisplayOrder(@Param("postId") Long postId);
 
     @Modifying
-    @Query("DELETE FROM PostImage pi WHERE pi.post.id = :postId AND pi.deletedAt IS NULL")
+    @Query("UPDATE PostImage pi SET pi.deletedAt = CURRENT_TIMESTAMP WHERE pi.post.id = :postId AND pi.deletedAt IS NULL")
     void deleteActiveByPostId(@Param("postId") Long postId);
+
+    @Modifying
+    @Query("UPDATE PostImage pi SET pi.displayOrder = pi.displayOrder + 10000 WHERE pi.post.id = :postId AND pi.deletedAt IS NULL")
+    void offsetDisplayOrderByPostId(@Param("postId") Long postId);
 }

@@ -20,6 +20,15 @@ public record CategoryTreeResponse(
     List<CategoryTreeResponse> children
 ) {
     public static List<CategoryTreeResponse> buildTree(List<Category> allCategories) {
+        return buildTree(allCategories, Map.of(), Map.of());
+    }
+
+    /**
+     * 게시글 수 실집계 버전(M4a backfill). 카테고리별 발행/임시저장 글 수를 함께 담는다.
+     */
+    public static List<CategoryTreeResponse> buildTree(List<Category> allCategories,
+                                                       Map<Long, Integer> postCounts,
+                                                       Map<Long, Integer> draftCounts) {
         Map<Long, CategoryTreeResponse> responseMap = new HashMap<>();
         List<CategoryTreeResponse> roots = new ArrayList<>();
 
@@ -31,8 +40,8 @@ public record CategoryTreeResponse(
                 category.getName(),
                 category.getType(),
                 category.getDisplayOrder(),
-                0,
-                0,
+                postCounts.getOrDefault(category.getId(), 0),
+                draftCounts.getOrDefault(category.getId(), 0),
                 new ArrayList<>()
             );
             responseMap.put(category.getId(), response);

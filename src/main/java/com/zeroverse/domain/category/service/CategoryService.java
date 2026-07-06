@@ -7,6 +7,7 @@ import com.zeroverse.domain.blog.repository.BlogRepository;
 import com.zeroverse.domain.category.entity.Category;
 import com.zeroverse.domain.category.entity.CategoryType;
 import com.zeroverse.domain.category.repository.CategoryRepository;
+import com.zeroverse.domain.post.repository.PostRepository;
 import com.zeroverse.dto.category.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,10 +22,13 @@ import java.util.stream.Collectors;
 public class CategoryService {
     private final CategoryRepository categoryRepository;
     private final BlogRepository blogRepository;
+    private final PostRepository postRepository;
 
-    public CategoryService(CategoryRepository categoryRepository, BlogRepository blogRepository) {
+    public CategoryService(CategoryRepository categoryRepository, BlogRepository blogRepository,
+                          PostRepository postRepository) {
         this.categoryRepository = categoryRepository;
         this.blogRepository = blogRepository;
+        this.postRepository = postRepository;
     }
 
     @Transactional(readOnly = true)
@@ -38,8 +42,19 @@ public class CategoryService {
         }
 
         List<Category> allCategories = categoryRepository.findActiveByBlogIdOrderByParentAndDisplayOrder(blogId);
-        List<CategoryTreeResponse> tree = CategoryTreeResponse.buildTree(allCategories);
-        return tree;
+
+        // M4a backfill: 카테고리별 발행 글 수 실집계. 임시저장 수는 소유자가 includeDrafts=true로 요청한 경우에만(FR-CAT-01).
+        boolean isOwner = userId != null && blog.getUser().getId().equals(userId);
+        java.util.Map<Long, Integer> postCounts = new java.util.HashMap<>();
+        java.util.Map<Long, Integer> draftCounts = new java.util.HashMap<>();
+        for (Category category : allCategories) {
+            postCounts.put(category.getId(), (int) postRepository.countPublishedPublicByCategory(category.getId()));
+            if (includeDrafts && isOwner) {
+                draftCounts.put(category.getId(), (int) postRepository.countDraftsByCategory(category.getId()));
+            }
+        }
+
+        return CategoryTreeResponse.buildTree(allCategories, postCounts, draftCounts);
     }
 
     public CategoryResponse createCategory(Long blogId, Long userId, CreateCategoryRequest request) {
@@ -190,9 +205,11 @@ public class CategoryService {
             throw new BusinessException(ErrorCode.CAT_005);
         }
 
-        // Soft delete category and all descendants
+        // Gather target category IDs for reassignment
         List<Long> deletedCategoryIds = new ArrayList<>();
         deletedCategoryIds.add(categoryId);
+
+        // Soft delete category and all descendants
         category.softDelete();
         categoryRepository.save(category);
 
@@ -202,15 +219,22 @@ public class CategoryService {
             deleteDescendantsRecursive(descendant, deletedCategoryIds);
         }
 
-        // M4: Post reassignment hook would be called here
-        // For M3, we return 0 reassigned posts and default category ID
+        // M4a Backfill: Reassign posts in deleted categories to DEFAULT
         Category defaultCategory = categoryRepository.findByBlogIdAndType(blogId, CategoryType.DEFAULT)
             .orElseThrow(() -> new BusinessException(ErrorCode.CAT_001));
+
+        // Count active posts in deleted categories before reassignment
+        long reassignedPostCount = postRepository.countActivePostsByCategories(deletedCategoryIds);
+
+        // Reassign posts to DEFAULT category
+        if (reassignedPostCount > 0) {
+            postRepository.reassignPostsByCategories(deletedCategoryIds, defaultCategory);
+        }
 
         return new DeleteCategoryResponse(
             deletedCategoryIds,
             defaultCategory.getId(),
-            0
+            (int) reassignedPostCount
         );
     }
 

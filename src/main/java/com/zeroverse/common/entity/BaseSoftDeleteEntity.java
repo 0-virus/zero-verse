@@ -18,6 +18,10 @@ public abstract class BaseSoftDeleteEntity extends BaseEntity {
         this.deletedAt = deletedAt;
     }
 
+    public void softDelete() {
+        this.deletedAt = LocalDateTime.now();
+    }
+
     public boolean isDeleted() {
         return deletedAt != null;
     }

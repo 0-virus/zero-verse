@@ -33,6 +33,9 @@ dependencies {
     // API Documentation
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.17'
 
+    // HTML Sanitizer
+    implementation 'org.jsoup:jsoup:1.18.1'
+
     // QueryDSL
     implementation 'com.querydsl:querydsl-jpa:5.1.0:jakarta'
     annotationProcessor 'com.querydsl:querydsl-apt:5.1.0:jakarta'

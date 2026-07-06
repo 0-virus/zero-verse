@@ -61,6 +61,13 @@ public class SecurityConfig {
                     "/api/v1/search"
                 ).permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/blogs/*/categories").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/blogs/*/posts").permitAll()
+                // Authenticated endpoints first (more specific patterns)
+                .requestMatchers(HttpMethod.GET, "/api/v1/posts/drafts").authenticated()
+                .requestMatchers(HttpMethod.PUT, "/api/v1/posts/*/images").authenticated()
+                // Public GET endpoints (less specific patterns)
+                .requestMatchers(HttpMethod.GET, "/api/v1/posts/*").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/tags/*/posts").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

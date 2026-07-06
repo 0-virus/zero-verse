@@ -28,6 +28,10 @@ public enum ErrorCode {
     POST_001("POST_001", "게시글을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
     POST_002("POST_002", "게시글에 접근할 수 없습니다.", HttpStatus.FORBIDDEN),
     POST_003("POST_003", "게시글 작성자만 수정할 수 있습니다.", HttpStatus.FORBIDDEN),
+    POST_004("POST_004", "게시글 카테고리가 블로그에 속하지 않습니다.", HttpStatus.BAD_REQUEST),
+    POST_005("POST_005", "게시글 공개 범위가 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
+    POST_006("POST_006", "게시글 이미지 요청이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
+    POST_007("POST_007", "게시글 태그 요청이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
 
     // Category
     CAT_001("CAT_001", "카테고리를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),

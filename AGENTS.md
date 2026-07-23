@@ -1,4 +1,4 @@
-<!-- Generated: 2026-07-01 | Updated: 2026-07-01 -->
+<!-- Generated: 2026-07-01 | Updated: 2026-07-24 -->
 
 # zeroverse-server
 
@@ -8,22 +8,26 @@ ZeroVerse Blog MVP의 명세 저장소. 개인 블로그 플랫폼으로, 사용
 
 ## Key Files & Docs
 
-핵심 명세는 모두 `docs/`에 있다(스펙 문서는 gitignore, `docs/worklog/`만 추적). 코드 작성 전 반드시 참조한다.
+핵심 명세는 모두 `docs/`에 있다(스펙 문서는 gitignore, `docs/worklog/`와 `docs/governance/`만 추적). 코드 작성 전 반드시 참조한다.
 
 | Path | Description |
 |------|--------------|
 | `docs/REQUIREMENTS.md` | MVP 전체 요구사항 명세(v2.1). 도메인 모델, API 규칙, FR-*/NFR-*, 프론트 라우트, 엔드포인트 목록, 에픽 초안. **요구사항 정본**(단, `docs/PRD.md` §9 사용자 결정이 override하는 부분 제외). |
-| `docs/PRD.md` | 요구사항 + Figma 와이어프레임(11개 화면) + 사용자 결정을 통합한 **구현 실행 명세**. 아키텍처/패키지 구조, 화면-API 매핑, 디자인 시스템 토큰, 결정 로그(§9), 마일스톤 순서(§10), 테스트 전략, DoD. 실제 구현의 로드맵. |
+| `docs/PRD.md` | 요구사항 + 디자인 정본 + 사용자 결정을 통합한 **구현 실행 명세**(v2.0). 아키텍처/패키지 구조, 화면-API 매핑, 디자인 시스템 토큰(§6), 화면 명세(§7), 결정 로그(§9), 마일스톤 순서(§10), 테스트 전략, DoD. 실제 구현의 로드맵. |
+| `docs/design/` | **시각 디자인 정본**(2026-07-24 도입). Claude Design 프로젝트에서 가져온 `.dc.html` 원본 + `DESIGN-SYSTEM.md`(토큰·컴포넌트·13화면 스펙). `docs/design/AGENTS.md` 참고. |
+| `docs/governance/` | Codex 기획 심의팀 운영 규칙, 회의록 템플릿, ADR, 결정·위험 레지스터. **Git 추적 대상**. |
 | `docs/log.md` | 개발 학습/작업 로그(과거 JPA·Security·JWT 메모). 현재 소스와 동기화 보장 안 됨(참고용). |
 | `AGENTS.md` | (이 파일, 루트) 저장소 최상위 AI 에이전트 안내. git 추적 대상. |
-| `.gitignore` | 표준 Spring/Gradle/IDE ignore + `docs/*` 무시(단 `!docs/worklog/`는 추적) + `application-local.yml` 제외. |
+| `.gitignore` | 표준 Spring/Gradle/IDE ignore + `docs/*` 무시(단 `docs/worklog/`, `docs/governance/`는 추적) + `application-local.yml` 제외. |
 
 ## Subdirectories
 
 | Directory | Purpose |
 |-----------|---------|
-| `docs/` | 요구사항·PRD·과거 로그. 스펙 문서(REQUIREMENTS/PRD/log)는 gitignore. 구현 전 반드시 읽는다. `docs/AGENTS.md` 참고. |
+| `docs/` | 요구사항·PRD·디자인·과거 로그. 스펙 문서(REQUIREMENTS/PRD/log/design)는 gitignore. 구현 전 반드시 읽는다. `docs/AGENTS.md` 참고. |
+| `docs/design/` | 시각 디자인 정본(`.dc.html` 원본 + `DESIGN-SYSTEM.md`). 프론트엔드 작업 전 반드시 읽는다. `docs/design/AGENTS.md` 참고. |
 | `docs/worklog/` | 마일스톤별 개발 로그(`M{n}-<slug>.md`). **git 추적됨**(`!docs/worklog/`). "개발 프로세스" 섹션 참조. |
+| `docs/governance/` | 중요 결정과 대형 마일스톤을 심의하는 Codex 기획 심의팀의 정책·회의록·ADR·레지스터. **git 추적됨**. |
 | `.claude/` | Claude Code 프로젝트 설정(`CLAUDE.md`)과 oh-my-claudecode 스킬. AI 오케스트레이션용, 앱 코드 아님. |
 | `.agents/` | 비어있음. |
 | `.omc/` | oh-my-claudecode 런타임 상태. 무시 대상 운영 아티팩트. |
@@ -64,6 +68,7 @@ ZeroVerse Blog MVP의 명세 저장소. 개인 블로그 플랫폼으로, 사용
 |------|------|-----------|
 | 0. 분기 | Claude | Bash git / `git-master` 에이전트 |
 | 1. 계획 | **Codex** | `codex:rescue` 스킬(또는 `Agent(subagent_type="codex:codex-rescue")`) — `docs/PRD.md` + `docs/worklog/*`를 읽고 현재 마일스톤 파악 + 세부 작업계획 제안 → 워크로그 `[계획]` 기록 |
+| 1a. 조건부 기획 심의 | **Codex 진행자 + Codex 독립 에이전트 3명** | `docs/governance/README.md`의 소집 조건 충족 시 제품성·기술 실현성·전달/위험을 독립 검토. Claude는 심의에 참여하지 않음. `LOW`만 자동 승인, 나머지는 사용자 승인 후 진행 |
 | 2. 개발 | **Claude(Sonnet)** | `Agent(subagent_type="oh-my-claudecode:executor", model="sonnet")` — PRD+계획 기반 구현 + 테스트(PRD §11, TDD) |
 | 점검 | Claude | `verifier` 에이전트 / 빌드·테스트 — 자체 통과 확인(자기 승인 아님, 최종 리뷰는 Codex) |
 | 3a. 커밋·PR | Claude | `git-master` / Bash+`gh` — 원자적 커밋(OMC 커밋 규약, co-author 라인) → `gh pr create --base dev` |
@@ -72,10 +77,11 @@ ZeroVerse Blog MVP의 명세 저장소. 개인 블로그 플랫폼으로, 사용
 | 4. 머지 | Claude | `gh pr merge` / `git-master` — `dev`로 머지 → 워크로그 `[머지]` 기록 |
 
 - **저자(Claude)와 검토자(Codex)는 항상 분리** — 같은 컨텍스트에서 자기 승인 금지(OMC 원칙).
+- 기획 심의가 소집되면 독립 에이전트끼리 메시지나 중간 결과를 공유하지 않는다. Codex 진행자만 결과를 취합하며, 상세 운영 규칙은 `docs/governance/README.md`를 따른다.
 - 사이클 동안 `TaskCreate`/`TaskUpdate`로 세부 작업을 추적한다.
 
 ### 워크로그 규약
-- 위치: `docs/worklog/M{n}-<slug>.md` — **마일스톤당 Markdown 1파일**. `docs/`는 gitignore이나 `!docs/worklog/`로 worklog만 추적됨(PR diff에 로그 포함).
+- 위치: `docs/worklog/M{n}-<slug>.md` — **마일스톤당 Markdown 1파일**. `docs/`는 gitignore이나 `docs/worklog/`와 `docs/governance/`는 예외로 추적됨(PR diff에 로그와 결정 문서 포함).
 - 기록: 파일 내부에 timestamp 항목을 **append**(새 파일 남발 금지).
 - 고정 섹션: `[계획]`(Codex) → `[개발 기록]`(Claude, 시각별) → `[이슈·결정]` → `[리뷰]`(Codex) → `[머지]`.
 - 목적: 3b 리뷰의 "로그 ↔ 실제 작업 일치" 검증 및 이후 마일스톤 참고.
@@ -86,20 +92,32 @@ ZeroVerse Blog MVP의 명세 저장소. 개인 블로그 플랫폼으로, 사용
 
 구현 판단이 갈릴 때 아래 순서로 따른다:
 
-0. **사용자의 명시적 결정** — `docs/PRD.md` **§9 결정 로그**에 기록된 확정 사항은 아래 문서를 **override**한다. (예: 카테고리 타입 재정의 §9-H, 공개범위 화면 라벨 §9-B, `나를 발견한` 피드 탭 제거 §9-G, 데스크톱 전용 §9-I.)
-1. **`docs/REQUIREMENTS.md`** — 데이터 모델·API 계약·규칙·에러코드의 최종 권위(§9로 override되지 않은 범위).
-2. **Figma 와이어프레임** (`GdWn01gB35uT1mebKXGIx6`, page `94:7`, *Requirements 2.1 Web App Wireframes*) — 레이아웃/시각/인터랙션 참조. 데이터·규칙이 요구사항과 다르면 요구사항이 이긴다. 정확한 디자인 값이 필요하면 Figma MCP(`get_design_context`/`get_screenshot`)로 노드 재확인.
+0. **사용자의 명시적 결정** — `docs/PRD.md` **§9 결정 로그**에 기록된 확정 사항은 아래 문서를 **override**한다. (예: 디자인 소스 교체 §9.0, 카테고리 타입 재정의 §9-H, 공개범위 화면 라벨 §9-B, `나를 발견한` 피드 탭 제거 §9-G, 데스크톱 전용 §9-I.)
+1. **`docs/design/` — Claude Design 정본** (프로젝트 `f1af0ea2-421d-44aa-9871-4273726f53fe` "우주 블로그 웹사이트 레이아웃"). **시각 디자인·레이아웃·화면 구성·UI 카피의 최종 권위.** 색·그림자·타이포·간격·패널 배치·버튼 라벨이 다른 문서와 충돌하면 **무조건 디자인이 이긴다**(사용자 결정, 2026-07-24). 요약은 `docs/design/DESIGN-SYSTEM.md`, 정확한 값은 `.dc.html` 원본의 인라인 `style`.
+2. **`docs/REQUIREMENTS.md`** — 데이터 모델·API 계약·비즈니스 규칙·접근제어·에러코드의 최종 권위(§9로 override되지 않은 범위).
 3. **`docs/PRD.md` 본문** — 위를 통합한 실행 계획.
 
+> **1과 2의 경계**: 디자인은 *어떻게 보이는가*, 요구사항은 *무엇을 저장하고 누구에게 허용하는가*를 정한다. 디자인에 어떤 필드·상태가 그려져 있지 않다는 사실만으로 요구사항의 필드를 삭제하지 않는다(예: `birth_date`, 카테고리 `DEFAULT/LOCKED` 잠금 — PRD §9.3에 확인 대기 항목으로 정리됨). 반대로 디자인이 명시한 레이아웃·라벨은 요구사항 문구보다 우선한다.
+>
+> **폐기**: Figma 와이어프레임(`GdWn01gB35uT1mebKXGIx6`, page `94:7`)과 거기서 파생된 다크 네온 토큰(`#02020b`/`#22d3ee`/`#a855f7`/골드 `#fde047`)은 더 이상 참조하지 않는다.
+>
 > 새 충돌 사례를 발견하면 임의 진행하지 말고 PRD §9 표에 추가한 뒤 사용자에게 확인한다. **S3/이미지 업로드는 로컬 LocalStack + S3 직접 URL로 확정(PRD §13.1)** — 실제 버킷·리전 값만 M4 착수 시 제공 필요.
 
 ### Working In This Directory
 
-- 어떤 기능이든 코드 작성 전에 **`docs/REQUIREMENTS.md`의 FR/NFR 번호와 `docs/PRD.md`의 대응 섹션(§5 백엔드 / §7 화면)** 을 먼저 확인한다. 스펙을 임의로 바꾸지 않는다.
+- 어떤 기능이든 코드 작성 전에 **`docs/REQUIREMENTS.md`의 FR/NFR 번호와 `docs/PRD.md`의 대응 섹션(§5 백엔드 / §7 화면)** 을 먼저 확인한다. 프론트엔드라면 **`docs/design/DESIGN-SYSTEM.md`를 함께** 읽는다. 스펙을 임의로 바꾸지 않는다.
 - 실제 Spring Boot 프로젝트(`build.gradle`, `src/main/java/com/zeroverse/...`)와 React 프로젝트(`frontend/`)는 아직 스캐폴딩 전이다. 구현 순서는 **PRD §10 마일스톤(M0 스캐폴딩 → M1 인증 → … → M10 마감)** 을 따르며 M0→M1이 모든 것의 선행이다.
 - 백엔드 패키지는 PRD §2.2(base `com.zeroverse`, 도메인 패키지 + 레이어드), 프론트는 §2.3. DB 컬럼 snake_case / Java 필드 camelCase(NFR-06), JPA 필드는 래퍼 타입.
 - **카테고리 타입은 `DEFAULT/GENERAL/LOCKED`** (SERIES 제거, §9-H). 미분류=DEFAULT(변경·삭제 불가), LOCKED=잠금(변경·삭제 불가). **공개범위 enum은 `UNIVERSE`이나 화면 표기는 "친구"**(§9-B).
-- **프론트엔드는 PRD §6 디자인 시스템 토큰을 반드시 적용**: 배경 `#02020b`, 시안 보더 `#22d3ee`, 퍼플 `#a855f7`, 위험 `#fb7185`, 관리자 골드 `#fde047`; 폰트 `Press Start 2P`(로고/헤딩) + `IBM Plex Sans KR`(본문); 각진 모서리 + 블러 없는 하드 오프셋 그림자(레트로 픽셀/우주 테마). 화면 레이아웃은 §7과 와이어프레임에 시각적으로 일치. **데스크톱 전용.**
+- **프론트엔드는 PRD §6 = `docs/design/DESIGN-SYSTEM.md` 토큰을 반드시 적용**(레트로 픽셀 × 크림 페이퍼 × 황혼의 우주):
+  - 배경 `#f6ead8`(paper) · 잉크/보더 `#2b1b3d` · 강조 `#e85d75`(accent) · 하드 오프셋 그림자 `#d8c7b0`.
+  - 표면 `#fff` / `#fff8ec` / `#ffe9c9` / `#fff3dd`, 텍스트 `#3d2f52`·`#5c4a72`·`#9b8aa8`, 잉크 위 텍스트 `#ffd9a0`.
+  - 상태색: PUBLIC/ACTIVE `#2e7d4f`+`#d7f5dd` · 친구(UNIVERSE) `#c86bb1`+`#f9e3f2` · PRIVATE `#9b8aa8`+`#f1ece2` · danger `#c73a55`+`#ffe3ea` · warning `#b8860b`+`#fdf3d7` · info `#2a6f97`+`#ddedf5`.
+  - **`border-radius: 0` 예외 없음**, 보더 `3px solid #2b1b3d`(주)/`2px`(보조), 그림자 `6px/7px/8px 오프셋 0 blur #d8c7b0`(버튼/카드/대형 컨테이너).
+  - 폰트 `Press Start 2P`(로고 + 짧은 영문 대문자 라벨 **전용, 한글 금지**) + `IBM Plex Sans KR`(그 외 전부).
+  - 우주 그라디언트·픽셀 별(`steps(2)` 반짝임)·픽셀 로켓은 **다크 영역(히어로·온보딩)에만**.
+  - 화면 레이아웃은 PRD §7 + `docs/design/*.dc.html`에 시각적으로 일치. **데스크톱 전용 `min-width:1440px`.**
+  - 폐기: 다크 네온 팔레트(`#02020b`/`#22d3ee`/`#a855f7`/`#fb7185`/`#fde047`), 골드 관리자 강조, 상단바 관리자 버튼, 사이드바 Admin 항목.
 - 공통 규약(응답 래퍼·페이징·에러코드·JWT/rotation·slug·sanitize)은 PRD §4를 전 도메인에 일관 적용.
 - 완료 판정은 PRD **§12 DoD**: 규칙 구현 + 테스트 통과(placeholder/skip/stub 금지) + Swagger 문서화 + 디자인 일치 + 보안 + 저자와 다른 패스의 검증.
 - 구현 시작 후 하위 디렉터리(`src/main/java/com/zeroverse/...`, `frontend/src/...`)별로 AGENTS.md를 추가 생성한다.

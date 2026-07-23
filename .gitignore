@@ -37,6 +37,8 @@ out/
 ### VS Code ###
 .vscode/
 
-### Docs — 스펙 문서는 무시, worklog만 추적 ###
+### Docs — 스펙 문서는 무시, worklog/governance만 추적 ###
 docs/*
 !docs/worklog/
+!docs/governance/
+!docs/governance/**

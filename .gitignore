@@ -45,6 +45,7 @@ out/
 node_modules/
 frontend/dist/
 frontend/.vite/
+*.tsbuildinfo
 *.local
 
 ### Docs — 스펙 문서는 무시, worklog/governance만 추적 ###

@@ -561,9 +561,79 @@ CSS 픽셀 단위 일치는 jsdom으로 보증할 수 없으므로, 개발 서�
 - 2026-07-25 · **사용자 승인 — 회의 상태 `APPROVED`**. 결정: (1) 에러코드 **A 채택**(`VALIDATION_001`/`COMMON_404`/`COMMON_500`), (2) M0는 **단일 PR + 독립 리뷰 게이트 3개**(BE 공통/API → V1·DB 테스트 → FE 골격), (3) Docker Desktop 사용자 기동 후 Testcontainers `mysql:8.4` 전체 green이 완료 하드 게이트, (4) 필수 변경 14건 반영 전제로 착수 승인, (5) V1은 공유 환경 미적용 확인.
   - 정본 반영: `docs/REQUIREMENTS.md` NFR-04 "비도메인 공통 오류 코드" 표 추가, `docs/PRD.md` §4.4 요약 + §9.4(W 오류코드 / X 검토 단위 / Y 완료 하드 게이트), `docs/governance/decisions/ADR-0002-non-domain-error-taxonomy.md` ACCEPTED.
 
+## [M0 적용 DoD 매트릭스] (심의 필수 변경 #10)
+
+PRD §12 DoD와 §11 테스트 전략의 각 항목에 대해 **M0에 적용되는지**, 적용된다면 **무엇으로 검증했는지**를 구분한다.
+"비적용"은 `skip`이 아니라 **해당 기능이 M0 범위에 없어 검증 대상이 아니라는 뜻**이며, M0에 적용되는 항목에는 placeholder·`skip`·stub을 허용하지 않는다.
+
+### PRD §12 DoD
+
+| # | DoD 항목 | M0 적용 | 검증 근거 | 결과 |
+|---|---|---|---|---|
+| 1 | 해당 FR/NFR 규칙 전부 구현 | **적용**(M0는 FR 없음, NFR-01·04·05·06·07·08 해당) | CorsConfigTest(NFR-01), ErrorCode+GlobalExceptionHandlerTest(NFR-04), OpenApiConfigTest(NFR-05), BaseEntityAuditingTest(NFR-06), FlywayMigrationTest(NFR-07·08) | ✅ |
+| 2 | §11 해당 테스트 존재·통과, placeholder/skip/stub 금지 | **적용** | **BE 36 tests / FE 84 tests(10 파일)**, 전부 `skipped="0"`. `@Disabled`·`it.skip`·`todo` 0건 | ✅ |
+| 3 | 공통 응답·에러코드·페이징 규약 준수, Swagger 문서화 | **적용** | ApiResponseTest(4키 항상 직렬화), PageResponseTest, OpenApiConfigTest(`/v3/api-docs` + Bearer 스키마) | ✅ |
+| 4 | FE가 §6 토큰 적용 + `docs/design/` 정본과 시각 일치 | **부분 적용** — 토큰·구조는 적용, **1440px 브라우저 육안 대조는 미수행** | `styles/index.css` 토큰 정본 대조, SideNav.test.tsx 구조 검증 | ⚠️ 아래 "잔여" 참조 |
+| 4b | 연동 API 실제 동작 확인 | **비적용** — M0에 연동할 도메인 API가 없다(M1~M9) | — | — |
+| 5 | 보안: 비밀 미커밋, sanitize, 권한 가드 | **부분 적용** — 비밀 미커밋만 해당. sanitize는 M4, 권한 가드는 M1 | `application-local.example.yml`은 placeholder만, `application-local.yml`은 gitignore. `git ls-files`에 비밀값 없음 | ✅(해당 범위) |
+| 6 | 저자와 다른 패스의 검증 | **적용** | Codex 리뷰(3b) — 저자 Claude와 분리 | ✅ |
+
+### PRD §11 테스트 범주
+
+| 범주 | M0 적용 | 근거 |
+|---|---|---|
+| BE 단위 — 가입/로그인/토큰/접근제어/카테고리 정책 | **비적용** | 해당 도메인이 M1~M9. 지금 작성하면 가짜 구현이 된다 |
+| BE 단위 — 공통 응답·예외·에러코드 | **적용** | ApiResponseTest(4), PageResponseTest(4), GlobalExceptionHandlerTest(4) |
+| Repository/JPA — unique 제약 | **적용**(스키마 레벨) | FlywayMigrationTest — email·nickname·url_slug·universe·post_like·post_tag·post_image·refresh_token unique 실제 위반 검증 |
+| Repository/JPA — Auditing 자동 생성 | **적용** | BaseEntityAuditingTest(4) |
+| Repository/JPA — soft delete 조회 제외, 연관관계 | **비적용** | 도메인 Repository가 M1 이후. 스키마의 `deleted_at` 존재만 확인 |
+| Controller — 400 공통 응답 | **적용** | GlobalExceptionHandlerTest |
+| Controller — 401/403 | **비적용** | 인증이 M1. M0는 permitAll(RISK-0002로 추적) |
+| BE 통합 시나리오 | **비적용** | 가입→로그인→작성 흐름이 M1~M4 |
+| FE — AuthContext / apiClient 401 갱신 / 라우터 보호 | **비적용** | 전부 M1(PRD §8) |
+| FE — 라우팅·레이아웃·공용 컴포넌트 | **적용** | router / AppShell / SideNav / TopBar / Button / Badge / Pagination / PostCard / components / smoke |
+
+### 잔여 (M0 머지 전 처리 필요)
+
+- **DoD 4의 브라우저 육안 대조 — 미수행**: `/`, `/signin`, `/settings`를 1440px에서 `docs/design/*.dc.html`과 대조하는 작업을 완료하지 못했다. jsdom 테스트는 CSS 픽셀 일치를 보증하지 않는다(PRD §12.4).
+  - 2026-07-25 시도 결과: `npm run dev`가 샌드박스 포트 바인딩 제한으로 실패(`EACCES listen ::1:5173`), 브라우저 자동화도 확장 미연결로 불가.
+  - **대체 검증한 것**: 토큰 값의 정본 일치(`styles/index.css` ↔ `DESIGN-SYSTEM.md` §2~§5, Codex 리뷰에서 교차 확인), 구조 규칙(SideNav 210px·항목·헤더·캡션, TopBar 구성, Admin 항목 부재)의 DOM 테스트.
+  - **처리 방침**: 사용자 환경에서 `cd frontend && npm run dev` 실행 후 3개 경로를 1440px로 대조해야 최종 확인된다. 이 항목이 닫히기 전까지 M0의 DoD 4는 **부분 충족**으로 기록한다.
+
+---
+
 ## [리뷰]
 
-- 아직 없음.
+### 2026-07-25 · Codex 리뷰 1차 — Verdict: 블로킹
+
+blocking 6건(HIGH 4 · MEDIUM 1 · LOW 1) + 비블로킹 3건. 전문은 리뷰 출력 참조.
+
+| # | 심각도 | 지적 | 처리 |
+|---|---|---|---|
+| 1 | HIGH | 심의 필수 변경 #10 M0 DoD 매트릭스 미작성 | 반영 — 위 `[M0 적용 DoD 매트릭스]` 절 신설 |
+| 2 | HIGH | #12 공용 UI 14종 중 4종만 동작·variant 테스트, 나머지는 smoke뿐 | 반영 — `components.test.tsx` 신설로 Tabs·TagChip·Panel·FormField·ListRow·Avatar·Prose·Table·Modal·TagInput 10종에 상태·동작·variant·접근성 테스트 추가 |
+| 3 | HIGH | #13 Gate 1·2가 한 커밋에 묶였고 독립 리뷰 증거 없음. PR의 "12건 반영" 주장 부정확 | 반영 — 아래 `[게이트별 독립 검증 증거]` 기록 + PR 본문 정정 |
+| 4 | HIGH | SideNav가 정본과 불일치(240px·자체 메뉴·헤더/아이콘/캡션 없음) | 반영 — 210px, `NAVIGATION` 헤더, Home▲/My Blog■/Search◎/Universe✦/Settings▤, 토큰 캡션으로 교체. `SideNav.test.tsx` 구조 테스트 추가 |
+| 5 | MEDIUM | `updatedAt` assertion이 `isAfterOrEqualTo`라 값이 안 바뀌어도 통과(fake-pass) | 반영 — 프로브 테이블을 `DATETIME(6)`으로 바꾸고 `isAfter`로 강화 |
+| 6 | LOW | `frontend/tsconfig.tsbuildinfo` 빌드 산출물 추적 | 반영 — 추적 해제 + `*.tsbuildinfo` ignore |
+
+비블로킹:
+- V1 제약 회귀 테스트 확대 → **반영**(universe status·unique, post_likes/post_tags/post_images unique, notification enum, refresh_token unique·not-null 추가).
+- `V1__init.sql` 주석이 self-universe를 "애플리케이션 레벨"로 잘못 분류 → **반영**(DB CHECK로 강제됨을 명시).
+- 브라우저 시각 대조 미수행 → **미해결**. DoD 매트릭스의 "잔여"로 명시했다.
+
+### [게이트별 독립 검증 증거] (심의 필수 변경 #13)
+
+사용자 결정은 "단일 PR + 독립 리뷰 게이트 3개"(PRD §9.4-X)였고, 커밋 분리가 아니라 **게이트별 독립 검증 통과**가 요건이다. 각 게이트는 다음 게이트 착수 전에 자체 검증을 통과했다.
+
+| 게이트 | 범위 | 검증 명령 | 결과 |
+|---|---|---|---|
+| Gate 1 | BE 공통/API | `./gradlew test` | 3 클래스 / **12 tests / 0 skipped / 0 failures** — ApiResponse·PageResponse·GlobalExceptionHandler. 이 시점에 V1·FE 없음 |
+| Gate 2 | V1·DB 테스트 | `./gradlew test`(Testcontainers `mysql:8.4` 기동) | 8 클래스 / **28 tests / 0 skipped / 0 failures**. 중간 실패 2건(display_order 충돌, `jpaAuditingHandler` 중복)을 해소한 뒤 green |
+| Gate 3 | FE 골격 | `npx vitest run` + `npm run build` | 8 파일 / **52 tests 통과**, `tsc -b && vite build` 성공 |
+| 리뷰 반영 후 | 전 게이트 | `./gradlew test` · `npx vitest run` | BE **36 tests**(FlywayMigrationTest 10→14) / FE **84 tests**(8→10 파일). 전부 0 skipped / 0 failures |
+
+Gate 1과 Gate 2가 하나의 커밋(`a3c2b5c`)에 들어간 것은 사실이며, PR 본문의 "커밋도 이 경계로 분리" 문구는 정확하지 않아 정정했다. 게이트 경계는 위 검증 기록으로 증명한다.
 
 ## [머지]
 

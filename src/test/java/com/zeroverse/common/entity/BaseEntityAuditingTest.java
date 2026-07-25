@@ -70,7 +70,7 @@ class BaseEntityAuditingTest extends MySqlTestSupport {
         entityManager.flush();
 
         assertThat(probe.getCreatedAt()).isEqualTo(createdAt);
-        assertThat(probe.getUpdatedAt()).isAfterOrEqualTo(firstUpdatedAt);
+        assertThat(probe.getUpdatedAt()).isAfter(firstUpdatedAt);
         assertThat(probe.getName()).isEqualTo("수정 후");
     }
 

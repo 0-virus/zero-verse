@@ -172,6 +172,110 @@ class FlywayMigrationTest extends MySqlTestSupport {
     }
 
     @Test
+    @DisplayName("Universe status는 PENDING/ACCEPTED/BLOCKED만 허용하고 같은 방향은 중복될 수 없다")
+    void universeStatusAndUniqueAreEnforced() {
+        Long from = insertUser("uni-from@zeroverse.test", "uni-from");
+        Long to = insertUser("uni-to@zeroverse.test", "uni-to");
+
+        jdbc().update(
+                "INSERT INTO universes (from_user_id, to_user_id, status) VALUES (?, ?, ?)",
+                from, to, "PENDING");
+
+        assertThatThrownBy(() -> jdbc().update(
+                        "INSERT INTO universes (from_user_id, to_user_id, status) VALUES (?, ?, ?)",
+                        from, to, "ACCEPTED"))
+                .rootCause()
+                .isInstanceOf(SQLException.class);
+
+        assertThatThrownBy(() -> jdbc().update(
+                        "INSERT INTO universes (from_user_id, to_user_id, status) VALUES (?, ?, ?)",
+                        to, from, "REJECTED"))
+                .rootCause()
+                .isInstanceOf(SQLException.class);
+    }
+
+    @Test
+    @DisplayName("좋아요·태그연결·이미지의 중복 방지 unique 제약이 동작한다")
+    void relationUniqueConstraintsAreEnforced() {
+        Long userId = insertUser("rel@zeroverse.test", "rel-user");
+        Long blogId = insertBlog(userId, "rel-blog");
+        Long postId = insertPost(userId, blogId, "관계 테스트");
+
+        jdbc().update("INSERT INTO post_likes (post_id, user_id) VALUES (?, ?)", postId, userId);
+        assertThatThrownBy(() -> jdbc().update(
+                        "INSERT INTO post_likes (post_id, user_id) VALUES (?, ?)", postId, userId))
+                .rootCause()
+                .isInstanceOf(SQLException.class);
+
+        jdbc().update("INSERT INTO tags (name, normalized_name) VALUES (?, ?)", "React", "react");
+        Long tagId = jdbc().queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+        jdbc().update("INSERT INTO post_tags (post_id, tag_id) VALUES (?, ?)", postId, tagId);
+        assertThatThrownBy(() -> jdbc().update(
+                        "INSERT INTO post_tags (post_id, tag_id) VALUES (?, ?)", postId, tagId))
+                .rootCause()
+                .isInstanceOf(SQLException.class);
+
+        jdbc().update(
+                "INSERT INTO post_images (post_id, image_url, display_order) VALUES (?, ?, ?)",
+                postId, "https://example.test/a.png", 0);
+        assertThatThrownBy(() -> jdbc().update(
+                        "INSERT INTO post_images (post_id, image_url, display_order)"
+                                + " VALUES (?, ?, ?)",
+                        postId, "https://example.test/b.png", 0))
+                .rootCause()
+                .isInstanceOf(SQLException.class);
+    }
+
+    @Test
+    @DisplayName("알림 type·target_type은 정의된 값만 허용한다")
+    void notificationEnumsAreRestricted() {
+        Long receiver = insertUser("noti@zeroverse.test", "noti-user");
+
+        jdbc().update(
+                "INSERT INTO notifications (receiver_user_id, type, target_type, target_id)"
+                        + " VALUES (?, ?, ?, ?)",
+                receiver, "COMMENT", "POST", 1L);
+
+        assertThatThrownBy(() -> jdbc().update(
+                        "INSERT INTO notifications (receiver_user_id, type, target_type, target_id)"
+                                + " VALUES (?, ?, ?, ?)",
+                        receiver, "MENTION", "POST", 1L))
+                .rootCause()
+                .isInstanceOf(SQLException.class);
+
+        assertThatThrownBy(() -> jdbc().update(
+                        "INSERT INTO notifications (receiver_user_id, type, target_type, target_id)"
+                                + " VALUES (?, ?, ?, ?)",
+                        receiver, "COMMENT", "BLOG", 1L))
+                .rootCause()
+                .isInstanceOf(SQLException.class);
+    }
+
+    @Test
+    @DisplayName("refresh_tokens는 token_id가 unique이고 필수 컬럼이 not null이다")
+    void refreshTokenConstraintsAreEnforced() {
+        Long userId = insertUser("rt@zeroverse.test", "rt-user");
+
+        jdbc().update(
+                "INSERT INTO refresh_tokens (user_id, token_id, token_hash, expires_at)"
+                        + " VALUES (?, ?, ?, NOW())",
+                userId, "token-1", "hash-1");
+
+        assertThatThrownBy(() -> jdbc().update(
+                        "INSERT INTO refresh_tokens (user_id, token_id, token_hash, expires_at)"
+                                + " VALUES (?, ?, ?, NOW())",
+                        userId, "token-1", "hash-2"))
+                .rootCause()
+                .isInstanceOf(SQLException.class);
+
+        assertThatThrownBy(() -> jdbc().update(
+                        "INSERT INTO refresh_tokens (user_id, token_id, token_hash) VALUES (?, ?, ?)",
+                        userId, "token-2", "hash-3"))
+                .rootCause()
+                .isInstanceOf(SQLException.class);
+    }
+
+    @Test
     @DisplayName("존재하지 않는 사용자로 블로그를 만들 수 없다 (FK)")
     void foreignKeyIsEnforced() {
         assertThatThrownBy(() -> insertBlog(999_999L, "orphan-blog"))
@@ -196,6 +300,14 @@ class FlywayMigrationTest extends MySqlTestSupport {
         jdbc().update(
                 "INSERT INTO users (email, password, name, nickname) VALUES (?, ?, ?, ?)",
                 email, "hashed", "테스터", nickname);
+        return jdbc().queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+    }
+
+    private Long insertPost(Long userId, Long blogId, String title) {
+        jdbc().update(
+                "INSERT INTO posts (user_id, blog_id, title, content_json, visibility)"
+                        + " VALUES (?, ?, ?, ?, ?)",
+                userId, blogId, title, "{\"type\":\"doc\"}", "PUBLIC");
         return jdbc().queryForObject("SELECT LAST_INSERT_ID()", Long.class);
     }
 

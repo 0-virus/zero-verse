@@ -484,6 +484,47 @@ PRD §9.4-AA에 내가 쓴 "birth_date nullable을 그대로 구현한다"는 �
 
 검증 항목 추가: 비밀번호 복잡도 5케이스, 닉네임 2~20자, 생년월일 필수·미래 거부.
 
+### 2026-07-25 · Gate 2 — FE 인증 인프라
+
+**타입·API 클라이언트**
+- `types/auth.ts` — 백엔드 계약과 1:1. **Refresh Token은 어떤 타입에도 없다**(HttpOnly 쿠키라 JS가 볼 수 없다).
+- `lib/apiClient.ts` — 공통 래퍼를 벗겨 `data`만 돌려주고 실패는 `ApiRequestError`로 던진다. 서버가 준 `code`를 그대로 쓰고 **프론트가 가짜 에러코드를 만들지 않는다**.
+  - Access Token은 모듈 메모리에만. localStorage·sessionStorage·document.cookie 미사용(PRD §8.1).
+  - 모든 요청에 `credentials:'include'`(Refresh 쿠키 전송).
+  - **401 → refresh single-flight → 각 요청 1회 재시도.** 동시에 여러 요청이 401을 받아도 갱신은 한 번만 돈다 — 각자 갱신하면 rotation 때문에 뒤늦은 요청이 폐기된 토큰을 쓰게 된다.
+  - `/auth/register|signin|refresh|signout`의 401은 refresh 대상에서 제외(재귀 방지).
+
+**AuthContext**
+- 앱 시작 시 refresh로 세션 복구 → 성공하면 `/auth/me`. **실패는 오류가 아니라 "비로그인"이라는 정상 상태**다.
+- Access를 state로 복제하지 않는다 — 두 곳에 있으면 갱신 시 어긋난다.
+- `register()`는 `RegisterOutcome{accountCreated, signedIn}`을 돌려준다. **가입은 됐는데 자동 로그인만 실패한 상태**를 구분하기 위해서다(ADR-0003 §4).
+- `signout()`은 서버 호출이 실패해도 로컬 세션을 반드시 정리한다.
+
+**가드(PRD §8.3)**
+- `ProtectedRoute` / `GuestOnlyRoute` / `SetupGuard` 3종. 셋 다 `isLoading` 동안 판단을 미룬다 — 세션 복구 전에 리다이렉트하면 로그인 상태인데도 `/signin`으로 튕기는 깜빡임이 생긴다.
+- M1 보호 화면은 모두 초기 설정 흐름에 묶여 있어 라우터에서는 `SetupGuard`만 쓴다. `ProtectedRoute`는 구현·검증해 두고 M2 이후에 쓴다.
+
+**화면**
+- `AuthCard` — 정본의 2분할 탭 구조. 라우트는 `/signin`·`/signup` 둘을 유지하고 탭 클릭이 라우트를 바꾼다(PRD §9-M).
+- `SigninPage` — 실패 사유를 세분화하지 않는다. 서버가 `AUTH_001` 하나로 주는 이유(계정 존재 여부 비노출)를 화면에서 무너뜨리지 않는다.
+- `SignupPage` — 닉네임·이름·이메일·비밀번호·생년월일 5필드(§9.4-AA). 자동 로그인 성공 시 `/blog/setup`, **자동 로그인만 실패하면 "계정이 생성되었습니다. 로그인해 주세요."**로 안내한다.
+
+**정본 카피보다 검증 규칙을 우선한 곳**
+- 비밀번호 placeholder를 정본의 `8자 이상, 영문+숫자 조합` 대신 **`8자 이상, 영문·숫자·특수문자 포함`**으로 썼다. 특수문자가 필수인데 안내에 없으면 사용자가 계속 실패한다. 저장·검증 요구가 시각 카피보다 우선하는 경계다(AGENTS.md 소스 오브 트루스 §1·2 경계).
+
+**이슈**
+- 가드를 붙이자 기존 `router.test.tsx`가 `AuthProvider` 없이 렌더해 9건 실패했다. 인증 세션을 고정한 뒤 라우팅만 검증하도록 고치고, `/signin`·`/signup`은 `GuestOnlyRoute` 때문에 비로그인 케이스로 분리했다.
+- `ProtectedRoute`가 import만 되고 쓰이지 않아 `tsc`가 막았다. import를 제거하고 사용 시점(M2)을 주석에 남겼다.
+
+**Gate 2 검증 — FE 182 tests / 16 파일, build·lint exit 0**
+
+| 테스트 | 수 | 검증 |
+|---|---|---|
+| `apiClient.test.ts` | 10 | 래퍼 unwrap, credentials·Bearer, 서버 code 보존, 필드 사유, 401 재시도, **동시 401 3건에 refresh 1회**, 인증 경로 재귀 방지, refresh 실패 시 만료 처리, 재시도 401 |
+| `guards.test.tsx` | 12 | 3가드 × (미인증/설정 완료/미완료), **로딩 중 리다이렉트 안 함** |
+| `authForms.test.tsx` | 10 | 2분할 탭, 실패 문구가 계정 존재를 드러내지 않음, 정지 계정, 5필드, **특수문자 힌트**, 자동 로그인 성공·실패 분기, 중복 이메일, 서버 검증 사유 |
+| 기존 M0 테스트 | 150 | 회귀 없음 |
+
 ## [이슈·결정]
 
 - 2026-07-25 · PRD §9.4-AA 확정 — 회원가입 `name`·`birth_date` 유지(사용자 결정). §9.3-① 종결.

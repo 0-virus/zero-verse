@@ -516,6 +516,24 @@ PRD §9.4-AA에 내가 쓴 "birth_date nullable을 그대로 구현한다"는 �
 - 가드를 붙이자 기존 `router.test.tsx`가 `AuthProvider` 없이 렌더해 9건 실패했다. 인증 세션을 고정한 뒤 라우팅만 검증하도록 고치고, `/signin`·`/signup`은 `GuestOnlyRoute` 때문에 비로그인 케이스로 분리했다.
 - `ProtectedRoute`가 import만 되고 쓰이지 않아 `tsc`가 막았다. import를 제거하고 사용 시점(M2)을 주석에 남겼다.
 
+#### 시각 대조 (2026-07-25 · 1440px)
+
+M0에서 시각 대조를 리뷰 지적으로 두 번 되돌아갔으므로 **PR 전에** 먼저 수행했다.
+
+- 서버: `npx vite --port 4173`(5173은 Windows 예약 포트 범위 5141~5240에 걸린다)
+- 렌더: Playwright + `channel:'chrome'`, viewport 1440×1200
+- **사전 확인**: 서빙 CSS에 `bg-paper`·`border-ink`·`shadow-card` 등 유틸리티가 생성됐는지 먼저 봤다. M0에서 장시간 떠 있던 dev 서버의 Tailwind 스캔이 상해 CSS 없는 화면을 대조할 뻔한 적이 있다.
+
+| 화면 | 정본 | 판정 |
+|---|---|---|
+| `/signin` | `Pages.dc.html` SCREEN: LOGIN | ✅ 420px 카드·`#fff8ec`·3px 보더·`shadow-on-dark`, ZEROVERSE 2색 로고, "나만의 우주에 접속하세요", 2분할 탭(활성=잉크+`#ffd9a0`), 이메일·비밀번호, `접속하기 ✦`, 하단 안내 |
+| `/signup` | 동일 카드의 signup 탭 | ✅ 5필드(닉네임·이름·이메일·비밀번호·생년월일), `나의 별 만들기 ✦` |
+
+계측: `border-radius != 0` 0개, `scrollWidth` 1440(가로 오버플로 없음).
+
+**대조로 발견해 수정한 것 1건**
+- 비밀번호 필드에 placeholder와 hint가 **같은 문구를 두 번** 보여줬다. 정본은 placeholder로만 안내한다. hint 자리는 서버가 준 필드 오류 전용으로 바꿨고, 테스트도 "중복 표시 없음"을 검증하도록 고쳤다.
+
 **Gate 2 검증 — FE 182 tests / 16 파일, build·lint exit 0**
 
 | 테스트 | 수 | 검증 |

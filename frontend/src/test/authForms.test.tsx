@@ -129,11 +129,17 @@ describe('SignupPage', () => {
     expect(screen.getByRole('button', { name: '나의 별 만들기 ✦' })).toBeInTheDocument();
   });
 
-  it('비밀번호 힌트는 실제 검증 규칙(특수문자 포함)을 안내한다', async () => {
+  it('비밀번호 안내는 실제 검증 규칙(특수문자 포함)을 알린다', async () => {
     renderPage('signup', noSession);
 
     await waitFor(() => expect(screen.getByLabelText('비밀번호')).toBeInTheDocument());
-    expect(screen.getByText(/영문·숫자·특수문자를 모두 포함/)).toBeInTheDocument();
+
+    // 정본은 placeholder로만 안내한다. 힌트를 겹쳐 쓰면 같은 문구가 두 번 나온다.
+    expect(screen.getByLabelText('비밀번호')).toHaveAttribute(
+      'placeholder',
+      '8자 이상, 영문·숫자·특수문자 포함',
+    );
+    expect(screen.queryByText(/모두 포함해야 합니다/)).not.toBeInTheDocument();
   });
 
   it('가입 성공 후 자동 로그인하면 /blog/setup으로 이동한다', async () => {

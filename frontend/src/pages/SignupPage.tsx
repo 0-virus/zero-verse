@@ -18,9 +18,10 @@ import { ERROR_CODE } from '../types/auth';
  *
  * <p>`name`·`birthDate` 모두 필수다(PRD §9.4-AA).
  *
- * <p>비밀번호 힌트는 정본 카피("영문+숫자 조합")가 아니라 **실제 검증 규칙**을 쓴다. 특수문자가
+ * <p>비밀번호 안내는 정본 카피("영문+숫자 조합")가 아니라 **실제 검증 규칙**을 쓴다. 특수문자가
  * 필수인데 안내에 없으면 사용자가 계속 실패한다 — 저장·검증 요구가 시각 카피보다 우선하는
- * 경계다(AGENTS.md 소스 오브 트루스 §1·2 경계).
+ * 경계다(AGENTS.md 소스 오브 트루스 §1·2 경계). 정본처럼 placeholder로만 알리고, 힌트 자리는
+ * 서버가 준 필드 오류에만 쓴다(같은 문구를 두 번 보여주지 않는다).
  *
  * <p>가입 후 자동 로그인을 시도하되, **자동 로그인만 실패**하면 계정이 이미 만들어졌음을
  * 알리고 로그인으로 안내한다. 재가입을 유도하면 이메일 중복으로 막힌다(ADR-0003 §4).
@@ -109,7 +110,7 @@ export function SignupPage() {
             value={form.password}
             onChange={update('password')}
             placeholder="8자 이상, 영문·숫자·특수문자 포함"
-            hint={fieldErrors.password ?? '8자 이상, 영문·숫자·특수문자를 모두 포함해야 합니다.'}
+            hint={fieldErrors.password}
             autoComplete="new-password"
             required
           />

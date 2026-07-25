@@ -159,7 +159,7 @@ class SecurityAccessControlTest extends MySqlTestSupport {
 
     private User persistUser(String email, String nickname, UserRole role) {
         User user = User.register(
-                email, passwordEncoder.encode("password123!"), "테스터", nickname, LocalDate.of(1995, 1, 1));
+                email, passwordEncoder.encode("Password123!"), "테스터", nickname, LocalDate.of(1995, 1, 1));
         userRepository.saveAndFlush(user);
         if (role == UserRole.ADMIN) {
             // M1에는 역할 변경 API가 없다(M9). 테스트는 직접 갱신한다.

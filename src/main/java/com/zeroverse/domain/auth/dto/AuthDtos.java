@@ -2,7 +2,9 @@ package com.zeroverse.domain.auth.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Past;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -10,16 +12,21 @@ import org.springframework.format.annotation.DateTimeFormat;
 /**
  * 인증 요청·응답 DTO(FR-AUTH-01~05).
  *
- * <p>회원가입은 `name`(필수)·`birthDate`(선택)를 포함한다 — PRD §9.4-AA 사용자 결정.
+ * <p>회원가입은 `name`·`birthDate`를 <b>모두 필수</b>로 받는다 — FR-AUTH-01, PRD §9.4-AA.
  */
 public final class AuthDtos {
 
     private AuthDtos() {}
 
     /**
-     * 회원가입 요청.
+     * 회원가입 요청(FR-AUTH-01).
      *
-     * @param birthDate 선택 항목. 미래 날짜는 거부한다
+     * <p>검증 규칙은 FR-AUTH-01이 정본이다: email unique·형식, password 최소 8자에
+     * 영문·숫자·특수문자 포함, nickname 2~20자 unique, <b>name·birthDate 필수</b>.
+     *
+     * <p>DB의 {@code birth_date}는 nullable이지만(NFR-08 not-null 목록에 없다) <b>가입 API에서는
+     * 필수</b>다 — 관리자 생성 계정 등 다른 경로로 만들어진 사용자는 값이 없을 수 있어 컬럼만
+     * 열어둔 것이고, 폼으로 받는 가입은 요구사항대로 받는다(PRD §9.4-AA).
      */
     public record RegisterRequest(
             @NotBlank(message = "이메일은 필수입니다.")
@@ -28,14 +35,18 @@ public final class AuthDtos {
                     String email,
             @NotBlank(message = "비밀번호는 필수입니다.")
                     @Size(min = 8, max = 64, message = "비밀번호는 8~64자여야 합니다.")
+                    @Pattern(
+                            regexp = "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[^A-Za-z0-9]).+$",
+                            message = "비밀번호는 영문·숫자·특수문자를 모두 포함해야 합니다.")
                     String password,
             @NotBlank(message = "이름은 필수입니다.")
                     @Size(max = 100, message = "이름은 100자를 넘을 수 없습니다.")
                     String name,
             @NotBlank(message = "닉네임은 필수입니다.")
-                    @Size(min = 2, max = 100, message = "닉네임은 2~100자여야 합니다.")
+                    @Size(min = 2, max = 20, message = "닉네임은 2~20자여야 합니다.")
                     String nickname,
-            @Past(message = "생년월일은 과거 날짜여야 합니다.")
+            @NotNull(message = "생년월일은 필수입니다.")
+                    @Past(message = "생년월일은 과거 날짜여야 합니다.")
                     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
                     LocalDate birthDate) {}
 

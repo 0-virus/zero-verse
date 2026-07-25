@@ -447,15 +447,42 @@ placeholder, `skip`, `@Disabled`, stub 성공 응답을 금지한다(`docs/PRD.m
 3. **테스트 격리 붕괴** — Testcontainers MySQL을 JVM당 하나로 재사용하는데 클래스 간 데이터가 남아, `AuthFlowTest`가 넣은 `dup@zeroverse.test`가 `FlywayMigrationTest`의 unique 제약을 깨뜨렸다. 실행 순서에 따라 결과가 달라지는 flaky 상태였다. `DatabaseCleaner`(도메인 테이블 TRUNCATE, Flyway 이력은 보존)를 만들어 `MySqlTestSupport`의 `@BeforeEach`에서 호출하도록 했다.
 4. slug 충돌 테스트에서 `collide`/`Collide`를 썼는데 **MySQL의 `utf8mb4_unicode_ci`는 대소문자를 구분하지 않아** nickname 중복(USER_002)이 먼저 발생했다. 정규화 결과만 같은 서로 다른 닉네임(`zero star` / `zero.star`)으로 교체.
 
-**Gate 1 검증 — 98 tests / 0 skipped / 0 failures**
+#### 2026-07-25 · Gate 1 수정 — FR-AUTH-01 위반 3건 (자체 발견)
+
+Gate 2 착수 전 계획서의 "비밀번호는 특수문자까지 필수" 문구를 확인하다가, **내 Gate 1 구현이
+FR-AUTH-01을 세 군데 어긴 것**을 발견했다. 리뷰 전에 자체 발견한 결함이다.
+
+| # | 위반 | 정본 | 내 구현 | 수정 |
+|---|---|---|---|---|
+| 1 | 비밀번호 복잡도 미검증 | "최소 8자, 영문/숫자/특수문자 포함" | `@Size(8,64)`만 | `@Pattern` 추가 |
+| 2 | 닉네임 상한 | "2~20자" | `@Size(2,100)` | `@Size(2,20)` |
+| 3 | 생년월일 필수 여부 | "name, birth_date 필수" | 선택(nullable) | `@NotNull` 추가 |
+
+**#3이 가장 나쁘다** — 잘못 구현한 데 그치지 않고 `birthDateIsOptional` 테스트로 **위반을
+고정**했다. 테스트가 요구사항을 지키는 게 아니라 어긴 상태를 지키고 있었다.
+
+원인은 층위 혼동이다. NFR-08의 not-null 목록에 `birth_date`가 없어 **DB 컬럼이 nullable**인
+것을 보고 **가입 API도 선택**이라고 단정했다. 둘은 다른 층위다 — 컬럼이 열려 있는 것은
+관리자 생성 등 다른 경로를 위한 것이고, 폼으로 받는 가입은 FR-AUTH-01대로 필수다.
+PRD §9.4-AA에 내가 쓴 "birth_date nullable을 그대로 구현한다"는 문구도 같은 혼동이라 정정했다.
+
+- 테스트 `birthDateIsOptional` → `birthDateIsRequired`로 교체.
+- 비밀번호 복잡도 5케이스(8자 미만, 숫자·특수문자 없음, 특수문자 없음, 영문 없음, 영문·숫자 없음),
+  닉네임 21자, 미래 생년월일 테스트 추가.
+- 기존 테스트의 `password123!`은 특수문자는 있으나 대문자가 없어도 통과하던 값이라
+  `Password123!`로 교체(복잡도 규칙 자체는 대소문자를 요구하지 않는다).
+
+**Gate 1 검증 — 105 tests / 0 skipped / 0 failures**
 
 | 테스트 | 수 | 검증 |
 |---|---|---|
 | `SecurityAccessControlTest` | 17 | **RISK-0002 종료 조건** — permitAll 부재, 보호 경로·admin 401/403의 code·message, 공개 경로 GET 허용·쓰기 401, Refresh 토큰으로 API 접근 차단(type 검증) |
 | `SlugGeneratorTest` | 29 | 정규화·예약어·30자 상한·suffix 후 길이·형식 규칙 |
-| `AuthFlowTest` | 14 | 가입 시 3개 생성, birthDate 선택·name 필수, USER_004/USER_002, slug suffix, Access 본문·Refresh 쿠키 분리, **로그인 실패 응답 동일성**, rotation, 재사용 거부, signout idempotent, `/auth/me` |
+| `AuthFlowTest` | 21 | 가입 시 3개 생성, birthDate 선택·name 필수, USER_004/USER_002, slug suffix, Access 본문·Refresh 쿠키 분리, **로그인 실패 응답 동일성**, rotation, 재사용 거부, signout idempotent, `/auth/me` |
 | `RefreshRotationConcurrencyTest` | 2 | **실제 MySQL 독립 트랜잭션 2개**로 동시 갱신 시 단일 성공 + 나머지 AUTH_003, 활성 row 정확히 1개 |
 | 기존 M0 테스트 | 36 | 회귀 없음 |
+
+검증 항목 추가: 비밀번호 복잡도 5케이스, 닉네임 2~20자, 생년월일 필수·미래 거부.
 
 ## [이슈·결정]
 

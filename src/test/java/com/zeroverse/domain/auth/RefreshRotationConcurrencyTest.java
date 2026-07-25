@@ -138,7 +138,7 @@ class RefreshRotationConcurrencyTest extends MySqlTestSupport {
     private User persistUser(String email, String nickname) {
         return userRepository.saveAndFlush(User.register(
                 email,
-                passwordEncoder.encode("password123!"),
+                passwordEncoder.encode("Password123!"),
                 "테스터",
                 nickname,
                 LocalDate.of(1995, 1, 1)));

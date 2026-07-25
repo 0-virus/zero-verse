@@ -14,7 +14,9 @@ import java.time.LocalDate;
 /**
  * 사용자(REQUIREMENTS §4 User, FR-AUTH-01).
  *
- * <p>{@code name}은 NOT NULL, {@code birthDate}는 nullable이다 — PRD §9.4-AA 사용자 결정.
+ * <p>{@code name}은 NOT NULL이다. {@code birthDate}는 <b>컬럼은 nullable</b>이지만(NFR-08의
+ * not-null 목록에 없다) <b>회원가입 API에서는 필수</b>다(FR-AUTH-01, PRD §9.4-AA) — 관리자
+ * 생성 등 다른 경로의 사용자는 값이 없을 수 있어 컬럼만 열어둔 것이다.
  * soft delete 대상이며 {@code deletedAt}이 채워진 사용자는 없는 계정과 동일하게 취급한다.
  */
 @Entity

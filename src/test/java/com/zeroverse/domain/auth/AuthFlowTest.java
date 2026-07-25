@@ -20,6 +20,8 @@ import com.zeroverse.support.MySqlTestSupport;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -72,28 +74,79 @@ class AuthFlowTest extends MySqlTestSupport {
     }
 
     @Test
-    @DisplayName("birthDate는 선택 항목이라 없어도 가입된다 (PRD §9.4-AA)")
-    void birthDateIsOptional() throws Exception {
+    @DisplayName("birthDate가 없으면 400이다 (FR-AUTH-01 — name·birth_date 필수)")
+    void birthDateIsRequired() throws Exception {
         String body = """
-                {"email":"nobirth@zeroverse.test","password":"password123!",
+                {"email":"nobirth@zeroverse.test","password":"Password123!",
                  "name":"테스터","nickname":"nobirth"}
                 """;
 
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
-                .andExpect(status().isCreated());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_001"))
+                .andExpect(jsonPath("$.error.details[?(@.field=='birthDate')]").exists());
+    }
 
-        assertThat(userRepository.findByEmailAndDeletedAtIsNull("nobirth@zeroverse.test"))
-                .get()
-                .satisfies(u -> assertThat(u.getBirthDate()).isNull());
+    @Test
+    @DisplayName("미래 생년월일은 400이다")
+    void futureBirthDateIsRejected() throws Exception {
+        String body = """
+                {"email":"future@zeroverse.test","password":"Password123!","name":"테스터",
+                 "nickname":"future","birthDate":"2999-01-01"}
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.details[?(@.field=='birthDate')]").exists());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "short1!",          // 8자 미만
+        "passwordonly",     // 숫자·특수문자 없음
+        "password123",      // 특수문자 없음
+        "12345678!",        // 영문 없음
+        "!@#$%^&*()"        // 영문·숫자 없음
+    })
+    @DisplayName("비밀번호는 8자 이상이고 영문·숫자·특수문자를 모두 포함해야 한다 (FR-AUTH-01)")
+    void passwordComplexityIsEnforced(String password) throws Exception {
+        String body = """
+                {"email":"pw@zeroverse.test","password":"%s","name":"테스터",
+                 "nickname":"pwuser","birthDate":"1995-01-01"}
+                """.formatted(password);
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_001"))
+                .andExpect(jsonPath("$.error.details[?(@.field=='password')]").exists());
+    }
+
+    @Test
+    @DisplayName("닉네임은 2~20자다 (FR-AUTH-01)")
+    void nicknameLengthIsEnforced() throws Exception {
+        String tooLong = """
+                {"email":"long@zeroverse.test","password":"Password123!","name":"테스터",
+                 "nickname":"%s","birthDate":"1995-01-01"}
+                """.formatted("a".repeat(21));
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(tooLong))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.details[?(@.field=='nickname')]").exists());
     }
 
     @Test
     @DisplayName("name이 없으면 400 VALIDATION_001이다 (PRD §9.4-AA — 필수 유지)")
     void nameIsRequired() throws Exception {
         String body = """
-                {"email":"noname@zeroverse.test","password":"password123!","nickname":"noname"}
+                {"email":"noname@zeroverse.test","password":"Password123!","nickname":"noname"}
                 """;
 
         mockMvc.perform(post("/api/v1/auth/register")
@@ -156,7 +209,7 @@ class AuthFlowTest extends MySqlTestSupport {
 
         MvcResult result = mockMvc.perform(post("/api/v1/auth/signin")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(signinBody("signin@zeroverse.test", "password123!")))
+                        .content(signinBody("signin@zeroverse.test", "Password123!")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.accessToken").isNotEmpty())
                 .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
@@ -284,7 +337,7 @@ class AuthFlowTest extends MySqlTestSupport {
 
     private String registerBody(String email, String nickname) {
         return """
-                {"email":"%s","password":"password123!","name":"테스터",
+                {"email":"%s","password":"Password123!","name":"테스터",
                  "nickname":"%s","birthDate":"1995-01-01"}
                 """.formatted(email, nickname);
     }
@@ -299,7 +352,7 @@ class AuthFlowTest extends MySqlTestSupport {
         register(email, nickname).andExpect(status().isCreated());
         return mockMvc.perform(post("/api/v1/auth/signin")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(signinBody(email, "password123!")))
+                        .content(signinBody(email, "Password123!")))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()
@@ -309,7 +362,7 @@ class AuthFlowTest extends MySqlTestSupport {
     private String signinAndGetAccessToken(String email) throws Exception {
         String body = mockMvc.perform(post("/api/v1/auth/signin")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(signinBody(email, "password123!")))
+                        .content(signinBody(email, "Password123!")))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()

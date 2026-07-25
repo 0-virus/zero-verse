@@ -37,6 +37,15 @@ out/
 ### VS Code ###
 .vscode/
 
+### Claude Code — 로컬 에이전트 설정/스킬(미추적) ###
+.claude/
+
+### Frontend ###
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.local
+
 ### Docs — 스펙 문서는 무시, worklog/governance만 추적 ###
 docs/*
 !docs/worklog/

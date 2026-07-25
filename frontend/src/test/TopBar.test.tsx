@@ -15,9 +15,9 @@ describe('TopBar', () => {
     setup();
     expect(screen.getByRole('link', { name: 'ZEROVERSE' })).toBeInTheDocument();
     expect(screen.getByRole('searchbox', { name: '검색' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '글쓰기' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '✎ 글쓰기' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '알림' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '프로필' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '제로별' })).toBeInTheDocument();
   });
 
   it('관리자 항목을 노출하지 않는다 (PRD §9-K 폐기)', () => {

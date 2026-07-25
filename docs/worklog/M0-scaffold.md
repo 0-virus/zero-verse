@@ -571,18 +571,19 @@ PRD §12 DoD와 §11 테스트 전략의 각 항목에 대해 **M0에 적용되�
 | # | DoD 항목 | M0 적용 | 검증 근거 | 결과 |
 |---|---|---|---|---|
 | 1 | 해당 FR/NFR 규칙 전부 구현 | **적용**(M0는 FR 없음, NFR-01·04·05·06·07·08 해당) | CorsConfigTest(NFR-01), ErrorCode+GlobalExceptionHandlerTest(NFR-04), OpenApiConfigTest(NFR-05), BaseEntityAuditingTest(NFR-06), FlywayMigrationTest(NFR-07·08) | ✅ |
-| 2 | §11 해당 테스트 존재·통과, placeholder/skip/stub 금지 | **적용** | **BE 36 tests / FE 84 tests(10 파일)**, 전부 `skipped="0"`. `@Disabled`·`it.skip`·`todo` 0건 | ✅ |
+| 2 | §11 해당 테스트 존재·통과, placeholder/skip/stub 금지 | **적용** | **BE 36 tests / FE 126 tests(12 파일)**, 전부 `skipped="0"`. `@Disabled`·`it.skip`·`todo` 0건 | ✅ |
 | 3 | 공통 응답·에러코드·페이징 규약 준수, Swagger 문서화 | **적용** | ApiResponseTest(4키 항상 직렬화), PageResponseTest, OpenApiConfigTest(`/v3/api-docs` + Bearer 스키마) | ✅ |
-| 4 | FE가 §6 토큰 적용 + `docs/design/` 정본과 시각 일치 | **부분 적용** — 토큰·구조는 적용, **1440px 브라우저 육안 대조는 미수행** | `styles/index.css` 토큰 정본 대조, SideNav.test.tsx 구조 검증 | ⚠️ 아래 "잔여" 참조 |
+| 4 | FE가 §6 토큰 적용 + `docs/design/` 정본과 시각 일치 | **적용** | 토큰 정본 대조 + 구조 DOM 테스트 + **1440px Playwright 시각 대조**(아래 `[시각 대조 기록]`) | ✅ |
 | 4b | 연동 API 실제 동작 확인 | **비적용** — M0에 연동할 도메인 API가 없다(M1~M9) | — | — |
 | 5 | 보안: 비밀 미커밋, sanitize, 권한 가드 | **부분 적용** — 비밀 미커밋만 해당. sanitize는 M4, 권한 가드는 M1 | `application-local.example.yml`은 placeholder만, `application-local.yml`은 gitignore. `git ls-files`에 비밀값 없음 | ✅(해당 범위) |
-| 6 | 저자와 다른 패스의 검증 | **적용** | Codex 리뷰(3b) — 저자 Claude와 분리 | ✅ |
+| 6 | 빌드·린트 통과 + 저자와 다른 패스의 검증 | **적용** | `./gradlew test` BUILD SUCCESSFUL, `npm run build`(tsc -b && vite build) exit 0, `npm run lint`(oxlint) exit 0. Codex 리뷰(3b) — 저자 Claude와 분리 | ✅ |
 
 ### PRD §11 테스트 범주
 
 | 범주 | M0 적용 | 근거 |
 |---|---|---|
 | BE 단위 — 가입/로그인/토큰/접근제어/카테고리 정책 | **비적용** | 해당 도메인이 M1~M9. 지금 작성하면 가짜 구현이 된다 |
+| NFR-01 CORS | **부분 적용** | 허용 origin preflight만 M0. JWT·Refresh 쿠키 정책은 M1(PRD §4.3) |
 | BE 단위 — 공통 응답·예외·에러코드 | **적용** | ApiResponseTest(4), PageResponseTest(4), GlobalExceptionHandlerTest(4) |
 | Repository/JPA — unique 제약 | **적용**(스키마 레벨) | FlywayMigrationTest — email·nickname·url_slug·universe·post_like·post_tag·post_image·refresh_token unique 실제 위반 검증 |
 | Repository/JPA — Auditing 자동 생성 | **적용** | BaseEntityAuditingTest(4) |
@@ -595,10 +596,47 @@ PRD §12 DoD와 §11 테스트 전략의 각 항목에 대해 **M0에 적용되�
 
 ### 잔여 (M0 머지 전 처리 필요)
 
-- **DoD 4의 브라우저 육안 대조 — 미수행**: `/`, `/signin`, `/settings`를 1440px에서 `docs/design/*.dc.html`과 대조하는 작업을 완료하지 못했다. jsdom 테스트는 CSS 픽셀 일치를 보증하지 않는다(PRD §12.4).
-  - 2026-07-25 시도 결과: `npm run dev`가 샌드박스 포트 바인딩 제한으로 실패(`EACCES listen ::1:5173`), 브라우저 자동화도 확장 미연결로 불가.
-  - **대체 검증한 것**: 토큰 값의 정본 일치(`styles/index.css` ↔ `DESIGN-SYSTEM.md` §2~§5, Codex 리뷰에서 교차 확인), 구조 규칙(SideNav 210px·항목·헤더·캡션, TopBar 구성, Admin 항목 부재)의 DOM 테스트.
-  - **처리 방침**: 사용자 환경에서 `cd frontend && npm run dev` 실행 후 3개 경로를 1440px로 대조해야 최종 확인된다. 이 항목이 닫히기 전까지 M0의 DoD 4는 **부분 충족**으로 기록한다.
+- **DoD 4 브라우저 시각 대조 — 2026-07-25 완료.** 아래 `[시각 대조 기록]` 참조.
+
+---
+
+## [시각 대조 기록] (2026-07-25 · DoD 4)
+
+### 환경 문제와 해결
+
+1차 시도가 `EACCES listen ::1:5173`으로 실패했다. 원인은 샌드박스가 아니라 **Windows 예약 포트**였다 — `netsh interface ipv4 show excludedportrange protocol=tcp`의 `5141–5240` 구간에 5173이 포함된다(Hyper-V/Docker 동적 예약). `4173`·`3000`·`8080`은 정상 바인딩된다.
+
+- 서버: `npx vite --port 4173 --strictPort` (IPv6 `[::1]`에 바인딩되므로 `localhost:4173`으로 접근)
+- 렌더: Playwright + `channel: 'chrome'`(설치된 Chrome 구동, 별도 브라우저 다운로드 없음), viewport **1440×1200**, `fullPage` 캡처
+- 정본: `docs/design/*.dc.html`을 `file://`로 직접 렌더(support.js 런타임이 동작함을 확인)
+
+### 대조 결과
+
+| 화면 | 정본 | 판정 |
+|---|---|---|
+| `/` | `ZeroVerse Main Feed v2.dc.html` | ✅ 히어로 240px(그라디언트·픽셀 별·로켓·구름 클립), 3열 `210px 1fr 300px`, SideNav, 우측 3패널, 탭 3개 |
+| `/signin` | `Pages.dc.html` LOGIN | ✅ 전폭 다크 그라디언트 + 중앙 420px 카드, `shadow-on-dark` |
+| `/settings` | `Pages.dc.html` SETTINGS shell | ✅ `max-width:1240`, `240px 1fr`, SETTINGS 패널 3항목 |
+
+계측값(모든 화면 공통): `border-radius != 0`인 요소 **0개**, `scrollWidth` 1440(가로 오버플로 없음), `body` 배경 `rgb(246,234,216)`(`#f6ead8`), 폰트 `IBM Plex Sans KR`.
+
+### 대조로 발견해 수정한 불일치
+
+| # | 불일치 | 수정 |
+|---|---|---|
+| 1 | 로고가 잉크 단색이고 마크가 없음 | 14px accent 정사각 마크(`4px 4px 0 shadow, -3px 3px 0 ink`) + `ZERO`(잉크)`VERSE`(accent) 2색 |
+| 2 | 검색바가 좌측에 붙고 "검색" 버튼이 줄바꿈됨 | `flex-1 justify-center`로 중앙 정렬, 버튼 `shrink-0` + `padding:0 18px` |
+| 3 | 검색 플레이스홀더가 임의 문구 | 정본 `유니버스 전체 검색 — 글 · 블로그 · 사용자 · 태그` |
+| 4 | 알림·프로필이 텍스트 링크 | 중립 버튼(3px 보더 + `shadow-btn`), 라벨 `제로별`, 글쓰기 `✎ 글쓰기` |
+| 5 | 상단바 padding/gap 임의값 | `height:64px`, `padding:0 28px`, `gap:20px`, `z-index:10` |
+| 6 | **`/`에 히어로가 없음** | `Hero` 신설 — 그라디언트, 2레이어 픽셀 별(`steps(2)` 2.6s/3.4s), 8단 픽셀 로켓(`floaty 5s`), 구름 clip-path |
+| 7 | **`/`의 우측 300px 열이 비어 있음** | `RightPanel` 신설 — `내 블로그` / `최근 알림` / `유니버스 현황` 3패널(빈 상태) |
+| 8 | **`/settings`의 240px 열이 비어 `main`이 잘못된 칸에 들어감** | `ScreenPanel` 신설 — SETTINGS 헤더 + 프로필/유니버스/글·카테고리. `/blog/:slug`용 blog 패널도 포함 |
+| 9 | 컨테이너 폭이 전 화면 동일 | `lib/layout.ts` 신설 — DESIGN-SYSTEM §6.2의 화면별 max-width·grid·패딩을 단일 출처로 |
+| 10 | `/signin`이 paper AppShell 안에서 렌더 | `OnboardingScaffold` + AppShell 온보딩 분기 — 전폭 다크, 중앙 카드(420/560px) |
+| 11 | MainPage가 히어로와 h1 중복 | 중앙 열을 정본 구조(탭 3개 + 피드 영역)로 교체 |
+
+**남은 차이(의도된 것)**: 알림 카운트 배지와 각 패널의 실제 데이터는 M0에 데이터가 없어 렌더하지 않는다. 가짜 데이터를 넣지 않는다는 원칙(PRD §12)에 따른다.
 
 ---
 

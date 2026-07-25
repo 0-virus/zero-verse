@@ -12,7 +12,7 @@ function renderAt(path: string) {
 }
 
 const ROUTES: Array<[string, string]> = [
-  ['/', '메인 피드'],
+  ['/', '유니버스 새 소식'],
   ['/signin', '로그인'],
   ['/signup', '회원가입'],
   ['/blog/setup', '블로그 초기 설정'],

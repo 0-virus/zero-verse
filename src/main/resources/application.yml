@@ -34,6 +34,25 @@ zeroverse:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
 
+  # JWT (ADR-0003). secret은 fallback 기본값을 두지 않는다 —
+  # 미설정 시 기동에 실패해야 개발용 키가 운영으로 새지 않는다.
+  jwt:
+    secret-base64: ${JWT_SECRET_BASE64}
+    access-ttl: PT1H
+    refresh-ttl: P14D
+
+  auth:
+    cookie:
+      name: refresh_token
+      path: /api/v1/auth
+      # 운영 기본 true. local profile에서만 false로 내린다.
+      secure: ${AUTH_COOKIE_SECURE:true}
+      # 운영 FE·API는 same-site 배치다(사용자 확정 2026-07-25).
+      # cross-site로 바뀌면 재심의 대상 — RISK-0005.
+      same-site: ${AUTH_COOKIE_SAME_SITE:Strict}
+      # 쿠키 인증 경로(refresh·signout)의 Origin 검증 허용 목록.
+      allowed-origins: ${AUTH_ALLOWED_ORIGINS:http://localhost:5173}
+
 logging:
   level:
     com.zeroverse: INFO

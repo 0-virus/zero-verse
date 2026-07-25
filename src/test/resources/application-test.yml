@@ -15,6 +15,23 @@ zeroverse:
   cors:
     allowed-origins: http://localhost:5173
 
+  # 테스트 전용 고정 키. 운영 비밀로 사용할 수 없다.
+  jwt:
+    secret-base64: dGVzdC1vbmx5LXNlY3JldC1rZXktZm9yLXplcm92ZXJzZS0yNTZiaXQh
+    access-ttl: PT1H
+    refresh-ttl: P14D
+
+  auth:
+    cookie:
+      name: refresh_token
+      path: /api/v1/auth
+      # ADR-0003 §3은 local에서 Secure=false만 허용한다.
+      # SameSite는 운영과 동일하게 Strict를 유지해야 계약을 실제로 검증할 수 있다.
+      secure: false
+      same-site: Strict
+      allowed-origins:
+        - http://localhost:5173
+
 logging:
   level:
     com.zeroverse: INFO

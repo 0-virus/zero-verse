@@ -1,0 +1,259 @@
+# M2 — 사용자/블로그 설정 + 초기 설정
+
+- **작성 시각**: 2026-07-26 KST
+- **브랜치**: `feature/M2-settings` (base: `dev`)
+- **범위**: FR-SETTINGS-01~04, FR-BLOG-01 — `/users/me`(GET/PUT), 비밀번호 변경, `/blogs/me`(GET/PUT), 블로그 초기설정, slug 검증, 공개 블로그 조회. FE: BlogInitialSetupPage, SettingsProfilePage, BlogPage(히어로 실연동).
+- **제외**: FR-BLOG-02(게시글 목록·필터·페이징 → M4/M7), 카테고리 CRUD(M3), 이미지 업로드(M4), 회원 탈퇴(대응 FR/API 없음), 유니버스·댓글·피드·알림·관리자.
+- **기준 문서**: `AGENTS.md`, `docs/PRD.md` §2.2·§3·§4·§5·§7·§9·§10 M2·§11·§12, `docs/REQUIREMENTS.md` §4·§5·§6.2·§6.3·FR-SETTINGS-01~04·FR-BLOG-01·NFR-04, `docs/design/DESIGN-SYSTEM.md` §2~§4·§6·§8.2·§8.6·§8.7 + 해당 `.dc.html`, `docs/governance/README.md` §2.
+- **선행 상태**: M1 완료·머지(PR #7, 머지 커밋 `094fa37`). `dev` 최신은 `f9fdc5b`. RISK-0002 CLOSED. 기준선 BE **138 tests** / FE **186 tests**, lint·build green — M2 완료 시 전부 회귀 통과해야 한다.
+- **참고 자산**: 초기화 이전 M2 구현이 `origin/feature/M2-settings`(과거 PR #3 머지분)에 읽기 전용으로 존재. 재사용 판정은 §4 참조 — **체리픽 금지**.
+
+## [계획] (Codex · 2026-07-26)
+
+### 0. 기준 상태와 선행 판정
+
+- 현재 `feature/M2-settings`는 최신 `dev`의 `f9fdc5b`에서 분기된 clean tree이며, M1 squash merge `094fa37`과 M1 머지 기록 커밋을 포함한다.
+- M1 기준선은 BE 138 tests, FE 186 tests, lint/build green이며 M2 완료 시 전부 회귀 통과해야 한다.
+- 구현 우선순위는 사용자 결정·PRD §9 → `docs/design/` → REQUIREMENTS → PRD 본문 → worklog/ADR 순이다. (PRD §9, governance/README §7)
+- M2 명시 범위는 `FR-SETTINGS-01~04`, `FR-BLOG-01`이다. `FR-BLOG-02`는 Post·Category·Universe에 의존하므로 M4/M7까지 이관한다. (REQUIREMENTS §6.2·§6.3, PRD §10)
+- **현재 ErrorCode에는 잘못된 현재 비밀번호와 초기 설정 중복을 나타낼 코드가 없다.** `USER_005` 또는 별도 사용자 코드, `BLOG_004` 추가 여부는 공개 계약 변경으로 심의 후 확정한다. (REQUIREMENTS NFR-04, PRD §4.4)
+- **디자인의 "slug는 나중에 변경할 수 없음" 문구는 `PUT /blogs/me`의 slug 변경 허용과 충돌한다.** 현 요구사항 기준으로 변경 가능하되, 구현 전 심의에서 카피 또는 정책을 확정한다. (REQUIREMENTS §5·§6.2, PRD §9.0)
+
+### 1. M2 Scope Lock
+
+#### IN SCOPE — Backend
+
+- `FR-SETTINGS-01`: `GET/PUT /api/v1/users/me` — name, nickname, bio, birthDate, profileImageUrl 조회·수정, nickname unique 검증, **nickname 변경 시 slug 유지**. (REQUIREMENTS §6.2)
+- `FR-SETTINGS-02`: `PUT /api/v1/users/me/password` — 현재 비밀번호 확인, 새 비밀번호 8~64자·영문·숫자·특수문자 정책, BCrypt strength 12 재해시. (REQUIREMENTS §6.2, PRD §3.2)
+- `FR-SETTINGS-03`: `GET/PUT /api/v1/blogs/me` — title, urlSlug, description 조회·수정, slug 형식·예약어·unique 검증. (REQUIREMENTS §5·§6.2)
+- `FR-SETTINGS-04`: `PUT /api/v1/blogs/me/initial-setup` — 기본 title/slug 생성, **1회성 상태 전이**, 성공 시 `isSetupCompleted=true`, 재호출 409. (REQUIREMENTS §4·§6.2)
+- `FR-BLOG-01`: `GET /api/v1/blogs/slug/{urlSlug}` — 공개 블로그와 소유자 기본 정보, 삭제된 Blog/User 제외, **SUSPENDED 소유자는 공개 유지**. (REQUIREMENTS §6.3)
+- `/me` 소유권은 요청의 userId를 받지 않고 **인증 principal에서만** 결정하며, 공개 API는 GET method만 permitAll로 유지한다. (REQUIREMENTS §5, PRD §4.3)
+- User/Blog 도메인 변경 메서드, repository soft-delete 조회, DTO·service·controller·Swagger·보안 회귀 테스트를 포함한다.
+
+#### IN SCOPE — Frontend
+
+- `/blog/setup`: 실제 초기 설정 폼, API 검증 오류 표시, 완료 후 `/blog/{urlSlug}` 이동, AuthContext 사용자 재조회. (PRD §7)
+- `/settings`: 좌측 SETTINGS 메뉴와 프로필·블로그·비밀번호 카드, email 비활성, birthDate/profileImageUrl 필드 포함. (PRD §7·§9-F)
+- `/blog/:blogSlug`: 공개 API로 히어로의 title/description/slug/owner를 실연동하고 loading·404·오류 상태를 제공한다. (PRD §7)
+- M1의 `SetupGuard`, `apiClient`, AuthContext single-flight refresh를 그대로 사용하며 **M2 전용 interceptor를 추가하지 않는다**. (PRD §8)
+- `BlogSetupPage`는 PRD 명칭에 맞춰 `BlogInitialSetupPage`로 정리하되 기존 라우트·가드 동작은 보존한다.
+- 프로필/블로그 저장과 비밀번호 변경은 **서로 독립된** 요청·성공·실패 상태를 갖는다.
+
+#### OUT OF SCOPE
+
+- `FR-BLOG-02` 게시글 목록·공개범위·카테고리/태그 필터·페이징 → Post/Category/Universe 이후. (REQUIREMENTS §6.3, PRD §10)
+- 초기 설정 디자인의 `시작 카테고리` 편집은 `FR-CAT-*`·M3 범위다. **M2에서 가짜 칩이나 stub API를 만들지 않는다.**
+- BlogPage의 카테고리 패널·글 수·통계·정렬·유니버스 신청·RSS 실제 동작은 M3/M4/M5 범위다.
+- `/settings` 위험 구역의 회원 탈퇴는 대응 FR/API가 없으므로 **비활성 장식도 구현하지 않는다**.
+- 이미지 파일 선택·업로드·presigned URL은 `FR-UPLOAD-*`·M4 범위다. M2는 `profileImageUrl` 문자열 저장만 담당한다.
+- `OwnerProfileCard`는 PRD §9-O에서 폐기 — 이전 M2 구현을 복구하지 않는다. 소유자 정보는 히어로에 반영한다.
+- 카테고리 CRUD, 게시글 CRUD, 유니버스, 댓글/좋아요, 피드/검색, 알림, 관리자 기능 제외.
+
+### 2. 명세 요약
+
+#### REQUIREMENTS §4/§5/§6
+
+- User와 Blog는 `BaseSoftDeleteEntity` 기반이며, user email/nickname과 blog urlSlug의 unique 제약을 유지한다.
+- Blog는 사용자당 기본 블로그 1개를 앱 레벨에서 보장하고 초기 설정 전후를 `is_setup_completed`로 구분한다.
+- slug는 소문자·숫자·하이픈 3~30자, 앞뒤/연속 하이픈 금지, 예약어 금지, unique가 계약이다.
+- **nickname 변경은 기존 slug를 자동 변경하지 않는다.** 자동 생성 충돌은 suffix `-2`, `-3`으로 해결한다.
+- 성공·실패 모두 `success/data/error/timestamp` 래퍼를 사용하고 timestamp는 UTC ISO-8601이다.
+- 보호 API는 401/403을 구분하고, `/users/me`와 `/blogs/me`는 principal 기반으로 **타 사용자 대상을 표현할 수 없게** 한다.
+- 공개 블로그는 Blog와 소유자 User 모두 soft delete되지 않은 경우만 반환한다.
+
+#### PRD §3/§4/§5/§7/§9/§10/§11/§12
+
+- 패키지는 `domain/{user,blog}/{entity,repository,service,controller,dto}`를 따르고 Controller→Service→Repository 방향을 유지한다.
+- ErrorCode와 응답 계약을 확장하되 기존 `AUTH_001~004`, `USER_004`, 공통 오류 **의미를 변경하지 않는다**. (PRD §4.4·§9.4-AB)
+- `/settings`는 탭이 아니라 `240px 1fr` 좌측 메뉴 구조이며, 프로필·블로그·비밀번호를 실제 API에 연결한다. (PRD §7·§9-F)
+- BlogPage의 우측 OwnerProfileCard는 폐기되고 블로그/소유자 정보는 히어로에 표현한다. (PRD §9-O)
+- M2는 BE API 선완성 후 FE 연동 순서이며, M3 카테고리와 M4 게시글을 선행 구현하지 않는다.
+- TDD로 domain/repository/service/controller/integration/FE 범위를 추적하고 placeholder·stub·skip을 금지한다. (PRD §11·§12)
+- PRD §11에 수치형 line/branch coverage 기준은 없다. 완료 기준은 **M2 관련 테스트 항목·FR·분기의 요구사항 추적률 100%**로 해석한다.
+
+#### design/DESIGN-SYSTEM.md 및 `.dc.html`
+
+- 색상 paper `#f6ead8` / ink `#2b1b3d` / accent `#e85d75` / shadow `#d8c7b0`. 폐기된 네온 팔레트 사용 금지.
+- radius 0, 주 보더 3px, 보조 2px, 그림자는 blur 0의 3~8px 하드 오프셋.
+- 한글·본문은 IBM Plex Sans KR, Press Start 2P는 영문 로고·아이브로우 전용.
+- `/blog/setup`은 다크 배경의 560px 카드, `/settings*`는 max-width 1240px의 `240px 1fr`, BlogPage는 `240px 1fr` + 190px 히어로.
+- 초기 설정의 실시간 "사용 가능" 표시는 **별도 availability API가 없다**. submit 전에는 형식만 검증하고 unique 확정은 API 409로 표시한다.
+- `시작 카테고리`는 M3, "나중에 변경할 수 없어요" 카피는 FR-SETTINGS-03과 충돌 → 심의 결과에 따라 제거·개정.
+- Settings의 회원 탈퇴와 BlogPage의 카테고리·통계·글 목록은 **시각 슬롯만 존재** — M2에서 가짜 데이터로 채우지 않는다.
+
+#### governance
+
+- M2는 공개 API 계약, 비밀번호·개인정보, 인증된 자기 정보 접근제어를 변경하므로 **일반 소집 조건에 해당**한다.
+- 디자인 slug 불변 카피와 요구사항의 slug 수정 API가 충돌하므로 **별도 소집 조건에도 해당**한다.
+- BE·FE 동시 변경과 인증/접근제어 포함으로 **대형 마일스톤 기준 2개를 충족**한다.
+- `RISK-0001`(JPA/V1 정합), `RISK-0004`(공용 UI 조기 고정), `RISK-0005`(실제 브라우저 쿠키 검증 이월)를 적용한다.
+- 신규 에러코드와 slug 변경 정책은 승인 후 `ADR-0004` 후보로 기록하며, **승인 전 번호·의미를 구현에 고정하지 않는다**.
+
+### 3. M1 재사용 자산
+
+- `SlugGenerator.fromNickname/withSuffix/isValid`가 생성·검증·예약어 처리를 이미 제공 → **별도 `SlugValidator` 클래스를 만들지 않는다**. 필요 시 의미가 드러나는 service wrapper만.
+- `User`, `Blog`, `Category`, `RefreshToken` 매핑과 `UserRegistrar`의 기본 Blog/Category 생성 트랜잭션을 보존한다.
+- `SetupGuard`의 미완료 사용자 강제 이동과 완료 사용자의 `/blog/setup` 진입 차단을 그대로 사용한다.
+- `ErrorCode`, `BusinessException`, `GlobalExceptionHandler` 재사용. M2 신규 코드 2건은 심의·명세 반영 후 추가.
+- `ApiResponse`/`ErrorResponse`는 변경하지 않는다. M2 응답 DTO만 `data`에 넣으며 **password/hash를 포함하지 않는다**.
+- `BaseEntity`/`BaseSoftDeleteEntity`와 `@EnableJpaAuditing` 그대로. **V1 스키마 변경 없이** 엔티티 메서드만 확장한다.
+- `MySqlTestSupport`·`DatabaseCleaner`, 실제 MySQL 8.4 제약 테스트, MockMvc 보안 테스트 패턴을 재사용한다.
+- `SetupGuard`·`ProtectedRoute`, `apiClient` Bearer 주입·credentials·single-flight·1회 재시도 재사용. **신규 interceptor 금지**.
+- AuthContext에는 초기 설정/프로필 저장 후 `/auth/me`를 다시 읽는 공개 `refreshUser` 또는 동등한 **단일 갱신 경로만** 최소 확장한다.
+- **M1 리뷰에서 도입한 뮤테이션 확인**을 unique 분기, soft-delete 조건, 현재 비밀번호 검증, setup 재호출 방지 테스트에 적용한다.
+
+### 4. `origin/feature/M2-settings` 재사용 판정
+
+- 원격 브랜치는 현재 `dev`와 merge-base `0dabaf4`에서 갈라진 별도 계보다. **커밋/cherry-pick 단위 재사용 금지.**
+- **개념 재사용 가능**: User/Blog 변경 메서드 이름, `/users/me`·`/blogs/me`·공개 블로그 DTO 필드, service/controller 시나리오 목록.
+- **fixture 재사용 가능**: 정상 User/Blog, 중복 nickname/slug, setup 완료/미완료, soft-deleted owner, SUSPENDED owner 입력값.
+- **재작성 필요**: controller/DTO가 `com.zeroverse.controller`·`com.zeroverse.dto`에 있어 현재 도메인 패키지 구조와 불일치.
+- **재작성 필요**: 과거 service는 soft-delete 필터 없는 `findById`, 구식 repository 메서드, 직접 `save`, 중복 경쟁 처리 부재를 사용한다.
+- **재작성 필요**: `USER_005~007`, `BLOG_004`의 옛 의미는 현재 NFR-04/ADR-0003과 합의되지 않았으므로 복사할 수 없다.
+- **재작성 필요**: FE의 탭형 Settings, 네온/dark 토큰, OwnerProfileCard, 별도 페이지 가드 파일은 PRD §9-F/O 및 현재 골격과 충돌.
+- **재작성 필요**: 과거 hook 테스트는 hook을 렌더하지 않고 mocked `apiClient`를 직접 호출하는 **fake-pass 구조**다.
+- **재사용 금지**: 과거 `IntegrationTestSupport` — 현재의 공유 MySQL 8.4 지원·DatabaseCleaner·M1 동시성/보안 패턴으로 다시 작성한다.
+
+### 5. 게이트 계획 (원자적 커밋)
+
+#### Gate 1: BE domain — User/Blog 상태 전이와 검증 + 단위 테스트
+
+- 변경: `domain/user/entity/User.java`, `domain/blog/entity/Blog.java`. 검증 보강: `common/util/SlugGenerator.java`.
+- 신규 테스트: `UserTest`, `BlogTest`.
+- User `updateProfile`·`changePassword`, Blog `updateInfo`·`initialSetup`을 **엔티티 불변식 단위**로 구현한다.
+- service/controller/repository/FE 파일 미포함.
+
+#### Gate 2: BE repository — soft delete·unique 조회 계약 + JPA 테스트
+
+- 변경: `UserRepository`, `BlogRepository`. 신규 테스트: `UserRepositoryTest`, `BlogRepositoryTest`.
+- **자기 자신을 제외한** nickname/slug 중복 조회, 기본 블로그 조회, 공개 slug + Blog/User soft-delete 제외 쿼리를 고정한다.
+- MySQL unique 제약과 auditing을 실제 컨테이너에서 검증한다.
+
+#### Gate 3: BE service — 설정 유스케이스·경쟁 처리 + 테스트
+
+- 신규: `UserSettingsService`, `BlogSettingsService`, `UserSettingsDtos`, `BlogSettingsDtos`.
+- 변경 후보: `ErrorCode` — **심의에서 승인된 M2 코드만** 추가.
+- 신규 테스트: 서비스 단위 + nickname/slug 동시 변경 경쟁 테스트.
+- principal userId → soft-delete 안전 조회, current password 검증, BCrypt 재해시, setup 1회성, 공개 Blog 조회.
+
+#### Gate 4: BE controller — HTTP 계약·Swagger·보안·통합 테스트
+
+- 신규: `UserSettingsController`, `BlogSettingsController`, `BlogPublicController`.
+- `SecurityConfig`는 공개 GET allowlist가 충분하면 **수정하지 않고 테스트만** 추가한다.
+- 변경: `SecurityAccessControlTest` + 신규 controller tests + `SettingsFlowTest`.
+- Validation 400, 무토큰 401/`AUTH_004`, 공개 GET 200, **공개 경로 쓰기 401**, 404/409, 래퍼·password 비노출 검증.
+
+#### Gate 5: FE data — 타입·API 모듈·AuthContext 갱신 + 단위 테스트
+
+- 신규: `features/settings/settingsApi.ts`·`types.ts`, `features/blog/blogApi.ts`. 변경: `lib/authContext.tsx`.
+- `lib/apiClient.ts`는 **M2 결함이 발견되지 않는 한 수정하지 않는다**.
+- profile/blog/password 상태·오류를 분리하고 **password를 상태·로그·응답 객체에 잔존시키지 않는다**.
+
+#### Gate 6: FE screens — 초기설정·Settings·BlogPage 연동과 화면 테스트
+
+- `BlogSetupPage` → `BlogInitialSetupPage`, `SettingsProfilePage`, `BlogPage`, `router.tsx`.
+- 신규 테스트: 각 페이지, 가드 전환, loading/error/404, 독립 저장, 디자인 토큰·1440px 레이아웃·접근성.
+- **1440px `.dc.html` 시각 대조를 PR 전에** 수행하고 기록한다(M0·M1에서 리뷰 지적으로 되돌아간 항목).
+
+### 6. 테스트 계획 (PRD §11, TDD)
+
+#### BE domain·service (예상 45~60)
+
+- User profile: 전체/부분 변경, nickname 유지·변경, null/blank/길이 경계, **slug 불변**, soft-deleted user 거부.
+- Password: 현재 비밀번호 성공/실패, 8/64자 경계, 영문·숫자·특수문자 각각 누락, BCrypt strength 12, 응답·로그 비노출.
+- Blog: title/description 변경, slug 정상·예약어·대문자·앞뒤/연속 하이픈·2/3/30/31자, **자신의 기존 slug 허용**, 타 blog slug 충돌.
+- Initial setup: 제공값/빈 title/빈 slug, nickname→fallback, suffix 충돌, 상태 전이, **두 번째 호출 409**, nickname 변경과 slug 비연동.
+- Public lookup: 정상·없는 slug·deleted Blog·deleted User·**SUSPENDED owner 공개 유지**.
+- 동시성: nickname/slug check-then-write 경쟁이 DB unique에서 `USER_002`/`BLOG_002`로 매핑되는지.
+
+#### BE Repository/Controller (예상 35~50)
+
+- Repository: unique, self-exclusion 쿼리, auditing, Blog/User soft-delete 제외, 기본 Blog 연관관계.
+- Controller: validation details, 무토큰 401, malformed/expired token, 공통 래퍼, 404/409 매핑.
+- 공개 경로: `GET /blogs/slug/**`만 무인증 허용하고 **같은 경로 POST/PUT/DELETE는 401**.
+- DTO: User 응답에 password 없음, 공개 응답에 owner의 비공개 필드 없음.
+- Swagger: 보호 endpoint Bearer 스키마, 공개 endpoint 표기를 OpenAPI JSON smoke로 확인.
+- **총 예상: 138 + 80~110 = 약 218~248 tests, 0 skipped / 0 failures.**
+
+#### BE 통합 시나리오
+
+1. 가입 → signin → `/users/me` 조회 → 프로필 변경 → `/auth/me`에 반영.
+2. 가입 → 초기 설정 → 완료된 slug 공개 조회 → 초기 설정 재호출 409.
+3. 가입 A/B → A가 B의 nickname/slug로 변경 시 409 → 기존 데이터 보존.
+4. 초기 설정 전 `/blogs/me` 조회 → setup → 일반 수정 → 공개 조회.
+5. 비밀번호 변경 → 기존 비밀번호 signin 실패 → 새 비밀번호 signin 성공, **응답·로그에 두 비밀번호 미출현**.
+6. User 또는 Blog soft delete → 공개 slug 조회 404. SUSPENDED만 적용하면 공개 유지.
+7. 무토큰 보호 API 401, 공개 블로그 GET 200, 공개 경로 쓰기 401.
+
+#### FE (예상 45~65, 총 231~251)
+
+- settings/blog API의 method/path/body와 타입 안전한 반환값.
+- AuthContext 갱신 후 nickname/title/urlSlug/isSetupCompleted가 가드·히어로에 즉시 반영.
+- apiClient Bearer·credentials·401 single-flight·1회 재시도 **M1 회귀 유지**.
+- 초기 설정: 필드 검증, 서버 409·slug 오류, 중복 제출 방지, 성공 후 이동.
+- Settings: 초기 로드, **독립 저장**, validation/409 표시, email disabled, password 입력 초기화·DOM 잔존 방지.
+- BlogPage: 무인증 조회, loading, 404, 일반 오류, 동적 히어로.
+- Guard/router: 미인증→signin, setup 미완료→setup, 완료 사용자의 setup 접근 차단.
+
+#### E2E·시각 검증
+
+- 실제 E2E runner가 `package.json`에 없다. **Playwright/Cypress 추가는 외부 라이브러리 도입으로 심의 대상**이다.
+- runner 승인 전에는 **skipped E2E 파일을 만들지 않고** MockMvc 전체 흐름 + Testing Library routed integration을 실행 가능한 게이트로 쓴다.
+- Secure/Strict Refresh 쿠키의 실제 브라우저 검증은 M1 승인대로 최초 HTTPS 배포 전 `RISK-0005` 게이트에 유지한다.
+- 1440×1200에서 `/blog/setup`, `/settings`, `/blog/{slug}`를 `.dc.html`과 대조하고 토큰·폭·보더·그림자·폰트·카피를 기록한다.
+- `it.skip`/`describe.skip`/placeholder mock/fake-pass **0건**을 하드 게이트로 둔다.
+
+### 7. 기획 심의 소집 판정
+
+**판정: 소집 필요.** (governance/README §2)
+
+- 일반 조건 ①: 신규 설정/공개 조회 API와 M2 에러코드는 **공개 API 계약 변경**이다.
+- 일반 조건 ②: 현재 비밀번호 검증·프로필 개인정보·principal 기반 소유권은 **인증·권한·개인정보 정책**에 해당한다.
+- 일반 조건 ③: 디자인의 slug 불변 카피와 `FR-SETTINGS-03`의 slug 수정 허용이 **충돌**한다.
+- 대형 조건: BE+FE 동시 변경, 인증/접근제어 포함 **2개 충족**.
+
+**심의 결정 항목**
+
+1. 잘못된 현재 비밀번호와 setup 완료 중복의 코드/HTTP — `USER_*` 400과 `BLOG_*` 409 후보.
+2. slug 변경 허용을 유지하고 디자인 카피를 고칠지, API를 불변으로 바꿀지. **현 정본 우선순위상 요구사항 유지·카피 개정 권고.**
+3. E2E runner를 M2에 도입할지, 실행 가능한 integration + 최초 배포 전 `RISK-0005` 브라우저 게이트를 유지할지.
+
+결정이 공개 계약·정책을 고정하면 회의록, REQUIREMENTS/PRD §9, Decision Register와 `ADR-0004` 후보에 반영한 뒤 Gate 1을 시작한다. **`LOW`가 아닌 결정은 사용자 승인 전 구현하지 않는다.**
+
+### 8. DoD 체크리스트
+
+- [ ] `FR-SETTINGS-01` 사용자 조회/수정과 nickname unique·slug 비연동 구현·테스트.
+- [ ] `FR-SETTINGS-02` 현재 비밀번호 확인, 신규 비밀번호 정책, BCrypt 재해시 구현·테스트.
+- [ ] `FR-SETTINGS-03` Blog 조회/수정과 slug 형식·예약어·unique 정책 구현·테스트.
+- [ ] `FR-SETTINGS-04` 기본값 생성, `isSetupCompleted` 전이, 재호출 409 구현·테스트.
+- [ ] `FR-BLOG-01` 공개 정보·소유자 기본 정보, soft-delete 제외, SUSPENDED 공개 유지 구현·테스트.
+- [ ] `FR-BLOG-02`, 카테고리, 게시글, 업로드, 회원 탈퇴, 유니버스가 M2에 섞이지 않았다.
+- [ ] 보호 API는 principal 기반 자기 정보만 다루고 무토큰 401/`AUTH_004`; 공개 GET만 permitAll.
+- [ ] User 응답·오류·로그·FE 상태에 password 원문/해시가 echo되지 않는다.
+- [ ] 공통 응답 래퍼·UTC timestamp·ErrorCode 계약 준수, 불필요한 래퍼 변경 없음.
+- [ ] Swagger UI에 M2 endpoint, Bearer 인증, 응답·오류 계약 문서화.
+- [ ] `/blog/setup`, `/settings`, `/blog/:slug`가 DESIGN-SYSTEM 색상·보더·그림자·폰트·1440px 레이아웃 적용.
+- [ ] `.dc.html`의 M3+ 요소는 가짜 데이터·stub 없이 경계 처리됐고 **시각 대조 기록**이 남았다.
+- [ ] BE 약 218~248, FE 약 231~251 테스트 통과, skip·placeholder mock·fake-pass 0건.
+- [ ] M2 관련 PRD §11 테스트 항목과 FR 분기 추적률 100%.
+- [ ] M1 BE 138·FE 186 회귀, BE/FE build, FE lint 통과.
+- [ ] 신규 secret·평문 credential·password 미커밋.
+- [ ] 신규 migration 불필요함을 확인했고 V1을 수정하지 않았다.
+- [ ] 기획 심의 결정, ADR/위험, Gate별 커밋, 테스트 수치와 실제 산출물이 워크로그와 일치한다.
+
+## [개발 기록]
+
+- 아직 없음.
+
+## [이슈·결정]
+
+- 2026-07-26 · Codex 계획 수립 완료. 기획 심의 **소집 필요** 판정(일반 조건 3 + 대형 조건 2).
+
+## [리뷰]
+
+- 아직 없음.
+
+## [머지]
+
+- 아직 없음.

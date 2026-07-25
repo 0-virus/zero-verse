@@ -244,7 +244,43 @@
 
 ## [개발 기록]
 
-- 아직 없음.
+### 2026-07-26 · Gate 1 — BE 도메인 (User/Blog 상태 전이)
+
+**구현**
+
+| 대상 | 불변식 |
+|---|---|
+| `ErrorCode` | 승인된 `USER_005`(400) · `BLOG_004`(409) **2개만** 추가 |
+| `User.updateProfile` | name·nickname 필수, **nickname 2~20자**, bio·birthDate·profileImageUrl nullable. **nickname을 바꿔도 Blog slug는 건드리지 않는다** |
+| `User.changePassword` | 이미 인코딩된 해시만 받는다 — 엔티티가 `PasswordEncoder`에 의존하지 않게 했다. 현재 비밀번호 대조는 Gate 3 서비스 책임 |
+| `Blog.updateInfo` | title 필수·200자 이하, slug는 `SlugGenerator.isValid`로 형식·예약어 검증(위반 시 `BLOG_003`), description nullable |
+| `Blog.initialSetup` | **1회성 전이**. 이미 완료면 `BLOG_004`(409), 성공 시 `isSetupCompleted=true` |
+
+**1차 구현에서 잡은 결함 3건**(자체 검토)
+
+executor의 1차 산출물에 승인 계약을 어긴 결함이 있어 되돌려 고쳤다. 셋 다 **잘못된 HTTP 응답**으로 이어지는 것이었다.
+
+| # | 결함 | 왜 문제인가 | 수정 |
+|---|---|---|---|
+| 1 | `initialSetup` 재호출이 `IllegalStateException` | `GlobalExceptionHandler`에 해당 핸들러가 없어 `Exception` 폴백 → **500 `COMMON_500`**. ADR-0004가 승인한 409 `BLOG_004`는 정의만 되고 **아무도 던지지 않는 죽은 코드**였다 | `BusinessException(BLOG_004)`. 테스트도 status가 아니라 **ErrorCode까지** 단정하도록 교정 |
+| 2 | nickname 상한 **100자** | 요구사항은 `2~20자`(REQUIREMENTS §4). DB `VARCHAR(100)`을 API 규칙으로 착각한 것 — **M1에서 같은 혼동으로 blocking 지적을 받았던 실수의 반복**(당시 `@Size(2,100)`→`@Size(2,20)`). 하한 검증도 없었다 | 2~20자로 교정, 1/2/20/21자 경계 전부 테스트. 가입(`AuthDtos`)과 규칙 일치 확인 |
+| 3 | 모든 도메인 검증이 `IllegalArgumentException` | #1과 같은 이유로 **사용자 입력 오류가 전부 500**이 된다. 공통 응답 계약(NFR-03·04) 위반 | `BusinessException`으로 전환. 필드 검증 → `VALIDATION_001`(400), slug 형식·예약어 → `BLOG_003` |
+
+**뮤테이션 확인**(M1에서 도입한 절차 — 테스트가 결함을 실제로 잡는지)
+
+| 무력화한 분기 | 결과 |
+|---|---|
+| `isSetupCompleted` 상태 전이 제거 | FAILED — 재호출 거부가 뚫린다 |
+| nickname 상한 `> 20` 검증 제거 | FAILED — 21자가 통과한다 |
+| nickname 하한 `< 2` 검증 제거 | FAILED — 1자가 통과한다 |
+| `SlugGenerator.isValid` 호출 제거 | FAILED — 예약어 `admin`이 통과한다 |
+
+**판단 근거를 남기는 항목**
+
+- `name` 100자 / `title` 200자 상한은 REQUIREMENTS에 명시 규칙이 없어 **V1 스키마의 컬럼 폭**(`VARCHAR(100)`/`VARCHAR(200)`)을 상한으로 삼았다. 초과 입력이 DB 오류(500)로 새는 것을 막기 위한 방어이며, nickname과 달리 **정본에 별도 규칙이 없어 컬럼 폭이 유일한 근거**다. 명시 규칙이 생기면 그쪽을 따른다.
+- 엔티티 검증은 **최후 방어선**이다. 1차 방어선은 Gate 3~4의 DTO Bean Validation이며, 거기서 필드별 `details`를 제공한다.
+
+**검증**: BE **200 tests** / 24 클래스 · 0 skipped · 0 failures · 0 errors (기준선 138 + 신규 62).
 
 ## [이슈·결정]
 

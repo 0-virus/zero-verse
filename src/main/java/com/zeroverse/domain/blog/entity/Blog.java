@@ -1,6 +1,9 @@
 package com.zeroverse.domain.blog.entity;
 
 import com.zeroverse.common.entity.BaseSoftDeleteEntity;
+import com.zeroverse.common.exception.BusinessException;
+import com.zeroverse.common.exception.ErrorCode;
+import com.zeroverse.common.util.SlugGenerator;
 import com.zeroverse.domain.user.entity.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -78,5 +81,58 @@ public class Blog extends BaseSoftDeleteEntity {
 
     public Boolean getIsSetupCompleted() {
         return isSetupCompleted;
+    }
+
+    /**
+     * 블로그 정보를 업데이트한다(FR-SETTINGS-03).
+     *
+     * <p>title, urlSlug, description을 변경할 수 있다. slug는 {@link SlugGenerator#isValid(String)}로
+     * 검증하여 형식·예약어·길이 위반 시 BusinessException(BLOG_003)을 던진다. slug의 unique 제약은
+     * service 레이어에서 (자신의 기존 slug는 허용) 검증한다.
+     *
+     * @param title 블로그 제목, NOT NULL이고 1~200자
+     * @param urlSlug 공개 주소, NOT NULL이고 3~30자·형식·예약어 제약
+     * @param description 소개글, nullable
+     * @throws BusinessException title이 null/blank 또는 길이 초과(VALIDATION_001), urlSlug 형식 위반(BLOG_003)
+     */
+    public void updateInfo(String title, String urlSlug, String description) {
+        if (title == null || title.isBlank()) {
+            throw new BusinessException(ErrorCode.VALIDATION_001, "제목은 필수입니다.");
+        }
+        if (title.length() > 200) {
+            throw new BusinessException(ErrorCode.VALIDATION_001, "제목은 200자 이하여야 합니다.");
+        }
+        if (urlSlug == null || urlSlug.isBlank()) {
+            throw new BusinessException(ErrorCode.BLOG_003, "주소는 필수입니다.");
+        }
+        if (!SlugGenerator.isValid(urlSlug)) {
+            throw new BusinessException(ErrorCode.BLOG_003, "주소 형식이 올바르지 않습니다.");
+        }
+
+        this.title = title;
+        this.urlSlug = urlSlug;
+        this.description = description;
+    }
+
+    /**
+     * 블로그 초기 설정을 완료한다(FR-SETTINGS-04).
+     *
+     * <p>1회성 상태 전이다. 이미 {@code isSetupCompleted=true}이면
+     * BusinessException(BLOG_004)을 던진다. 성공 시 title/urlSlug을 설정하고
+     * {@code isSetupCompleted=true}로 전이한다.
+     *
+     * <p>slug 형식 검증은 {@link #updateInfo(String, String, String)}와 동일하다.
+     *
+     * @param title 기본 블로그 제목
+     * @param urlSlug 생성된 기본 slug(nickname 기반 또는 fallback)
+     * @throws BusinessException 이미 setupCompleted=true(BLOG_004), 또는 updateInfo 검증 실패
+     */
+    public void initialSetup(String title, String urlSlug) {
+        if (isSetupCompleted) {
+            throw new BusinessException(ErrorCode.BLOG_004);
+        }
+
+        updateInfo(title, urlSlug, null);
+        this.isSetupCompleted = true;
     }
 }

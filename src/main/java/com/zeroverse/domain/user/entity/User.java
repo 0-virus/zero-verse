@@ -1,6 +1,8 @@
 package com.zeroverse.domain.user.entity;
 
 import com.zeroverse.common.entity.BaseSoftDeleteEntity;
+import com.zeroverse.common.exception.BusinessException;
+import com.zeroverse.common.exception.ErrorCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -122,5 +124,59 @@ public class User extends BaseSoftDeleteEntity {
     /** 로그인·토큰 갱신이 가능한 상태인지. soft delete된 사용자는 활성이 아니다. */
     public boolean isActive() {
         return status == UserStatus.ACTIVE && !isDeleted();
+    }
+
+    /**
+     * 사용자 프로필을 업데이트한다(FR-SETTINGS-01).
+     *
+     * <p>name, nickname, bio, birthDate, profileImageUrl을 변경할 수 있다. nickname을 바꿔도
+     * Blog slug는 건드리지 않는다(blob의 urlSlug는 유지). null/blank/길이 검증은 엔티티 수준에서 방어한다.
+     *
+     * @param name 이름, NOT NULL이고 1~100자
+     * @param nickname 닉네임, NOT NULL이고 2~20자, unique는 서비스 레이어에서 검증(FR-AUTH-01·REQUIREMENTS §6.2)
+     * @param bio 소개글, nullable
+     * @param birthDate 생년월일, nullable
+     * @param profileImageUrl 프로필 이미지 URL, nullable
+     * @throws BusinessException name 또는 nickname이 null/blank이거나 길이 초과(VALIDATION_001)
+     */
+    public void updateProfile(String name, String nickname, String bio, LocalDate birthDate,
+                             String profileImageUrl) {
+        if (name == null || name.isBlank()) {
+            throw new BusinessException(ErrorCode.VALIDATION_001, "이름은 필수입니다.");
+        }
+        if (name.length() > 100) {
+            throw new BusinessException(ErrorCode.VALIDATION_001, "이름은 100자 이하여야 합니다.");
+        }
+        if (nickname == null || nickname.isBlank()) {
+            throw new BusinessException(ErrorCode.VALIDATION_001, "닉네임은 필수입니다.");
+        }
+        if (nickname.length() < 2) {
+            throw new BusinessException(ErrorCode.VALIDATION_001, "닉네임은 2자 이상이어야 합니다.");
+        }
+        if (nickname.length() > 20) {
+            throw new BusinessException(ErrorCode.VALIDATION_001, "닉네임은 20자 이하여야 합니다.");
+        }
+
+        this.name = name;
+        this.nickname = nickname;
+        this.bio = bio;
+        this.birthDate = birthDate;
+        this.profileImageUrl = profileImageUrl;
+    }
+
+    /**
+     * 비밀번호를 변경한다(FR-SETTINGS-02).
+     *
+     * <p>이미 BCrypt로 인코딩된 해시를 받는다. 엔티티는 PasswordEncoder에 의존하지 않으며, 현재 비밀번호
+     * 검증은 service 레이어에서 수행한다. 여기서는 받은 hash를 그대로 저장한다.
+     *
+     * @param encodedPassword BCrypt로 인코딩된 비밀번호 해시
+     * @throws BusinessException encodedPassword가 null/blank(VALIDATION_001)
+     */
+    public void changePassword(String encodedPassword) {
+        if (encodedPassword == null || encodedPassword.isBlank()) {
+            throw new BusinessException(ErrorCode.VALIDATION_001, "인코딩된 비밀번호는 필수입니다.");
+        }
+        this.password = encodedPassword;
     }
 }

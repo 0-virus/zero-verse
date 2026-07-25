@@ -418,6 +418,11 @@ placeholder, `skip`, `@Disabled`, stub 성공 응답을 금지한다(`docs/PRD.m
 
 - 2026-07-25 · PRD §9.4-AA 확정 — 회원가입 `name`·`birth_date` 유지(사용자 결정). §9.3-① 종결.
 - 2026-07-25 · 기획 심의 소집: 대형 마일스톤 **4개 조건** 해당(BE·FE 동시 / User·Blog·Category·RefreshToken 4개 도메인 / 인증·접근제어 포함 / M0 보안 설정 교체). `docs/governance/README.md` §2.
+- 2026-07-25 · 기획 심의 `M1-20260725-auth` 종료 — 회의록 [`docs/governance/meetings/M1-20260725-auth.md`](../governance/meetings/M1-20260725-auth.md). 독립 검토 3인 전원 `APPROVE_WITH_CHANGES`(확신도 92·93·유사), 제안 등급 전원 `HIGH`. 진행자 최종 등급 **`HIGH`**, 상태 **`USER_DECISION_REQUIRED`**.
+  - 1차 결정 질문: 인증 오류 계약 A(신규 코드 추가) / B(기존 코드 재사용) / C. 검토자·진행자 **전원 A 권고** — B는 email 중복 409를 표현할 기존 코드가 없어 공개 계약 의미가 왜곡된다.
+  - 구현 전 필수 변경 **15건**, 사용자 결정 항목 **8건**은 회의록 §7~§8 참조.
+  - **미제공 정보**: 운영 FE/API의 scheme·host·site·HTTPS 관계. `docs/` 전수 검색 결과 배포 환경 정보가 문서에 없다. cross-site로 확인되면 `SameSite=Strict` 계약은 별도 재심의 대상이다.
+  - ADR-0003 `M1 인증 토큰·세션 및 오류 계약` — 번호만 예약, 사용자 승인 후 작성.
 
 ## [리뷰]
 

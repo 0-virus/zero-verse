@@ -48,7 +48,7 @@ export function TopBar() {
             type="search"
             aria-label="검색"
             placeholder="유니버스 전체 검색 — 글 · 블로그 · 사용자 · 태그"
-            className="min-w-0 flex-1 border-0 bg-transparent px-3 py-2.5 text-[13px] text-ink outline-0"
+            className="min-w-0 flex-1 border-0 bg-transparent px-3 py-[9px] text-[13px] text-ink outline-0"
           />
           <button
             type="submit"

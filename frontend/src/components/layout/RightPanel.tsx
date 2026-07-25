@@ -17,8 +17,8 @@ export function RightPanel() {
   return (
     <aside
       aria-label="사이드 패널"
-      style={{ position: 'sticky', top: 20 }}
-      className="flex w-[300px] shrink-0 flex-col gap-6 self-start"
+      style={{ position: 'sticky', top: 20, gap: 18 }}
+      className="flex w-[300px] shrink-0 flex-col self-start"
     >
       {SECTIONS.map((section) => (
         <Panel key={section.title} title={section.title}>

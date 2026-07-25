@@ -35,11 +35,14 @@ describe('Hero', () => {
     });
   });
 
-  it('별·로켓·구름은 aria-hidden 장식이다', () => {
+  it('별 2레이어·로켓·구름을 장식으로 렌더한다', () => {
     const { container } = render(<Hero eyebrow="E" title="T" description="D" />);
 
-    const decorations = container.querySelectorAll('[aria-hidden="true"]');
-    expect(decorations.length).toBeGreaterThanOrEqual(3);
+    expect(container.querySelectorAll('[data-pixel-stars="true"]')).toHaveLength(2);
+    expect(container.querySelectorAll('[data-pixel-rocket="true"]')).toHaveLength(1);
+    expect(container.querySelector('[data-hero-clouds="true"]')).not.toBeNull();
+    container.querySelectorAll('[data-pixel-stars],[data-pixel-rocket],[data-hero-clouds]')
+      .forEach((el) => expect(el).toHaveAttribute('aria-hidden', 'true'));
   });
 });
 
@@ -90,15 +93,21 @@ describe('ScreenPanel', () => {
     ]);
   });
 
-  it('블로그 패널은 빈 상태를 렌더한다', () => {
+  it('블로그 패널은 카테고리·블로그 통계 두 패널을 렌더한다', () => {
     render(
       <MemoryRouter>
         <ScreenPanel kind="blog" />
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole('complementary', { name: '블로그 메뉴' })).toBeInTheDocument();
+    const aside = screen.getByRole('complementary', { name: '블로그 메뉴' });
+    const headings = within(aside)
+      .getAllByRole('heading', { level: 2 })
+      .map((h) => h.textContent);
+
+    expect(headings).toEqual(['■ 카테고리', '■ 블로그 통계']);
     expect(screen.getByText(/카테고리를 불러오면/)).toBeInTheDocument();
+    expect(screen.getByText(/통계를 불러오면/)).toBeInTheDocument();
   });
 
   it('폭 240px로 앱 내비(210px)와 구분된다', () => {
@@ -147,5 +156,21 @@ describe('AppShell 영역 조합', () => {
 
     expect(container.querySelector('[data-hero="true"]')).toBeNull();
     expect(container.querySelector('[data-layout="onboarding"]')).not.toBeNull();
+  });
+
+  it('온보딩 화면도 별과 로켓 장식을 렌더한다 (정본 SCREEN: LOGIN)', () => {
+    const { container } = renderAt('/signin');
+
+    expect(container.querySelectorAll('[data-pixel-stars="true"]')).toHaveLength(1);
+    expect(container.querySelectorAll('[data-pixel-rocket="true"]')).toHaveLength(1);
+    expect(container.querySelector('[data-layout="onboarding"]')).toHaveStyle({
+      background: 'var(--gradient-auth)',
+    });
+  });
+
+  it('/blog/:slug 는 190px 히어로를 렌더한다', () => {
+    const { container } = renderAt('/blog/zerostar');
+
+    expect(container.querySelector('[data-hero="true"]')).toHaveStyle({ height: '190px' });
   });
 });

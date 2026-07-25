@@ -89,6 +89,12 @@ const RULES: Array<{ test: (path: string) => boolean; spec: LayoutSpec }> = [
       columns: '240px 1fr',
       appNav: false,
       screenPanel: 'blog',
+      hero: {
+        height: 190,
+        eyebrow: 'MY UNIVERSE / BLOG',
+        title: '블로그',
+        description: '블로그 정보를 불러오면 여기에 표시됩니다.',
+      },
     },
   },
   {
@@ -96,7 +102,8 @@ const RULES: Array<{ test: (path: string) => boolean; spec: LayoutSpec }> = [
     spec: { kind: 'app', maxWidth: 1060, padding: APP_PADDING_NARROW, columns: null, appNav: false },
   },
   {
-    test: (p) => p.startsWith('/settings'),
+    // 등록된 설정 경로만. `/settings-unknown` 같은 미등록 경로는 not-found 단일 컬럼으로 떨어진다.
+    test: (p) => ['/settings', '/settings/universe', '/settings/posts'].includes(p),
     spec: {
       kind: 'app',
       maxWidth: 1240,

@@ -63,6 +63,9 @@
   --gradient-dusk: linear-gradient(180deg, #241b4d 0%, #4b2a7b 50%, #c86bb1 85%, #ff9d6c 100%);
   --gradient-sunset: linear-gradient(180deg, #4b2a7b 0%, #c86bb1 45%, #ff9d6c 80%, #ffd9a0 100%);
   --gradient-dawn: linear-gradient(180deg, #2a6f97 0%, #7bc4c4 55%, #ffd9a0 90%, #fff1d6 100%);
+  /* 온보딩(로그인·회원가입·초기설정) 전용 — `Pages.dc.html` SCREEN: LOGIN.
+     dusk와 정지점이 다르다(55%/90% vs 50%/85%). */
+  --gradient-auth: linear-gradient(180deg, #241b4d 0%, #4b2a7b 55%, #c86bb1 90%, #ff9d6c 100%);
 }
 
 /* border-radius: 0 — 예외 없음 (§3) */

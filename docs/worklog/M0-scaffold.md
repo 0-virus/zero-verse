@@ -573,7 +573,7 @@ PRD §12 DoD와 §11 테스트 전략의 각 항목에 대해 **M0에 적용되�
 | 1 | 해당 FR/NFR 규칙 전부 구현 | **적용**(M0는 FR 없음, NFR-01·04·05·06·07·08 해당) | CorsConfigTest(NFR-01), ErrorCode+GlobalExceptionHandlerTest(NFR-04), OpenApiConfigTest(NFR-05), BaseEntityAuditingTest(NFR-06), FlywayMigrationTest(NFR-07·08) | ✅ |
 | 2 | §11 해당 테스트 존재·통과, placeholder/skip/stub 금지 | **적용** | **BE 36 tests / FE 126 tests(12 파일)**, 전부 `skipped="0"`. `@Disabled`·`it.skip`·`todo` 0건 | ✅ |
 | 3 | 공통 응답·에러코드·페이징 규약 준수, Swagger 문서화 | **적용** | ApiResponseTest(4키 항상 직렬화), PageResponseTest, OpenApiConfigTest(`/v3/api-docs` + Bearer 스키마) | ✅ |
-| 4 | FE가 §6 토큰 적용 + `docs/design/` 정본과 시각 일치 | **적용** | 토큰 정본 대조 + 구조 DOM 테스트 + **1440px Playwright 시각 대조**(아래 `[시각 대조 기록]`) | ✅ |
+| 4 | FE가 §6 토큰 적용 + `docs/design/` 정본과 시각 일치 | **적용** | 토큰 정본 대조 + 구조 DOM 테스트 + **1440px Playwright 시각 대조 2회**(3차 리뷰 지적 7건 반영 포함, 아래 `[시각 대조 기록]`) | ✅ |
 | 4b | 연동 API 실제 동작 확인 | **비적용** — M0에 연동할 도메인 API가 없다(M1~M9) | — | — |
 | 5 | 보안: 비밀 미커밋, sanitize, 권한 가드 | **부분 적용** — 비밀 미커밋만 해당. sanitize는 M4, 권한 가드는 M1 | `application-local.example.yml`은 placeholder만, `application-local.yml`은 gitignore. `git ls-files`에 비밀값 없음 | ✅(해당 범위) |
 | 6 | 빌드·린트 통과 + 저자와 다른 패스의 검증 | **적용** | `./gradlew test` BUILD SUCCESSFUL, `npm run build`(tsc -b && vite build) exit 0, `npm run lint`(oxlint) exit 0. Codex 리뷰(3b) — 저자 Claude와 분리 | ✅ |
@@ -639,6 +639,39 @@ PRD §12 DoD와 §11 테스트 전략의 각 항목에 대해 **M0에 적용되�
 **남은 차이(의도된 것)**: 알림 카운트 배지와 각 패널의 실제 데이터는 M0에 데이터가 없어 렌더하지 않는다. 가짜 데이터를 넣지 않는다는 원칙(PRD §12)에 따른다.
 
 ---
+
+### 2026-07-25 · Codex 재리뷰 3차 — Verdict: 블로킹(4건 중 3건 해소)
+
+| 2차 지적 | 판정 |
+|---|---|
+| #13 게이트 커밋 분리 | **해소** — `fe675a2`에 V1·FE 없음, `32afc11`에 V1·DB만. 백업 대비 트리 동일 |
+| build/lint 증거 | **해소** — lint 직접 실행 exit 0, `dist`·BE XML 시각·수치 대조 |
+| SideNav 정본·테스트 | **해소** |
+| DoD 4 시각 일치 | **미해소** — 아래 7건 |
+
+**리뷰가 옳았다.** 2차 반영 때 워크로그에 `✅ 정본 시각 일치`로 단정한 것은 과장이었다.
+당시 대조는 **구조 수준**이었고 픽셀 수준 대조가 아니었는데 ✅로 적었다.
+
+### 2026-07-25 · 3차 리뷰 반영 (수정 7건 + 사용자 결정 1건)
+
+| # | 지적 | 처리 |
+|---|---|---|
+| 1 | `/blog/:slug`에 190px 히어로 누락 | 반영 — layout spec에 `hero`(190px) 추가. `BlogPage`는 히어로가 h1을 담당하므로 본문 열만 렌더하도록 재작성 |
+| 2 | 구름 기본값이 정본과 다름(`showClouds` 기본 `false`) | **사용자 결정으로 현행 유지** — PRD §9.4-Z에 결정 기록. 다크 히어로 → 크림 페이퍼 전환을 픽셀 스카이라인이 담당한다 |
+| 3 | 온보딩에 별·로켓 누락 | 반영 — `StarField.tsx` 신설(`PixelStars`·`PixelRocket`·정본 별 좌표 3종). 온보딩에 `AUTH_STARS` + 로켓(`floaty 6s`, `left:120 bottom:120`) 적용 |
+| 4 | 온보딩 그라디언트가 정본과 정지점 다름 | 반영 — `--gradient-auth`(55%/90%) 토큰 신설. dusk(50%/85%)와 구분 |
+| 5 | RightPanel 간격 24px ↔ 정본 18px | 반영 — `gap: 18` |
+| 6 | Panel 헤더 13px/2px ↔ 정본 12px/3px | 반영 — `px-3.5 py-[11px] text-xs tracking-[3px]`. 정본 인스턴스(RIGHT RAIL·블로그 카테고리) 기준 |
+| 7 | 블로그 ScreenPanel이 단일 빈 박스 ↔ 정본 2패널 | 반영 — `■ 카테고리` / `■ 블로그 통계` 두 패널, `gap:18px` |
+| 8 | TopBar 검색 입력 padding 10px ↔ 정본 9px | 반영 — `py-[9px]` |
+| 비블로킹 | `startsWith('/settings')`로 미등록 경로가 설정 셸로 렌더 | 반영 — 등록된 3개 경로 정확 매칭으로 교체 + 회귀 테스트 |
+
+**대조 중 발견한 환경 이슈**: 장시간 떠 있던 Vite dev 서버의 Tailwind 스캔이 상해
+유틸리티 클래스가 생성되지 않은 채 서빙됐다(토큰은 정상). 서버 재기동으로 해소.
+CSS가 빠진 스크린샷을 정본 대조 결과로 오인할 뻔했으므로, 이후 대조 전에는
+`bg-paper` 등 대표 유틸리티가 서빙 CSS에 있는지 먼저 확인한다.
+
+**검증**: FE **130 tests**(12 파일), BE **36 tests**, `npm run build`·`npm run lint` exit 0.
 
 ## [리뷰]
 

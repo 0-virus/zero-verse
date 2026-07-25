@@ -5,6 +5,7 @@ import { SideNav } from './SideNav';
 import { Hero } from './Hero';
 import { RightPanel } from './RightPanel';
 import { ScreenPanel } from './ScreenPanel';
+import { AUTH_STARS, PixelRocket, PixelStars } from './StarField';
 import { resolveLayout } from '../../lib/layout';
 
 /**
@@ -26,10 +27,23 @@ export function AppShell({ children }: { children: ReactNode }) {
         <TopBar />
         <div
           data-layout="onboarding"
-          style={{ background: 'var(--gradient-dusk)', minHeight: 'calc(100vh - 118px)' }}
-          className="flex items-center justify-center px-10 py-14"
+          style={{ background: 'var(--gradient-auth)', minHeight: 'calc(100vh - 118px)' }}
+          className="relative flex items-center justify-center overflow-hidden px-10 py-14"
         >
-          <div data-onboarding-card="true" style={{ width: layout.cardWidth }}>
+          <PixelStars
+            top={60}
+            left={150}
+            size={3}
+            color="#fff"
+            shadow={AUTH_STARS}
+            duration={2.6}
+          />
+          <PixelRocket duration={6} style={{ left: 120, bottom: 120 }} />
+          <div
+            data-onboarding-card="true"
+            style={{ width: layout.cardWidth }}
+            className="relative z-[2]"
+          >
             {children}
           </div>
         </div>

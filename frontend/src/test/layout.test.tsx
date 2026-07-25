@@ -44,6 +44,22 @@ describe('resolveLayout', () => {
     expect(layout.appNav).toBe(false);
   });
 
+  it('미등록 `/settings-*` 경로는 설정 셸이 아니라 not-found 단일 컬럼이다', () => {
+    const layout = resolveLayout('/settings-unknown');
+
+    expect(layout.columns).toBeNull();
+    expect(layout.screenPanel).toBeUndefined();
+    expect(layout.maxWidth).toBe(860);
+  });
+
+  it('히어로는 `/`(240px)와 `/blog/:slug`(190px)에만 있다', () => {
+    expect(resolveLayout('/').hero?.height).toBe(240);
+    expect(resolveLayout('/blog/zerostar').hero?.height).toBe(190);
+    expect(resolveLayout('/settings').hero).toBeUndefined();
+    expect(resolveLayout('/search').hero).toBeUndefined();
+    expect(resolveLayout('/signin').hero).toBeUndefined();
+  });
+
   it('앱 내비 사이드바는 `/`에만 존재한다', () => {
     const withNav = [
       '/',
@@ -81,7 +97,7 @@ describe('AppShell 레이아웃 적용', () => {
 
     const onboarding = container.querySelector('[data-layout="onboarding"]');
     expect(onboarding).not.toBeNull();
-    expect(onboarding).toHaveStyle({ background: 'var(--gradient-dusk)' });
+    expect(onboarding).toHaveStyle({ background: 'var(--gradient-auth)' });
     expect(container.querySelector('[data-layout="app"]')).toBeNull();
   });
 

@@ -37,8 +37,9 @@ out/
 ### VS Code ###
 .vscode/
 
-### Claude Code — 로컬 에이전트 설정/스킬(미추적) ###
+### Claude Code / OMC — 로컬 에이전트 설정·런타임 상태(미추적) ###
 .claude/
+.omc/
 
 ### Frontend ###
 node_modules/

@@ -282,6 +282,35 @@ executor의 1차 산출물에 승인 계약을 어긴 결함이 있어 되돌려
 
 **검증**: BE **200 tests** / 24 클래스 · 0 skipped · 0 failures · 0 errors (기준선 138 + 신규 62).
 
+### 2026-07-26 · Gate 2 — BE repository (soft delete·unique 조회 계약)
+
+**추가한 조회 메서드와 각각이 막는 실패**
+
+| 메서드 | 없으면 무슨 일이 나는가 |
+|---|---|
+| `UserRepository.existsByNicknameAndIdNotAndDeletedAtIsNull` | 사용자가 **자기 닉네임을 그대로 둔 채** bio만 바꿔도 "이미 사용 중"으로 409가 난다. 자기 자신을 제외하지 않으면 모든 프로필 수정이 막힌다 |
+| `BlogRepository.existsByUrlSlugAndIdNotAndDeletedAtIsNull` | 같은 이유로 slug를 유지한 채 title만 바꾸는 수정이 막힌다 |
+| `BlogRepository.findByUrlSlugAndDeletedAtIsNullAndUserDeletedAtIsNull` | 소유자가 탈퇴(soft delete)한 블로그가 계속 공개된다 |
+
+기존 메서드로 충분한 것(`findFirstByUserIdAndDeletedAtIsNullOrderByIdAsc` 등)은 새로 만들지 않았다.
+
+**핵심 구분 — soft delete ≠ SUSPENDED**
+
+공개 조회에서 세 상태를 분리해 검증한다. 정상 → 공개 / **SUSPENDED → 공개 유지** / soft deleted → 비공개.
+정지는 계정 제재이지 삭제가 아니므로 이미 공개된 블로그를 내리지 않는다(REQUIREMENTS §6.3).
+
+**범위 이탈 1건 되돌림**
+
+1차 산출물이 SUSPENDED 상태를 만들려고 `User.suspend()`를 **프로덕션 엔티티에 추가**했다. 소비처는 테스트 2곳뿐이고 사용자 정지는 M9(FR-ADMIN) 범위다 — 이 저장소가 `RISK-0004`("소비처 없는 API 조기 고정")로 추적 중인 패턴 그대로다. M9가 실제 정지 정책(사유·시각·복구)을 구현할 때 시그니처가 먼저 굳어 있게 된다.
+
+→ 메서드를 제거하고, 테스트에서 `EntityManager` native update로 실제 행 상태를 만든 뒤 `flush()`+`clear()`로 1차 캐시를 비우고 재조회하도록 바꿨다. 프로덕션 코드를 오염시키지 않고 같은 상황을 재현한다.
+
+**테스트 클래스 정리**: `MutationTests`라는 nested 클래스가 있었다. 뮤테이션은 **검증 절차이지 영구 테스트가 아니고**, 내용도 기존 케이스와 겹쳤다. 중복을 지우고 `QueryConditionInteractionTests`·`PublicLookupOwnerStatusTests`처럼 무엇을 검증하는지 드러나는 이름으로 바꿨다.
+
+**뮤테이션 확인**(직접 수행) — `findByUrlSlug...UserDeletedAtIsNull`에 `@Query`를 붙여 **소유자 soft delete 조건만 제거** → `BlogRepositoryTest` **4건 FAILED**(soft delete된 소유자의 블로그가 공개 조회됨). 확인 후 원복했다.
+
+**검증**: BE **237 tests** / 37 클래스 · 0 skipped · 0 failures · 0 errors (Gate 1의 200 + 신규 37). 수치는 `build/test-results/test/*.xml` 합산값이다.
+
 ## [이슈·결정]
 
 - 2026-07-26 · Codex 계획 수립 완료. 기획 심의 **소집 필요** 판정(일반 조건 3 + 대형 조건 2).

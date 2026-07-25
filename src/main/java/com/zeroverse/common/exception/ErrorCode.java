@@ -18,15 +18,22 @@ public enum ErrorCode {
     /** 처리되지 않은 서버 오류. 내부 예외 정보를 절대 노출하지 않는 고정 메시지를 사용한다. */
     COMMON_500("COMMON_500", HttpStatus.INTERNAL_SERVER_ERROR, "서버 오류가 발생했습니다."),
 
-    // --- AUTH ---
-    AUTH_001("AUTH_001", HttpStatus.UNAUTHORIZED, "로그인에 실패했습니다."),
+    // --- AUTH (ADR-0003) ---
+    /** signin 실패 <b>전용</b>. 이메일 없음과 비밀번호 불일치를 구분하지 않는다(계정 존재 여부 노출 방지). */
+    AUTH_001("AUTH_001", HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다."),
+    /** 만료된 Access Token. 프론트의 자동 갱신 트리거다. */
     AUTH_002("AUTH_002", HttpStatus.UNAUTHORIZED, "토큰이 만료되었습니다."),
+    /** Refresh Token 무효 — 없음/만료/폐기/해시 불일치/rotation 경합 패배. */
     AUTH_003("AUTH_003", HttpStatus.UNAUTHORIZED, "유효하지 않은 Refresh Token입니다."),
+    /** 인증 필요 — Access Token 없음, 형식·서명·type 무효. {@code AUTH_001}을 이 용도로 쓰지 않는다. */
+    AUTH_004("AUTH_004", HttpStatus.UNAUTHORIZED, "인증이 필요합니다."),
 
     // --- USER ---
     USER_001("USER_001", HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
     USER_002("USER_002", HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다."),
     USER_003("USER_003", HttpStatus.FORBIDDEN, "정지된 사용자입니다."),
+    /** register 시 이메일 중복(ADR-0003). */
+    USER_004("USER_004", HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다."),
 
     // --- BLOG ---
     BLOG_001("BLOG_001", HttpStatus.NOT_FOUND, "블로그를 찾을 수 없습니다."),

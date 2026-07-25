@@ -2,6 +2,7 @@ package com.zeroverse.common.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.zeroverse.ZeroverseServerApplication;
 import com.zeroverse.support.MySqlTestSupport;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
@@ -31,11 +32,17 @@ class BaseEntityAuditingTest extends MySqlTestSupport {
     @Autowired private EntityManager entityManager;
 
     /**
-     * 테스트 전용 프로브 엔티티만 등록한다. {@code @EnableJpaAuditing}은
-     * {@code ZeroverseServerApplication}에 이미 있으므로 여기서 다시 선언하지 않는다(빈 중복 정의 방지).
+     * 프로브 엔티티를 추가로 등록한다.
+     *
+     * <p>{@code @EntityScan}은 기본 스캔 경로를 <b>대체</b>하므로 프로브 패키지만 지정하면
+     * {@code com.zeroverse.domain.*} 엔티티가 관리 대상에서 빠져 Repository 생성이 실패한다.
+     * 따라서 운영 base package를 함께 지정한다.
+     *
+     * <p>{@code @EnableJpaAuditing}은 {@code ZeroverseServerApplication}에 이미 있으므로
+     * 여기서 다시 선언하지 않는다(빈 중복 정의 방지).
      */
     @TestConfiguration
-    @EntityScan(basePackageClasses = AuditingProbe.class)
+    @EntityScan(basePackageClasses = {AuditingProbe.class, ZeroverseServerApplication.class})
     static class ProbeEntityConfig {}
 
     @Test

@@ -1,45 +1,92 @@
 package com.zeroverse.config;
 
+import com.zeroverse.domain.auth.config.AuthCookieProperties;
+import com.zeroverse.security.SecurityErrorResponder;
+import com.zeroverse.security.jwt.JwtAuthenticationFilter;
+import com.zeroverse.security.jwt.JwtProperties;
 import java.util.List;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /**
- * M0 보안 설정.
+ * 보안 설정(ADR-0003 §5).
  *
- * <p><b>주의</b>: M0에는 보호할 도메인 API가 아직 없으므로 {@code permitAll}로 둔다. JWT 필터와 최종
- * 401/403 정책은 <b>M1에서 반드시 교체</b>한다 — 위험 레지스터 {@code RISK-0002}로 추적 중이며, M1
- * 완료 조건에 401/403 회귀 테스트가 포함된다.
+ * <p>M0의 임시 {@code anyRequest().permitAll()}을 교체했다 — RISK-0002 해소.
+ *
+ * <p><b>공개 경로는 HTTP method까지 제한</b>한다. 경로만 열면 같은 경로의 POST·DELETE까지
+ * 함께 열려, 나중에 그 경로에 쓰기 API가 붙는 순간 인증 없이 노출된다.
  */
 @Configuration
-@EnableConfigurationProperties(CorsProperties.class)
+@EnableConfigurationProperties({CorsProperties.class, JwtProperties.class, AuthCookieProperties.class})
 public class SecurityConfig {
 
-    private final CorsProperties corsProperties;
+    /** BCrypt 강도. 기본값 10보다 높여 오프라인 크래킹 비용을 올린다(ADR-0003 §4). */
+    private static final int BCRYPT_STRENGTH = 12;
 
-    public SecurityConfig(CorsProperties corsProperties) {
+    private final CorsProperties corsProperties;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final SecurityErrorResponder securityErrorResponder;
+
+    public SecurityConfig(
+            CorsProperties corsProperties,
+            JwtAuthenticationFilter jwtAuthenticationFilter,
+            SecurityErrorResponder securityErrorResponder) {
         this.corsProperties = corsProperties;
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.securityErrorResponder = securityErrorResponder;
     }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                // Bearer 토큰 API는 CSRF 대상이 아니다. 쿠키를 쓰는 refresh·signout은
+                // SameSite=Strict + Origin 검증으로 막는다(ADR-0003 §3).
                 .csrf(csrf -> csrf.disable())
                 .formLogin(form -> form.disable())
                 .httpBasic(basic -> basic.disable())
                 .sessionManagement(
                         session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                // M0 한정. M1에서 인증 규칙으로 교체한다(RISK-0002).
-                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+                .exceptionHandling(handler -> handler
+                        .authenticationEntryPoint(securityErrorResponder)
+                        .accessDeniedHandler(securityErrorResponder))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                        // 인증 엔드포인트 — POST만 연다.
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/v1/auth/register",
+                                "/api/v1/auth/signin",
+                                "/api/v1/auth/refresh",
+                                "/api/v1/auth/signout").permitAll()
+
+                        // 공개 조회 — GET만 연다. 같은 경로의 쓰기 요청은 인증이 필요하다.
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/blogs/slug/**",
+                                "/api/v1/feed/public",
+                                "/api/v1/search").permitAll()
+
+                        // API 문서.
+                        .requestMatchers(HttpMethod.GET,
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/v3/api-docs",
+                                "/v3/api-docs/**").permitAll()
+
+                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                        .anyRequest().authenticated())
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
         return http.build();
     }
 
@@ -49,6 +96,7 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(corsProperties.allowedOrigins());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
+        // Refresh 쿠키를 주고받으려면 필요하다.
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
@@ -58,6 +106,6 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+        return new BCryptPasswordEncoder(BCRYPT_STRENGTH);
     }
 }

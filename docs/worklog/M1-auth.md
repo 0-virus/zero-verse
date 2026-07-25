@@ -412,7 +412,50 @@ placeholder, `skip`, `@Disabled`, stub 성공 응답을 금지한다(`docs/PRD.m
 
 ## [개발 기록]
 
-- 아직 없음. 기획 심의 승인 후 착수한다.
+### 2026-07-25 · Gate 1 — BE 도메인·인증
+
+**의존성·설정**
+- JJWT 0.13.0 추가. `jjwt-api`만 `implementation`, 구현체 2개는 `runtimeOnly`로 컴파일 노출을 막았다.
+- `application.yml`에 `zeroverse.jwt`·`zeroverse.auth.cookie` 추가. **secret은 fallback 기본값을 두지 않았다** — 미설정 시 기동 실패한다(개발용 키가 운영으로 새는 것을 막는다).
+- 테스트 프로파일에는 고정 키(42바이트)를 두고 "운영 비밀로 사용 불가"를 주석에 명시.
+
+**에러코드(ADR-0003)**
+- `AUTH_004`(401 인증 필요)·`USER_004`(409 이메일 중복) 신설. 계획서 §3.5의 "일반 Access 실패에 `AUTH_001` 사용" 문구는 심의 필수 변경대로 폐기하고 `AUTH_004`로 통일했다.
+- `AUTH_001` 메시지를 "이메일 또는 비밀번호가 올바르지 않습니다."로 바꿔 계정 존재 여부가 드러나지 않게 했다.
+
+**도메인**
+- `User`(name NOT NULL / birthDate nullable — §9.4-AA), `Blog`, `Category`, `RefreshToken` 4개 엔티티.
+- Repository 4종. 사용자 조회는 `...AndDeletedAtIsNull`로 soft delete를 제외한다.
+- `RefreshTokenRepository.findByTokenIdForUpdate`에 `PESSIMISTIC_WRITE`.
+
+**인증**
+- `JwtProvider` — HS256 단일 알고리즘, `sub`/`jti`/`type`/`iat`/`exp` + Access만 `role`. **refresh로 Access를 재발급할 때 refresh claim을 신뢰하지 않고 DB의 현재 User를 다시 읽는다**(발급 후 권한 강등·정지 반영).
+- `RefreshTokenHasher` — SHA-256 + `MessageDigest.isEqual` 상수 시간 비교. BCrypt를 쓰지 않은 이유를 주석에 남겼다(128-bit 랜덤이라 사전 공격 대상이 아니고, 갱신마다 검증하므로 느린 해시는 지연만 만든다).
+- `RefreshTokenService.rotate` — row lock → revoked/만료/해시/사용자 활성 검증 → 기존 revoke → 신규 발급을 한 트랜잭션에서.
+- 보안 로그는 실패 사유·userId·**jti 앞 8자리만** 남긴다. raw token·해시·secret은 기록하지 않는다.
+- `AuthService.register` — 사용자·기본 블로그·미분류를 한 트랜잭션에서 생성. 실패 시 전부 롤백.
+- `SlugGenerator` — suffix 포함 30자 상한(과거 리뷰 지적 항목), 예약어·빈 정규화 fallback.
+
+**보안 설정 — RISK-0002 해소**
+- `anyRequest().permitAll()` 제거. `anyRequest().authenticated()` + `/api/v1/admin/**`는 `hasRole("ADMIN")`.
+- **공개 경로를 HTTP method까지 제한**했다. 경로만 열면 나중에 그 경로에 쓰기 API가 붙는 순간 인증 없이 노출된다.
+- `SecurityErrorResponder` — Security 필터 체인의 401/403은 `GlobalExceptionHandler`를 타지 않아 기본 HTML 오류가 나간다. 공통 응답 계약을 지키려고 직접 JSON을 쓴다.
+
+**이슈**
+1. `AccessDeniedHandler` import 패키지 오류(`security.web` → `security.web.access`) — 컴파일 실패 후 수정.
+2. **`BaseEntityAuditingTest` 컨텍스트 로드 실패** — `@EntityScan(basePackageClasses = AuditingProbe.class)`가 기본 스캔을 **대체**해 `com.zeroverse.domain.*` 엔티티가 관리 대상에서 빠졌다(`Not a managed type: User`). 프로브 패키지와 운영 base package를 함께 지정해 해결.
+3. **테스트 격리 붕괴** — Testcontainers MySQL을 JVM당 하나로 재사용하는데 클래스 간 데이터가 남아, `AuthFlowTest`가 넣은 `dup@zeroverse.test`가 `FlywayMigrationTest`의 unique 제약을 깨뜨렸다. 실행 순서에 따라 결과가 달라지는 flaky 상태였다. `DatabaseCleaner`(도메인 테이블 TRUNCATE, Flyway 이력은 보존)를 만들어 `MySqlTestSupport`의 `@BeforeEach`에서 호출하도록 했다.
+4. slug 충돌 테스트에서 `collide`/`Collide`를 썼는데 **MySQL의 `utf8mb4_unicode_ci`는 대소문자를 구분하지 않아** nickname 중복(USER_002)이 먼저 발생했다. 정규화 결과만 같은 서로 다른 닉네임(`zero star` / `zero.star`)으로 교체.
+
+**Gate 1 검증 — 98 tests / 0 skipped / 0 failures**
+
+| 테스트 | 수 | 검증 |
+|---|---|---|
+| `SecurityAccessControlTest` | 17 | **RISK-0002 종료 조건** — permitAll 부재, 보호 경로·admin 401/403의 code·message, 공개 경로 GET 허용·쓰기 401, Refresh 토큰으로 API 접근 차단(type 검증) |
+| `SlugGeneratorTest` | 29 | 정규화·예약어·30자 상한·suffix 후 길이·형식 규칙 |
+| `AuthFlowTest` | 14 | 가입 시 3개 생성, birthDate 선택·name 필수, USER_004/USER_002, slug suffix, Access 본문·Refresh 쿠키 분리, **로그인 실패 응답 동일성**, rotation, 재사용 거부, signout idempotent, `/auth/me` |
+| `RefreshRotationConcurrencyTest` | 2 | **실제 MySQL 독립 트랜잭션 2개**로 동시 갱신 시 단일 성공 + 나머지 AUTH_003, 활성 row 정확히 1개 |
+| 기존 M0 테스트 | 36 | 회귀 없음 |
 
 ## [이슈·결정]
 

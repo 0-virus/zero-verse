@@ -16,3 +16,17 @@ spring:
 zeroverse:
   cors:
     allowed-origins: http://localhost:5173
+
+  # JWT 서명 키 — 최소 256-bit(32바이트) 랜덤을 Base64로 넣는다.
+  # 생성 예: openssl rand -base64 32
+  # 이 값은 절대 커밋하지 않는다.
+  jwt:
+    secret-base64: "<Base64 인코딩된 32바이트 이상 랜덤 키>"
+
+  auth:
+    cookie:
+      # 로컬은 http라 Secure 쿠키가 저장되지 않으므로 false로 내린다.
+      secure: false
+      same-site: Lax
+      allowed-origins:
+        - http://localhost:5173

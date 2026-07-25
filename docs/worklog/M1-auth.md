@@ -423,6 +423,13 @@ placeholder, `skip`, `@Disabled`, stub 성공 응답을 금지한다(`docs/PRD.m
   - 구현 전 필수 변경 **15건**, 사용자 결정 항목 **8건**은 회의록 §7~§8 참조.
   - **미제공 정보**: 운영 FE/API의 scheme·host·site·HTTPS 관계. `docs/` 전수 검색 결과 배포 환경 정보가 문서에 없다. cross-site로 확인되면 `SameSite=Strict` 계약은 별도 재심의 대상이다.
   - ADR-0003 `M1 인증 토큰·세션 및 오류 계약` — 번호만 예약, 사용자 승인 후 작성.
+- 2026-07-25 · **사용자 승인 — 회의 상태 `APPROVED`**. 결정 4건:
+  1. 오류 계약 **A 채택** — `AUTH_004`(401 인증 필요)·`USER_004`(409 이메일 중복) 신설, `AUTH_001~003` 의미 유지.
+  2. 운영 FE/API **same-site 확정** — `SameSite=Strict` + 운영 `Secure=true` 승인. cross-site 전환 시 재심의(RISK-0005).
+  3. 토큰·세션·가입 흐름 **전부 승인** — JJWT 0.13.0·HS256, Access 1h·Refresh 2주, `jti`+SHA-256 해시 저장, row-lock rotation, slug fallback `blog`/`blog-2`, register 후 자동 signin + 실패 시 "계정 생성됨" 복구.
+  4. 필수 변경 **15건** 반영 전제로 착수 승인.
+  - 정본 반영: `docs/REQUIREMENTS.md` NFR-04 "M1 인증 오류 코드" 표, `docs/PRD.md` §4.4·§9.4-AB, `ADR-0003` ACCEPTED, `RISK-0005`·`RISK-0006` 등록.
+  - **RISK-0002 종료 조건 확정**(ADR-0003 §5): `permitAll()` 잔존 없음 / `/auth/me`·대표 보호 API 무토큰 401+`AUTH_004` / 일반 사용자 `/api/v1/admin/**` 403+`ADMIN_001` / 공개 allowlist의 HTTP method 제한 / 공개 경로 쓰기 401 / status뿐 아니라 code·message 검증.
 
 ## [리뷰]
 

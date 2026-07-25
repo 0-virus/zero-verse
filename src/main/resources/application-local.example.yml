@@ -25,8 +25,10 @@ zeroverse:
 
   auth:
     cookie:
-      # 로컬은 http라 Secure 쿠키가 저장되지 않으므로 false로 내린다.
+      # ADR-0003 §3이 허용한 유일한 local 완화. 로컬은 http라 Secure 쿠키가 저장되지 않는다.
       secure: false
-      same-site: Lax
+      # SameSite는 운영과 동일하게 Strict를 유지한다. 여기서 Lax로 내리면 로컬에서만 통과하고
+      # 운영에서 깨지는 흐름을 못 잡는다.
+      same-site: Strict
       allowed-origins:
         - http://localhost:5173

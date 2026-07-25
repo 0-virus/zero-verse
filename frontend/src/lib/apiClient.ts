@@ -44,6 +44,15 @@ export class ApiRequestError extends Error {
 
 let accessToken: string | null = null;
 
+/**
+ * Access Token의 세대 번호.
+ *
+ * <p>지연된 401을 구분하기 위해 필요하다. 요청을 보낼 때의 버전과 401을 받은 시점의 버전이
+ * 다르면, 그 사이 **다른 요청이 이미 갱신을 마친 것**이므로 refresh를 또 돌릴 이유가 없다.
+ * 버전 비교 없이 401만 보고 판단하면 rotation이 연쇄로 일어나 세션이 깨진다.
+ */
+let tokenVersion = 0;
+
 /** 진행 중인 refresh. 동시 401이 여러 개여도 갱신은 한 번만 돈다. */
 let refreshPromise: Promise<boolean> | null = null;
 
@@ -52,6 +61,7 @@ let onAuthExpired: (() => void) | null = null;
 
 export function setAccessToken(token: string | null): void {
   accessToken = token;
+  tokenVersion += 1;
 }
 
 export function getAccessToken(): string | null {
@@ -65,8 +75,21 @@ export function setAuthExpiredHandler(handler: (() => void) | null): void {
 /** 테스트에서 모듈 상태를 초기화한다. */
 export function resetApiClient(): void {
   accessToken = null;
+  tokenVersion = 0;
   refreshPromise = null;
   onAuthExpired = null;
+}
+
+/**
+ * 세션 복구용 refresh.
+ *
+ * <p>{@link AuthProvider} 초기화가 직접 `/auth/refresh`를 호출하면 React StrictMode의
+ * effect 이중 실행으로 **같은 쿠키에 rotation이 두 번** 일어난다. 두 번째는 이미 폐기된
+ * 토큰을 써서 `AUTH_003`을 받고, 복구된 세션이 도로 비워질 수 있다. 그래서 초기 복구도
+ * 401 갱신과 **같은 single-flight**를 탄다.
+ */
+export function restoreSession(): Promise<boolean> {
+  return refreshOnce();
 }
 
 interface RequestOptions {
@@ -128,7 +151,9 @@ function refreshOnce(): Promise<boolean> {
         if (!envelope.success || !envelope.data) {
           return false;
         }
-        accessToken = envelope.data.accessToken;
+        // setAccessToken을 거쳐야 tokenVersion이 올라가고, 대기 중인 요청이
+        // "이미 갱신됨"을 알아볼 수 있다.
+        setAccessToken(envelope.data.accessToken);
         return true;
       } catch {
         return false;
@@ -146,14 +171,23 @@ function refreshOnce(): Promise<boolean> {
  *
  * <p>401이면 refresh를 한 번 돌리고 **각 요청은 1회만** 재시도한다. 재시도도 401이거나
  * refresh가 실패하면 세션이 끝난 것으로 보고 만료 핸들러를 부른다.
+ *
+ * <p>**지연된 401 처리**: 요청을 보낼 때의 {@link tokenVersion}을 기억해 두고, 401이 돌아온
+ * 시점에 버전이 이미 바뀌었다면 다른 요청이 갱신을 마친 것이므로 refresh 없이 새 토큰으로
+ * 바로 재시도한다. 이 확인이 없으면 느린 요청의 뒤늦은 401이 불필요한 두 번째 rotation을
+ * 일으켜, 방금 발급된 토큰이 곧바로 폐기된다.
  */
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T | null> {
   const skipRefresh = options.skipRefresh || NO_REFRESH_PATHS.includes(path);
 
+  const versionAtRequest = tokenVersion;
   let response = await rawRequest(path, options);
 
   if (response.status === 401 && !skipRefresh) {
-    const refreshed = await refreshOnce();
+    // 내 요청이 나간 뒤 토큰이 바뀌었다면 이미 누군가 갱신했다.
+    const alreadyRefreshed = tokenVersion !== versionAtRequest;
+    const refreshed = alreadyRefreshed || (await refreshOnce());
+
     if (!refreshed) {
       accessToken = null;
       onAuthExpired?.();

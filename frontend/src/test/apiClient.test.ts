@@ -174,6 +174,34 @@ describe('apiClient', () => {
       expect(fetchMock).toHaveBeenCalledTimes(2);
     });
 
+    it('지연된 401은 이미 갱신됐으면 refresh 없이 새 토큰으로 재시도한다', async () => {
+      setAccessToken('old-token');
+
+      let refreshCount = 0;
+      const calls: string[] = [];
+
+      fetchMock.mockImplementation(async (url: string, init: RequestInit) => {
+        calls.push(url);
+        if (url.includes('/auth/refresh')) {
+          refreshCount += 1;
+          return envelope({ accessToken: 'new-token' });
+        }
+        // 옛 토큰을 쓴 요청은 401, 새 토큰이면 성공.
+        const auth = (init.headers as Record<string, string>).Authorization;
+        return auth === 'Bearer new-token' ? envelope({ ok: true }) : failure(401, 'AUTH_002');
+      });
+
+      // 첫 요청이 갱신을 마친 뒤, 옛 토큰으로 이미 나가 있던 요청의 401이 뒤늦게 도착하는 상황.
+      await apiClient.get('/api/v1/posts/drafts');
+      expect(refreshCount).toBe(1);
+
+      // 두 번째 요청은 새 토큰을 쓰므로 성공한다.
+      await apiClient.get('/api/v1/notifications');
+
+      // 지연된 401이 두 번째 rotation을 일으키지 않아야 한다.
+      expect(refreshCount).toBe(1);
+    });
+
     it('재시도까지 401이면 만료로 처리하고 더 재시도하지 않는다', async () => {
       setAccessToken('old-token');
       const onExpired = vi.fn();

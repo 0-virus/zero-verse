@@ -539,9 +539,64 @@ M0에서 시각 대조를 리뷰 지적으로 두 번 되돌아갔으므로 **PR
 | 테스트 | 수 | 검증 |
 |---|---|---|
 | `apiClient.test.ts` | 10 | 래퍼 unwrap, credentials·Bearer, 서버 code 보존, 필드 사유, 401 재시도, **동시 401 3건에 refresh 1회**, 인증 경로 재귀 방지, refresh 실패 시 만료 처리, 재시도 401 |
-| `guards.test.tsx` | 12 | 3가드 × (미인증/설정 완료/미완료), **로딩 중 리다이렉트 안 함** |
+| `guards.test.tsx` | 11 | 3가드 × (미인증/설정 완료/미완료), **로딩 중 리다이렉트 안 함** |
 | `authForms.test.tsx` | 10 | 2분할 탭, 실패 문구가 계정 존재를 드러내지 않음, 정지 계정, 5필드, **특수문자 힌트**, 자동 로그인 성공·실패 분기, 중복 이메일, 서버 검증 사유 |
 | 기존 M0 테스트 | 150 | 회귀 없음 |
+
+
+### 2026-07-26 · Codex 리뷰 1차 반영 — blocking 10건
+
+**Verdict: 블로킹**(높음 8 · 중간 2). 지적이 전부 타당했고, 특히 **내가 리뷰 요청 시 "놓쳤을 수
+있다"고 명시한 타이밍 문제가 실제 결함으로 확정**됐다.
+
+| # | 지적 | 처리 |
+|---|---|---|
+| 1 | **로그인 타이밍으로 계정 존재 노출** — 없는 이메일은 BCrypt를 건너뛰어 응답이 수십 배 빠름 | 더미 해시(기동 시 1회 생성)로 동일 비용을 치르게 했다. 응답시간 중앙값 비율 < 5배 회귀 테스트 추가 |
+| 2 | 동시 가입 DB unique 충돌이 `COMMON_500`이 됨 | `UserRegistrar`를 **별도 빈으로 분리**하고 `REQUIRES_NEW`로 재시도. 제약별 매핑(email→`USER_004`, nickname→`USER_002`, slug→재시도 후 `BLOG_002`) |
+| 3 | Origin 검증이 fail-open | **fail-closed**로 전환. Origin → Referer → **둘 다 없으면 거부**. allowlist가 비어도 거부(설정 누락이 무방비가 되지 않게) |
+| 4 | local/test가 `SameSite=Lax`로 계약 이탈 | 둘 다 `Strict` 유지(ADR이 허용한 완화는 `Secure=false`뿐). Set-Cookie의 HttpOnly·SameSite·Path·Max-Age 전체 검증 |
+| 5 | StrictMode에서 초기 refresh 이중 실행 | `restoreSession()`이 401 갱신과 **같은 single-flight**를 타도록 변경 |
+| 6 | 지연된 401이 두 번째 rotation 유발 | **`tokenVersion`** 도입. 요청 시점 버전과 401 도착 시점 버전이 다르면 이미 갱신된 것이므로 refresh 없이 재시도 |
+| 7 | RISK-0002 테스트가 fake assertion | filter chain 문자열 확인 → **미매핑 경로 4개를 실제 호출**해 401 검증. message 검증 8곳 추가 |
+| 8 | 활성 row 테스트 fake-pass 가능 | 모든 예외를 무시하던 것을 성공 1·`AUTH_003` 1·기존 row revoked·신규 row active로 명시 검증 |
+| 9 | Refresh 서명 실패 관측 누락 | 만료(debug)·서명 위조(warn)·형식 오류(warn, 클래스명만) 구분. 토큰 원문·예외 메시지는 기록하지 않는다 |
+| 10 | 브라우저 E2E·배포 순서 미기록 | 아래 별도 절로 기록 |
+
+**구현 중 피한 함정**: #2를 같은 클래스의 `@Transactional` 메서드 자기 호출로 만들려 했는데,
+그러면 Spring 프록시를 거치지 않아 **트랜잭션이 아예 걸리지 않는다**. `UserRegistrar`로 분리했다.
+
+**테스트 수정 중 발견**: 허용되지 않은 Origin은 `verifyOrigin`에 닿기 전에 **CORS 필터가 먼저
+403으로 차단**한다. 방어가 두 겹이라는 뜻이며, 테스트를 실제 동작에 맞추고 "CORS를 우회해도
+컨트롤러가 막는다"(Referer 위조 시나리오)를 별도로 검증하도록 했다.
+
+**워크로그 자체 오류 정정**(리뷰 지적):
+- `guards.test.tsx` 건수를 12 → **11**로 정정.
+- `AuthDtos` 주석의 "birthDate(선택)" 문구가 수정 후에도 남아 있어 정정.
+- "SecurityAccessControlTest가 code·message를 검증한다"는 주장이 실제와 달랐다 — 이제 실제로 검증한다.
+
+**검증**: BE **115 tests** / FE **183 tests**, 전부 0 skipped·0 failures. build·lint exit 0.
+
+### [전달·배포 순서] (심의 필수 변경 #14)
+
+1. **BE 선배포** — `dev` 머지 후 백엔드를 먼저 올린다. FE가 먼저 나가면 없는 API를 호출한다.
+2. **API smoke** — `POST /api/v1/auth/register` → `signin` → `refresh` → `signout` 순으로
+   실제 호출해 200/401 계약과 Set-Cookie 헤더를 확인한다.
+3. **FE 배포** — smoke 통과 후.
+4. **롤백은 역순** — 문제가 생기면 **FE를 먼저 되돌린다**. BE를 먼저 내리면 남아 있는 FE가
+   전부 실패한다. BE 롤백은 `V1__init.sql`이 불변이라 스키마 되돌림 없이 애플리케이션만 교체한다.
+
+### [미완료 — 브라우저 E2E] (심의 필수 변경 #12)
+
+**수행하지 못했다.** HTTPS 환경에서 signin → 쿠키 저장 → rotation → 새로고침 복구 → signout을
+실제 브라우저로 확인하는 항목이다.
+
+- 이유: 로컬에 HTTPS 종단이 없고 운영 배포 환경도 아직 없다. `Secure=true`·`SameSite=Strict`
+  쿠키는 http에서 저장되지 않아 로컬 http로는 계약을 그대로 재현할 수 없다.
+- **대체 검증한 것**: MockMvc로 Set-Cookie 전체(HttpOnly·SameSite=Strict·Path·Max-Age),
+  rotation·재사용 거부·signout idempotent, Origin/Referer fail-closed. FE는 apiClient의
+  single-flight·지연 401·세션 복구를 jsdom으로 검증.
+- **남은 위험**: 브라우저의 실제 쿠키 저장·전송 동작은 미검증이다. `RISK-0005`(same-site 배치
+  전제)와 직결되므로 **최초 배포 전에 반드시 수행**해야 한다.
 
 ## [이슈·결정]
 

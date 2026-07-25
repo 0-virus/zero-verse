@@ -37,6 +37,8 @@ import org.springframework.test.web.servlet.MvcResult;
 class AuthFlowTest extends MySqlTestSupport {
 
     private static final String COOKIE_NAME = "refresh_token";
+    /** `application-test.yml`의 `zeroverse.auth.cookie.allowed-origins`와 같아야 한다. */
+    private static final String ALLOWED_ORIGIN = "http://localhost:5173";
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
@@ -215,11 +217,107 @@ class AuthFlowTest extends MySqlTestSupport {
                 .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
                 .andExpect(jsonPath("$.data.expiresIn").value(3600))
                 .andExpect(cookie().exists(COOKIE_NAME))
-                .andExpect(cookie().httpOnly(COOKIE_NAME, true))
                 .andReturn();
 
         // Refresh Token은 본문에 절대 넣지 않는다.
         assertThat(result.getResponse().getContentAsString()).doesNotContain("refreshToken");
+
+        // ADR-0003 §3 쿠키 계약 전체를 검증한다. HttpOnly만 보면 SameSite·path 회귀를 놓친다.
+        String setCookie = result.getResponse().getHeader("Set-Cookie");
+        assertThat(setCookie).isNotNull();
+        assertThat(setCookie).contains("HttpOnly");
+        assertThat(setCookie).contains("SameSite=Strict");
+        assertThat(setCookie).contains("Path=/api/v1/auth");
+        assertThat(setCookie).contains("Max-Age=");
+        // test profile은 Secure=false다(로컬 http). 운영은 true — application.yml 기본값.
+        assertThat(result.getResponse().getCookie(COOKIE_NAME).isHttpOnly()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Origin이 없고 Referer도 없으면 refresh를 거부한다 (fail-closed)")
+    void refreshRejectsRequestWithoutOriginAndReferer() throws Exception {
+        Cookie refreshCookie = signinAndGetCookie("noorigin@zeroverse.test", "nooriginuser");
+
+        mockMvc.perform(post("/api/v1/auth/refresh").cookie(refreshCookie))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("AUTH_003"));
+    }
+
+    /**
+     * 허용되지 않은 Origin은 <b>CORS 필터가 먼저</b> 403으로 막는다.
+     *
+     * <p>`verifyOrigin`까지 도달하지 않으므로 응답은 `AUTH_003`이 아니라 403이다. 방어가 두 겹
+     * (CORS 필터 → 컨트롤러 Origin 검증)이라는 뜻이며, 어느 쪽이든 요청이 실행되지 않는 것이
+     * 핵심이다. CORS 설정이 느슨해지면 `verifyOrigin`이 두 번째 방어선으로 남는다.
+     */
+    @Test
+    @DisplayName("허용되지 않은 Origin의 refresh는 CORS 단계에서 차단된다")
+    void refreshRejectsDisallowedOrigin() throws Exception {
+        Cookie refreshCookie = signinAndGetCookie("evil@zeroverse.test", "eviluser");
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(refreshCookie)
+                        .header("Origin", "https://evil.example.com"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("null Origin(샌드박스 iframe 등)도 차단된다")
+    void refreshRejectsNullOrigin() throws Exception {
+        Cookie refreshCookie = signinAndGetCookie("nullorigin@zeroverse.test", "nulloriginuser");
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(refreshCookie)
+                        .header("Origin", "null"))
+                .andExpect(status().isForbidden());
+    }
+
+    /**
+     * CORS를 우회한 요청도 컨트롤러의 Origin 검증이 막는지 확인한다.
+     *
+     * <p>CORS 필터는 브라우저 규약이라 서버 간 요청·프록시 변조에는 적용되지 않을 수 있다.
+     * Referer만 위조된 경우가 그 시나리오다 — 이때는 `verifyOrigin`이 `AUTH_003`으로 막아야 한다.
+     */
+    @Test
+    @DisplayName("CORS를 통과해도 허용되지 않은 Referer는 컨트롤러가 AUTH_003으로 막는다")
+    void refreshRejectsForgedRefererWithoutOrigin() throws Exception {
+        Cookie refreshCookie = signinAndGetCookie("forged@zeroverse.test", "forgeduser");
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(refreshCookie)
+                        .header("Referer", "https://evil.example.com/attack"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("AUTH_003"));
+    }
+
+    @Test
+    @DisplayName("Origin이 없어도 허용된 Referer면 refresh를 통과시킨다")
+    void refreshAcceptsAllowedReferer() throws Exception {
+        Cookie refreshCookie = signinAndGetCookie("referer@zeroverse.test", "refereruser");
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(refreshCookie)
+                        .header("Referer", ALLOWED_ORIGIN + "/signin"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("signout도 출처 검증을 거친다")
+    void signoutVerifiesOrigin() throws Exception {
+        Cookie refreshCookie = signinAndGetCookie("soorigin@zeroverse.test", "sooriginuser");
+
+        // CORS 단계에서 차단.
+        mockMvc.perform(post("/api/v1/auth/signout")
+                        .cookie(refreshCookie)
+                        .header("Origin", "https://evil.example.com"))
+                .andExpect(status().isForbidden());
+
+        // CORS를 지나가도 컨트롤러가 막는다.
+        mockMvc.perform(post("/api/v1/auth/signout")
+                        .cookie(refreshCookie)
+                        .header("Referer", "https://evil.example.com/attack"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("AUTH_003"));
     }
 
     @Test
@@ -247,6 +345,46 @@ class AuthFlowTest extends MySqlTestSupport {
         assertThat(a.get("message").asText()).isEqualTo(b.get("message").asText());
     }
 
+    @Test
+    @DisplayName("없는 이메일도 BCrypt 비용을 치러 응답 시간으로 가입 여부를 알 수 없다")
+    void signinTimingDoesNotRevealAccountExistence() throws Exception {
+        register("timing@zeroverse.test", "timinguser").andExpect(status().isCreated());
+
+        // JIT warm-up. 첫 호출의 클래스 로딩 비용이 측정을 왜곡한다.
+        for (int i = 0; i < 2; i++) {
+            attemptSignin("timing@zeroverse.test", "WrongPassword1!");
+            attemptSignin("nobody-" + i + "@zeroverse.test", "WrongPassword1!");
+        }
+
+        long existing = medianSigninNanos("timing@zeroverse.test");
+        long missing = medianSigninNanos("nobody@zeroverse.test");
+
+        // BCrypt strength 12는 수백 ms다. 더미 해시 비교를 빠뜨리면 없는 이메일이
+        // 수십 배 빨라진다. 5배 이내면 동일 비용 경로로 본다(CI 변동성 감안).
+        double ratio = (double) Math.max(existing, missing) / Math.min(existing, missing);
+        assertThat(ratio)
+                .as("존재/미존재 이메일의 응답 시간 비율 (existing=%dns, missing=%dns)", existing, missing)
+                .isLessThan(5.0);
+    }
+
+    private long medianSigninNanos(String email) throws Exception {
+        long[] samples = new long[5];
+        for (int i = 0; i < samples.length; i++) {
+            long start = System.nanoTime();
+            attemptSignin(email, "WrongPassword1!");
+            samples[i] = System.nanoTime() - start;
+        }
+        java.util.Arrays.sort(samples);
+        return samples[samples.length / 2];
+    }
+
+    private void attemptSignin(String email, String password) throws Exception {
+        mockMvc.perform(post("/api/v1/auth/signin")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(signinBody(email, password)))
+                .andExpect(status().isUnauthorized());
+    }
+
     // --- FR-AUTH-04 refresh rotation ---
 
     @Test
@@ -254,7 +392,9 @@ class AuthFlowTest extends MySqlTestSupport {
     void refreshRotatesToken() throws Exception {
         Cookie refreshCookie = signinAndGetCookie("rotate@zeroverse.test", "rotateuser");
 
-        MvcResult rotated = mockMvc.perform(post("/api/v1/auth/refresh").cookie(refreshCookie))
+        MvcResult rotated = mockMvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(refreshCookie)
+                        .header("Origin", ALLOWED_ORIGIN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.accessToken").isNotEmpty())
                 .andExpect(cookie().exists(COOKIE_NAME))
@@ -269,10 +409,14 @@ class AuthFlowTest extends MySqlTestSupport {
     void reusedRefreshTokenIsRejected() throws Exception {
         Cookie refreshCookie = signinAndGetCookie("reuse@zeroverse.test", "reuseuser");
 
-        mockMvc.perform(post("/api/v1/auth/refresh").cookie(refreshCookie))
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(refreshCookie)
+                        .header("Origin", ALLOWED_ORIGIN))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(post("/api/v1/auth/refresh").cookie(refreshCookie))
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(refreshCookie)
+                        .header("Origin", ALLOWED_ORIGIN))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("AUTH_003"));
     }
@@ -280,7 +424,7 @@ class AuthFlowTest extends MySqlTestSupport {
     @Test
     @DisplayName("쿠키 없이 refresh하면 AUTH_003이다")
     void refreshWithoutCookieFails() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/refresh"))
+        mockMvc.perform(post("/api/v1/auth/refresh").header("Origin", ALLOWED_ORIGIN))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("AUTH_003"));
     }
@@ -292,11 +436,15 @@ class AuthFlowTest extends MySqlTestSupport {
     void signoutRevokesToken() throws Exception {
         Cookie refreshCookie = signinAndGetCookie("signout@zeroverse.test", "signoutuser");
 
-        mockMvc.perform(post("/api/v1/auth/signout").cookie(refreshCookie))
+        mockMvc.perform(post("/api/v1/auth/signout")
+                        .cookie(refreshCookie)
+                        .header("Origin", ALLOWED_ORIGIN))
                 .andExpect(status().isOk())
                 .andExpect(cookie().maxAge(COOKIE_NAME, 0));
 
-        mockMvc.perform(post("/api/v1/auth/refresh").cookie(refreshCookie))
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(refreshCookie)
+                        .header("Origin", ALLOWED_ORIGIN))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("AUTH_003"));
     }
@@ -304,7 +452,7 @@ class AuthFlowTest extends MySqlTestSupport {
     @Test
     @DisplayName("쿠키가 없어도 signout은 성공한다 (idempotent)")
     void signoutWithoutCookieSucceeds() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/signout"))
+        mockMvc.perform(post("/api/v1/auth/signout").header("Origin", ALLOWED_ORIGIN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
     }

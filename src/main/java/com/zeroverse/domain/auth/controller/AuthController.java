@@ -18,8 +18,12 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -37,6 +41,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/auth")
 @Tag(name = "Auth", description = "회원가입·로그인·토큰 갱신·로그아웃")
 public class AuthController {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     private final AuthService authService;
     private final RefreshTokenService refreshTokenService;
@@ -128,16 +134,63 @@ public class AuthController {
     /**
      * 쿠키 인증 경로의 Origin 검증(ADR-0003 §3).
      *
-     * <p>{@code SameSite=Strict}만으로도 대부분 막히지만, 브라우저·프록시 구현 차이를 감안한
-     * 두 번째 방어선이다. Origin 헤더가 없는 요청(동일 출처 네비게이션·서버 간 호출)은 통과시킨다.
+     * <p><b>fail-closed다.</b> `SameSite=Strict`가 1차 방어지만 브라우저·프록시 구현 차이가
+     * 있고, CORS는 응답 <i>읽기</i>만 막을 뿐 쿠키가 실린 요청이 서버에서 <i>실행되는 것</i>은
+     * 막지 못한다. 그래서 refresh·signout은 출처를 반드시 확인한다.
+     *
+     * <p>판정 순서:
+     * <ol>
+     *   <li>{@code Origin}이 있으면 allowlist와 대조한다.
+     *   <li>없으면 {@code Referer}의 출처로 대조한다(일부 브라우저는 same-origin POST에
+     *       Origin을 붙이지 않는다).
+     *   <li>둘 다 없으면 <b>거부</b>한다. 브라우저 요청이라면 최소한 하나는 있다.
+     * </ol>
+     *
+     * <p>allowlist가 비어 있으면 설정 누락이므로 역시 거부한다 — 비어 있다고 전부 통과시키면
+     * 설정 실수가 곧 무방비가 된다.
      */
     private void verifyOrigin(HttpServletRequest request) {
+        List<String> allowed = cookieProperties.allowedOrigins();
+        if (allowed.isEmpty()) {
+            log.error("zeroverse.auth.cookie.allowed-origins 가 비어 있어 쿠키 인증 요청을 거부합니다.");
+            throw new BusinessException(ErrorCode.AUTH_003);
+        }
+
         String origin = request.getHeader(HttpHeaders.ORIGIN);
-        if (origin == null || cookieProperties.allowedOrigins().isEmpty()) {
+        if (origin != null) {
+            if (!allowed.contains(origin)) {
+                log.warn("쿠키 인증 요청 거부: 허용되지 않은 Origin");
+                throw new BusinessException(ErrorCode.AUTH_003);
+            }
             return;
         }
-        if (!cookieProperties.allowedOrigins().contains(origin)) {
+
+        String referer = request.getHeader(HttpHeaders.REFERER);
+        if (referer != null) {
+            String refererOrigin = toOrigin(referer);
+            if (refererOrigin != null && allowed.contains(refererOrigin)) {
+                return;
+            }
+            log.warn("쿠키 인증 요청 거부: 허용되지 않은 Referer");
             throw new BusinessException(ErrorCode.AUTH_003);
+        }
+
+        log.warn("쿠키 인증 요청 거부: Origin·Referer 모두 없음");
+        throw new BusinessException(ErrorCode.AUTH_003);
+    }
+
+    /** `https://host:port/path...` → `https://host:port`. 파싱 실패는 null. */
+    private static String toOrigin(String url) {
+        try {
+            URI uri = URI.create(url);
+            if (uri.getScheme() == null || uri.getHost() == null) {
+                return null;
+            }
+            return uri.getPort() == -1
+                    ? uri.getScheme() + "://" + uri.getHost()
+                    : uri.getScheme() + "://" + uri.getHost() + ":" + uri.getPort();
+        } catch (IllegalArgumentException e) {
+            return null;
         }
     }
 }

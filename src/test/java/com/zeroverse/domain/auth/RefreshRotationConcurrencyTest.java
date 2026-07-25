@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.zeroverse.common.exception.BusinessException;
 import com.zeroverse.common.exception.ErrorCode;
+import com.zeroverse.domain.auth.entity.RefreshToken;
 import com.zeroverse.domain.auth.repository.RefreshTokenRepository;
 import com.zeroverse.domain.auth.service.RefreshTokenService;
 import com.zeroverse.domain.auth.service.RefreshTokenService.IssuedPair;
@@ -102,15 +103,17 @@ class RefreshRotationConcurrencyTest extends MySqlTestSupport {
     }
 
     @Test
-    @DisplayName("동시 갱신 후 활성 refresh row는 정확히 하나다")
-    void exactlyOneActiveTokenRemainsAfterConcurrentRotation() throws Exception {
+    @DisplayName("동시 갱신 후 기존 row는 폐기되고 새 row 하나만 활성이다")
+    void exactlyOneNewActiveTokenRemainsAfterConcurrentRotation() throws Exception {
         User user = persistUser("single@zeroverse.test", "singleuser");
-        String refreshToken = refreshTokenService.issue(user, Instant.now()).refresh().token();
+        IssuedPair initial = refreshTokenService.issue(user, Instant.now());
+        String refreshToken = initial.refresh().token();
+        String originalTokenId = initial.refresh().tokenId();
 
         ExecutorService pool = Executors.newFixedThreadPool(2);
         CountDownLatch start = new CountDownLatch(1);
 
-        List<Future<?>> futures = new ArrayList<>();
+        List<Future<IssuedPair>> futures = new ArrayList<>();
         for (int i = 0; i < 2; i++) {
             futures.add(pool.submit(() -> {
                 start.await(5, TimeUnit.SECONDS);
@@ -118,21 +121,50 @@ class RefreshRotationConcurrencyTest extends MySqlTestSupport {
             }));
         }
         start.countDown();
-        for (Future<?> future : futures) {
+
+        // 성공/실패를 세지 않고 넘어가면, 둘 다 실패해 기존 row가 남아도 "활성 1개"가 되어
+        // 테스트가 통과한다. 결과를 명시적으로 분류한다.
+        int success = 0;
+        int auth003 = 0;
+        String newTokenId = null;
+        for (Future<IssuedPair> future : futures) {
             try {
-                future.get(30, TimeUnit.SECONDS);
-            } catch (Exception ignored) {
-                // 한 건은 AUTH_003으로 실패하는 것이 정상이다.
+                IssuedPair rotated = future.get(30, TimeUnit.SECONDS);
+                success++;
+                newTokenId = rotated.refresh().tokenId();
+            } catch (Exception e) {
+                Throwable cause = e.getCause() == null ? e : e.getCause();
+                if (cause instanceof BusinessException be
+                        && be.getErrorCode() == ErrorCode.AUTH_003) {
+                    auth003++;
+                } else {
+                    throw new AssertionError("예상하지 못한 예외", cause);
+                }
             }
         }
         pool.shutdownNow();
 
-        long active = refreshTokenRepository.findAll().stream()
-                .filter(token -> token.getUser().getId().equals(user.getId()))
-                .filter(token -> !token.isRevoked())
-                .count();
+        assertThat(success).as("성공한 갱신 수").isEqualTo(1);
+        assertThat(auth003).as("AUTH_003으로 거부된 수").isEqualTo(1);
+        assertThat(newTokenId).as("새로 발급된 jti").isNotNull().isNotEqualTo(originalTokenId);
 
-        assertThat(active).as("활성 refresh row 수").isEqualTo(1);
+        List<RefreshToken> mine = refreshTokenRepository.findAll().stream()
+                .filter(token -> token.getUser().getId().equals(user.getId()))
+                .toList();
+
+        assertThat(mine).as("총 row 수 (기존 1 + 신규 1)").hasSize(2);
+
+        RefreshToken original = mine.stream()
+                .filter(token -> token.getTokenId().equals(originalTokenId))
+                .findFirst()
+                .orElseThrow();
+        assertThat(original.isRevoked()).as("기존 row는 폐기됐다").isTrue();
+
+        List<RefreshToken> active = mine.stream().filter(token -> !token.isRevoked()).toList();
+        assertThat(active).as("활성 row").hasSize(1);
+        assertThat(active.get(0).getTokenId())
+                .as("활성 row는 새로 발급된 것이다")
+                .isEqualTo(newTokenId);
     }
 
     private User persistUser(String email, String nickname) {

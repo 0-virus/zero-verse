@@ -10,6 +10,7 @@ import {
 import {
   apiClient,
   ApiRequestError,
+  restoreSession,
   setAccessToken,
   setAuthExpiredHandler,
 } from './apiClient';
@@ -71,17 +72,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // 앱 시작 시 Refresh 쿠키로 세션을 복구한다.
+  //
+  // `restoreSession`은 401 갱신과 같은 single-flight를 탄다. StrictMode가 effect를 두 번
+  // 실행해도 rotation은 한 번만 일어난다 — 직접 호출하면 두 번째가 이미 폐기된 쿠키를 써서
+  // AUTH_003을 받고 복구된 세션을 도로 비운다.
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
       try {
-        const token = await apiClient.post<AuthTokenResponse>('/api/v1/auth/refresh');
-        if (token) {
-          setAccessToken(token.accessToken);
-          if (!cancelled) {
-            await loadUser();
-          }
+        const restored = await restoreSession();
+        if (restored && !cancelled) {
+          await loadUser();
+        } else if (!restored && !cancelled) {
+          clearSession();
         }
       } catch {
         // 쿠키가 없거나 만료됨 = 비로그인. 오류로 다루지 않는다.

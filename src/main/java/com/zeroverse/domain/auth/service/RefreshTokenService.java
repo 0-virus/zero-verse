@@ -9,7 +9,9 @@ import com.zeroverse.domain.user.entity.User;
 import com.zeroverse.domain.user.repository.UserRepository;
 import com.zeroverse.security.jwt.JwtProvider;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.security.SignatureException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -128,14 +130,33 @@ public class RefreshTokenService {
         }
     }
 
+    /**
+     * Refresh JWT를 파싱한다.
+     *
+     * <p>실패 종류를 <b>구조화 로그로 남긴다</b>(심의 필수 변경 #13). 서명 위조는 공격 신호이고
+     * 만료는 정상 흐름이라 운영에서 구분이 필요하다. 다만 응답은 모두 {@code AUTH_003}으로
+     * 통일해 공격자에게 실패 사유를 알려주지 않는다.
+     *
+     * <p>로그에 토큰 원문·해시·secret을 남기지 않는다 — 예외 메시지도 기록하지 않는다.
+     * JJWT는 메시지에 토큰 조각을 포함할 수 있다.
+     */
     private Claims parseRefresh(String rawRefreshToken) {
         if (rawRefreshToken == null || rawRefreshToken.isBlank()) {
+            log.debug("refresh 실패: 쿠키 없음");
             throw new BusinessException(ErrorCode.AUTH_003);
         }
         try {
             return jwtProvider.parse(rawRefreshToken, JwtProvider.TYPE_REFRESH);
+        } catch (ExpiredJwtException e) {
+            log.debug("refresh 실패: 만료된 토큰");
+            throw new BusinessException(ErrorCode.AUTH_003);
+        } catch (SignatureException e) {
+            // 서명 위조는 정상 사용자에게 일어나지 않는다.
+            log.warn("refresh 실패: 서명 검증 실패 (위조 가능성)");
+            throw new BusinessException(ErrorCode.AUTH_003);
         } catch (JwtException e) {
-            // 만료·서명 오류·type 불일치 모두 AUTH_003이다. Access의 AUTH_002와 구분한다.
+            // 형식 오류·type 불일치. 예외 클래스명만 남긴다.
+            log.warn("refresh 실패: 토큰 형식 오류 kind={}", e.getClass().getSimpleName());
             throw new BusinessException(ErrorCode.AUTH_003);
         }
     }

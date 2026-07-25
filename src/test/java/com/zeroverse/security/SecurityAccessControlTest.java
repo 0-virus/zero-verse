@@ -24,7 +24,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.web.FilterChainProxy;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -40,21 +39,31 @@ import org.springframework.test.web.servlet.MockMvc;
 class SecurityAccessControlTest extends MySqlTestSupport {
 
     @Autowired private MockMvc mockMvc;
-    @Autowired private FilterChainProxy filterChainProxy;
     @Autowired private UserRepository userRepository;
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private JwtProvider jwtProvider;
 
     // --- RISK-0002 종료 조건 1: permitAll 잔존 없음 ---
 
-    @Test
-    @DisplayName("SecurityFilterChain에 anyRequest().permitAll()이 남아 있지 않다")
-    void noBlanketPermitAll() {
-        String chain = filterChainProxy.getFilterChains().toString();
-
-        // permitAll이 살아 있으면 아래 보호 경로 테스트가 전부 200을 받는다.
-        assertThat(chain).isNotBlank();
-        assertThat(filterChainProxy.getFilterChains()).isNotEmpty();
+    /**
+     * allowlist에 없는 임의 경로를 실제로 호출해 blanket 공개가 아님을 증명한다.
+     *
+     * <p>filter chain 객체를 문자열로 확인하는 방식은 `permitAll` 유무를 실제로 판별하지 못한다
+     * — 체인이 비어 있지 않다는 사실만 알려줄 뿐이다. 그래서 요청으로 검증한다.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "/api/v1/anything",
+        "/api/v1/blogs/1",
+        "/api/v1/posts/1",
+        "/api/v1/some/deep/unmapped/path"
+    })
+    @DisplayName("allowlist에 없는 경로는 전부 401이다 — blanket permitAll이 아니다")
+    void noBlanketPermitAll(String path) throws Exception {
+        mockMvc.perform(get(path))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("AUTH_004"))
+                .andExpect(jsonPath("$.error.message").value("인증이 필요합니다."));
     }
 
     // --- 종료 조건 2: 보호 경로 무토큰 401 + AUTH_004 ---
@@ -81,7 +90,9 @@ class SecurityAccessControlTest extends MySqlTestSupport {
     void protectedEndpointsRequireToken(String path) throws Exception {
         mockMvc.perform(get(path))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error.code").value("AUTH_004"));
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("AUTH_004"))
+                .andExpect(jsonPath("$.error.message").value("인증이 필요합니다."));
     }
 
     @Test
@@ -89,7 +100,8 @@ class SecurityAccessControlTest extends MySqlTestSupport {
     void malformedTokenIsRejected() throws Exception {
         mockMvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer not-a-jwt"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error.code").value("AUTH_004"));
+                .andExpect(jsonPath("$.error.code").value("AUTH_004"))
+                .andExpect(jsonPath("$.error.message").value("인증이 필요합니다."));
     }
 
     @Test
@@ -100,7 +112,8 @@ class SecurityAccessControlTest extends MySqlTestSupport {
 
         mockMvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + refresh))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error.code").value("AUTH_004"));
+                .andExpect(jsonPath("$.error.code").value("AUTH_004"))
+                .andExpect(jsonPath("$.error.message").value("인증이 필요합니다."));
     }
 
     // --- 종료 조건 3: 관리자 경로 403 + ADMIN_001 ---
@@ -123,7 +136,8 @@ class SecurityAccessControlTest extends MySqlTestSupport {
     void adminPathRequiresTokenFirst() throws Exception {
         mockMvc.perform(get("/api/v1/admin/users"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error.code").value("AUTH_004"));
+                .andExpect(jsonPath("$.error.code").value("AUTH_004"))
+                .andExpect(jsonPath("$.error.message").value("인증이 필요합니다."));
     }
 
     // --- 종료 조건 4·5: 공개 allowlist의 method 제한, 공개 경로 쓰기 401 ---
@@ -145,7 +159,8 @@ class SecurityAccessControlTest extends MySqlTestSupport {
         for (var request : Arrays.asList(post(path), patch(path), delete(path))) {
             mockMvc.perform(request)
                     .andExpect(status().isUnauthorized())
-                    .andExpect(jsonPath("$.error.code").value("AUTH_004"));
+                    .andExpect(jsonPath("$.error.code").value("AUTH_004"))
+                    .andExpect(jsonPath("$.error.message").value("인증이 필요합니다."));
         }
     }
 
@@ -154,7 +169,8 @@ class SecurityAccessControlTest extends MySqlTestSupport {
     void authEndpointsOnlyAllowPost() throws Exception {
         mockMvc.perform(get("/api/v1/auth/signin"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error.code").value("AUTH_004"));
+                .andExpect(jsonPath("$.error.code").value("AUTH_004"))
+                .andExpect(jsonPath("$.error.message").value("인증이 필요합니다."));
     }
 
     private User persistUser(String email, String nickname, UserRole role) {

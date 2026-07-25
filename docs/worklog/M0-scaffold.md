@@ -662,17 +662,27 @@ blocking 6건(HIGH 4 · MEDIUM 1 · LOW 1) + 비블로킹 3건. 전문은 리뷰
 
 ### [게이트별 독립 검증 증거] (심의 필수 변경 #13)
 
-사용자 결정은 "단일 PR + 독립 리뷰 게이트 3개"(PRD §9.4-X)였고, 커밋 분리가 아니라 **게이트별 독립 검증 통과**가 요건이다. 각 게이트는 다음 게이트 착수 전에 자체 검증을 통과했다.
+사용자 결정(PRD §9.4-X)은 "단일 PR + **원자적 커밋**·독립 리뷰 게이트 3개"였다.
 
-| 게이트 | 범위 | 검증 명령 | 결과 |
+1차 구현에서 Gate 1과 Gate 2가 커밋 `a3c2b5c` 하나로 합쳐졌고, Codex 재리뷰가 이를
+**HIGH 블로킹**으로 판정했다("사후 테스트 기록은 독립 리뷰 게이트 증거가 아니다").
+2026-07-25 사용자 승인을 받아 **rebase로 커밋을 분리하고 force-push**했다.
+
+- 백업: `backup/M0-before-split`(분리 전 `f9e7787`)
+- 분리 후 최종 트리는 분리 전과 **바이트 동일**함을 `git diff --stat backup/M0-before-split HEAD`(출력 없음)로 확인했다.
+
+| 게이트 | 커밋 | 범위 | 검증 |
 |---|---|---|---|
-| Gate 1 | BE 공통/API | `./gradlew test` | 3 클래스 / **12 tests / 0 skipped / 0 failures** — ApiResponse·PageResponse·GlobalExceptionHandler. 이 시점에 V1·FE 없음 |
-| Gate 2 | V1·DB 테스트 | `./gradlew test`(Testcontainers `mysql:8.4` 기동) | 8 클래스 / **28 tests / 0 skipped / 0 failures**. 중간 실패 2건(display_order 충돌, `jpaAuditingHandler` 중복)을 해소한 뒤 green |
-| Gate 3 | FE 골격 | `npx vitest run` + `npm run build` | 8 파일 / **52 tests 통과**, `tsc -b && vite build` 성공 |
-| 리뷰 반영 후 | 전 게이트 | `./gradlew test` · `npx vitest run` | BE **36 tests**(FlywayMigrationTest 10→14) / FE **84 tests**(8→10 파일). 전부 0 skipped / 0 failures |
+| Gate 1 | `fe675a2` | 빌드 설정, 공통 응답·예외·엔티티 기반, config | `./gradlew test` **12 tests / 0 skipped / 0 failures**. 이 시점에 V1·FE 없음 |
+| Gate 2 | `32afc11` | `V1__init.sql` 12테이블, Testcontainers 인프라, DB 통합 테스트 | **28 tests / 0 / 0**. 중간 실패 2건(display_order 충돌, `jpaAuditingHandler` 중복) 해소 후 green |
+| Gate 3 | `2cc1901` | FE 골격·디자인 토큰·공용 UI·라우터 | `npx vitest run` **52 tests**, `tsc -b && vite build` 성공 |
+| 리뷰 반영 | `58977e7`, `8dcb95d` | 1차·2차 리뷰 blocking 해소 | BE **36 tests**, FE **126 tests**, build·lint exit 0 |
 
-Gate 1과 Gate 2가 하나의 커밋(`a3c2b5c`)에 들어간 것은 사실이며, PR 본문의 "커밋도 이 경계로 분리" 문구는 정확하지 않아 정정했다. 게이트 경계는 위 검증 기록으로 증명한다.
+### 환경 이슈 (2026-07-25, 코드 회귀 아님)
 
-## [머지]
+rebase 직후 BE 테스트가 `NoClassDefFoundError: MySqlTestSupport`로 20건 실패했다.
+원인은 **Docker Desktop 종료**였고 Testcontainers가 컨테이너를 띄우지 못한 것이다.
+트리가 36/36 통과 시점과 동일했으므로 코드 회귀가 아니다. Docker 재기동 후
+`./gradlew test` **36 tests / 0 skipped / 0 failures**로 복구됐다.
 
-- 아직 없음.
+이는 PRD §9.4-Y가 정한 하드 게이트가 실제로 작동함을 보여준다 — Docker 없이는 skip하지 않고 **실패한다**.

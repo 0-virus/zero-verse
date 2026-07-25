@@ -571,7 +571,7 @@ PRD §12 DoD와 §11 테스트 전략의 각 항목에 대해 **M0에 적용되�
 | # | DoD 항목 | M0 적용 | 검증 근거 | 결과 |
 |---|---|---|---|---|
 | 1 | 해당 FR/NFR 규칙 전부 구현 | **적용**(M0는 FR 없음, NFR-01·04·05·06·07·08 해당) | CorsConfigTest(NFR-01), ErrorCode+GlobalExceptionHandlerTest(NFR-04), OpenApiConfigTest(NFR-05), BaseEntityAuditingTest(NFR-06), FlywayMigrationTest(NFR-07·08) | ✅ |
-| 2 | §11 해당 테스트 존재·통과, placeholder/skip/stub 금지 | **적용** | **BE 36 tests / FE 126 tests(12 파일)**, 전부 `skipped="0"`. `@Disabled`·`it.skip`·`todo` 0건 | ✅ |
+| 2 | §11 해당 테스트 존재·통과, placeholder/skip/stub 금지 | **적용** | **BE 36 tests / FE 152 tests(13 파일)**, 전부 `skipped="0"`. `@Disabled`·`it.skip`·`todo` 0건 | ✅ |
 | 3 | 공통 응답·에러코드·페이징 규약 준수, Swagger 문서화 | **적용** | ApiResponseTest(4키 항상 직렬화), PageResponseTest, OpenApiConfigTest(`/v3/api-docs` + Bearer 스키마) | ✅ |
 | 4 | FE가 §6 토큰 적용 + `docs/design/` 정본과 시각 일치 | **적용** | 토큰 정본 대조 + 구조 DOM 테스트 + 수치 고정 테스트 + **1440px Playwright 시각 대조 3회**(3·4차 리뷰 지적 반영 포함, 아래 `[시각 대조 기록]`) | ✅ |
 | 4b | 연동 API 실제 동작 확인 | **비적용** — M0에 연동할 도메인 API가 없다(M1~M9) | — | — |

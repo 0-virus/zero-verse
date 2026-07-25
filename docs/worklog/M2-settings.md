@@ -249,6 +249,7 @@
 ## [이슈·결정]
 
 - 2026-07-26 · Codex 계획 수립 완료. 기획 심의 **소집 필요** 판정(일반 조건 3 + 대형 조건 2).
+- 2026-07-26 · 기획 심의 `M2-20260726-settings` 완료 — 회의록 [`docs/governance/meetings/M2-20260726-settings.md`](../governance/meetings/M2-20260726-settings.md). 독립 검토 3인 전원 `APPROVE_WITH_CHANGES`, 확신도 94, 제안 등급 `HIGH`, 공통 권고 **Q1=A(`USER_005`/400·`BLOG_004`/409), Q2=A(slug 변경 허용 유지·카피 개정), Q3=B(M2 runner 미도입·RISK-0005 배포 전 게이트 유지)**. 진행자 최종 등급 `HIGH`, 상태 `USER_DECISION_REQUIRED`. `ADR-0004`는 번호만 예약했으며 사용자 승인 전 문서는 작성하지 않는다. RISK-0007(slug 변경 후 기존 URL 단절) 등록.
 
 ## [리뷰]
 

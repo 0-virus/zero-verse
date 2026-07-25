@@ -34,11 +34,15 @@ public enum ErrorCode {
     USER_003("USER_003", HttpStatus.FORBIDDEN, "정지된 사용자입니다."),
     /** register 시 이메일 중복(ADR-0003). */
     USER_004("USER_004", HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다."),
+    /** 비밀번호 변경 시 현재 비밀번호 불일치(FR-SETTINGS-02, ADR-0004). */
+    USER_005("USER_005", HttpStatus.BAD_REQUEST, "현재 비밀번호가 일치하지 않습니다."),
 
     // --- BLOG ---
     BLOG_001("BLOG_001", HttpStatus.NOT_FOUND, "블로그를 찾을 수 없습니다."),
     BLOG_002("BLOG_002", HttpStatus.CONFLICT, "이미 사용 중인 주소입니다."),
     BLOG_003("BLOG_003", HttpStatus.BAD_REQUEST, "주소 형식이 올바르지 않습니다."),
+    /** initial-setup 완료 후 재호출(FR-SETTINGS-04, ADR-0004). */
+    BLOG_004("BLOG_004", HttpStatus.CONFLICT, "블로그 초기 설정이 이미 완료되었습니다."),
 
     // --- POST ---
     POST_001("POST_001", HttpStatus.NOT_FOUND, "게시글을 찾을 수 없습니다."),

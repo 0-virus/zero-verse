@@ -738,3 +738,60 @@ rebase 직후 BE 테스트가 `NoClassDefFoundError: MySqlTestSupport`로 20건 
 `./gradlew test` **36 tests / 0 skipped / 0 failures**로 복구됐다.
 
 이는 PRD §9.4-Y가 정한 하드 게이트가 실제로 작동함을 보여준다 — Docker 없이는 skip하지 않고 **실패한다**.
+
+### 2026-07-25 · Codex 재리뷰 5차 — **Verdict: MERGEABLE**
+
+**남은 blocking 없음. 심의 필수 변경 14/14 충족.** 진행자 판정: PR #6을 `dev`로 머지 권고.
+
+- 4차 blocking 2건(블로그 히어로 variant, `/blog/setup` 장식 회귀) 모두 해소 확인.
+- 구름 유지는 PRD §9.4-Z 사용자 결정으로 적절히 기록됐다고 판정 — 재지적 대상 아님.
+- 액션 버튼을 슬롯만 두고 렌더하지 않은 판단도 **타당**하다고 판정 — "테스트 가능한 동작 없는
+  버튼을 추가하지 않는 것이 placeholder/stub 금지 원칙에 부합"(PRD §12).
+- 새 회귀 없음: `feed` variant가 기존 별 2레이어·로켓 `right:150/top:16`·240px·중앙 정렬 유지.
+
+**비블로킹 지적 반영(머지 전 처리)**
+
+| 지적 | 처리 |
+|---|---|
+| 별 좌표가 개수 검사뿐이라 다른 값으로 바꿔도 통과 | 반영 — 정본에서 옮긴 **독립 기대 문자열**과 5종 전부 일치 검증 |
+| 로켓 8단 폭·색·높이 미고정 | 반영 — 8단 폭/색/7px 높이 + 4번째 단에만 날개 그림자 검증 |
+| 블로그 히어로 padding·gap·타이포·아바타 수치 미고정 | 반영 — `0 60px 24px`/`gap:18`/하단정렬, eyebrow 9px·h1 28px tracking 2px, 아바타 76px·3px 보더·다크 그림자 |
+| DoD 매트릭스 FE 수치 stale | 반영 — **152 tests / 13 파일**로 최신화 |
+
+**최종 검증**: FE **152 tests**(13 파일) / BE **36 tests**, 전부 0 skipped·0 failures.
+`npm run build`·`npm run lint` exit 0.
+
+---
+
+## [머지]
+
+### 2026-07-25 07:32 UTC · PR #6 → `dev` 머지 완료
+
+- **머지 커밋**: `62e4040` — `M0: 프로젝트 스캐폴딩 (백엔드 공통 인프라 + V1 스키마 + 프론트 골격) (#6)`
+- **방식**: **merge commit**(squash 아님). 심의 필수 변경 #13이 게이트별 원자적 커밋을 요구했으므로
+  squash하면 그 히스토리가 `dev`에서 사라진다. PR #1~#4의 squash 관행과 다른 선택이며 이 사유로 정당화된다.
+- **게이트 커밋 보존 확인**: `fe675a2`(Gate 1) · `32afc11`(Gate 2) · `2cc1901`(Gate 3) 모두
+  `git merge-base --is-ancestor <c> dev`로 `dev`에 포함됨을 검증했다.
+
+**최종 상태**
+
+| 항목 | 결과 |
+|---|---|
+| 기획 심의 | `M0-20260725-scaffold` HIGH / APPROVED, 필수 변경 **14/14 충족** |
+| Codex 리뷰 | 5회 — blocking 6 → 4 → 1 → 2 → **0**, 최종 `MERGEABLE` |
+| BE 테스트 | **36 tests** / 0 skipped / 0 failures (Testcontainers mysql:8.4) |
+| FE 테스트 | **152 tests**(13 파일) / 0 skipped / 0 failures |
+| 빌드·린트 | `./gradlew test`, `npm run build`, `npm run lint` 전부 exit 0 |
+| 시각 대조 | `/`, `/signin`, `/settings`, `/blog/:slug`, `/blog/setup` 1440px 완료 |
+
+**M1로 넘기는 항목**
+
+- `RISK-0002` — M0의 임시 `anyRequest().permitAll()`을 JWT 필터·401/403으로 **반드시 교체**.
+  M1 완료 조건에 401/403 회귀 테스트가 포함된다.
+- `RISK-0001`(V1 ↔ 후속 JPA 엔티티 정합), `RISK-0003`(V1 checksum), `RISK-0004`(공용 UI API 조기 고정) OPEN 유지.
+- PRD §9.3 미확정 4건 중 ①`birth_date`는 M1 회원가입 폼에서 확인 필요.
+- 5차 리뷰 후속 권고: FE 테스트 결과·1440px 비교 이미지를 CI 아티팩트로 보존하는 방안 검토.
+
+**기록 정정**: 이 두 절(`5차 리뷰`·`[머지]`)은 원래 머지 전에 기록됐어야 했으나, 앞선 편집에서
+`[게이트별 독립 검증 증거]` 이후 내용을 통째로 잘라내는 실수로 유실됐다가 머지 직후 복구됐다.
+`[리뷰]` 절의 1~4차 기록은 영향 없다.

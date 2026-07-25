@@ -19,6 +19,7 @@ import com.zeroverse.security.jwt.JwtProvider;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,6 +42,9 @@ class RefreshTokenObservabilityTest {
     /** 테스트 전용 키. `application-test.yml`과 같은 값이다. */
     private static final String SECRET =
             "dGVzdC1vbmx5LXNlY3JldC1rZXktZm9yLXplcm92ZXJzZS0yNTZiaXQh";
+
+    /** 이 길이 이상의 토큰 조각이 로그에 남으면 누출로 본다. */
+    private static final int FRAGMENT_LENGTH = 8;
 
     /** 서명 위조를 만들기 위한 <b>다른</b> 키. */
     private static final String FOREIGN_SECRET =
@@ -170,13 +174,9 @@ class RefreshTokenObservabilityTest {
 
             assertThat(logged).as("토큰 원문이 로그에 없어야 한다").doesNotContain(token);
             assertThat(logged).as("시크릿이 로그에 없어야 한다").doesNotContain(SECRET);
-            for (String part : token.split("\\.")) {
-                if (part.length() >= 8) {
-                    assertThat(logged)
-                            .as("토큰 조각(%s…)이 로그에 없어야 한다", part.substring(0, 8))
-                            .doesNotContain(part);
-                }
-            }
+            assertThat(fragmentsOf(token))
+                    .as("토큰의 8자 이상 조각이 로그에 없어야 한다")
+                    .noneMatch(logged::contains);
             // 예외 스택을 통째로 실어 나르지 않는다.
             assertThat(appender.list).allSatisfy(e ->
                     assertThat(e.getThrowableProxy()).as("예외 객체를 로그에 싣지 않는다").isNull());
@@ -184,6 +184,22 @@ class RefreshTokenObservabilityTest {
     }
 
     // --- helpers ---
+
+    /**
+     * 토큰의 각 segment에서 <b>8자 슬라이딩 윈도우</b>를 모두 뽑는다.
+     *
+     * <p>segment 전체만 비교하면 {@code substring(0, 16)} 같은 <b>앞자리 일부 로깅</b>을 잡지
+     * 못한다. 어느 위치의 조각이든 8자 이상이 새면 걸리도록 전 구간을 훑는다.
+     */
+    private static List<String> fragmentsOf(String token) {
+        List<String> fragments = new ArrayList<>();
+        for (String segment : token.split("\\.")) {
+            for (int start = 0; start + FRAGMENT_LENGTH <= segment.length(); start++) {
+                fragments.add(segment.substring(start, start + FRAGMENT_LENGTH));
+            }
+        }
+        return fragments;
+    }
 
     private void assertRejected(String rawToken) {
         assertThatThrownBy(() -> service.rotate(rawToken, Instant.now()))

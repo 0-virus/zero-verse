@@ -28,9 +28,13 @@ com/zeroverse/
 - **Auditing**: 공통 엔티티는 `BaseEntity` 상속. soft delete가 필요하면 `BaseSoftDeleteEntity`. `@EnableJpaAuditing`을 다른 곳에 중복 선언하면 `jpaAuditingHandler` 빈이 충돌한다.
 - **마이그레이션**: `db/migration/V1__init.sql`은 공유 환경 적용 후 수정 금지. V2 이상 forward migration만 추가한다(RISK-0003).
 
-## 주의 — M1에서 반드시 교체
+## 보안 설정 — M1에서 교체 완료 (RISK-0002 CLOSED)
 
-`SecurityConfig`는 M0 한정으로 `anyRequest().permitAll()`이다. M1 인증 구현 시 JWT 필터와 401/403 정책으로 교체하고 회귀 테스트를 추가한다. **위험 레지스터 `RISK-0002`로 추적 중이다.**
+`SecurityConfig`는 `anyRequest().authenticated()` + `/api/v1/admin/**`는 `hasRole("ADMIN")`이다. M0의 임시 `anyRequest().permitAll()`은 M1(PR #7)에서 제거했고 `RISK-0002`는 CLOSED다.
+
+- **공개 경로는 HTTP method까지 제한**한다. 경로만 열면 나중에 같은 경로에 쓰기 API가 붙는 순간 인증 없이 노출된다.
+- 새 API를 추가할 때 **기본값은 인증 필요**다. 공개가 필요하면 method까지 명시해 allowlist에 넣고, `SecurityAccessControlTest`에 401/403 회귀 케이스를 함께 추가한다.
+- 필터 체인의 401/403은 `GlobalExceptionHandler`를 타지 않는다 — `SecurityErrorResponder`가 공통 응답 계약(`AUTH_004`/`ADMIN_001`)으로 직접 JSON을 쓴다.
 
 ## 테스트
 

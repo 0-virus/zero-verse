@@ -711,7 +711,51 @@ M0에서 시각 대조를 리뷰 지적으로 두 번 되돌아갔으므로 **PR
 - **2026-07-26 · Codex 3차 리뷰 — Verdict `HOLD`(blocking 1건)**. #11 해소 확인, 프로덕션 회귀
   없음. #9의 토큰 조각 누출 단정이 segment 전체만 비교해 앞자리 일부 로깅을 못 잡는다는 지적.
   8자 슬라이딩 윈도우로 교체하고 뮤테이션으로 확인했다.
+- **2026-07-26 · Codex 4차 리뷰 — Verdict `CLEAN` · 머지 승인**. blocking 해소 확인, 신규 결함
+  없음, 프로덕션 코드 무변경(테스트·워크로그만), 워크로그와 실제 코드 일치 확인.
+
+**리뷰 요약**: 1차 blocking 10 → 2차 blocking 2(신규 1 포함) → 3차 blocking 1 → 4차 클린.
+2차 이후 지적은 전부 "구현은 맞는데 테스트가 그것을 지키지 못한다"는 유형이었다. 이번 마일스톤에서
+**수정할 때마다 뮤테이션으로 테스트가 결함을 실제로 잡는지 확인**하는 절차를 도입했고, 3차 지적은
+그 절차를 적용하지 않은 단정에서 나왔다. 이후 마일스톤에도 이 절차를 유지한다.
 
 ## [머지]
 
-- 아직 없음.
+### 2026-07-25 18:29 UTC · PR #7 → `dev` 머지 완료
+
+- **머지 커밋**: `094fa37` — `M1: 인증/인가 (FR-AUTH-01~05) — RISK-0002 해소 (#7)`
+- **방식**: **squash**. M1 심의는 M0의 필수 변경 #13(게이트별 원자적 커밋 보존)에 해당하는 요구를
+  두지 않았고, PR #1~#4의 squash 관행을 따랐다. M0만 merge commit인 이유는 M0 워크로그에 기록돼 있다.
+- **머지 전 최종 검증**(feature/M1-auth `7f0cfdf`):
+
+| 항목 | 결과 |
+|---|---|
+| BE `./gradlew cleanTest test` | 138 tests / 16 클래스 · 0 skipped · 0 failures · 0 errors |
+| FE `vitest run` | 186 tests / 17 파일 · 0 skipped · 0 failures |
+| FE `npm run lint` (oxlint) | exit 0 |
+| FE `npm run build` (tsc -b + vite) | exit 0 |
+| Codex 4차 리뷰 | CLEAN · 머지 승인 |
+
+**RISK-0002 종료**
+
+ADR-0003 §5의 종료 조건을 모두 충족해 `RISK-REGISTER.md`에서 **CLOSED**로 변경했다.
+
+| 종료 조건 | 확인 |
+|---|---|
+| `anyRequest().permitAll()` 잔존 없음 | `SecurityConfig`는 `anyRequest().authenticated()`. 남은 `permitAll()`은 OPTIONS·공개 allowlist·Swagger뿐이며 전부 method 제한 |
+| 무토큰 401 + `AUTH_004` | `SecurityAccessControlTest`가 미매핑 경로 4개를 실제 호출해 status·code·message 검증 |
+| 일반 사용자 `/api/v1/admin/**` 403 + `ADMIN_001` | 동 테스트에서 검증 |
+| 공개 allowlist의 HTTP method 제한 | `SecurityConfig` 공개 경로 전부 method 지정 |
+| 공개 경로 쓰기 401 | 동 테스트에서 검증 |
+
+`src/main/java/com/zeroverse/AGENTS.md`의 "M1에서 반드시 교체" 경고도 현재 상태(교체 완료 + 새 API
+추가 시 기본값은 인증 필요)로 갱신했다.
+
+**M1 완료 후 이월 항목**
+
+| 항목 | 이월처 |
+|---|---|
+| 브라우저 E2E(HTTPS 쿠키 저장·rotation·signout 실기기 검증) | `RISK-0005` — 최초 배포 전 게이트(사용자 승인 2026-07-26) |
+| 폐기 토큰 재사용 시 전체 세션 폐기 | `RISK-0006` — 후속 보안 범위 |
+| `/users/me`·블로그 초기설정 API | M2 |
+| 카테고리 CRUD | M3 |

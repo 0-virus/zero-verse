@@ -250,6 +250,17 @@
 
 - 2026-07-26 · Codex 계획 수립 완료. 기획 심의 **소집 필요** 판정(일반 조건 3 + 대형 조건 2).
 - 2026-07-26 · 기획 심의 `M2-20260726-settings` 완료 — 회의록 [`docs/governance/meetings/M2-20260726-settings.md`](../governance/meetings/M2-20260726-settings.md). 독립 검토 3인 전원 `APPROVE_WITH_CHANGES`, 확신도 94, 제안 등급 `HIGH`, 공통 권고 **Q1=A(`USER_005`/400·`BLOG_004`/409), Q2=A(slug 변경 허용 유지·카피 개정), Q3=B(M2 runner 미도입·RISK-0005 배포 전 게이트 유지)**. 진행자 최종 등급 `HIGH`, 상태 `USER_DECISION_REQUIRED`. `ADR-0004`는 번호만 예약했으며 사용자 승인 전 문서는 작성하지 않는다. RISK-0007(slug 변경 후 기존 URL 단절) 등록.
+- 2026-07-26 · **위임 승인** — Q1=`A`, Q2=`A`, Q3=`B`. **사용자의 개별 명시 승인이 아니라, "중대하지 않은 결정은 권장안대로 진행하라"는 사용자 포괄 위임에 따라 Claude가 채택했다**(회의록 [승인 절](../governance/meetings/M2-20260726-settings.md#승인) 참조). 세 검토자 권고가 일치했고 세 결정 모두 되돌림 비용이 낮다는 판단이다 — Q1은 외부 공개 전 철회 가능한 신규 코드, Q2는 요구사항 무변경·카피만 개정, Q3은 외부 의존성을 늘리지 않는 현상 유지. **사용자가 다른 판단을 내리면 되돌린다.** 회의록 상태를 `APPROVED`로 갱신하고 [승인 섹션](../governance/meetings/M2-20260726-settings.md#승인)을 append했다. `USER_005`(400, 현재 비밀번호 불일치)·`BLOG_004`(409, initial-setup 완료 후 재호출)를 신설하고 기존 `AUTH_001~004`·`USER_004`·`BLOG_002/003` 의미를 보존한다. slug 변경 허용과 nickname 변경 시 slug 자동 비연동을 유지하며 초기 설정 카피를 “설정에서 나중에 변경할 수 있어요.”로 개정한다. M2에는 E2E runner를 도입하지 않고 RISK-0005의 최초 배포 전 실제 HTTPS 브라우저 게이트를 유지한다. 결정 근거: [`ADR-0004`](../governance/decisions/ADR-0004-error-codes-and-slug-policy.md), RISK-0007.
+- 2026-07-26 · 회의록의 **구현 선행 조건** 전수 목록:
+  1. 승인 — Q1=A/Q2=A/Q3=B. **위임 승인으로 완료**(사용자 명시 승인 미수령).
+  2. 오류 계약 동기화 — REQUIREMENTS NFR-04·PRD §4.4·§5.2·§9에 `USER_005`·`BLOG_004` 반영. **완료**.
+  3. slug 정책·카피 동기화 — slug 변경 허용·nickname 비연동 유지, PRD §7·DESIGN-SYSTEM §8.6·`.dc.html`·화면 테스트 동기화. **문서 정본 완료, 화면 테스트는 Gate 6에서 수행**.
+  4. 결정 추적성 확보 — ADR-0004와 회의록·worklog 연결. **완료**. `DECISION-REGISTER.md`도 갱신했다(M2 회의록 `APPROVED(위임)`, ADR-0004 `ACCEPTED(위임)`, 승인자 Claude).
+  5. initial-setup 단일 성공 보장 — 잠금/조건부 update와 실제 MySQL 독립 트랜잭션 테스트. **Gate 3에서 수행**.
+  6. availability 오인 방지 — 별도 availability API 없이 서버 확인 전 unique 확정 표현 금지, 형식 검증과 submit 409 분리. **Gate 6에서 수행**.
+  7. M2 검증 증적 — 여섯 게이트의 자동 테스트·FR 추적·1440px 대조·회귀·build/lint·skip/stub/fake-pass 0건 기록. **각 Gate 및 M2 리뷰 전 수행**.
+  8. 이월 게이트 유지 — RISK-0005 OPEN 유지, 실제 HTTPS browser smoke를 최초 배포 체크리스트 차단 조건에 연결. **최초 배포 전 수행**.
+- 2026-07-26 · 새 문제 및 처리: 승인 요청의 `FR-BLOG-03`은 현 REQUIREMENTS에 존재하지 않으며 slug 수정 정책의 실제 정본 번호는 `FR-SETTINGS-03`이다. ADR-0004에 이 식별자 불일치와 실제 근거를 명시했다. 또한 PRD의 기존 표 항목 `J`(Base package)·`K`(관리자 시각 강조)가 신규 `§9-J`·`§9-K` 요청과 겹쳐, 기존 참조를 `§9.1-J`·`§9.2-K`로 한정하고 신규 결정 소제목을 `§9-J`·`§9-K`로 기록했다.
 
 ## [리뷰]
 

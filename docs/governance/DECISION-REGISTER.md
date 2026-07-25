@@ -9,5 +9,5 @@
 | ADR-0002 | 2026-07-25 | 비도메인 API 오류 코드 분류 | HIGH | ACCEPTED | 사용자 | [ADR-0002](decisions/ADR-0002-non-domain-error-taxonomy.md) |
 | M1-20260725-auth | 2026-07-25 | M1 인증 토큰·세션 및 오류 계약 | HIGH | APPROVED | 사용자 | [회의록](meetings/M1-20260725-auth.md) |
 | ADR-0003 | 2026-07-25 | M1 인증 토큰·세션 및 오류 계약 | HIGH | ACCEPTED | 사용자 | [ADR-0003](decisions/ADR-0003-m1-auth-token-session-contract.md) |
-| M2-20260726-settings | 2026-07-26 | M2 설정 오류·slug 정책·E2E 게이트 | HIGH | USER_DECISION_REQUIRED | 사용자 | [회의록](meetings/M2-20260726-settings.md) |
-| ADR-0004 | 2026-07-26 | M2 설정 오류·slug 정책·E2E 게이트(번호 예약) | HIGH | PROPOSED — 문서 미작성 | 사용자 | [관련 회의록](meetings/M2-20260726-settings.md) |
+| M2-20260726-settings | 2026-07-26 | M2 설정 오류·slug 정책·E2E 게이트 | HIGH | APPROVED(위임) | Claude — 사용자 포괄 위임 | [회의록](meetings/M2-20260726-settings.md) |
+| ADR-0004 | 2026-07-26 | M2 설정 오류 계약(`USER_005`·`BLOG_004`)·slug 변경 정책·M2 검증 범위 | HIGH | ACCEPTED(위임) | Claude — 사용자 포괄 위임 | [ADR-0004](decisions/ADR-0004-error-codes-and-slug-policy.md) |

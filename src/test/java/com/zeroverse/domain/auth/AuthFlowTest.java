@@ -228,9 +228,31 @@ class AuthFlowTest extends MySqlTestSupport {
         assertThat(setCookie).contains("HttpOnly");
         assertThat(setCookie).contains("SameSite=Strict");
         assertThat(setCookie).contains("Path=/api/v1/auth");
-        assertThat(setCookie).contains("Max-Age=");
-        // test profile은 Secure=false다(로컬 http). 운영은 true — application.yml 기본값.
+        // Refresh TTL 14일 = 1209600초.
+        assertThat(setCookie).contains("Max-Age=1209600");
+        // test profile은 Secure=false다(로컬 http). 운영 기본값은 application.yml의 true다.
         assertThat(result.getResponse().getCookie(COOKIE_NAME).isHttpOnly()).isTrue();
+    }
+
+    @Test
+    @DisplayName("삭제 쿠키도 HttpOnly·SameSite·Path 계약을 지킨다")
+    void signoutCookieKeepsContract() throws Exception {
+        Cookie refreshCookie = signinAndGetCookie("delcookie@zeroverse.test", "delcookieuser");
+
+        String setCookie = mockMvc.perform(post("/api/v1/auth/signout")
+                        .cookie(refreshCookie)
+                        .header("Origin", ALLOWED_ORIGIN))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getHeader("Set-Cookie");
+
+        assertThat(setCookie).isNotNull();
+        // 속성이 다르면 브라우저가 다른 쿠키로 보고 원본을 지우지 않는다.
+        assertThat(setCookie).contains("HttpOnly");
+        assertThat(setCookie).contains("SameSite=Strict");
+        assertThat(setCookie).contains("Path=/api/v1/auth");
+        assertThat(setCookie).contains("Max-Age=0");
     }
 
     @Test

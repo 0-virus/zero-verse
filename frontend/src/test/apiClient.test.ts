@@ -174,31 +174,45 @@ describe('apiClient', () => {
       expect(fetchMock).toHaveBeenCalledTimes(2);
     });
 
-    it('지연된 401은 이미 갱신됐으면 refresh 없이 새 토큰으로 재시도한다', async () => {
+    it('옛 토큰으로 동시 출발한 요청 중 하나의 401이 지연돼도 refresh는 1회다', async () => {
       setAccessToken('old-token');
 
       let refreshCount = 0;
-      const calls: string[] = [];
+      let releaseSlow401: (() => void) | null = null;
+      const slow401 = new Promise<void>((resolve) => {
+        releaseSlow401 = resolve;
+      });
 
       fetchMock.mockImplementation(async (url: string, init: RequestInit) => {
-        calls.push(url);
+        const auth = (init.headers as Record<string, string> | undefined)?.Authorization;
+
         if (url.includes('/auth/refresh')) {
           refreshCount += 1;
           return envelope({ accessToken: 'new-token' });
         }
-        // 옛 토큰을 쓴 요청은 401, 새 토큰이면 성공.
-        const auth = (init.headers as Record<string, string>).Authorization;
-        return auth === 'Bearer new-token' ? envelope({ ok: true }) : failure(401, 'AUTH_002');
+        if (auth === 'Bearer new-token') {
+          return envelope({ ok: true });
+        }
+        // 옛 토큰 요청. 느린 쪽은 refresh가 끝난 뒤에야 401을 돌려준다.
+        if (url.includes('/notifications')) {
+          await slow401;
+        }
+        return failure(401, 'AUTH_002');
       });
 
-      // 첫 요청이 갱신을 마친 뒤, 옛 토큰으로 이미 나가 있던 요청의 401이 뒤늦게 도착하는 상황.
-      await apiClient.get('/api/v1/posts/drafts');
+      // 두 요청 모두 옛 토큰으로 출발한다.
+      const fast = apiClient.get('/api/v1/posts/drafts');
+      const slow = apiClient.get('/api/v1/notifications');
+
+      // 빠른 쪽이 401 → refresh → 재시도까지 끝낸다.
+      await expect(fast).resolves.toEqual({ ok: true });
       expect(refreshCount).toBe(1);
 
-      // 두 번째 요청은 새 토큰을 쓰므로 성공한다.
-      await apiClient.get('/api/v1/notifications');
+      // 이제 느린 쪽의 401이 도착한다. 토큰은 이미 바뀐 뒤다.
+      releaseSlow401!();
+      await expect(slow).resolves.toEqual({ ok: true });
 
-      // 지연된 401이 두 번째 rotation을 일으키지 않아야 한다.
+      // 지연된 401이 두 번째 rotation을 일으키면 안 된다.
       expect(refreshCount).toBe(1);
     });
 

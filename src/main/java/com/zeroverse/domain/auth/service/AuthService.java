@@ -6,6 +6,7 @@ import com.zeroverse.domain.auth.dto.AuthDtos.AuthMeResponse;
 import com.zeroverse.domain.auth.dto.AuthDtos.DefaultBlogResponse;
 import com.zeroverse.domain.auth.dto.AuthDtos.RegisterRequest;
 import com.zeroverse.domain.auth.dto.AuthDtos.SigninRequest;
+import com.zeroverse.domain.auth.support.RegisterConstraintMapper;
 import com.zeroverse.domain.blog.entity.Blog;
 import com.zeroverse.domain.blog.repository.BlogRepository;
 import com.zeroverse.domain.user.entity.User;
@@ -13,8 +14,6 @@ import com.zeroverse.domain.user.entity.UserStatus;
 import com.zeroverse.domain.user.repository.UserRepository;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -75,7 +74,7 @@ public class AuthService {
             try {
                 return userRegistrar.createAccount(request, attempt);
             } catch (DataIntegrityViolationException e) {
-                ErrorCode mapped = mapConstraintViolation(e);
+                ErrorCode mapped = RegisterConstraintMapper.map(e);
                 if (mapped != null) {
                     throw new BusinessException(mapped);
                 }
@@ -84,55 +83,6 @@ public class AuthService {
         }
         log.warn("가입 실패: slug 충돌이 {}회 재시도 후에도 해소되지 않음", MAX_REGISTER_RETRIES);
         throw new BusinessException(ErrorCode.BLOG_002);
-    }
-
-    /**
-     * MySQL 중복 키 오류에서 <b>제약 이름</b>만 뽑아낸다.
-     *
-     * <p>메시지 형식: {@code Duplicate entry 'zerostar' for key 'users.nickname'}.
-     *
-     * <p>전체 메시지를 {@code contains}로 훑으면 <b>입력값이 제약 이름과 겹칠 때 오분류</b>된다 —
-     * 닉네임을 {@code email}로 가입하면 {@code Duplicate entry 'email' for key 'users.nickname'}
-     * 이 되어 이메일 중복으로 잘못 판정된다. 값 부분을 배제하고 키 이름만 본다.
-     */
-    private static final Pattern DUPLICATE_KEY =
-            Pattern.compile("for key '([^']+)'", Pattern.CASE_INSENSITIVE);
-
-    /**
-     * DB 제약 위반을 도메인 오류로 매핑한다.
-     *
-     * <p>{@code V1__init.sql}이 {@code users.email}, {@code users.nickname},
-     * {@code blogs.url_slug}에 unique를 걸어 두었다. 제약 이름은 스키마가 정하므로
-     * 사용자 입력에 영향받지 않는다.
-     *
-     * @return 매핑된 오류. {@code null}이면 slug 충돌이므로 호출자가 재시도한다
-     */
-    private static ErrorCode mapConstraintViolation(DataIntegrityViolationException e) {
-        String message = e.getMostSpecificCause().getMessage();
-        if (message == null) {
-            return ErrorCode.COMMON_500;
-        }
-
-        Matcher matcher = DUPLICATE_KEY.matcher(message);
-        if (!matcher.find()) {
-            // 중복 키가 아닌 무결성 위반(FK 등)은 서버 오류다.
-            log.warn("가입 실패: 매핑되지 않은 무결성 위반");
-            return ErrorCode.COMMON_500;
-        }
-
-        // `users.nickname` 또는 이전 MySQL의 `nickname` 형태 모두를 다룬다.
-        String key = matcher.group(1).toLowerCase(Locale.ROOT);
-        String column = key.contains(".") ? key.substring(key.lastIndexOf('.') + 1) : key;
-
-        return switch (column) {
-            case "url_slug", "uk_blogs_url_slug" -> null;
-            case "email", "uk_users_email" -> ErrorCode.USER_004;
-            case "nickname", "uk_users_nickname" -> ErrorCode.USER_002;
-            default -> {
-                log.warn("가입 실패: 알 수 없는 unique 제약 key={}", key);
-                yield ErrorCode.COMMON_500;
-            }
-        };
     }
 
     /**

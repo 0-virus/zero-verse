@@ -70,28 +70,25 @@ class ConcurrentRegisterTest extends MySqlTestSupport {
 
     /**
      * 닉네임이 {@code email}이면 MySQL 메시지가
-     * {@code Duplicate entry 'email' for key 'users.nickname'}이 된다.
+     * {@code Duplicate entry 'email' for key 'users.nickname'}이 된다. 메시지 전체를 훑는 방식은
+     * 이걸 이메일 중복으로 오분류한다.
      *
-     * <p>전체 메시지를 훑는 방식은 이걸 이메일 중복으로 오분류한다. 제약 이름만 보는지 확인한다.
+     * <p><b>반드시 동시 요청이어야 한다</b> — 순차로 보내면 {@code UserRegistrar}의 선조회가
+     * 먼저 {@code USER_002}를 던져 매핑 코드에 도달하지 못한다. 그러면 매핑을 되돌려도 통과하는
+     * 가짜 회귀 테스트가 된다. 메시지 형태 자체의 검증은
+     * {@link RegisterConstraintMapperTest}가 결정적으로 담당한다.
      */
     @Test
-    @DisplayName("닉네임 값이 'email'이어도 닉네임 중복으로 올바르게 분류한다")
+    @DisplayName("닉네임 값이 'email'인 동시 가입도 닉네임 중복으로 분류한다")
     void nicknameValueNamedEmailIsNotMisclassified() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body("first@zeroverse.test", "email")))
-                .andReturn();
+        List<Result> results = registerConcurrently(
+                body("firstemail@zeroverse.test", "email"),
+                body("secondemail@zeroverse.test", "email"));
 
-        var response = mockMvc.perform(post("/api/v1/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body("second@zeroverse.test", "email")))
-                .andReturn()
-                .getResponse();
-
-        assertThat(response.getStatus()).isEqualTo(409);
-        assertThat(codeOf(response.getContentAsString()))
+        assertThat(created(results)).isEqualTo(1);
+        assertThat(codesOfFailures(results))
                 .as("닉네임 중복이므로 USER_002여야 한다")
-                .isEqualTo("USER_002");
+                .containsExactly("USER_002");
     }
 
     @Test

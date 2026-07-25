@@ -573,7 +573,7 @@ PRD §12 DoD와 §11 테스트 전략의 각 항목에 대해 **M0에 적용되�
 | 1 | 해당 FR/NFR 규칙 전부 구현 | **적용**(M0는 FR 없음, NFR-01·04·05·06·07·08 해당) | CorsConfigTest(NFR-01), ErrorCode+GlobalExceptionHandlerTest(NFR-04), OpenApiConfigTest(NFR-05), BaseEntityAuditingTest(NFR-06), FlywayMigrationTest(NFR-07·08) | ✅ |
 | 2 | §11 해당 테스트 존재·통과, placeholder/skip/stub 금지 | **적용** | **BE 36 tests / FE 126 tests(12 파일)**, 전부 `skipped="0"`. `@Disabled`·`it.skip`·`todo` 0건 | ✅ |
 | 3 | 공통 응답·에러코드·페이징 규약 준수, Swagger 문서화 | **적용** | ApiResponseTest(4키 항상 직렬화), PageResponseTest, OpenApiConfigTest(`/v3/api-docs` + Bearer 스키마) | ✅ |
-| 4 | FE가 §6 토큰 적용 + `docs/design/` 정본과 시각 일치 | **적용** | 토큰 정본 대조 + 구조 DOM 테스트 + **1440px Playwright 시각 대조 2회**(3차 리뷰 지적 7건 반영 포함, 아래 `[시각 대조 기록]`) | ✅ |
+| 4 | FE가 §6 토큰 적용 + `docs/design/` 정본과 시각 일치 | **적용** | 토큰 정본 대조 + 구조 DOM 테스트 + 수치 고정 테스트 + **1440px Playwright 시각 대조 3회**(3·4차 리뷰 지적 반영 포함, 아래 `[시각 대조 기록]`) | ✅ |
 | 4b | 연동 API 실제 동작 확인 | **비적용** — M0에 연동할 도메인 API가 없다(M1~M9) | — | — |
 | 5 | 보안: 비밀 미커밋, sanitize, 권한 가드 | **부분 적용** — 비밀 미커밋만 해당. sanitize는 M4, 권한 가드는 M1 | `application-local.example.yml`은 placeholder만, `application-local.yml`은 gitignore. `git ls-files`에 비밀값 없음 | ✅(해당 범위) |
 | 6 | 빌드·린트 통과 + 저자와 다른 패스의 검증 | **적용** | `./gradlew test` BUILD SUCCESSFUL, `npm run build`(tsc -b && vite build) exit 0, `npm run lint`(oxlint) exit 0. Codex 리뷰(3b) — 저자 Claude와 분리 | ✅ |
@@ -672,6 +672,25 @@ CSS가 빠진 스크린샷을 정본 대조 결과로 오인할 뻔했으므로,
 `bg-paper` 등 대표 유틸리티가 서빙 CSS에 있는지 먼저 확인한다.
 
 **검증**: FE **130 tests**(12 파일), BE **36 tests**, `npm run build`·`npm run lint` exit 0.
+
+### 2026-07-25 · Codex 재리뷰 4차 — Verdict: 블로킹 2건
+
+3차 지적 7건 중 6건(구름은 사용자 결정으로 제외)을 해소로 판정하고 2건을 새로 냈다.
+
+| # | 지적 | 처리 |
+|---|---|---|
+| 1 | `/blog/:slug` 히어로가 높이만 맞고 정본 구조와 다름 — 전용 별 좌표, 로켓 `right:170/top:34`, 하단 정렬, 76px 아바타, 우측 액션 슬롯이 없음 | 반영 — `Hero`에 `variant`(`feed`/`blog`) 도입. blog는 `BLOG_STARS`(11개), 로켓 `right:170/top:34`, 하단 정렬, `HeroAvatar`(76px) + `actions` 슬롯 |
+| 2 | **내가 만든 회귀** — 로그인 장식을 온보딩 3경로에 일괄 적용해 `/blog/setup` 정본을 깨뜨림(정본은 별 11개, 로켓 없음) | 반영 — `SETUP_STARS` 추가, layout spec에 `onboardingDecor`(별 종류 + 로켓 여부)를 두어 경로별로 분기 |
+| 비블로킹 | `/settings/` 후행 슬래시가 fallback으로 떨어짐 | 반영 — `normalize()`로 후행 슬래시 제거 후 매칭 |
+| 비블로킹 | 수정 수치가 테스트로 고정되지 않음 | 반영 — `design-tokens.test.tsx` 신설. 별 개수·로켓 좌표·Panel 헤더·RightPanel/ScreenPanel gap·TopBar 규격을 고정 |
+| 비블로킹 | PR 본문이 최신 수치를 반영하지 않음 | 반영 — 갱신 |
+
+**액션 버튼**(`✦ 유니버스 신청`·`RSS`)은 슬롯만 제공하고 M0에서 렌더하지 않는다.
+동작이 M5(유니버스)·M2(블로그 설정)에 있어 지금 그리면 눌러도 아무 일이 없는 가짜 UI가 된다.
+아바타는 데이터가 아니라 디자인 크롬이므로 M0에서 렌더한다.
+
+**검증**: FE **144 tests**(13 파일) / BE **36 tests**, 전부 0 skipped·0 failures.
+build·lint exit 0. `/`, `/signin`, `/settings`, `/blog/:slug`, `/blog/setup` 1440px 재대조 완료.
 
 ## [리뷰]
 

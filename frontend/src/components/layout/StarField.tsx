@@ -82,7 +82,19 @@ export const HERO_STARS_SECONDARY =
   '160px -14px 0 #fff,340px 12px 0 #ffe9c9,560px -20px 0 #fff,' +
   '760px 6px 0 #ffe9c9,1000px -10px 0 #fff,1180px 14px 0 #ffe9c9';
 
-/** `Pages.dc.html` SCREEN: LOGIN 별 좌표. 히어로보다 넓게 흩뿌려진다. */
+/** `Pages.dc.html` SCREEN: BLOG HOME 별 좌표(11개). 메인 피드와 다른 배치다. */
+export const BLOG_STARS =
+  '130px 20px 0 #ffd9a0,290px 6px 0 #fff,450px 34px 0 #ffe9c9,610px 12px 0 #fff,' +
+  '780px 40px 0 #ffd9a0,930px 8px 0 #fff,1090px 28px 0 #ffe9c9,1230px 16px 0 #fff,' +
+  '70px 52px 0 #ffd9a0,520px 58px 0 #fff,990px 60px 0 #ffd9a0';
+
+/** `Pages.dc.html` SCREEN: BLOG SETUP 별 좌표(11개). LOGIN에서 마지막 3개가 빠진 축약본이며 **로켓이 없다**. */
+export const SETUP_STARS =
+  '170px 40px 0 #ffd9a0,350px 10px 0 #fff,540px 70px 0 #ffe9c9,720px 24px 0 #fff,' +
+  '900px 90px 0 #ffd9a0,1080px 30px 0 #fff,1230px 60px 0 #ffe9c9,90px 140px 0 #fff,' +
+  '420px 180px 0 #ffd9a0,820px 170px 0 #fff,1150px 200px 0 #ffd9a0';
+
+/** `Pages.dc.html` SCREEN: LOGIN 별 좌표(14개). 히어로보다 넓게 흩뿌려진다. */
 export const AUTH_STARS =
   '170px 40px 0 #ffd9a0,350px 10px 0 #fff,540px 70px 0 #ffe9c9,720px 24px 0 #fff,' +
   '900px 90px 0 #ffd9a0,1080px 30px 0 #fff,1230px 60px 0 #ffe9c9,90px 140px 0 #fff,' +

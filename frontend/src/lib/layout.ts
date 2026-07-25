@@ -22,8 +22,19 @@ export interface LayoutSpec {
   appNav: boolean;
   /** 온보딩 중앙 카드 폭(px) */
   cardWidth?: number;
-  /** 상단 다크 히어로. 없으면 undefined */
-  hero?: { height: number; eyebrow: string; title: string; description: string };
+  /**
+   * 온보딩 장식. 정본은 화면마다 다르다 —
+   * LOGIN/SIGNUP은 별 14개 + 픽셀 로켓, BLOG SETUP은 축약된 별 11개에 **로켓 없음**.
+   */
+  onboardingDecor?: { stars: 'auth' | 'setup'; rocket: boolean };
+  /** 상단 다크 히어로. 없으면 undefined. variant마다 별 좌표·로켓 위치·정렬이 다르다 */
+  hero?: {
+    variant: 'feed' | 'blog';
+    height: number;
+    eyebrow: string;
+    title: string;
+    description: string;
+  };
   /** 우측 패널(300px) 노출 여부 — `/`에만 true(PRD §6.7) */
   rightPanel?: boolean;
   /** 화면 전용 좌측 패널(240px). 앱 내비가 아니다(PRD §6.7) */
@@ -44,6 +55,7 @@ const RULES: Array<{ test: (path: string) => boolean; spec: LayoutSpec }> = [
       columns: null,
       appNav: false,
       cardWidth: 420,
+      onboardingDecor: { stars: 'auth', rocket: true },
     },
   },
   {
@@ -55,6 +67,7 @@ const RULES: Array<{ test: (path: string) => boolean; spec: LayoutSpec }> = [
       columns: null,
       appNav: false,
       cardWidth: 560,
+      onboardingDecor: { stars: 'setup', rocket: false },
     },
   },
   {
@@ -67,6 +80,7 @@ const RULES: Array<{ test: (path: string) => boolean; spec: LayoutSpec }> = [
       appNav: true,
       rightPanel: true,
       hero: {
+        variant: 'feed',
         height: 240,
         eyebrow: '▚▚ SIGNAL RECEIVED',
         title: '유니버스 새 소식',
@@ -90,6 +104,7 @@ const RULES: Array<{ test: (path: string) => boolean; spec: LayoutSpec }> = [
       appNav: false,
       screenPanel: 'blog',
       hero: {
+        variant: 'blog',
         height: 190,
         eyebrow: 'MY UNIVERSE / BLOG',
         title: '블로그',
@@ -140,6 +155,15 @@ const FALLBACK: LayoutSpec = {
   appNav: false,
 };
 
+/** 후행 슬래시를 제거해 `/settings/`가 `/settings`와 같은 레이아웃을 쓰도록 한다(React Router와 동일 취급). */
+function normalize(pathname: string): string {
+  if (pathname.length > 1 && pathname.endsWith('/')) {
+    return pathname.replace(/\/+$/, '') || '/';
+  }
+  return pathname;
+}
+
 export function resolveLayout(pathname: string): LayoutSpec {
-  return RULES.find((rule) => rule.test(pathname))?.spec ?? FALLBACK;
+  const path = normalize(pathname);
+  return RULES.find((rule) => rule.test(path))?.spec ?? FALLBACK;
 }

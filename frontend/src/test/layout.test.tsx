@@ -33,16 +33,20 @@ describe('resolveLayout', () => {
   });
 
   it.each([
-    ['/signin', 420],
-    ['/signup', 420],
-    ['/blog/setup', 560],
-  ] as const)('%s 은 온보딩 레이아웃이고 카드 폭 %dpx다', (path, cardWidth) => {
-    const layout = resolveLayout(path);
+    ['/signin', 420, 'auth', true],
+    ['/signup', 420, 'auth', true],
+    ['/blog/setup', 560, 'setup', false],
+  ] as const)(
+    '%s 은 온보딩 레이아웃 · 카드 %dpx · 별 %s · 로켓 %s',
+    (path, cardWidth, stars, rocket) => {
+      const layout = resolveLayout(path);
 
-    expect(layout.kind).toBe('onboarding');
-    expect(layout.cardWidth).toBe(cardWidth);
-    expect(layout.appNav).toBe(false);
-  });
+      expect(layout.kind).toBe('onboarding');
+      expect(layout.cardWidth).toBe(cardWidth);
+      expect(layout.appNav).toBe(false);
+      expect(layout.onboardingDecor).toEqual({ stars, rocket });
+    },
+  );
 
   it('미등록 `/settings-*` 경로는 설정 셸이 아니라 not-found 단일 컬럼이다', () => {
     const layout = resolveLayout('/settings-unknown');
@@ -52,9 +56,17 @@ describe('resolveLayout', () => {
     expect(layout.maxWidth).toBe(860);
   });
 
-  it('히어로는 `/`(240px)와 `/blog/:slug`(190px)에만 있다', () => {
+  it('후행 슬래시는 같은 레이아웃으로 정규화된다', () => {
+    expect(resolveLayout('/settings/')).toEqual(resolveLayout('/settings'));
+    expect(resolveLayout('/search/')).toEqual(resolveLayout('/search'));
+    expect(resolveLayout('/')).toEqual(resolveLayout('/'));
+  });
+
+  it('히어로는 `/`(feed 240px)와 `/blog/:slug`(blog 190px)에만 있다', () => {
     expect(resolveLayout('/').hero?.height).toBe(240);
+    expect(resolveLayout('/').hero?.variant).toBe('feed');
     expect(resolveLayout('/blog/zerostar').hero?.height).toBe(190);
+    expect(resolveLayout('/blog/zerostar').hero?.variant).toBe('blog');
     expect(resolveLayout('/settings').hero).toBeUndefined();
     expect(resolveLayout('/search').hero).toBeUndefined();
     expect(resolveLayout('/signin').hero).toBeUndefined();

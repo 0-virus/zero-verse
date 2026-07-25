@@ -1,0 +1,18 @@
+# 로컬 개발용 설정 예시.
+#
+# 이 파일을 `application-local.yml`로 복사한 뒤 실제 값을 채운다.
+# `application-local.yml`은 .gitignore 대상이며 절대 커밋하지 않는다.
+#
+# 실행: ./gradlew bootRun --args='--spring.profiles.active=local'
+#
+# 요구 DB: MySQL 8.x (REQUIREMENTS §2). 스키마는 Flyway V1__init.sql이 생성한다.
+
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/zeroverse?serverTimezone=UTC&characterEncoding=UTF-8
+    username: zeroverse
+    password: "<로컬 비밀번호를 여기에>"
+
+zeroverse:
+  cors:
+    allowed-origins: http://localhost:5173

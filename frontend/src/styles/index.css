@@ -1,0 +1,124 @@
+@import "tailwindcss";
+
+/* ZeroVerse 디자인 토큰 — 정본: docs/design/DESIGN-SYSTEM.md §2~§5, PRD §6.
+   레트로 픽셀 × 크림 페이퍼 × 황혼의 우주.
+   폐기된 다크 네온·골드 팔레트(#02020b/#22d3ee/#a855f7/#fde047)는 넣지 않는다. */
+
+@theme {
+  /* 2.1 코어 */
+  --color-paper: #f6ead8;
+  --color-ink: #2b1b3d;
+  --color-accent: #e85d75;
+  --color-accent-strong: #c73a55;
+  --color-shadow: #d8c7b0;
+
+  /* 2.2 표면 */
+  --color-surface: #ffffff;
+  --color-surface-warm: #fff8ec;
+  --color-surface-raise: #ffe9c9;
+  --color-surface-soft: #fff3dd;
+  --color-surface-hover: #fffdf7;
+  --color-surface-inert: #f1ece2;
+  --color-line: #eadbc4;
+
+  /* 2.3 텍스트 */
+  --color-text: #2b1b3d;
+  --color-text-prose: #3d2f52;
+  --color-text-body: #5c4a72;
+  --color-text-nav: #6b5a80;
+  --color-text-muted: #9b8aa8;
+  --color-text-on-ink: #ffd9a0;
+  --color-text-on-dark: #ffe9c9;
+
+  /* 2.4 시맨틱 — 보더·텍스트 / 배경 틴트 쌍 */
+  --color-success: #2e7d4f;
+  --color-success-bg: #d7f5dd;
+  --color-universe: #c86bb1;
+  --color-universe-bg: #f9e3f2;
+  --color-neutral: #9b8aa8;
+  --color-neutral-bg: #f1ece2;
+  --color-danger: #c73a55;
+  --color-danger-bg: #ffe3ea;
+  --color-warning: #b8860b;
+  --color-warning-bg: #fdf3d7;
+  --color-info: #2a6f97;
+  --color-info-bg: #ddedf5;
+
+  /* 4. 타이포 */
+  --font-pixel: "Press Start 2P", monospace;
+  --font-sans: "IBM Plex Sans KR", sans-serif;
+  --font-mono: ui-monospace, Menlo, monospace;
+
+  /* 3. 그림자 — blur 0, 우하단 오프셋 */
+  --shadow-sm: 3px 3px 0 #d8c7b0;
+  --shadow-btn-sm: 5px 5px 0 #d8c7b0;
+  --shadow-btn: 6px 6px 0 #d8c7b0;
+  --shadow-card: 7px 7px 0 #d8c7b0;
+  --shadow-panel: 8px 8px 0 #d8c7b0;
+  --shadow-on-dark: 8px 8px 0 rgba(43, 27, 61, 0.55);
+}
+
+:root {
+  /* 2.5 우주(다크) 영역 — 히어로·온보딩 전용 */
+  --gradient-dusk: linear-gradient(180deg, #241b4d 0%, #4b2a7b 50%, #c86bb1 85%, #ff9d6c 100%);
+  --gradient-sunset: linear-gradient(180deg, #4b2a7b 0%, #c86bb1 45%, #ff9d6c 80%, #ffd9a0 100%);
+  --gradient-dawn: linear-gradient(180deg, #2a6f97 0%, #7bc4c4 55%, #ffd9a0 90%, #fff1d6 100%);
+  /* 온보딩(로그인·회원가입·초기설정) 전용 — `Pages.dc.html` SCREEN: LOGIN.
+     dusk와 정지점이 다르다(55%/90% vs 50%/85%). */
+  --gradient-auth: linear-gradient(180deg, #241b4d 0%, #4b2a7b 55%, #c86bb1 90%, #ff9d6c 100%);
+}
+
+/* border-radius: 0 — 예외 없음 (§3) */
+*,
+*::before,
+*::after {
+  border-radius: 0;
+}
+
+html,
+body,
+#root {
+  /* MVP 데스크톱 전용 (PRD §9-I) */
+  min-width: 1440px;
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-paper);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* 5. 모션 — 픽셀 반짝임과 부유. 그 외 트랜지션은 쓰지 않는다. */
+@keyframes tw {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.2;
+  }
+}
+
+@keyframes floaty {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+::selection {
+  background: #ffb26b;
+  color: #2b1b3d;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-text-muted);
+}

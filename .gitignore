@@ -37,6 +37,17 @@ out/
 ### VS Code ###
 .vscode/
 
+### Claude Code / OMC — 로컬 에이전트 설정·런타임 상태(미추적) ###
+.claude/
+.omc/
+
+### Frontend ###
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
+*.local
+
 ### Docs — 스펙 문서는 무시, worklog/governance만 추적 ###
 docs/*
 !docs/worklog/

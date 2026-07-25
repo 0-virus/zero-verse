@@ -585,18 +585,53 @@ M0에서 시각 대조를 리뷰 지적으로 두 번 되돌아갔으므로 **PR
 4. **롤백은 역순** — 문제가 생기면 **FE를 먼저 되돌린다**. BE를 먼저 내리면 남아 있는 FE가
    전부 실패한다. BE 롤백은 `V1__init.sql`이 불변이라 스키마 되돌림 없이 애플리케이션만 교체한다.
 
-### [미완료 — 브라우저 E2E] (심의 필수 변경 #12)
+### [브라우저 E2E — 최초 배포 전으로 이관] (심의 필수 변경 #12)
 
-**수행하지 못했다.** HTTPS 환경에서 signin → 쿠키 저장 → rotation → 새로고침 복구 → signout을
-실제 브라우저로 확인하는 항목이다.
+**사용자 승인으로 M1 완료 조건에서 제외**했다(2026-07-26). 회의록 §10 정정 기록 참조.
 
 - 이유: 로컬에 HTTPS 종단이 없고 운영 배포 환경도 아직 없다. `Secure=true`·`SameSite=Strict`
-  쿠키는 http에서 저장되지 않아 로컬 http로는 계약을 그대로 재현할 수 없다.
-- **대체 검증한 것**: MockMvc로 Set-Cookie 전체(HttpOnly·SameSite=Strict·Path·Max-Age),
-  rotation·재사용 거부·signout idempotent, Origin/Referer fail-closed. FE는 apiClient의
-  single-flight·지연 401·세션 복구를 jsdom으로 검증.
-- **남은 위험**: 브라우저의 실제 쿠키 저장·전송 동작은 미검증이다. `RISK-0005`(same-site 배치
-  전제)와 직결되므로 **최초 배포 전에 반드시 수행**해야 한다.
+  쿠키는 http에서 저장되지 않아 환경이 갖춰지기 전에는 수행 자체가 불가능하다.
+- **대체 검증한 것**: MockMvc로 Set-Cookie 전체 계약(HttpOnly·SameSite=Strict·Path·
+  Max-Age=1209600, 삭제 쿠키 Max-Age=0), rotation 단일 성공·재사용 거부·signout idempotent,
+  Origin/Referer fail-closed. FE는 jsdom으로 apiClient single-flight·**지연 401 경쟁**·
+  **StrictMode 이중 실행**·세션 복구.
+- **이관처**: `RISK-0005`에 **최초 배포 전 게이트**로 편입했다. 브라우저의 실제 쿠키 저장·전송
+  동작은 여전히 미검증이며, 배포 환경이 확정되는 시점에 반드시 수행한다.
+
+### 2026-07-26 · 리뷰 반영 마무리 — 중복키 오분류 수정 + 검증 재실행
+
+1차 리뷰 반영분을 커밋한 뒤, #2(동시 가입 매핑)의 구현을 다시 읽다가 **자체 결함 1건**을 찾았다.
+
+| 항목 | 내용 |
+|---|---|
+| 결함 | `mapConstraintViolation`이 MySQL 오류 **메시지 전체**를 `contains`로 훑었다. `Duplicate entry 'email' for key 'users.nickname'` — 즉 **닉네임 값이 `email`인 사용자**가 중복 가입하면 이메일 중복(`USER_004`)으로 오분류된다. 입력값이 제약 이름과 겹치는 순간 공개 오류 계약이 뒤집힌다 |
+| 수정 | `for key '([^']+)'` 정규식으로 **제약 이름만** 추출하고 스키마 한정자(`users.`)를 벗겨 `switch`로 매핑. 중복 키가 아닌 무결성 위반(FK 등)과 알 수 없는 제약은 `COMMON_500` + `warn` 로그로 분리 |
+| 회귀 테스트 | `ConcurrentRegisterTest.nicknameValueNamedEmailIsNotMisclassified` — 닉네임 `email`로 2회 가입해 409 + `USER_002`를 검증 |
+
+**함께 보강한 테스트**
+
+- `ConcurrentRegisterTest`(신규) — `CountDownLatch`로 실제 동시 요청. 이메일 중복 1성공+`USER_004`,
+  닉네임 중복 1성공+`USER_002`, slug 3중 충돌은 재시도로 **3건 전부 성공 + slug 중복 없음**.
+  `@Transactional`을 붙이지 않았다 — 붙이면 스레드가 트랜잭션을 공유해 동시성이 재현되지 않는다.
+- `AuthFlowTest.signoutCookieKeepsContract`(신규) — **삭제 쿠키**도 HttpOnly·SameSite=Strict·
+  Path·`Max-Age=0`을 지키는지. 속성이 하나라도 다르면 브라우저가 다른 쿠키로 보고 원본을 안 지운다.
+  기존 발급 쿠키 검증도 `Max-Age=` → `Max-Age=1209600`(14일) 정확값으로 조였다.
+- `apiClient.test.ts` 지연 401 테스트 재작성 — 기존 테스트는 요청을 **순차로** 보내 실제 경쟁을
+  재현하지 못했다(뒤 요청이 이미 새 토큰을 씀). 두 요청을 옛 토큰으로 **동시 출발**시키고 느린
+  쪽의 401을 refresh 완료 후에 도착시켜 `tokenVersion` 가드를 실제로 통과시킨다.
+- `authSessionRestore.test.tsx`(신규) — `<StrictMode>` 아래에서 초기 세션 복구가 rotation을
+  두 번 일으키지 않는지. `main.tsx`가 실제로 StrictMode를 쓰므로 그 조건 그대로 검증한다.
+
+**검증**(2026-07-26 02:5x, 이 커밋 기준 실측):
+
+| 대상 | 결과 |
+|---|---|
+| BE `./gradlew cleanTest test` | **120 tests** / 13 클래스 · 0 skipped · 0 failures · 0 errors · BUILD SUCCESSFUL |
+| FE `vitest run` | **186 tests** / 17 파일 · 0 skipped · 0 failures |
+| FE `npm run lint` (oxlint) | exit 0 |
+| FE `npm run build` (tsc -b + vite) | exit 0 |
+
+앞선 기록의 BE 115 / FE 183은 이 테스트 4건 추가 **이전** 수치다.
 
 ## [이슈·결정]
 
@@ -617,7 +652,10 @@ M0에서 시각 대조를 리뷰 지적으로 두 번 되돌아갔으므로 **PR
 
 ## [리뷰]
 
-- 아직 없음.
+- **2026-07-26 · Codex 1차 리뷰 — Verdict `블로킹`** (높음 8 · 중간 2). 지적 10건과 처리 내역은
+  [개발 기록 「Codex 리뷰 1차 반영 — blocking 10건」](#2026-07-26--codex-리뷰-1차-반영--blocking-10건)에
+  표로 정리했다. 워크로그 자체 오류 3건(guards 건수, `AuthDtos` 주석, 접근제어 테스트 주장)도 함께 지적받아 정정.
+- 2026-07-26 · 1차 반영 후 **자체 발견 1건**(중복키 오분류) 수정 + 테스트 4건 보강 — 재리뷰 대기.
 
 ## [머지]
 

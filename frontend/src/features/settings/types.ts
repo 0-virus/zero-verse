@@ -60,10 +60,10 @@ export interface PublicBlogResponse {
   title: string;
   urlSlug: string;
   description?: string | null;
+  /** 공개 소유자 정보 — 실명(name)은 포함하지 않는다(BlogSettingsDtos.OwnerInfo 참조). */
   owner: {
     id: number;
     nickname: string;
-    name: string;
     profileImageUrl?: string | null;
     bio?: string | null;
   };

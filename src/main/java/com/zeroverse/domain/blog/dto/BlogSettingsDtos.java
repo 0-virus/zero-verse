@@ -70,11 +70,19 @@ public class BlogSettingsDtos {
             String description,
             OwnerInfo owner) {
 
+        /**
+         * 공개 소유자 정보.
+         *
+         * <p><b>실명({@code name})은 포함하지 않는다.</b> 이 응답은 인증 없이 조회되는
+         * 경로이고, 디자인 정본의 블로그 히어로는 소유자를 nickname으로만 표시한다.
+         * FR-BLOG-01의 "소유자 기본 정보"에는 실명이 명시돼 있지 않으므로, 가입·설정에서
+         * 수집한 실명을 전 세계에 노출하지 않는다(데이터 최소화). 실명 공개가 필요해지면
+         * 정본에 결정을 먼저 기록한다.
+         */
         @JsonInclude(JsonInclude.Include.NON_NULL)
         public record OwnerInfo(
                 Long id,
                 String nickname,
-                String name,
                 String profileImageUrl,
                 String bio) {}
     }

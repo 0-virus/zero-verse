@@ -81,6 +81,30 @@ class BlogPublicControllerTest extends MySqlTestSupport {
                 .andExpect(jsonPath("$.data.owner.email").doesNotExist());
     }
 
+    /**
+     * 인증 없이 열리는 경로이므로 가입·설정에서 수집한 실명이 응답에 실리면 안 된다.
+     * {@code @JsonInclude(NON_NULL)} 때문에 값이 null이면 필드가 사라져 통과하는 착시가
+     * 생기므로, 실명을 실제로 채운 사용자로 검증한다.
+     */
+    @Test
+    @DisplayName("공개 블로그 응답의 owner에 실명(name)이 없다")
+    void publicBlogOwnerInfoExcludesRealName() throws Exception {
+        User user = persistUser("realname@test.com", "realnameuser");
+
+        assertThat(user.getName()).isNotBlank();
+
+        String response =
+                mockMvc.perform(get("/api/v1/blogs/slug/realnameuser"))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.data.owner.nickname").value("realnameuser"))
+                        .andExpect(jsonPath("$.data.owner.name").doesNotExist())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+
+        assertThat(response).doesNotContain(user.getName());
+    }
+
     @Test
     @DisplayName("없는 slug는 404 BLOG_001")
     void notFoundBlog() throws Exception {

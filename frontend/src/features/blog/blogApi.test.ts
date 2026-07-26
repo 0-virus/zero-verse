@@ -244,7 +244,6 @@ describe('blogApi', () => {
         owner: {
           id: 1,
           nickname: 'owner',
-          name: '소유자',
           profileImageUrl: null,
           bio: '소개',
         },
@@ -275,7 +274,6 @@ describe('blogApi', () => {
         owner: {
           id: 1,
           nickname: 'owner',
-          name: '소유자',
           profileImageUrl: null,
           bio: '소개',
         },
@@ -297,7 +295,6 @@ describe('blogApi', () => {
         owner: {
           id: 2,
           nickname: 'owner',
-          name: '소유자',
           profileImageUrl: 'https://example.com/avatar.jpg',
           bio: '나는 소유자',
         },
@@ -308,8 +305,30 @@ describe('blogApi', () => {
 
       expect(result.owner).toBeDefined();
       expect(result.owner.nickname).toBe('owner');
-      expect(result.owner.name).toBe('소유자');
       expect(result.owner.bio).toBe('나는 소유자');
+    });
+
+    /**
+     * 공개 소유자 정보에 실명을 담지 않는다. 서버가 `name`을 흘려도 프론트 타입·화면이
+     * 그것을 소비하지 않아야 노출 경로가 생기지 않는다.
+     */
+    it('공개 응답의 owner에 실명(name)이 없다', async () => {
+      fetchMock.mockResolvedValueOnce(ok({
+        id: 1,
+        title: '공개 블로그',
+        urlSlug: 'public',
+        description: '공개 소개',
+        owner: {
+          id: 2,
+          nickname: 'owner',
+          profileImageUrl: null,
+          bio: '소개',
+        },
+      }));
+
+      const result = await getPublicBlog('public');
+
+      expect(Object.keys(result.owner)).not.toContain('name');
     });
 
     it('없는 slug는 404를 반환한다', async () => {

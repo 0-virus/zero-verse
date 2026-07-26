@@ -185,10 +185,10 @@ public class BlogSettingsService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.BLOG_001));
 
         User owner = blog.getUser();
+        // 실명(name)은 공개하지 않는다 — OwnerInfo 참조.
         OwnerInfo ownerInfo = new OwnerInfo(
                 owner.getId(),
                 owner.getNickname(),
-                owner.getName(),
                 owner.getProfileImageUrl(),
                 owner.getBio());
 

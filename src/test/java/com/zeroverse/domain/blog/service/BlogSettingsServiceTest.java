@@ -381,8 +381,12 @@ class BlogSettingsServiceTest extends MySqlTestSupport {
                     .extracting("title", "urlSlug")
                     .containsExactly("공개 제목", "public-blog");
             assertThat(response.owner())
-                    .extracting("nickname", "name", "bio", "profileImageUrl")
-                    .containsExactly("publicnick", "공개 사용자", "공개 소개", "http://example.com/pic.jpg");
+                    .extracting("nickname", "bio", "profileImageUrl")
+                    .containsExactly("publicnick", "공개 소개", "http://example.com/pic.jpg");
+
+            // 실명은 공개 응답에 담지 않는다(OwnerInfo 참조).
+            assertThat(user.getName()).isEqualTo("공개 사용자");
+            assertThat(response.owner().toString()).doesNotContain("공개 사용자");
         }
 
         @Test

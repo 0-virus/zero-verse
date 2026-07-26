@@ -508,7 +508,128 @@ M2는 그 일부만 만든다. 제거 사유를 컴포넌트 주석에 남겨 �
 
 ## [리뷰]
 
-- 아직 없음.
+### 2026-07-26 19:00 · Codex 1차 리뷰 (PR #8, `origin/dev...feature/M2-settings`)
+
+**판정: `needs-attention` — blocking 3건 + non-blocking 1건.**
+
+리뷰 실행 자체가 4번 중단됐다. 원인은 Codex도 `gradlew`도 아니고 **호출 측이 프로세스를 끊은 것**이었다 —
+`--background`가 detach되지 않고 스트리밍하는데 도구 타임아웃(2분)이 걸려 `exit 143`으로 죽었다.
+1·2차 실패를 `gradlew test`의 `exit 124` 탓으로 지목했던 최초 판단은 틀렸고, 그 124도 같은 타임아웃의 증상이었다.
+harness 백그라운드로 완전히 분리하고 타임아웃을 늘린 4차에서 완주했다.
+
+리뷰어가 테스트를 재실행하다 죽는 것을 막기 위해 실측 결과를 미리 확보해 전달했다(아래 [개발 기록] 참조).
+
+| # | 등급 | 항목 | 근거 |
+|---|---|---|---|
+| B1 | high · blocking | `/settings`가 블로그 설정과 일부 프로필 필드를 구현하지 않음 | `SettingsProfilePage.tsx:5` |
+| B2 | high · blocking | 공개 블로그 응답이 실명을 노출 | `BlogSettingsDtos.java:73` |
+| B3 | medium · blocking | 1440px 실제 렌더 대조 미수행 | `docs/worklog/M2-settings.md:473` |
+| N1 | low · non-blocking | soft-delete 제외 테스트에 assertion이 없어 fake-pass | `BlogRepositoryTest.java:298` |
+
+**리뷰어가 통과로 확인한 항목**: initial-setup의 `@Transactional` + `PESSIMISTIC_WRITE` 잠금과 실제 MySQL
+독립 트랜잭션 테스트(1 성공·1 `BLOG_004`), soft-delete 조건·unique 자기제외 쿼리·principal 기반 두 사용자
+소유권 테스트.
+
+N1은 등급상 non-blocking이지만 내용은 워크로그의 "fake-pass 0건" 주장을 직접 반증한다. 322개 통과라는
+수치가 최소 한 곳에서는 아무것도 보장하지 않았다.
+
+## [개발 기록] — 리뷰 반영
+
+### 2026-07-26 19:20 · 1차 리뷰 반영 (B1·B2·B3·N1 전부)
+
+**사전 조치 — 테스트 실측 확보.** 리뷰어가 빌드 명령에서 죽는 것을 막으려고 먼저 돌려 근거로 넘겼다.
+이 과정에서 이 저장소의 Gradle 실행에 두 가지 함정이 확인됐다:
+
+- `./gradlew`(bash 래퍼)는 `--no-daemon`·`--rerun-tasks`·`--tests` 등 **모든 `--` 옵션을 삼킨다**
+  (`gradlew: unknown option`). `gradlew.bat`을 쓰면 정상 전달된다.
+- 플래그 없이 `test`만 돌리면 `:test UP-TO-DATE`로 **조용히 건너뛴다**. 첫 두 번의 "BUILD SUCCESSFUL"은
+  테스트를 한 건도 실행하지 않은 캐시였다. `cleanTest test`가 필요하다.
+
+**B2 — 공개 응답 실명 제거.** `PublicBlogResponse.OwnerInfo`에서 `name`을 뺐다(`BlogSettingsDtos.java`,
+`BlogSettingsService.java`, FE `types.ts`). 인증 없이 열리는 경로에 가입·설정에서 수집한 실명을 실을 근거가
+정본에 없고, 디자인 히어로도 소유자를 nickname으로만 표시한다. 회귀 방어로 **실명을 실제로 채운 사용자**로
+응답 전문에 실명이 없음을 확인하는 테스트를 넣었다 — `@JsonInclude(NON_NULL)` 때문에 값이 null이면 필드가
+사라져 통과하는 착시가 생기기 때문이다.
+
+**N1 — fake-pass 정정.** `V1__init.sql:46`이 `url_slug ... UNIQUE`로 `deleted_at`과 무관한 전역 유니크임을
+확인했고, 이 메서드를 쓰는 곳이 slug 발급(`allocateSlug`)이므로 **삭제된 행까지 포함하는 쪽이 올바른 계약**이다.
+즉 구현이 아니라 테스트 이름이 틀렸다. 제외했다면 삭제된 블로그의 slug를 후보로 골라 INSERT에서 터진다.
+1개 테스트를 3개로 분리했다: 전역 포함(true/false 양쪽), 자기제외·삭제제외(false), 살아있는 충돌(true).
+마지막 하나가 없으면 항상 false를 돌려주는 구현도 통과한다.
+
+**B1 — `/settings` 범위 보강.** 디자인 정본(`ZeroVerse Pages.dc.html:295-298`)의 프로필 카드는
+`닉네임 / 이메일 / 블로그 이름 / 한 줄 소개`이고 PRD §7이 `birth_date`·`profile_image_url` 추가를 지시한다.
+여기서 `한 줄 소개`가 `user.bio`인지 `blog.description`인지 갈렸다 — 디자인의 값이 초기설정 화면의
+`한 줄 소개`(=`blog.description`)와 같은 문구라 후자로 읽을 여지가 있었다. **사용자 결정: `user.bio` 유지,
+블로그 설정은 별도 카드로 분리, 저장은 카드별로 자기 API만 호출.** 라벨 충돌을 피해 블로그 쪽은 `블로그 소개`로 뒀다.
+slug 입력은 포함했다 — 초기설정 카피가 "설정에서 나중에 변경할 수 있어요"라고 약속하고(ADR-0004)
+FR-SETTINGS-03의 수정 가능 필드에 `url_slug`가 있다. 디자인에 없는 필드지만 그 사실만으로 요구사항 필드를
+지우지 않는다(AGENTS.md).
+
+행동 테스트 7건을 추가했다(로드·PUT 호출·BLOG_002·카드 간 상태 독립·slug 미변경 저장·신규 프로필 필드).
+처음 작성한 3건이 실패했는데 원인이 **로드 완료를 기다리지 않음**이었다 — 그대로 뒀다면 `getBlog()` 호출을
+통째로 지워도 통과하는, N1과 같은 종류의 테스트가 됐다. 값이 실제로 채워질 때까지 기다리는 헬퍼로 고쳤다.
+
+**B3 — 1440×1200 실제 브라우저 렌더 대조.** Playwright + Chromium으로 수행했다. 환경이 갖춰져 있지 않아
+MySQL 컨테이너(`zeroverse-local-mysql`, 13306)와 `application-local.yml`(gitignore 대상, 로컬 전용 키)을
+만들어 백엔드·Vite를 띄우고 가입 → 초기설정 → 공개 블로그 → 설정 순으로 실제 조작했다.
+
+**여기서 값 대조가 놓친 결함이 나왔다.** `OnboardingScaffold.tsx:34`가 `children`을 `<p>`로 감싸고 있어
+`<p>` 안에 `<div>`·`<p>`·`<form>`이 들어가는 **잘못된 HTML**이었다(React hydration 경고). M0의 빈 상태
+placeholder용 마크업이 M1·M2에서 실제 폼을 받으면서 생긴 문제다. 부수 효과로 `text-center`가 폼 라벨까지
+가운데로 밀어 정본의 좌측 정렬과 어긋나 있었다. children을 직접 렌더하고 가운데 정렬은 placeholder에만
+남기도록 고쳤다. **콘솔 오류 8건 → 0건.**
+
+Gate 6이 이 화면을 "코드 값 ↔ 정본 값 대조 일치"로 기록했던 항목이다. 값 대조로는 원리적으로 잡히지 않는
+종류라, B3를 blocking으로 판정한 리뷰어 판단이 맞았다.
+
+검증 결과: `/settings` 신규 필드 4종이 모두 서버 값으로 채워짐, 초기설정 후 `/blog/{slug}` 정상 이동,
+공개 히어로에 실명 미노출, 가로 오버플로우 `/blog/setup` 0px · `/settings` 0px, 콘솔·네트워크 오류 0건.
+
+**검증**: BE **325 tests** / 52 suites · 0 failures · 0 errors · **0 skipped**(`cleanTest test`, 7m30s) ·
+FE **233 tests** / 21 파일 · 0 failures · lint exit 0 · build 성공.
+BE는 322 → 325(추가한 테스트 수와 일치), FE는 226 → 233.
+
+### 2026-07-26 21:35 · 정본 시각 차이 2건 반영 + 재검증
+
+B3에서 기록만 해 뒀던 `/blog/setup` 카드 구조와 `/settings` 라벨 배치를 정본에 맞췄다(상세는 [이슈·결정]).
+같은 Playwright 절차로 1440×1200 재검증했다 — 세 화면 렌더 확인, `/settings` 신규 필드 4종이 서버 값으로
+채워짐, 가로 오버플로우 `/blog/setup` 0px · `/settings` 0px, **콘솔·네트워크 오류 0건**.
+
+**검증**: FE **233 tests** / 21 파일 · 0 failures. BE는 이 라운드에서 변경 없음(FE 전용 수정).
+
+**검증 환경 정리 완료**: MySQL 컨테이너(`zeroverse-local-mysql`) 삭제, `application-local.yml` 삭제,
+스크린샷·스크립트 등 스크래치 산출물 삭제. 저장소에 남은 것은 소스·테스트·이 워크로그뿐이다.
+
+중간에 BE가 1건 실패했다 — `BlogSettingsServiceTest.java:384`가 제거된 `name` 속성을 `extracting`으로 꺼내
+`IntrospectionError`가 났다. 리뷰가 지적하지 않은, 이번 수정이 만든 회귀다. 실명 제외 검증으로 바꿔 해소했다.
+
+## [이슈·결정] — 리뷰 반영분
+
+- 2026-07-26 · **`OwnerInfo.name` 확정** — 제거. 이전 항목의 "Gate 6 시각 대조에서 확정" 대기 상태를 종료한다.
+  근거: 디자인 히어로가 소유자를 nickname으로만 표시하고 공개 FE도 `owner.name`을 쓰지 않으며, FR-BLOG-01의
+  "소유자 기본 정보"에 실명이 명시돼 있지 않다. 실명 공개가 제품 요구가 되면 정본에 결정을 먼저 기록한다.
+- 2026-07-26 · **라이브 브라우저 렌더링 미확인 항목 종료** — B3로 수행 완료. `RISK-0005`(운영 HTTPS 쿠키
+  smoke)는 별개 항목으로 최초 배포 전 게이트를 그대로 유지한다.
+- 2026-07-26 · **해소 — `/blog/setup` 카드 구조를 정본에 맞췄다.** 정본(`ZeroVerse Pages.dc.html:245-249`)대로
+  아이브로우·제목·설명을 `surface-raise`(#ffe9c9) 배경 + `border-bottom:3px` **헤더 밴드**로 묶고, 본문의
+  `border-2 border-shadow` 내부 상자를 걷어냈다. 패딩은 정본 `24px 32px`, 제목 `23px→21px`, 아이브로우
+  `letter-spacing` 제거. `BlogInitialSetupPage`의 폼도 중복 패딩을 걷고 필드 간격 16px·버튼 여백 4px로 맞췄다.
+  **최초 판단 정정**: "고치면 `/signin`·`/signup`까지 바뀐다"고 기록했으나 틀렸다. `OnboardingScaffold`는
+  `BlogInitialSetupPage`에서만 쓰이고 인증 화면은 `AuthCard`를 쓴다. M1 영향은 없고 순수 M2 범위였다.
+- 2026-07-26 · **해소 — `/settings` 프로필 카드 라벨 배치를 정본에 맞췄다.** `FormField`에
+  `orientation="inline"`(정본 `grid-template-columns:90px 1fr`, 라벨이 입력 왼쪽)과 `surface="warm"`(정본
+  입력 배경 #fff8ec)을 옵션으로 추가하고 프로필·블로그 카드에 적용했다. **기본값은 기존 동작 그대로**라
+  `/blog/setup` 등 다른 화면은 영향받지 않는다. textarea는 정본대로 라벨을 위쪽 정렬(`align-items:start` +
+  라벨 `padding-top:8px`)했다.
+  라벨 `프로필 이미지 주소` → `프로필 이미지`로 변경했다. `주소 (slug)`와 부분 일치해 셀렉터가 두 필드를
+  동시에 잡는 문제가 브라우저 검증 중 실제로 발생했다.
+- 2026-07-26 · **미반영 — `/settings` 비밀번호 카드 배치.** 정본은 두 입력과 `변경` 버튼이 한 행
+  (`align-items:flex-end`)이고 라벨이 `12px/600/#9b8aa8`인데, 구현은 2열 그리드 + 버튼이 아래 행이다.
+  리뷰가 지적한 항목이 아니고 이번 반영 범위(프로필 카드 라벨 배치)와도 별개라 기록만 남긴다.
+- 2026-07-26 · **로컬 검증 환경은 저장소에 없다.** `application-local.yml`이 gitignore 대상이고 상시 MySQL도
+  없어(테스트는 Testcontainers) 브라우저 검증에는 매번 컨테이너·설정 구성이 선행된다. 앞으로 시각 대조가
+  필요한 마일스톤마다 반복되므로 절차를 문서화하거나 스크립트로 남기는 편이 낫다.
 
 ## [머지]
 

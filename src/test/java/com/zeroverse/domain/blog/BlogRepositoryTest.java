@@ -295,9 +295,15 @@ class BlogRepositoryTest extends MySqlTestSupport {
             assertThat(blog.getDeletedAt()).isNull();
         }
 
+        /**
+         * {@code url_slug}는 {@code V1__init.sql}에서 {@code deleted_at}과 무관하게 전역
+         * UNIQUE다. 그래서 slug 발급({@code allocateSlug})이 쓰는 이 메서드는 soft delete된
+         * 행까지 포함해야 한다 — 제외하면 삭제된 블로그의 slug를 후보로 골랐다가 INSERT에서
+         * 제약 위반으로 터진다.
+         */
         @Test
-        @DisplayName("soft delete된 블로그는 존재 여부 확인 시 제외된다")
-        void existsByUrlSlugExcludesDeletedBlogs() {
+        @DisplayName("soft delete된 블로그의 slug도 존재로 판정된다 — url_slug는 전역 UNIQUE")
+        void existsByUrlSlugIncludesDeletedBlogs() {
             User user = createUser("user@test.com", "usernick");
             userRepository.save(user);
 
@@ -309,11 +315,64 @@ class BlogRepositoryTest extends MySqlTestSupport {
             blogRepository.save(blog);
             blogRepository.flush();
 
-            boolean exists = blogRepository.existsByUrlSlug("todelete");
+            assertThat(blogRepository.existsByUrlSlug("todelete")).isTrue();
+            assertThat(blogRepository.existsByUrlSlug("neverused")).isFalse();
+        }
 
-            // 기존 existsByUrlSlug는 soft delete를 고려하지 않는지 확인
-            // 실제로는 true일 수 있음 — service 레이어에서 soft delete를 확인해야 함
-            // 하지만 public lookup 메서드는 반드시 soft delete를 제외해야 한다
+        /**
+         * 반면 slug 변경(FR-SETTINGS-03)의 중복 검사는 soft delete된 블로그를 제외하고
+         * <b>자기 자신도</b> 제외해야 한다. 자신을 세면 slug를 그대로 두고 제목만 바꾸는
+         * 저장이 409로 막힌다.
+         */
+        @Test
+        @DisplayName("중복 검사는 soft delete된 블로그와 자기 자신을 제외한다")
+        void existsByUrlSlugAndIdNotAndDeletedAtIsNullExcludesDeletedAndSelf() {
+            User owner = createUser("owner@test.com", "ownernick");
+            userRepository.save(owner);
+            Blog mine = createBlog(owner, "내 블로그", "mine");
+            blogRepository.saveAndFlush(mine);
+
+            User other = createUser("other@test.com", "othernick");
+            userRepository.save(other);
+            Blog deleted = createBlog(other, "삭제된 블로그", "gone");
+            blogRepository.saveAndFlush(deleted);
+            deleted.softDelete();
+            blogRepository.saveAndFlush(deleted);
+
+            // 자기 자신의 slug는 중복이 아니다
+            assertThat(
+                            blogRepository.existsByUrlSlugAndIdNotAndDeletedAtIsNull(
+                                    "mine", mine.getId()))
+                    .isFalse();
+
+            // soft delete된 다른 블로그의 slug도 중복으로 세지 않는다
+            assertThat(
+                            blogRepository.existsByUrlSlugAndIdNotAndDeletedAtIsNull(
+                                    "gone", mine.getId()))
+                    .isFalse();
+        }
+
+        /**
+         * 살아 있는 다른 블로그의 slug는 반드시 중복으로 잡아야 한다. 위 두 단정만 있으면
+         * 항상 false를 돌려주는 구현도 통과한다.
+         */
+        @Test
+        @DisplayName("살아 있는 다른 블로그의 slug는 중복으로 판정된다")
+        void existsByUrlSlugAndIdNotAndDeletedAtIsNullDetectsLiveConflict() {
+            User owner = createUser("owner@test.com", "ownernick");
+            userRepository.save(owner);
+            Blog mine = createBlog(owner, "내 블로그", "mine");
+            blogRepository.saveAndFlush(mine);
+
+            User other = createUser("other@test.com", "othernick");
+            userRepository.save(other);
+            Blog alive = createBlog(other, "남의 블로그", "taken");
+            blogRepository.saveAndFlush(alive);
+
+            assertThat(
+                            blogRepository.existsByUrlSlugAndIdNotAndDeletedAtIsNull(
+                                    "taken", mine.getId()))
+                    .isTrue();
         }
     }
 

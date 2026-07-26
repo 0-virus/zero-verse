@@ -25,13 +25,27 @@ export function OnboardingScaffold({
     <section
       data-onboarding-scaffold="true"
       style={{ boxShadow: 'var(--shadow-on-dark)' }}
-      className="border-[3px] border-ink bg-surface-warm px-8 py-9"
+      className="border-[3px] border-ink bg-surface-warm"
     >
-      <p className="font-pixel text-[10px] tracking-[2px] text-universe">{eyebrow}</p>
-      <h1 className="mt-3 text-[23px] font-bold">{title}</h1>
-      <p className="mt-2 text-[13px] text-text-body">{description}</p>
-      <div className="mt-6 border-2 border-shadow bg-surface px-5 py-10 text-center">
-        <p className="text-[13px] text-text-muted">{children ?? '아직 표시할 내용이 없습니다.'}</p>
+      {/* 헤더 밴드 — 정본은 아이브로우·제목·설명을 surface-raise 밴드에 넣고 3px로 본문과 가른다. */}
+      <div className="border-b-[3px] border-ink bg-surface-raise px-8 py-6">
+        <p className="font-pixel text-[10px] text-universe">{eyebrow}</p>
+        <h1 className="mt-2 text-[21px] font-bold">{title}</h1>
+        <p className="mt-1 text-[13px] text-text-body">{description}</p>
+      </div>
+      {/*
+        children을 <p>로 감싸지 않는다. M0의 빈 상태 문구를 담으려고 넣은 <p>였는데,
+        M2가 여기에 <form>을 넣으면서 `<p>` 안에 `<div>`·`<p>`·`<form>`이 들어가는
+        잘못된 HTML이 됐다(React hydration 경고). 가운데 정렬도 placeholder용이라
+        실제 폼에서는 라벨까지 가운데로 밀어 정본과 어긋났다.
+
+        정본 본문에는 내부 테두리가 없다. M0가 빈 상태를 눈에 보이게 하려고 넣었던
+        `border-2` 상자를 걷어낸다.
+      */}
+      <div className="px-8 py-6">
+        {children ?? (
+          <p className="text-center text-[13px] text-text-muted">아직 표시할 내용이 없습니다.</p>
+        )}
       </div>
     </section>
   );

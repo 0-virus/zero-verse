@@ -87,6 +87,16 @@ export function SettingsProfilePage() {
   const profileDirty = useRef(false);
   const blogDirty = useRef(false);
 
+  /**
+   * 편집 횟수. 요청을 보낼 때 값을 캡처해 두고 응답이 왔을 때 그대로인지 본다.
+   *
+   * <p>입력은 저장 중에도 활성이라 사용자가 `저장`을 누른 뒤 응답이 오기 전에 계속 칠 수 있다.
+   * 그때 응답으로 폼을 통째로 갈아끼우거나 dirty를 무조건 풀면 방금 친 글자가 사라진다.
+   * revision이 그대로일 때만 서버 값을 반영하고 dirty를 해제한다.
+   */
+  const profileRevision = useRef(0);
+  const blogRevision = useRef(0);
+
   // 초기 로드 — 프로필과 블로그는 서로 독립이라 한쪽 실패가 다른 쪽을 비우지 않는다.
   const userId = user?.id;
   useEffect(() => {
@@ -128,12 +138,14 @@ export function SettingsProfilePage() {
 
   const handleProfileChange = (field: keyof ProfileForm, value: string) => {
     profileDirty.current = true;
+    profileRevision.current += 1;
     setProfileForm((prev) => ({ ...prev, [field]: value }));
     setProfileSuccess(false);
   };
 
   const handleBlogChange = (field: keyof BlogForm, value: string) => {
     blogDirty.current = true;
+    blogRevision.current += 1;
     setBlogForm((prev) => ({ ...prev, [field]: value }));
     setBlogSuccess(false);
   };
@@ -144,6 +156,8 @@ export function SettingsProfilePage() {
     setBlogSuccess(false);
     setBlogLoading(true);
 
+    const revisionAtSubmit = blogRevision.current;
+
     try {
       const updated = await updateBlog({
         title: blogForm.title,
@@ -151,13 +165,16 @@ export function SettingsProfilePage() {
         description: blogForm.description || undefined,
       });
 
-      blogDirty.current = false;
-      // 서버가 정규화한 값을 그대로 되비춘다.
-      setBlogForm({
-        title: updated.title || '',
-        urlSlug: updated.urlSlug || '',
-        description: updated.description || '',
-      });
+      // 저장을 누른 뒤에도 계속 입력했다면 그 편집이 최신이다. 서버 응답으로 덮지 않는다.
+      if (blogRevision.current === revisionAtSubmit) {
+        blogDirty.current = false;
+        // 서버가 정규화한 값을 그대로 되비춘다.
+        setBlogForm({
+          title: updated.title || '',
+          urlSlug: updated.urlSlug || '',
+          description: updated.description || '',
+        });
+      }
       setBlogSuccess(true);
       setTimeout(() => setBlogSuccess(false), 3000);
     } catch (err) {
@@ -183,6 +200,8 @@ export function SettingsProfilePage() {
     setProfileSuccess(false);
     setProfileLoading(true);
 
+    const revisionAtSubmit = profileRevision.current;
+
     try {
       await updateProfile({
         name: profileForm.name,
@@ -192,8 +211,10 @@ export function SettingsProfilePage() {
         profileImageUrl: profileForm.profileImageUrl || undefined,
       });
 
-      // 저장된 뒤에는 서버 값과 같으므로 dirty를 푼다.
-      profileDirty.current = false;
+      // 요청을 보낸 뒤에도 계속 입력했다면 아직 저장되지 않은 편집이 남아 있다 — dirty를 유지한다.
+      if (profileRevision.current === revisionAtSubmit) {
+        profileDirty.current = false;
+      }
       // 세션 갱신
       await refreshUser();
       setProfileSuccess(true);

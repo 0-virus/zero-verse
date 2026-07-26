@@ -36,6 +36,22 @@ public interface BlogRepository extends JpaRepository<Blog, Long> {
     boolean existsByUrlSlugAndIdNotAndDeletedAtIsNull(String urlSlug, Long blogId);
 
     /**
+     * 자신을 제외한 slug 점유 검사 — <b>soft delete된 블로그도 포함</b>(FR-SETTINGS-04 자동 할당).
+     *
+     * <p>{@code url_slug}는 {@code V1__init.sql}에서 {@code deleted_at}과 무관하게 전역 UNIQUE다.
+     * 그래서 새 slug를 발급할 때는 삭제된 블로그가 쥐고 있는 값도 피해야 한다 — 위의
+     * {@code ...AndDeletedAtIsNull} 변형을 쓰면 삭제된 slug를 후보로 골랐다가 제약 위반으로 터진다.
+     *
+     * <p>반면 <b>자기 자신</b>은 제외해야 한다. 초기 설정에서 slug를 비운 사용자는 가입 때 이미
+     * nickname 기반 slug를 받아 둔 상태라, 자기 것을 세면 중복이 없는데도 {@code nick-2}로 밀린다.
+     *
+     * @param urlSlug 검사할 slug
+     * @param blogId 자신의 블로그 ID (제외 대상)
+     * @return 자신이 아닌 다른 블로그가 이미 쓰고 있으면 true
+     */
+    boolean existsByUrlSlugAndIdNot(String urlSlug, Long blogId);
+
+    /**
      * 공개 블로그 조회(FR-BLOG-01).
      *
      * <p>블로그와 소유자가 모두 soft delete되지 않은 경우만 반환한다. 소유자가

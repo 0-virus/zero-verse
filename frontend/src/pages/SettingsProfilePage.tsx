@@ -97,13 +97,22 @@ export function SettingsProfilePage() {
   const profileRevision = useRef(0);
   const blogRevision = useRef(0);
 
+  /**
+   * 조회 세대. dirty 플래그만으로는 부족하다 — 초기 GET이 느릴 때 사용자가 값을 넣고 저장까지
+   * 마치면 dirty가 풀리는데, 그 뒤 도착한 **PUT 이전 상태를 읽은 GET**이 방금 저장한 값을 옛날
+   * 값으로 되돌린다. 저장이 성공하면 세대를 올려 진행 중이던 조회를 무효로 만든다.
+   */
+  const loadGeneration = useRef(0);
+
   // 초기 로드 — 프로필과 블로그는 서로 독립이라 한쪽 실패가 다른 쪽을 비우지 않는다.
   const userId = user?.id;
   useEffect(() => {
+    const generation = ++loadGeneration.current;
+
     const loadProfile = async () => {
       try {
         const profile = await getProfile();
-        if (profileDirty.current) return;
+        if (loadGeneration.current !== generation || profileDirty.current) return;
         setProfileForm({
           name: profile.name || '',
           nickname: profile.nickname || '',
@@ -119,7 +128,7 @@ export function SettingsProfilePage() {
     const loadBlog = async () => {
       try {
         const blog = await getBlog();
-        if (blogDirty.current) return;
+        if (loadGeneration.current !== generation || blogDirty.current) return;
         setBlogForm({
           title: blog.title || '',
           urlSlug: blog.urlSlug || '',
@@ -165,6 +174,7 @@ export function SettingsProfilePage() {
         description: blogForm.description || undefined,
       });
 
+      loadGeneration.current += 1;
       // 저장을 누른 뒤에도 계속 입력했다면 그 편집이 최신이다. 서버 응답으로 덮지 않는다.
       if (blogRevision.current === revisionAtSubmit) {
         blogDirty.current = false;
@@ -211,6 +221,8 @@ export function SettingsProfilePage() {
         profileImageUrl: profileForm.profileImageUrl || undefined,
       });
 
+      // 저장 이전 상태를 읽고 있던 조회는 이제 낡았다. 도착해도 반영되지 않게 세대를 올린다.
+      loadGeneration.current += 1;
       // 요청을 보낸 뒤에도 계속 입력했다면 아직 저장되지 않은 편집이 남아 있다 — dirty를 유지한다.
       if (profileRevision.current === revisionAtSubmit) {
         profileDirty.current = false;

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.zeroverse.common.exception.BusinessException;
 import com.zeroverse.common.exception.ErrorCode;
+import com.zeroverse.common.util.SlugGenerator;
 import com.zeroverse.domain.blog.dto.BlogSettingsDtos.BlogResponse;
 import com.zeroverse.domain.blog.dto.BlogSettingsDtos.InitialSetupRequest;
 import com.zeroverse.domain.blog.dto.BlogSettingsDtos.InitialSetupResponse;
@@ -326,6 +327,54 @@ class BlogSettingsServiceTest extends MySqlTestSupport {
             InitialSetupResponse response = blogSettingsService.initialSetup(user.getId(), request);
 
             assertThat(response.urlSlug()).isEqualTo("auto-nick");
+        }
+
+        /**
+         * 위 테스트는 블로그 slug를 {@code default-slug}로 만들어 <b>실제 가입 상태를 재현하지
+         * 않았다</b>. 진짜 가입은 nickname 기반 slug로 기본 블로그를 만들기 때문에(UserRegistrar),
+         * 자동 할당이 자기 블로그를 제외하지 않으면 자기 slug를 충돌로 보고 {@code nick-2}로 민다.
+         * 중복이 없는데 공개 URL이 바뀌는 것이라 실제 가입 상태를 그대로 세워 확인한다.
+         */
+        @Test
+        @DisplayName("가입 때 받은 slug를 그대로 둔 채 slug를 비우면 그 slug를 유지한다")
+        void emptySlugKeepsRegisteredSlug() {
+            User user = createUser("keepslug@test.com", "keepnick");
+            // 실제 가입과 동일하게 nickname 기반 slug로 기본 블로그를 만든다.
+            String registered = SlugGenerator.fromNickname("keepnick");
+            createBlog(user, "keepnick의 블로그", registered);
+
+            InitialSetupResponse response = blogSettingsService.initialSetup(
+                    user.getId(), new InitialSetupRequest("제목", "", null));
+
+            assertThat(response.urlSlug())
+                    .as("자기 slug를 충돌로 오인해 suffix를 붙이면 안 된다")
+                    .isEqualTo(registered);
+        }
+
+        /**
+         * 자기 제외가 "아무나 제외"로 번지면 안 된다. 다른 블로그가 이미 쥔 slug는 여전히 피해야 한다.
+         *
+         * <p>블로그 slug는 닉네임과 독립적으로 정할 수 있으므로, 남의 블로그가 내 후보 slug를
+         * 선점한 상황을 그대로 세운다.
+         */
+        @Test
+        @DisplayName("다른 블로그가 쓰는 slug는 자동 할당에서 피한다")
+        void emptySlugAvoidsOtherBlogsSlug() {
+            // 남의 블로그가 "latenick"을 선점한다.
+            User squatter = createUser("squatter@test.com", "squatternick");
+            createBlog(squatter, "선점", "latenick");
+
+            // 후보 base가 "latenick"이 되는 사용자
+            User late = createUser("late@test.com", "latenick");
+            createBlog(late, "나중", "late-default");
+            assertThat(SlugGenerator.fromNickname("latenick")).isEqualTo("latenick");
+
+            InitialSetupResponse response = blogSettingsService.initialSetup(
+                    late.getId(), new InitialSetupRequest("제목", "", null));
+
+            assertThat(response.urlSlug())
+                    .as("남이 쥔 slug를 가져가면 안 된다")
+                    .isEqualTo("latenick-2");
         }
 
         @Test

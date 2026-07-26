@@ -123,16 +123,20 @@ public class Blog extends BaseSoftDeleteEntity {
      *
      * <p>slug 형식 검증은 {@link #updateInfo(String, String, String)}와 동일하다.
      *
+     * <p>초기 설정 화면은 `한 줄 소개`까지 함께 받는다(REQUIREMENTS FR-SETTINGS-04 "필드: title,
+     * url_slug, description", DESIGN-SYSTEM §8.6).
+     *
      * @param title 기본 블로그 제목
      * @param urlSlug 생성된 기본 slug(nickname 기반 또는 fallback)
+     * @param description 한 줄 소개, nullable
      * @throws BusinessException 이미 setupCompleted=true(BLOG_004), 또는 updateInfo 검증 실패
      */
-    public void initialSetup(String title, String urlSlug) {
+    public void initialSetup(String title, String urlSlug, String description) {
         if (isSetupCompleted) {
             throw new BusinessException(ErrorCode.BLOG_004);
         }
 
-        updateInfo(title, urlSlug, null);
+        updateInfo(title, urlSlug, description);
         this.isSetupCompleted = true;
     }
 }

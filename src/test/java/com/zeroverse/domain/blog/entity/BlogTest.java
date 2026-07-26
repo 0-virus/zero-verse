@@ -294,11 +294,28 @@ class BlogTest {
 
             assertThat(blog.getIsSetupCompleted()).isFalse();
 
-            blog.initialSetup("내 블로그", "my-slug");
+            blog.initialSetup("내 블로그", "my-slug", null);
 
             assertThat(blog.getTitle()).isEqualTo("내 블로그");
             assertThat(blog.getUrlSlug()).isEqualTo("my-slug");
             assertThat(blog.getDescription()).isNull();
+            assertThat(blog.getIsSetupCompleted()).isTrue();
+        }
+
+        /**
+         * 초기 설정 화면은 `한 줄 소개`까지 함께 받는다(REQUIREMENTS FR-SETTINGS-04 "필드: title,
+         * url_slug, description", DESIGN-SYSTEM §8.6). 이 인자를 무시하고 저장하지 않으면
+         * 사용자가 입력한 소개가 소리 없이 사라진다.
+         */
+        @Test
+        @DisplayName("초기 설정에서 받은 한 줄 소개를 저장한다")
+        void setupStoresDescription() {
+            User user = createTestUser();
+            Blog blog = createTestBlog(user);
+
+            blog.initialSetup("내 블로그", "my-slug", "우주를 항해하는 기록");
+
+            assertThat(blog.getDescription()).isEqualTo("우주를 항해하는 기록");
             assertThat(blog.getIsSetupCompleted()).isTrue();
         }
 
@@ -308,10 +325,10 @@ class BlogTest {
             User user = createTestUser();
             Blog blog = createTestBlog(user);
 
-            blog.initialSetup("title-1", "slug-1");
+            blog.initialSetup("title-1", "slug-1", null);
             assertThat(blog.getIsSetupCompleted()).isTrue();
 
-            assertThatThrownBy(() -> blog.initialSetup("title-2", "slug-2"))
+            assertThatThrownBy(() -> blog.initialSetup("title-2", "slug-2", null))
                     .isInstanceOf(BusinessException.class)
                     .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
                             .isEqualTo(ErrorCode.BLOG_004));
@@ -323,7 +340,7 @@ class BlogTest {
             User user = createTestUser();
             Blog blog = createTestBlog(user);
 
-            assertThatThrownBy(() -> blog.initialSetup(null, "valid-slug"))
+            assertThatThrownBy(() -> blog.initialSetup(null, "valid-slug", null))
                     .isInstanceOf(BusinessException.class)
                     .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
                             .isEqualTo(ErrorCode.VALIDATION_001));
@@ -335,7 +352,7 @@ class BlogTest {
             User user = createTestUser();
             Blog blog = createTestBlog(user);
 
-            assertThatThrownBy(() -> blog.initialSetup("Valid Title", null))
+            assertThatThrownBy(() -> blog.initialSetup("Valid Title", null, null))
                     .isInstanceOf(BusinessException.class)
                     .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
                             .isEqualTo(ErrorCode.BLOG_003));
@@ -347,7 +364,7 @@ class BlogTest {
             User user = createTestUser();
             Blog blog = createTestBlog(user);
 
-            assertThatThrownBy(() -> blog.initialSetup("My Blog", "admin"))
+            assertThatThrownBy(() -> blog.initialSetup("My Blog", "admin", null))
                     .isInstanceOf(BusinessException.class)
                     .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
                             .isEqualTo(ErrorCode.BLOG_003));
@@ -359,7 +376,7 @@ class BlogTest {
             User user = createTestUser();
             Blog blog = createTestBlog(user);
 
-            assertThatThrownBy(() -> blog.initialSetup("My Blog", "invalid slug"))
+            assertThatThrownBy(() -> blog.initialSetup("My Blog", "invalid slug", null))
                     .isInstanceOf(BusinessException.class)
                     .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
                             .isEqualTo(ErrorCode.BLOG_003));
@@ -373,7 +390,7 @@ class BlogTest {
             Blog blog = createTestBlog(user);
             String slug = "a".repeat(length);
 
-            blog.initialSetup("Title", slug);
+            blog.initialSetup("Title", slug, null);
 
             assertThat(blog.getUrlSlug()).isEqualTo(slug);
             assertThat(blog.getIsSetupCompleted()).isTrue();
@@ -386,7 +403,7 @@ class BlogTest {
             Blog blog = createTestBlog(user);
             String tooLongSlug = "a".repeat(31);
 
-            assertThatThrownBy(() -> blog.initialSetup("Title", tooLongSlug))
+            assertThatThrownBy(() -> blog.initialSetup("Title", tooLongSlug, null))
                     .isInstanceOf(BusinessException.class)
                     .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
                             .isEqualTo(ErrorCode.BLOG_003));
@@ -403,11 +420,11 @@ class BlogTest {
             User user = createTestUser();
             Blog blog = createTestBlog(user);
 
-            blog.initialSetup("title-1", "slug-1");
+            blog.initialSetup("title-1", "slug-1", null);
             assertThat(blog.getIsSetupCompleted()).isTrue();
 
             // 두 번째 호출은 반드시 BLOG_004를 던져야 한다
-            assertThatThrownBy(() -> blog.initialSetup("title-2", "slug-2"))
+            assertThatThrownBy(() -> blog.initialSetup("title-2", "slug-2", null))
                     .isInstanceOf(BusinessException.class)
                     .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
                             .isEqualTo(ErrorCode.BLOG_004));
@@ -419,10 +436,10 @@ class BlogTest {
             User user = createTestUser();
             Blog blog = createTestBlog(user);
 
-            blog.initialSetup("title-1", "slug-1");
+            blog.initialSetup("title-1", "slug-1", null);
 
             // 반드시 BLOG_004를 던져야 한다
-            assertThatThrownBy(() -> blog.initialSetup("title-2", "slug-2"))
+            assertThatThrownBy(() -> blog.initialSetup("title-2", "slug-2", null))
                     .isInstanceOf(BusinessException.class)
                     .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
                             .isEqualTo(ErrorCode.BLOG_004));

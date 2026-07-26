@@ -311,6 +311,52 @@ executor의 1차 산출물에 승인 계약을 어긴 결함이 있어 되돌려
 
 **검증**: BE **237 tests** / 37 클래스 · 0 skipped · 0 failures · 0 errors (Gate 1의 200 + 신규 37). 수치는 `build/test-results/test/*.xml` 합산값이다.
 
+### 2026-07-26 · Gate 3 — BE 서비스 (설정 유스케이스·동시성)
+
+`UserSettingsService`(프로필 조회·수정, 비밀번호 변경), `BlogSettingsService`(블로그 조회·수정,
+초기 설정, 공개 조회)와 각 DTO. 소유권은 **principal userId로만** 결정하며, 서비스 시그니처에
+다른 사용자를 지정할 표현 수단이 없다. 응답 DTO에 password 원문·해시가 없고 공개 블로그 응답에
+email도 없다.
+
+**동시성 — 심의 필수 조건 #5**
+
+`initialSetup`은 `@Lock(PESSIMISTIC_WRITE)` 잠금 조회로 한 스레드만 상태를 확인·전이한다
+(M1 `RefreshTokenService.rotate`와 같은 패턴). `DataIntegrityViolationException`은 M1의
+`RegisterConstraintMapper`를 **재사용**해 제약별로 매핑한다.
+
+**바로잡은 결함 4건**
+
+| # | 결함 | 원인과 수정 |
+|---|---|---|
+| 1 | 동시 initial-setup이 **둘 다 성공** | 처음엔 "재조회"로 막으려 했다. 두 스레드가 거의 동시에 읽으면 둘 다 `isSetupCompleted=false`를 보고, 이후는 같은 row에 대한 단순 UPDATE라 충돌조차 없다. `saveAndFlush()`도 flush 시점만 앞당길 뿐 원자성을 주지 않는다 → 비관적 잠금으로 교체 |
+| 2 | 잠금을 걸었는데도 **여전히 둘 다 성공** | 잠금 조회 **앞에 비잠금 조회**가 있었다. 먼저 읽은 인스턴스가 영속성 컨텍스트에 올라가면, 뒤이은 잠금 조회는 DB 락만 잡고 **1차 캐시의 오래된 엔티티**를 돌려준다. 두 번째 스레드는 자기 트랜잭션 초반의 `false`를 계속 본다 → 사전 조회 제거, 조회는 잠금 조회 한 번뿐 |
+| 3 | `DataIntegrityViolationException`을 전부 `BLOG_002`로 뭉갬 | 코드 주석에 "구분할 수 있지만 하지 않는다"고 적혀 있었다. M1에서 blocking으로 고친 오분류와 같은 결함 → `RegisterConstraintMapper` 재사용 |
+| 4 | **`initialSetup`이 description을 버림** | `Blog.initialSetup(title, urlSlug)` 시그니처 자체가 틀렸다. REQUIREMENTS FR-SETTINGS-04는 "필드: title, url_slug, **description**"이고 DESIGN-SYSTEM §8.6 초기 설정 화면에도 `한 줄 소개` 입력이 있다. **Gate 1 작업 지시에서 이 필드를 누락한 것이 원인**이다 → 3-arg로 정정하고 호출부 15곳 수정, "받은 소개를 저장한다" 테스트 추가 |
+
+**중복 방어 제거 — 뮤테이션이 살아남아 발견**
+
+self-exclusion 쿼리 앞에 `!기존값.equals(새값)` 비교가 있었다. 닉네임이 그대로면 **단락 평가로
+쿼리 자체를 타지 않으므로**, self-exclusion을 일반 `exists`로 바꿔도 **어떤 테스트도 실패하지
+않았다**(뮤테이션 생존). 방어가 두 겹이면 정작 쿼리가 자기 자신을 제외하는지는 아무도 검증하지
+못한다.
+
+→ 앞단 비교를 제거해 self-exclusion 쿼리를 **유일한 방어선**으로 만들고, 누락돼 있던
+"닉네임을 그대로 두고 소개만 바꾼다" 테스트를 추가했다. 재뮤테이션 결과 **2건 FAILED**로 전환.
+
+**뮤테이션 확인**(전부 실제 실행)
+
+| 무력화한 것 | 결과 |
+|---|---|
+| 잠금 조회 → 비잠금 조회 | `ConcurrentSetupTest` **1건 FAILED**(expected 1, but was 2) |
+| 현재 비밀번호 대조 제거 | `UserSettingsServiceTest` **1건 FAILED** |
+| self-exclusion → 일반 exists (수정 전) | **0건 FAILED — 생존**. 위 중복 방어 제거의 근거 |
+| self-exclusion → 일반 exists (수정 후) | **2건 FAILED** |
+
+**테스트 단정 강화**: 동시 initial-setup 테스트가 "하나만 성공"만 보고 **실패 사유를 확인하지
+않았다** — 실패가 `BLOG_002`나 `COMMON_500`이어도 통과했다. `BLOG_004`를 단정하도록 고쳤다.
+
+**검증**: BE **281 tests** / 48 클래스 · 0 skipped · 0 failures · 0 errors (Gate 2의 237 + 신규 44).
+
 ## [이슈·결정]
 
 - 2026-07-26 · Codex 계획 수립 완료. 기획 심의 **소집 필요** 판정(일반 조건 3 + 대형 조건 2).
@@ -326,6 +372,9 @@ executor의 1차 산출물에 승인 계약을 어긴 결함이 있어 되돌려
   7. M2 검증 증적 — 여섯 게이트의 자동 테스트·FR 추적·1440px 대조·회귀·build/lint·skip/stub/fake-pass 0건 기록. **각 Gate 및 M2 리뷰 전 수행**.
   8. 이월 게이트 유지 — RISK-0005 OPEN 유지, 실제 HTTPS browser smoke를 최초 배포 체크리스트 차단 조건에 연결. **최초 배포 전 수행**.
 - 2026-07-26 · 새 문제 및 처리: 승인 요청의 `FR-BLOG-03`은 현 REQUIREMENTS에 존재하지 않으며 slug 수정 정책의 실제 정본 번호는 `FR-SETTINGS-03`이다. ADR-0004에 이 식별자 불일치와 실제 근거를 명시했다. 또한 PRD의 기존 표 항목 `J`(Base package)·`K`(관리자 시각 강조)가 신규 `§9-J`·`§9-K` 요청과 겹쳐, 기존 참조를 `§9.1-J`·`§9.2-K`로 한정하고 신규 결정 소제목을 `§9-J`·`§9-K`로 기록했다.
+
+- 2026-07-26 · **공개 블로그 응답의 소유자 필드 확인 필요** — `PublicBlogResponse.OwnerInfo`에 현재 `name`(실명)이 포함돼 있다. REQUIREMENTS FR-BLOG-01은 "소유자 기본 정보"라고만 하고 필드를 특정하지 않으며, 디자인의 블로그 히어로가 닉네임만 노출한다면 실명은 불필요한 개인정보 노출이다. **Gate 6 시각 대조에서 확정**한다.
+- 2026-07-26 · **Gate 1 지시 오류 정정** — `Blog.initialSetup`을 `(title, urlSlug)` 2-arg로 지시했으나 FR-SETTINGS-04의 필드는 `title, url_slug, description`이고 디자인 §8.6에도 `한 줄 소개` 입력이 있다. Gate 3에서 3-arg로 정정했다. 엔티티 시그니처를 정할 때 **FR의 필드 목록과 디자인 화면의 입력 필드를 함께** 확인해야 한다.
 
 ## [리뷰]
 

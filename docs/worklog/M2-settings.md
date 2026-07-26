@@ -397,6 +397,40 @@ id 1이다. 즉 "소유권이 principal에서 나온다"를 아무도 검증하�
 
 **검증**: BE **322 tests** / 52 클래스 · 0 skipped · 0 failures · 0 errors (Gate 3의 281 + 신규 41).
 
+### 2026-07-26 · Gate 5 — FE 데이터 계층
+
+`features/settings/types.ts`(백엔드 DTO와 필드명·nullable까지 1:1), `features/settings/settingsApi.ts`
+(`getProfile`·`updateProfile`·`changePassword`), `features/blog/blogApi.ts`(`getBlog`·`updateBlog`·
+`initialSetup`·`getPublicBlog`).
+
+**`apiClient`·`authContext`는 수정하지 않았다.** `refreshUser`가 이미 `authContext`에 있어
+(`authContext.tsx:43·162`) 저장 후 세션 갱신은 그것을 쓴다. 신규 interceptor도 만들지 않았다.
+
+**되돌린 판단 1건 — 공개 조회의 apiClient 우회**
+
+1차 구현이 `getPublicBlog`만 `apiClient`를 우회해 `fetch`를 직접 불렀다. "Authorization 헤더 없이
+나가는지 검증하라"는 **내 지시 문구가 그 제약을 만든 원인**이다.
+
+- 실제로는 우회할 이유가 없다. `apiClient`는 **토큰이 있을 때만** Authorization을 붙이므로
+  (`apiClient.ts:107`) 비로그인 상태에서는 그대로 무인증 요청이 나가고, 로그인 상태에서 헤더가
+  붙어도 서버가 이 경로를 permitAll GET으로 열어 두어 결과가 같다. **헤더 유무는 계약이 아니다.**
+- 우회의 대가는 envelope 파싱·오류 변환·자격증명 처리를 한 벌 더 갖는 것이고, 그 사본이
+  `apiClient`와 어긋나는 순간이 버그가 된다. 계획 §3의 "apiClient 재사용" 원칙과도 어긋난다.
+- → `apiClient.get`으로 교체(slug는 `encodeURIComponent`). 테스트도 "토큰이 있어도 헤더를 안
+  붙인다"에서 **"비로그인에서 무인증으로 호출된다" + "로그인 상태에서도 조회가 성립한다"**로
+  의도에 맞게 고쳤다.
+
+**뮤테이션 확인**(전부 실제 실행)
+
+| 무력화한 것 | 결과 |
+|---|---|
+| 공개 조회에 Authorization 강제 부착 | **2건 FAILED**(1차 구현 기준) |
+| `updateProfile`의 `put` → `get` | **1건 FAILED** |
+| `initialSetup` URL을 `/blogs/me/setup`으로 변경 | **1건 FAILED** |
+| `changePassword`의 오류를 일반 `Error`로 삼킴 | **2건 FAILED** — 호출자가 `USER_005`로 분기할 수 있어야 한다 |
+
+**검증**: FE **209 tests** / 19 파일 · 0 failures (기준선 186 + 신규 23) · lint exit 0 · build exit 0.
+
 ## [이슈·결정]
 
 - 2026-07-26 · Codex 계획 수립 완료. 기획 심의 **소집 필요** 판정(일반 조건 3 + 대형 조건 2).

@@ -484,6 +484,10 @@ describe('/settings — 프로필·블로그·비밀번호 독립 상태', () =>
     const getHeld = new Promise<void>((resolve) => {
       releaseGet = resolve;
     });
+    let markResolved: (() => void) | null = null;
+    const getResolved = new Promise<void>((resolve) => {
+      markResolved = resolve;
+    });
 
     install([
       [/\/users\/me$/, () => envelope(USER)],
@@ -495,7 +499,9 @@ describe('/settings — 프로필·블로그·비밀번호 독립 상태', () =>
           }
           // 초기 조회를 붙잡는다. 저장이 끝난 뒤에야 옛날 값을 들고 도착한다.
           await getHeld;
-          return envelope({ ...BLOG, title: '저장 이전의 옛날 제목' });
+          const response = envelope({ ...BLOG, title: '저장 이전의 옛날 제목' });
+          markResolved!();
+          return response;
         },
       ],
     ]);
@@ -514,12 +520,98 @@ describe('/settings — 프로필·블로그·비밀번호 독립 상태', () =>
 
     // 이제서야 초기 조회가 도착한다.
     releaseGet!();
-    await waitFor(() =>
-      expect(callsTo(/\/blogs\/me$/).length).toBeGreaterThanOrEqual(2),
-    );
+    // 호출 횟수로 세면 저장 시점에 이미 2회(GET+PUT)라 즉시 통과한다. 지연 GET 핸들러가
+    // 실제로 응답을 돌려준 시점을 직접 기다려야 경합 결과를 관찰할 수 있다.
+    await getResolved;
+    await waitFor(() => expect(titleInput).toHaveValue('저장된 제목'));
 
     expect(titleInput).not.toHaveValue('저장 이전의 옛날 제목');
-    expect(titleInput).toHaveValue('저장된 제목');
+  });
+
+  /**
+   * 조회 세대를 두 카드가 공유하면, 한쪽 저장이 아직 도착하지 않은 **다른 쪽** 조회까지 폐기한다.
+   * `refreshUser()`는 `userId`를 바꾸지 않아 effect도 다시 돌지 않으므로 그 카드는 빈 채로 남는다.
+   */
+  it('프로필을 저장해도 지연된 블로그 조회는 정상적으로 반영된다', async () => {
+    let releaseGet: (() => void) | null = null;
+    const getHeld = new Promise<void>((resolve) => {
+      releaseGet = resolve;
+    });
+    let markResolved: (() => void) | null = null;
+    const getResolved = new Promise<void>((resolve) => {
+      markResolved = resolve;
+    });
+
+    install([
+      [/\/users\/me$/, () => envelope(USER)],
+      [
+        /\/blogs\/me$/,
+        async () => {
+          await getHeld;
+          const response = envelope(BLOG);
+          markResolved!();
+          return response;
+        },
+      ],
+    ]);
+
+    renderSettings();
+
+    const user = userEvent.setup();
+    const profileForm = await formOf(/닉네임/);
+    await user.click(within(profileForm).getByRole('button', { name: '저장' }));
+    expect(await screen.findByText('프로필이 저장되었습니다.')).toBeInTheDocument();
+
+    // 프로필 저장이 끝난 뒤 블로그 조회가 도착한다. 폐기되면 안 된다.
+    releaseGet!();
+    await getResolved;
+
+    await waitFor(() =>
+      expect(screen.getByLabelText(/블로그 이름/)).toHaveValue('테스터의 블로그'),
+    );
+  });
+
+  it('블로그를 저장해도 지연된 프로필 조회는 정상적으로 반영된다', async () => {
+    let releaseGet: (() => void) | null = null;
+    const getHeld = new Promise<void>((resolve) => {
+      releaseGet = resolve;
+    });
+    let markResolved: (() => void) | null = null;
+    const getResolved = new Promise<void>((resolve) => {
+      markResolved = resolve;
+    });
+
+    install([
+      [
+        /\/users\/me$/,
+        async (_u, init) => {
+          if (init?.method === 'PUT') return envelope(USER);
+          await getHeld;
+          const response = envelope({ ...USER, name: '조회로 채워진 이름' });
+          markResolved!();
+          return response;
+        },
+      ],
+      BLOG_GET,
+    ]);
+
+    renderSettings();
+
+    const user = userEvent.setup();
+    const titleInput = await awaitLoadedValue(/블로그 이름/, '테스터의 블로그');
+    await user.clear(titleInput);
+    await user.type(titleInput, '새 제목');
+
+    const blogForm = await formOf(/블로그 이름/);
+    await user.click(within(blogForm).getByRole('button', { name: '저장' }));
+    expect(await screen.findByText('블로그 정보가 저장되었습니다.')).toBeInTheDocument();
+
+    releaseGet!();
+    await getResolved;
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('이름')).toHaveValue('조회로 채워진 이름'),
+    );
   });
 
   /**

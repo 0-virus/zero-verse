@@ -430,6 +430,51 @@ describe('/settings — 프로필·블로그·비밀번호 독립 상태', () =>
   });
 
   /**
+   * 입력은 저장 중에도 활성이다. `저장`을 누른 뒤 응답이 오기 전에 계속 친 글자를 성공 응답이
+   * 덮으면 방금 입력한 것이 사라진다. 응답을 붙잡아 두고 그 사이에 입력해 경합을 재현한다.
+   */
+  it('블로그 저장 중에 이어서 입력한 값이 성공 응답에 덮이지 않는다', async () => {
+    let releasePut: (() => void) | null = null;
+    const putArrived = new Promise<void>((resolve) => {
+      releasePut = resolve;
+    });
+
+    install([
+      [/\/users\/me$/, () => envelope(USER)],
+      [
+        /\/blogs\/me$/,
+        async (_u, init) => {
+          if (init?.method !== 'PUT') return envelope(BLOG);
+          // 응답을 테스트가 풀어 줄 때까지 붙잡는다.
+          await putArrived;
+          return envelope({ ...BLOG, title: '서버가 돌려준 제목' });
+        },
+      ],
+    ]);
+
+    renderSettings();
+
+    const user = userEvent.setup();
+    const titleInput = await awaitLoadedValue(/블로그 이름/, '테스터의 블로그');
+    await user.clear(titleInput);
+    await user.type(titleInput, '첫 번째 편집');
+
+    const blogForm = await formOf(/블로그 이름/);
+    await user.click(within(blogForm).getByRole('button', { name: '저장' }));
+
+    // 요청이 나간 뒤, 응답이 오기 전에 이어서 입력한다.
+    await user.clear(titleInput);
+    await user.type(titleInput, '저장 후 이어서 친 제목');
+
+    releasePut!();
+
+    await waitFor(() =>
+      expect(screen.getByText('블로그 정보가 저장되었습니다.')).toBeInTheDocument(),
+    );
+    expect(titleInput).toHaveValue('저장 후 이어서 친 제목');
+  });
+
+  /**
    * 계획이 명시한 요구다. 한쪽 실패가 다른 쪽 상태를 지우면 사용자는 방금 저장한 것이
    * 취소된 줄 안다.
    */

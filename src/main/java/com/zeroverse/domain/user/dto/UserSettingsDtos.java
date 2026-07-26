@@ -1,6 +1,7 @@
 package com.zeroverse.domain.user.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.zeroverse.common.util.PasswordPolicy;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -52,10 +53,11 @@ public class UserSettingsDtos {
             @NotBlank(message = "현재 비밀번호는 필수입니다.")
             String currentPassword,
             @NotBlank(message = "새 비밀번호는 필수입니다.")
-            @Size(min = 8, max = 64, message = "비밀번호는 8~64자여야 합니다.")
-            @Pattern(
-                    regexp = "^(?=.*[a-zA-Z])(?=.*\\d)(?=.*[!@#$%^&*()_+=\\-\\[\\]{};:'\",.<>?/\\\\|`~]).+$",
-                    message = "비밀번호는 영문, 숫자, 특수문자를 모두 포함해야 합니다.")
+            @Size(
+                    min = PasswordPolicy.MIN_LENGTH,
+                    max = PasswordPolicy.MAX_LENGTH,
+                    message = PasswordPolicy.SIZE_MESSAGE)
+            @Pattern(regexp = PasswordPolicy.REGEX, message = PasswordPolicy.PATTERN_MESSAGE)
             String newPassword) {}
 
     /** 비밀번호 변경 응답(FR-SETTINGS-02). 성공 시 빈 응답. */

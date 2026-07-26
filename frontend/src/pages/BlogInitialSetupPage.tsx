@@ -65,7 +65,8 @@ export function BlogInitialSetupPage() {
       title="나의 별 이름 짓기"
       description="블로그를 만들어야 유니버스 항해를 시작할 수 있어요."
     >
-      <form onSubmit={handleSubmit} className="space-y-5 px-5 py-4">
+      {/* 패딩은 OnboardingScaffold 본문이 준다(정본 24px 32px). 필드 간격은 정본 16px. */}
+      <form onSubmit={handleSubmit} className="space-y-4">
         <FormField
           label="블로그 이름"
           type="text"
@@ -106,7 +107,7 @@ export function BlogInitialSetupPage() {
           size="submit"
           type="submit"
           disabled={isLoading}
-          className="mt-8"
+          className="mt-1"
         >
           {isLoading ? '항해 시작 중...' : '항해 시작하기 ✦'}
         </Button>

@@ -174,7 +174,18 @@ describe('/blog/setup — 초기 설정 행동', () => {
   });
 });
 
-describe('/settings — 프로필·비밀번호 독립 상태', () => {
+const BLOG = {
+  id: 1,
+  title: '테스터의 블로그',
+  urlSlug: 'behaver',
+  description: '기존 소개',
+  isSetupCompleted: true,
+};
+
+/** 블로그 조회는 설정 화면이 항상 부르므로 기본 라우트로 깐다. 개별 테스트가 앞에서 덮어쓴다. */
+const BLOG_GET: [RegExp, Handler] = [/\/blogs\/me$/, () => envelope(BLOG)];
+
+describe('/settings — 프로필·블로그·비밀번호 독립 상태', () => {
   function renderSettings() {
     return render(
       <MemoryRouter initialEntries={['/settings']}>
@@ -187,18 +198,169 @@ describe('/settings — 프로필·비밀번호 독립 상태', () => {
     );
   }
 
+  /**
+   * `저장` 버튼은 프로필 카드와 블로그 카드에 각각 있다. 카드 안의 고유 필드로 form을
+   * 좁혀야 엉뚱한 카드를 눌러 놓고 통과하는 일이 없다.
+   */
+  async function formOf(labelPattern: RegExp) {
+    const field = await screen.findByLabelText(labelPattern);
+    const form = field.closest('form');
+    expect(form).not.toBeNull();
+    return form as HTMLElement;
+  }
+
   it('프로필 저장에 성공하면 저장 완료를 표시한다', async () => {
     install([
       [/\/users\/me$/, (_u, init) => (init?.method === 'PUT' ? envelope(USER) : envelope(USER))],
+      BLOG_GET,
     ]);
 
     renderSettings();
 
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: '저장' }));
+    const profileForm = await formOf(/닉네임/);
+    await user.click(within(profileForm).getByRole('button', { name: '저장' }));
 
     // setProfileSuccess(true)를 지우면 여기서 걸린다.
     expect(await screen.findByText('프로필이 저장되었습니다.')).toBeInTheDocument();
+  });
+
+  /**
+   * 입력은 처음엔 빈 값으로 그려지고 조회 응답이 도착해야 채워진다. 값이 들어오기를
+   * 기다리지 않으면 로드를 통째로 지워도 통과한다.
+   */
+  async function awaitLoadedValue(labelPattern: RegExp, expected: string) {
+    const field = await screen.findByLabelText(labelPattern);
+    await waitFor(() => expect(field).toHaveValue(expected));
+    return field;
+  }
+
+  it('블로그 설정을 불러와 입력에 채운다', async () => {
+    install([[/\/users\/me$/, () => envelope(USER)], BLOG_GET]);
+
+    renderSettings();
+
+    await awaitLoadedValue(/블로그 이름/, '테스터의 블로그');
+    expect(screen.getByLabelText(/주소 \(slug\)/)).toHaveValue('behaver');
+    expect(screen.getByLabelText(/블로그 소개/)).toHaveValue('기존 소개');
+  });
+
+  /** 저장이 실제로 PUT /blogs/me를 부르지 않으면 사용자는 저장됐다고 믿고 떠난다. */
+  it('블로그 저장은 PUT /blogs/me를 호출하고 성공을 표시한다', async () => {
+    install([
+      [/\/users\/me$/, () => envelope(USER)],
+      [
+        /\/blogs\/me$/,
+        (_u, init) =>
+          init?.method === 'PUT'
+            ? envelope({ ...BLOG, title: '새 이름', description: '새 소개' })
+            : envelope(BLOG),
+      ],
+    ]);
+
+    renderSettings();
+
+    const user = userEvent.setup();
+    const titleInput = await awaitLoadedValue(/블로그 이름/, '테스터의 블로그');
+    await user.clear(titleInput);
+    await user.type(titleInput, '새 이름');
+
+    const blogForm = await formOf(/블로그 이름/);
+    await user.click(within(blogForm).getByRole('button', { name: '저장' }));
+
+    expect(await screen.findByText('블로그 정보가 저장되었습니다.')).toBeInTheDocument();
+
+    const puts = fetchMock.mock.calls.filter(
+      (c) => String(c[0]).endsWith('/blogs/me') && (c[1] as RequestInit)?.method === 'PUT',
+    );
+    expect(puts).toHaveLength(1);
+    expect(JSON.parse(String((puts[0][1] as RequestInit).body))).toMatchObject({
+      title: '새 이름',
+      urlSlug: 'behaver',
+    });
+    // 서버가 정규화한 값을 되비춘다.
+    expect(screen.getByLabelText(/블로그 소개/)).toHaveValue('새 소개');
+  });
+
+  it('중복된 주소면 BLOG_002 안내를 보여준다', async () => {
+    install([
+      [/\/users\/me$/, () => envelope(USER)],
+      [
+        /\/blogs\/me$/,
+        (_u, init) => (init?.method === 'PUT' ? failure(409, 'BLOG_002') : envelope(BLOG)),
+      ],
+    ]);
+
+    renderSettings();
+
+    const user = userEvent.setup();
+    const blogForm = await formOf(/블로그 이름/);
+    await user.click(within(blogForm).getByRole('button', { name: '저장' }));
+
+    expect(await screen.findByText(/이미 사용 중인 주소/)).toBeInTheDocument();
+  });
+
+  /** 카드별 상태가 결합돼 있으면 한쪽 실패가 다른 쪽 성공 표시를 지운다. */
+  it('블로그 저장이 실패해도 프로필 저장 성공 표시는 남는다', async () => {
+    install([
+      [/\/users\/me$/, () => envelope(USER)],
+      [
+        /\/blogs\/me$/,
+        (_u, init) => (init?.method === 'PUT' ? failure(409, 'BLOG_002') : envelope(BLOG)),
+      ],
+    ]);
+
+    renderSettings();
+
+    const user = userEvent.setup();
+    const profileForm = await formOf(/닉네임/);
+    await user.click(within(profileForm).getByRole('button', { name: '저장' }));
+    expect(await screen.findByText('프로필이 저장되었습니다.')).toBeInTheDocument();
+
+    const blogForm = await formOf(/블로그 이름/);
+    await user.click(within(blogForm).getByRole('button', { name: '저장' }));
+
+    expect(await screen.findByText(/이미 사용 중인 주소/)).toBeInTheDocument();
+    expect(screen.getByText('프로필이 저장되었습니다.')).toBeInTheDocument();
+  });
+
+  /** slug를 그대로 두고 제목만 바꾸는 저장이 막히면 안 된다(자기 제외 계약의 화면 쪽 확인). */
+  it('slug를 바꾸지 않아도 저장이 성립한다', async () => {
+    install([
+      [/\/users\/me$/, () => envelope(USER)],
+      [
+        /\/blogs\/me$/,
+        (_u, init) => (init?.method === 'PUT' ? envelope({ ...BLOG, title: '제목만' }) : envelope(BLOG)),
+      ],
+    ]);
+
+    renderSettings();
+
+    const user = userEvent.setup();
+    const titleInput = await awaitLoadedValue(/블로그 이름/, '테스터의 블로그');
+    await user.clear(titleInput);
+    await user.type(titleInput, '제목만');
+
+    const blogForm = await formOf(/블로그 이름/);
+    await user.click(within(blogForm).getByRole('button', { name: '저장' }));
+
+    expect(await screen.findByText('블로그 정보가 저장되었습니다.')).toBeInTheDocument();
+    expect(screen.getByLabelText(/주소 \(slug\)/)).toHaveValue('behaver');
+  });
+
+  it('생년월일과 프로필 이미지 주소를 입력할 수 있다', async () => {
+    install([
+      [
+        /\/users\/me$/,
+        () => envelope({ ...USER, birthDate: '1995-01-01', profileImageUrl: 'https://a.dev/x.png' }),
+      ],
+      BLOG_GET,
+    ]);
+
+    renderSettings();
+
+    await awaitLoadedValue(/생년월일/, '1995-01-01');
+    expect(screen.getByLabelText('프로필 이미지')).toHaveValue('https://a.dev/x.png');
   });
 
   /**
@@ -209,12 +371,14 @@ describe('/settings — 프로필·비밀번호 독립 상태', () => {
     install([
       [/\/users\/me\/password/, () => failure(400, 'USER_005')],
       [/\/users\/me$/, () => envelope(USER)],
+      BLOG_GET,
     ]);
 
     renderSettings();
 
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: '저장' }));
+    const profileForm = await formOf(/닉네임/);
+    await user.click(within(profileForm).getByRole('button', { name: '저장' }));
     expect(await screen.findByText('프로필이 저장되었습니다.')).toBeInTheDocument();
 
     await user.type(screen.getByLabelText(/현재 비밀번호/), 'OldPass123!');
@@ -241,18 +405,20 @@ describe('/settings — 프로필·비밀번호 독립 상태', () => {
         /\/users\/me$/,
         (_u, init) => (init?.method === 'PUT' ? failure(409, 'USER_002') : envelope(USER)),
       ],
+      BLOG_GET,
     ]);
 
     renderSettings();
 
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: '저장' }));
+    const profileForm = await formOf(/닉네임/);
+    await user.click(within(profileForm).getByRole('button', { name: '저장' }));
 
-    expect(await screen.findByText(/닉네임/)).toBeInTheDocument();
+    expect(await within(profileForm).findByText(/닉네임/)).toBeInTheDocument();
   });
 
   it('이메일 입력은 비활성이다', async () => {
-    install([[/\/users\/me$/, () => envelope(USER)]]);
+    install([[/\/users\/me$/, () => envelope(USER)], BLOG_GET]);
 
     renderSettings();
 
@@ -291,7 +457,7 @@ describe('/blog/:slug — 공개 블로그 히어로 연동', () => {
             title: '공개된 별',
             urlSlug: 'public-star',
             description: '항해 기록',
-            owner: { id: 2, nickname: 'owner', name: '소유자', profileImageUrl: null, bio: null },
+            owner: { id: 2, nickname: 'owner', profileImageUrl: null, bio: null },
           }),
       ],
     ]);

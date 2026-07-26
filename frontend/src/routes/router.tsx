@@ -4,7 +4,7 @@ import { GuestOnlyRoute, SetupGuard } from './guards';
 import { MainPage } from '../pages/MainPage';
 import { SigninPage } from '../pages/SigninPage';
 import { SignupPage } from '../pages/SignupPage';
-import { BlogSetupPage } from '../pages/BlogSetupPage';
+import { BlogInitialSetupPage } from '../pages/BlogInitialSetupPage';
 import { BlogPage } from '../pages/BlogPage';
 import { PostDetailPage } from '../pages/PostDetailPage';
 import { WritePage } from '../pages/WritePage';
@@ -58,7 +58,7 @@ export function AppRoutes() {
           path="/blog/setup"
           element={
             <SetupGuard>
-              <BlogSetupPage />
+              <BlogInitialSetupPage />
             </SetupGuard>
           }
         />

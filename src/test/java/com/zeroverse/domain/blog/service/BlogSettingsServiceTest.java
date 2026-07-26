@@ -377,6 +377,32 @@ class BlogSettingsServiceTest extends MySqlTestSupport {
                     .isEqualTo("latenick-2");
         }
 
+        /**
+         * soft delete된 블로그의 slug도 피해야 한다. {@code url_slug}가 {@code deleted_at}과 무관하게
+         * 전역 UNIQUE라, 삭제된 값을 후보로 고르면 UPDATE에서 제약 위반이 나고 BLOG_002로 끝난다.
+         *
+         * <p>이 단정이 없으면 조회를 {@code ...AndDeletedAtIsNull}로 바꿔도 다른 테스트가 모두
+         * 통과한다 — 자기 블로그와 살아 있는 블로그만 다루기 때문이다.
+         */
+        @Test
+        @DisplayName("soft delete된 블로그의 slug도 자동 할당에서 피한다")
+        void emptySlugAvoidsSoftDeletedSlug() {
+            User gone = createUser("gone@test.com", "gonenick");
+            Blog goneBlog = createBlog(gone, "삭제될 블로그", "deletednick");
+            goneBlog.softDelete();
+            blogRepository.saveAndFlush(goneBlog);
+
+            User late = createUser("survivor@test.com", "deletednick");
+            createBlog(late, "나중", "survivor-default");
+
+            InitialSetupResponse response = blogSettingsService.initialSetup(
+                    late.getId(), new InitialSetupRequest("제목", "", null));
+
+            assertThat(response.urlSlug())
+                    .as("삭제된 블로그가 쥔 slug는 전역 UNIQUE라 재사용할 수 없다")
+                    .isEqualTo("deletednick-2");
+        }
+
         @Test
         @DisplayName("이미 초기 설정이 완료되면 BLOG_004를 던진다")
         void throwBlog004IfAlreadySetup() {

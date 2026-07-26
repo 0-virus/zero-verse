@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FormField } from '../components/ui/FormField';
 import { Button } from '../components/ui/Button';
 import { Panel } from '../components/ui/Panel';
@@ -75,11 +75,25 @@ export function SettingsProfilePage() {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
 
+  /**
+   * 사용자가 손댄 폼은 재조회 결과로 덮지 않는다.
+   *
+   * <p>프로필 저장은 `refreshUser()`를 부르고 `/auth/me` 응답은 매번 **새 객체**로 들어온다
+   * (`authContext`의 `setUser(me)`). 로드 effect가 `user` 객체 전체에 의존하면 저장할 때마다
+   * effect가 다시 돌아 아직 저장하지 않은 다른 카드의 입력을 서버 값으로 덮어쓴다 —
+   * 블로그 제목·slug를 고쳐 놓고 프로필을 저장하면 입력이 조용히 사라졌다.
+   * 의존성을 `user.id`로 좁히고, 그래도 남는 늦은 응답 경합은 이 플래그로 막는다.
+   */
+  const profileDirty = useRef(false);
+  const blogDirty = useRef(false);
+
   // 초기 로드 — 프로필과 블로그는 서로 독립이라 한쪽 실패가 다른 쪽을 비우지 않는다.
+  const userId = user?.id;
   useEffect(() => {
     const loadProfile = async () => {
       try {
         const profile = await getProfile();
+        if (profileDirty.current) return;
         setProfileForm({
           name: profile.name || '',
           nickname: profile.nickname || '',
@@ -95,6 +109,7 @@ export function SettingsProfilePage() {
     const loadBlog = async () => {
       try {
         const blog = await getBlog();
+        if (blogDirty.current) return;
         setBlogForm({
           title: blog.title || '',
           urlSlug: blog.urlSlug || '',
@@ -105,18 +120,20 @@ export function SettingsProfilePage() {
       }
     };
 
-    if (user) {
+    if (userId != null) {
       loadProfile();
       loadBlog();
     }
-  }, [user]);
+  }, [userId]);
 
   const handleProfileChange = (field: keyof ProfileForm, value: string) => {
+    profileDirty.current = true;
     setProfileForm((prev) => ({ ...prev, [field]: value }));
     setProfileSuccess(false);
   };
 
   const handleBlogChange = (field: keyof BlogForm, value: string) => {
+    blogDirty.current = true;
     setBlogForm((prev) => ({ ...prev, [field]: value }));
     setBlogSuccess(false);
   };
@@ -134,6 +151,7 @@ export function SettingsProfilePage() {
         description: blogForm.description || undefined,
       });
 
+      blogDirty.current = false;
       // 서버가 정규화한 값을 그대로 되비춘다.
       setBlogForm({
         title: updated.title || '',
@@ -174,6 +192,8 @@ export function SettingsProfilePage() {
         profileImageUrl: profileForm.profileImageUrl || undefined,
       });
 
+      // 저장된 뒤에는 서버 값과 같으므로 dirty를 푼다.
+      profileDirty.current = false;
       // 세션 갱신
       await refreshUser();
       setProfileSuccess(true);
@@ -397,23 +417,35 @@ export function SettingsProfilePage() {
 
       {/* 비밀번호 변경 카드 */}
       <Panel title="비밀번호 변경" tone="primary">
-        <form onSubmit={handlePasswordSubmit} className="space-y-4 px-5 py-6">
-          <div className="grid grid-cols-2 gap-4">
+        {/* 정본 §8.7: 두 입력과 `변경` 버튼이 한 행(`align-items:flex-end`), 패딩 20px 24px. */}
+        <form onSubmit={handlePasswordSubmit} className="space-y-4 px-6 py-5">
+          <div className="flex items-end gap-3">
             <FormField
+              className="flex-1"
               label="현재 비밀번호"
               type="password"
               value={passwordForm.currentPassword}
               onChange={(e) => handlePasswordChange('currentPassword', e.target.value)}
+              labelTone="muted"
+              surface="warm"
               required
             />
             <FormField
+              className="flex-1"
               label="새 비밀번호"
               type="password"
               value={passwordForm.newPassword}
               onChange={(e) => handlePasswordChange('newPassword', e.target.value)}
-              hint="8~64자, 영문·숫자·특수문자"
+              labelTone="muted"
+              surface="warm"
+              // 정본은 이 자리에 별도 힌트 줄이 없다. 정책 문구는 placeholder로 넣어
+              // 한 행 정렬(`items-end`)을 깨지 않으면서 실제 정책(8~64자)을 알린다.
+              placeholder="8~64자, 영문·숫자·특수문자"
               required
             />
+            <Button variant="ink" size="md" type="submit" disabled={passwordLoading}>
+              {passwordLoading ? '변경 중...' : '변경'}
+            </Button>
           </div>
 
           {passwordError && (
@@ -427,15 +459,6 @@ export function SettingsProfilePage() {
               비밀번호가 변경되었습니다.
             </div>
           )}
-
-          <Button
-            variant="ink"
-            size="md"
-            type="submit"
-            disabled={passwordLoading}
-          >
-            {passwordLoading ? '변경 중...' : '변경'}
-          </Button>
         </form>
       </Panel>
     </div>

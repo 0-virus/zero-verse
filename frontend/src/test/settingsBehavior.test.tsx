@@ -348,7 +348,7 @@ describe('/settings — 프로필·블로그·비밀번호 독립 상태', () =>
     expect(screen.getByLabelText(/주소 \(slug\)/)).toHaveValue('behaver');
   });
 
-  it('생년월일과 프로필 이미지 주소를 입력할 수 있다', async () => {
+  it('생년월일과 프로필 이미지를 서버 값으로 표시한다', async () => {
     install([
       [
         /\/users\/me$/,
@@ -361,6 +361,72 @@ describe('/settings — 프로필·블로그·비밀번호 독립 상태', () =>
 
     await awaitLoadedValue(/생년월일/, '1995-01-01');
     expect(screen.getByLabelText('프로필 이미지')).toHaveValue('https://a.dev/x.png');
+  });
+
+  /**
+   * 표시만 확인하면 `onChange`나 PUT payload에서 두 필드를 빼도 통과한다.
+   * FR-SETTINGS-01의 수정 경로를 실제로 잡으려면 요청 본문을 단정해야 한다.
+   */
+  it('생년월일·프로필 이미지 수정이 PUT 본문에 실린다', async () => {
+    install([
+      [
+        /\/users\/me$/,
+        () => envelope({ ...USER, birthDate: '1995-01-01', profileImageUrl: 'https://a.dev/x.png' }),
+      ],
+      BLOG_GET,
+    ]);
+
+    renderSettings();
+
+    const user = userEvent.setup();
+    const birth = await awaitLoadedValue(/생년월일/, '1995-01-01');
+    await user.clear(birth);
+    await user.type(birth, '2000-12-31');
+
+    const image = screen.getByLabelText('프로필 이미지');
+    await user.clear(image);
+    await user.type(image, 'https://a.dev/new.png');
+
+    const profileForm = await formOf(/닉네임/);
+    await user.click(within(profileForm).getByRole('button', { name: '저장' }));
+
+    await waitFor(() => {
+      const puts = fetchMock.mock.calls.filter(
+        (c) => String(c[0]).endsWith('/users/me') && (c[1] as RequestInit)?.method === 'PUT',
+      );
+      expect(puts).toHaveLength(1);
+      expect(JSON.parse(String((puts[0][1] as RequestInit).body))).toMatchObject({
+        birthDate: '2000-12-31',
+        profileImageUrl: 'https://a.dev/new.png',
+      });
+    });
+  });
+
+  /**
+   * 프로필 저장은 `refreshUser()`를 부르고 `/auth/me`는 매번 새 객체를 준다. 로드 effect가
+   * `user` 객체 전체에 의존하면 그때 다시 돌아 아직 저장하지 않은 블로그 입력을 서버 값으로
+   * 덮어쓴다 — 사용자가 고쳐 놓은 제목이 조용히 사라진다.
+   */
+  it('프로필을 저장해도 블로그 카드의 미저장 입력이 유지된다', async () => {
+    install([
+      [/\/users\/me$/, () => envelope(USER)],
+      BLOG_GET,
+    ]);
+
+    renderSettings();
+
+    const user = userEvent.setup();
+    const titleInput = await awaitLoadedValue(/블로그 이름/, '테스터의 블로그');
+    await user.clear(titleInput);
+    await user.type(titleInput, '아직 저장 안 한 제목');
+
+    const profileForm = await formOf(/닉네임/);
+    await user.click(within(profileForm).getByRole('button', { name: '저장' }));
+    expect(await screen.findByText('프로필이 저장되었습니다.')).toBeInTheDocument();
+
+    // refreshUser() 이후에도 편집 중이던 값이 남아 있어야 한다.
+    await waitFor(() => expect(callsTo(/\/auth\/me/).length).toBeGreaterThan(1));
+    expect(screen.getByLabelText(/블로그 이름/)).toHaveValue('아직 저장 안 한 제목');
   });
 
   /**

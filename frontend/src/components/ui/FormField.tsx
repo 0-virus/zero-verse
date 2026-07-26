@@ -14,6 +14,11 @@ export interface FormFieldProps extends InputHTMLAttributes<HTMLInputElement> {
   orientation?: 'stacked' | 'inline';
   /** 입력 배경. `/blog/setup` 정본은 흰색, `/settings` 정본은 surface-warm. */
   surface?: 'plain' | 'warm';
+  /**
+   * 라벨 색·굵기. 기본은 잉크/700(`/blog/setup` 정본).
+   * `muted`는 `/settings` 비밀번호 카드 정본의 `12px/600/#9b8aa8`.
+   */
+  labelTone?: 'ink' | 'muted';
 }
 
 export function FormField({
@@ -26,6 +31,7 @@ export function FormField({
   className = '',
   orientation = 'stacked',
   surface = 'plain',
+  labelTone = 'ink',
   ...rest
 }: FormFieldProps) {
   const inputId = id ?? `field-${label}`;
@@ -64,9 +70,12 @@ export function FormField({
     );
   }
 
+  const stackedLabelClass =
+    labelTone === 'muted' ? 'font-semibold text-text-muted' : 'font-bold';
+
   return (
     <div className={className}>
-      <label htmlFor={inputId} className="mb-[5px] block text-xs font-bold">
+      <label htmlFor={inputId} className={`mb-[5px] block text-xs ${stackedLabelClass}`}>
         {label}
       </label>
       {control}

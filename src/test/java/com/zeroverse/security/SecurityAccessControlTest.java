@@ -82,11 +82,12 @@ class SecurityAccessControlTest extends MySqlTestSupport {
     @ParameterizedTest
     @ValueSource(strings = {
         "/api/v1/users/me",
+        "/api/v1/blogs/me",
         "/api/v1/posts/drafts",
         "/api/v1/universe/friends",
         "/api/v1/notifications"
     })
-    @DisplayName("대표 보호 경로는 토큰 없이 401 AUTH_004를 반환한다")
+    @DisplayName("대표 보호 경로는 토큰 없이 401 AUTH_004를 반환한다 (M2: /users/me, /blogs/me 포함)")
     void protectedEndpointsRequireToken(String path) throws Exception {
         mockMvc.perform(get(path))
                 .andExpect(status().isUnauthorized())
@@ -143,8 +144,8 @@ class SecurityAccessControlTest extends MySqlTestSupport {
     // --- 종료 조건 4·5: 공개 allowlist의 method 제한, 공개 경로 쓰기 401 ---
 
     @ParameterizedTest
-    @ValueSource(strings = {"/api/v1/blogs/slug/zerostar", "/api/v1/feed/public", "/api/v1/search"})
-    @DisplayName("공개 경로의 GET은 인증을 요구하지 않는다 (401이 아니다)")
+    @ValueSource(strings = {"/api/v1/blogs/slug/zerostar", "/api/v1/blogs/slug/another-blog", "/api/v1/feed/public", "/api/v1/search"})
+    @DisplayName("공개 경로의 GET은 인증을 요구하지 않는다 (401이 아니다) (M2: /blogs/slug/** 포함)")
     void publicGetIsNotUnauthorized(String path) throws Exception {
         int status = mockMvc.perform(get(path)).andReturn().getResponse().getStatus();
 
@@ -154,7 +155,7 @@ class SecurityAccessControlTest extends MySqlTestSupport {
 
     @ParameterizedTest
     @ValueSource(strings = {"/api/v1/blogs/slug/zerostar", "/api/v1/feed/public", "/api/v1/search"})
-    @DisplayName("공개 경로여도 쓰기 요청은 401이다 — 경로만 열지 않고 method까지 제한한다")
+    @DisplayName("공개 경로여도 쓰기 요청은 401이다 — 경로만 열지 않고 method까지 제한한다 (M2: /blogs/slug/{slug}의 PUT도 401)")
     void publicPathWriteRequiresAuth(String path) throws Exception {
         for (var request : Arrays.asList(post(path), patch(path), delete(path))) {
             mockMvc.perform(request)
@@ -162,6 +163,19 @@ class SecurityAccessControlTest extends MySqlTestSupport {
                     .andExpect(jsonPath("$.error.code").value("AUTH_004"))
                     .andExpect(jsonPath("$.error.message").value("인증이 필요합니다."));
         }
+    }
+
+    @Test
+    @DisplayName("공개 블로그 조회 PUT은 401이다 — /blogs/slug/{slug} 쓰기 요청 방어 (M2)")
+    void publicBlogSlugPutRequiresAuth() throws Exception {
+        mockMvc.perform(
+                        org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                                "/api/v1/blogs/slug/test-blog")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("AUTH_004"))
+                .andExpect(jsonPath("$.error.message").value("인증이 필요합니다."));
     }
 
     @Test

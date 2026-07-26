@@ -357,6 +357,46 @@ self-exclusion 쿼리 앞에 `!기존값.equals(새값)` 비교가 있었다. �
 
 **검증**: BE **281 tests** / 48 클래스 · 0 skipped · 0 failures · 0 errors (Gate 2의 237 + 신규 44).
 
+### 2026-07-26 · Gate 4 — BE 컨트롤러·보안·통합 시나리오
+
+`UserSettingsController`(`/users/me` GET·PUT, `/users/me/password` PUT), `BlogSettingsController`
+(`/blogs/me` GET·PUT, `/blogs/me/initial-setup` PUT), `BlogPublicController`
+(`/blogs/slug/{urlSlug}` GET, 공개). userId는 `@AuthenticationPrincipal`에서만 꺼내며 경로·쿼리·
+본문 어디에도 대상 사용자를 지정할 수단이 없다.
+
+**`SecurityConfig`는 수정하지 않았다.** M1의 공개 allowlist가 `GET /api/v1/blogs/slug/**`를 이미
+method 제한과 함께 열어 두었다. 확인만 하고 테스트(`SecurityAccessControlTest`)에 M2 경로를 추가했다.
+
+**테스트 픽스처 결함 2건**
+
+| # | 증상 | 원인과 수정 |
+|---|---|---|
+| 1 | 블로그 API 테스트 **18건이 404** | `persistUser`가 **User만** 만들었다. 실제 가입(`UserRegistrar`)은 User·Blog·미분류 Category를 한 트랜잭션에서 만드는데, 사용자만 있으면 `/blogs/me`가 정당하게 `BLOG_001`(404)을 돌려준다 → 픽스처가 기본 블로그도 만들도록 수정 |
+| 2 | soft delete·SUSPENDED 테스트 4건이 `TransactionRequiredException` | MockMvc 요청은 각자 트랜잭션을 열고 테스트 메서드에는 트랜잭션이 없다. native update를 그냥 실행하면 예외가 난다 → `TransactionTemplate`으로 감쌌다. 테이블명도 `zeroverse_user`/`zeroverse_blog`로 잘못 적혀 있어 `users`/`blogs`로 정정(트랜잭션 예외가 먼저 나서 가려져 있었다) |
+
+**무력한 단정 제거**: 응답에 password가 없는지 확인하는 두 테스트가 JVM `assert` 문을 썼다.
+`-ea` 없이는 **아무것도 검증하지 않는다**. AssertJ로 교체했다.
+
+**접근제어 커버리지 구멍 — 뮤테이션이 살아남아 발견**
+
+`principal.userId()`를 **상수 `1L`로 바꿔도 어떤 테스트도 실패하지 않았다.** 테스트가 사용자를
+한 명만 만드는데, `DatabaseCleaner`가 TRUNCATE로 auto_increment를 리셋하므로 그 한 명이 항상
+id 1이다. 즉 "소유권이 principal에서 나온다"를 아무도 검증하지 않고 있었다.
+
+→ 두 컨트롤러에 **사용자 2명을 만들고 두 번째 사용자의 토큰으로 조회**하는 테스트를 추가했다.
+재뮤테이션에서 **2건 FAILED**로 전환.
+
+**뮤테이션 확인**(전부 실제 실행)
+
+| 무력화한 것 | 결과 |
+|---|---|
+| 공개 allowlist의 `HttpMethod.GET` 제한 제거 | **5건 FAILED**(공개 경로 쓰기 요청이 401이 아니게 됨) |
+| `changePassword`의 `@Valid` 제거 | **1건 FAILED**(비밀번호 정책 위반이 통과) |
+| `principal.userId()` → 상수 `1L` (수정 전) | **0건 FAILED — 생존**. 위 커버리지 구멍의 근거 |
+| `principal.userId()` → 상수 `1L` (수정 후) | **2건 FAILED** |
+
+**검증**: BE **322 tests** / 52 클래스 · 0 skipped · 0 failures · 0 errors (Gate 3의 281 + 신규 41).
+
 ## [이슈·결정]
 
 - 2026-07-26 · Codex 계획 수립 완료. 기획 심의 **소집 필요** 판정(일반 조건 3 + 대형 조건 2).

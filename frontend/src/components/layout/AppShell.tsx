@@ -7,6 +7,7 @@ import { RightPanel } from './RightPanel';
 import { ScreenPanel } from './ScreenPanel';
 import { AUTH_STARS, PixelRocket, PixelStars, SETUP_STARS } from './StarField';
 import { resolveLayout } from '../../lib/layout';
+import { useHeroBlog } from '../../lib/heroBlogContext';
 
 /**
  * 앱 셸 = 상단바(PRD §9-L). 사이드바와 컨테이너 폭은 화면별 옵션이다.
@@ -21,6 +22,7 @@ import { resolveLayout } from '../../lib/layout';
  */
 export function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
+  const { blog } = useHeroBlog();
   const layout = resolveLayout(pathname);
 
   if (layout.kind === 'onboarding') {
@@ -63,9 +65,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Hero
           variant={layout.hero.variant}
           height={layout.hero.height}
-          eyebrow={layout.hero.eyebrow}
-          title={layout.hero.title}
-          description={layout.hero.description}
+          eyebrow={layout.hero.variant === 'blog' && blog ? 'MY UNIVERSE / BLOG' : layout.hero.eyebrow}
+          title={layout.hero.variant === 'blog' && blog ? blog.title : layout.hero.title}
+          description={layout.hero.variant === 'blog' && blog ? `${blog.description || ''} · /blog/${blog.urlSlug}` : layout.hero.description}
           // 아바타는 디자인 크롬이므로 M0에서 렌더한다. 실제 블로그 이미지·액션 버튼은
           // M2(블로그 설정)·M5(유니버스 신청)에서 이 슬롯을 채운다.
           avatar={layout.hero.variant === 'blog' ? <HeroAvatar /> : undefined}

@@ -54,7 +54,10 @@ class PasswordPolicyContractTest {
                 Arguments.of("Password!", false, "숫자 없음"),
                 Arguments.of("12345678!", false, "영문 없음"),
                 Arguments.of("Passw0rd", false, "특수문자 없음"),
-                // 길이 위반
+                // 길이 경계 — inclusive 양끝을 고정한다. 거부 사례만 두면 MIN_LENGTH가 9,
+                // MAX_LENGTH가 63으로 잘못 바뀌어도 표본이 통과한다.
+                Arguments.of("Pw0rd!ab", true, "정확히 8자"),
+                Arguments.of("P1!" + "a".repeat(61), true, "정확히 64자"),
                 Arguments.of("Pw0rd!a", false, "7자"),
                 Arguments.of("P1!" + "a".repeat(62), false, "65자"));
     }

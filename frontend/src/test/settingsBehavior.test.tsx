@@ -475,6 +475,54 @@ describe('/settings — 프로필·블로그·비밀번호 독립 상태', () =>
   });
 
   /**
+   * dirty 플래그만으로는 부족한 경합. 초기 GET이 느릴 때 사용자가 값을 넣고 저장까지 마치면
+   * dirty가 풀리는데, 그 뒤 도착한 **저장 이전 상태를 읽은 GET**이 방금 저장한 값을 되돌린다.
+   * GET을 붙잡아 두고 편집 → 저장 성공 → 오래된 GET 해제 순서로 재현한다.
+   */
+  it('저장에 성공한 뒤 도착한 오래된 초기 조회가 폼을 되돌리지 않는다', async () => {
+    let releaseGet: (() => void) | null = null;
+    const getHeld = new Promise<void>((resolve) => {
+      releaseGet = resolve;
+    });
+
+    install([
+      [/\/users\/me$/, () => envelope(USER)],
+      [
+        /\/blogs\/me$/,
+        async (_u, init) => {
+          if (init?.method === 'PUT') {
+            return envelope({ ...BLOG, title: '저장된 제목' });
+          }
+          // 초기 조회를 붙잡는다. 저장이 끝난 뒤에야 옛날 값을 들고 도착한다.
+          await getHeld;
+          return envelope({ ...BLOG, title: '저장 이전의 옛날 제목' });
+        },
+      ],
+    ]);
+
+    renderSettings();
+
+    const user = userEvent.setup();
+    const titleInput = await screen.findByLabelText(/블로그 이름/);
+    await user.type(titleInput, '저장할 제목');
+    // 조회를 붙잡아 둔 상태라 폼이 비어 있다. required를 통과하도록 slug도 채운다.
+    await user.type(screen.getByRole('textbox', { name: '주소 (slug)' }), 'held-slug');
+
+    const blogForm = await formOf(/블로그 이름/);
+    await user.click(within(blogForm).getByRole('button', { name: '저장' }));
+    expect(await screen.findByText('블로그 정보가 저장되었습니다.')).toBeInTheDocument();
+
+    // 이제서야 초기 조회가 도착한다.
+    releaseGet!();
+    await waitFor(() =>
+      expect(callsTo(/\/blogs\/me$/).length).toBeGreaterThanOrEqual(2),
+    );
+
+    expect(titleInput).not.toHaveValue('저장 이전의 옛날 제목');
+    expect(titleInput).toHaveValue('저장된 제목');
+  });
+
+  /**
    * 계획이 명시한 요구다. 한쪽 실패가 다른 쪽 상태를 지우면 사용자는 방금 저장한 것이
    * 취소된 줄 안다.
    */

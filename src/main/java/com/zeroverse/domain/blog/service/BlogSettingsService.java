@@ -142,15 +142,22 @@ public class BlogSettingsService {
                 ? request.title()
                 : user.getNickname() + "의 블로그";
 
-        String urlSlug = (request.urlSlug() != null && !request.urlSlug().isBlank())
-                ? request.urlSlug()
-                : allocateSlug(user.getNickname(), 0);
-
         Blog resultBlog;
         try {
             // 비관적 잠금으로 한 스레드만 상태를 확인·전이하도록 보장한다(FR-SETTINGS-04, 심의 필수 변경 #5).
             Blog lockedBlog = blogRepository.findFirstByUserIdAndDeletedAtIsNullForUpdateOrderByIdAsc(userId)
                     .orElseThrow(() -> new BusinessException(ErrorCode.BLOG_001));
+
+            // slug를 비우면 nickname 기반으로 자동 할당하되 **자기 블로그는 제외**한다.
+            //
+            // 가입 시 이미 nickname 기반 slug를 받아 둔 상태다(UserRegistrar). 예전 검사는
+            // 자기 자신을 제외하지 않아 `nick`을 쥔 사용자가 slug를 비우면 그것을 충돌로 보고
+            // `nick-2`를 발급했다 — 중복이 없는데도 공개 URL이 바뀌었다. 자기를 제외하면
+            // 첫 후보에서 원래 slug를 그대로 되찾는다.
+            String urlSlug = (request.urlSlug() != null && !request.urlSlug().isBlank())
+                    ? request.urlSlug()
+                    : allocateSlug(user.getNickname(), lockedBlog.getId());
+
             lockedBlog.initialSetup(title, urlSlug, request.description());
             blogRepository.saveAndFlush(lockedBlog);
             resultBlog = lockedBlog;
@@ -203,16 +210,22 @@ public class BlogSettingsService {
     /**
      * 중복되지 않는 slug를 고른다(FR-SETTINGS-04).
      *
+     * <p>가입 때 발급된 자기 블로그의 slug는 <b>중복으로 세지 않는다</b>. 세면 정상 가입한
+     * 사용자가 slug를 비웠을 때 자기 것과 충돌한다고 판단해 {@code nick-2}로 밀린다.
+     *
+     * <p>반대로 <b>soft delete된 블로그의 slug는 피해야 한다</b> — {@code url_slug}가
+     * {@code deleted_at}과 무관하게 전역 UNIQUE라 그 값을 고르면 UPDATE에서 제약 위반이 난다.
+     *
      * @param nickname 사용자 닉네임
-     * @param offset 재시도 시 이전 시도를 건너뛰기 위한 시작 위치
+     * @param blogId 자신의 블로그 ID (중복 검사에서 제외)
      * @return 선택된 slug
      * @throws BusinessException BLOG_002(409) slug 후보 전부 중복
      */
-    private String allocateSlug(String nickname, int offset) {
+    private String allocateSlug(String nickname, Long blogId) {
         String base = SlugGenerator.fromNickname(nickname);
-        for (int attempt = 1 + offset; attempt <= MAX_SLUG_ATTEMPTS + offset; attempt++) {
+        for (int attempt = 1; attempt <= MAX_SLUG_ATTEMPTS; attempt++) {
             String candidate = SlugGenerator.withSuffix(base, attempt);
-            if (!blogRepository.existsByUrlSlug(candidate)) {
+            if (!blogRepository.existsByUrlSlugAndIdNot(candidate, blogId)) {
                 return candidate;
             }
         }

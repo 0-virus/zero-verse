@@ -12,6 +12,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
+import org.hibernate.annotations.DynamicUpdate;
 
 /**
  * 사용자(REQUIREMENTS §4 User, FR-AUTH-01).
@@ -21,7 +22,18 @@ import java.time.LocalDate;
  * 생성 등 다른 경로의 사용자는 값이 없을 수 있어 컬럼만 열어둔 것이다.
  * soft delete 대상이며 {@code deletedAt}이 채워진 사용자는 없는 계정과 동일하게 취급한다.
  */
+/*
+ * @DynamicUpdate가 필요한 이유: 프로필 수정(FR-SETTINGS-01)과 비밀번호 변경(FR-SETTINGS-02)은
+ * 서로 다른 트랜잭션에서 같은 행을 쓴다. Hibernate 기본 UPDATE는 **모든 컬럼**을 쓰므로, 두 요청이
+ * 옛 행을 함께 읽으면 나중 flush가 상대의 변경을 자기가 읽은 낡은 값으로 덮는다 — 비밀번호를 바꾸고
+ * 성공 응답까지 받았는데 동시에 저장된 프로필이 옛 해시를 되돌려 놓는 식이다. 변경된 컬럼만 쓰면
+ * 서로 다른 필드를 만지는 두 요청이 겹치지 않는다.
+ *
+ * 같은 컬럼을 동시에 고치는 경우의 last-write-wins는 그대로 남는다. 그건 낙관적 잠금(@Version)이
+ * 필요한 범위이며 스키마 변경을 동반하므로 M2에서 다루지 않는다.
+ */
 @Entity
+@DynamicUpdate
 @Table(name = "users")
 public class User extends BaseSoftDeleteEntity {
 

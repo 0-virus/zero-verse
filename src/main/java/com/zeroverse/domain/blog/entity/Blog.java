@@ -14,6 +14,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.DynamicUpdate;
 
 /**
  * 블로그(REQUIREMENTS §4 Blog).
@@ -21,7 +22,14 @@ import jakarta.persistence.Table;
  * <p>사용자 1명당 기본 블로그 1개를 가입 시 자동 생성하되, 다중 블로그 확장을 위해
  * {@code User 1:N Blog} 구조를 유지한다. "기본 블로그 1개" 제약은 애플리케이션 레벨에서 보장한다.
  */
+/*
+ * @DynamicUpdate가 필요한 이유: `updateBlog`(FR-SETTINGS-03)은 잠금 없이, `initialSetup`(FR-SETTINGS-04)은
+ * PESSIMISTIC_WRITE로 같은 행을 쓴다. 전체 컬럼 UPDATE라면 초기 설정과 겹친 수정이 `is_setup_completed`를
+ * 자기가 읽은 false로 되돌려, 설정을 끝낸 사용자가 다시 `/blog/setup`으로 끌려간다.
+ * 변경된 컬럼만 쓰면 서로 다른 필드를 만지는 두 요청이 겹치지 않는다. User 엔티티의 주석도 참고.
+ */
 @Entity
+@DynamicUpdate
 @Table(name = "blogs")
 public class Blog extends BaseSoftDeleteEntity {
 

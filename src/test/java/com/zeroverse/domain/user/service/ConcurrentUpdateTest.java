@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.zeroverse.common.exception.BusinessException;
 import com.zeroverse.common.exception.ErrorCode;
+import com.zeroverse.domain.user.dto.UserSettingsDtos.ChangePasswordRequest;
 import com.zeroverse.domain.user.dto.UserSettingsDtos.UpdateProfileRequest;
 import com.zeroverse.domain.user.entity.User;
 import com.zeroverse.domain.user.repository.UserRepository;
@@ -88,6 +89,81 @@ class ConcurrentUpdateTest extends MySqlTestSupport {
         assertThat(changedCount)
                 .as("정확히 한 사용자만 nickname이 변경되어야 한다")
                 .isEqualTo(1);
+    }
+
+    /**
+     * 같은 사용자의 프로필 수정과 비밀번호 변경이 겹쳐도 서로를 지우지 않아야 한다.
+     *
+     * <p>두 요청은 각각 User를 조회해 자기 필드만 바꾸고 독립적으로 flush한다. Hibernate 기본
+     * UPDATE는 <b>모든 컬럼</b>을 쓰므로, 둘이 옛 행을 함께 읽으면 나중 flush가 상대의 변경을
+     * 자기가 읽은 낡은 값으로 덮는다 — 비밀번호를 바꾸고 성공 응답까지 받았는데 동시에 저장된
+     * 프로필이 옛 해시를 되돌려 놓는다. {@code @DynamicUpdate}로 변경된 컬럼만 쓰면 두 요청이
+     * 겹치지 않는다.
+     *
+     * <p>화면에서 프로필 카드와 비밀번호 카드는 각각 독립된 저장 버튼을 가지므로 실제로 동시
+     * 제출이 가능한 경로다.
+     */
+    @Test
+    @DisplayName("프로필 수정과 비밀번호 변경이 동시에 일어나도 서로를 덮어쓰지 않는다")
+    void concurrentProfileAndPasswordKeepBothChanges() throws Exception {
+        User user = createUser("both@test.com", "bothnick");
+        String originalHash = user.getPassword();
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+
+        List<Future<Result>> futures = new ArrayList<>();
+
+        futures.add(pool.submit(() -> {
+            ready.countDown();
+            start.await(5, TimeUnit.SECONDS);
+            try {
+                userSettingsService.updateProfile(
+                        user.getId(),
+                        new UpdateProfileRequest("바뀐이름", "bothnick", null, null, null));
+                return new Result(true, null);
+            } catch (BusinessException e) {
+                return new Result(false, e.getErrorCode().getCode());
+            }
+        }));
+
+        futures.add(pool.submit(() -> {
+            ready.countDown();
+            start.await(5, TimeUnit.SECONDS);
+            try {
+                userSettingsService.changePassword(
+                        user.getId(),
+                        new ChangePasswordRequest("password123!@", "NewPassw0rd!"));
+                return new Result(true, null);
+            } catch (BusinessException e) {
+                return new Result(false, e.getErrorCode().getCode());
+            }
+        }));
+
+        assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+        start.countDown();
+
+        List<Result> results = new ArrayList<>();
+        for (Future<Result> future : futures) {
+            results.add(future.get(30, TimeUnit.SECONDS));
+        }
+        pool.shutdownNow();
+
+        assertThat(results)
+                .as("두 요청 모두 성공해야 한다 — 서로 다른 필드를 만진다")
+                .allMatch(Result::isSuccess);
+
+        User reloaded = userRepository.findByIdAndDeletedAtIsNull(user.getId()).orElseThrow();
+        assertThat(reloaded.getName())
+                .as("프로필 변경이 비밀번호 변경에 덮이면 안 된다")
+                .isEqualTo("바뀐이름");
+        assertThat(reloaded.getPassword())
+                .as("비밀번호 변경이 프로필 변경에 덮이면 안 된다 — 성공 응답을 받은 변경이다")
+                .isNotEqualTo(originalHash);
+        assertThat(passwordEncoder.matches("NewPassw0rd!", reloaded.getPassword()))
+                .as("새 비밀번호로 로그인할 수 있어야 한다")
+                .isTrue();
     }
 
     // --- helpers ---

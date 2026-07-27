@@ -43,11 +43,15 @@ public class BlogSettingsDtos {
     public record InitialSetupRequest(
             @Size(max = 200, message = "제목은 200자 이하여야 합니다.")
             String title,
-            // min을 걸지 않는다. `@Valid`는 컨트롤러에서 서비스보다 먼저 도는데, `min = 3`이면
-            // FR-SETTINGS-04가 보장하는 **빈 slug 자동 생성**이 HTTP 경계에서 400으로 막힌다.
+            // slug에는 Bean Validation을 걸지 않는다.
+            //
+            // `@Valid`는 컨트롤러에서 서비스보다 먼저 돈다. 하한(`min = 3`)을 걸면 FR-SETTINGS-04가
+            // 보장하는 **빈 slug 자동 생성**이 HTTP 경계에서 400으로 막히고, 상한(`max = 30`)을 걸면
+            // 31자 이상이 도메인에 닿지 못해 `VALIDATION_001`이 된다 — slug 형식 오류는 `BLOG_003`이라는
+            // NFR-04·ADR-0004의 오류 계약을 어긴다.
+            //
             // 비어 있지 않은 값의 형식·길이·예약어는 `Blog.initialSetup`이 `SlugGenerator.isValid`로
-            // 검증해 BLOG_003을 던지므로, 여기서 하한을 겹쳐 걸 이유가 없다.
-            @Size(max = 30, message = "주소는 30자 이하여야 합니다.")
+            // 검증해 일관되게 BLOG_003을 던진다. 여기서 겹쳐 걸 이유가 없다.
             String urlSlug,
             String description) {}
 

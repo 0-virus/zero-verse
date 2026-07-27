@@ -110,12 +110,16 @@ export function SettingsProfilePage() {
   const blogLoadGeneration = useRef(0);
 
   /**
-   * 조회가 끝나기 전에는 저장할 수 없다.
+   * 조회가 끝나기 전에는 **입력도 저장도** 할 수 없다.
    *
    * <p>`PUT`은 부분 수정이 아니라 **전체 교체**다. 조회가 느린 동안 폼은 빈 상태로 그려지는데,
    * 그때 한 필드만 채워 저장하면 아직 화면에 오지 못한 `bio`·`birthDate`·`profileImageUrl`·
-   * `description`이 전부 비어 있는 채로 전송되어 서버의 기존 값이 지워진다. 화면에 보이지도
-   * 않은 값을 사용자가 지울 수는 없어야 하므로, 로드 완료 전에는 저장 자체를 막는다.
+   * `description`이 전부 비어 있는 채로 전송되어 서버의 기존 값이 지워진다.
+   *
+   * <p>저장 버튼만 잠그는 것으로는 부족하다 — 로드 전에 한 필드라도 건드리면 dirty가 서고,
+   * 그러면 도착한 응답이 "사용자가 편집 중"이라는 이유로 폼 반영을 건너뛴다. 편집하지 않은
+   * 나머지 필드는 빈 채로 남고 잠금만 풀려, 결국 같은 삭제가 일어난다. 그래서 카드 전체를
+   * `fieldset`으로 잠근다 — dirty가 설 수 없으니 응답은 항상 폼을 채운다.
    */
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [blogLoaded, setBlogLoaded] = useState(false);
@@ -310,7 +314,9 @@ export function SettingsProfilePage() {
       <h1 className="sr-only">프로필 설정</h1>
       {/* 프로필 카드 */}
       <Panel title="프로필" tone="primary">
+        {/* 조회 전에는 카드 전체를 잠근다 — dirty가 서면 응답이 폼을 못 채운다. 상단 주석 참조. */}
         <form onSubmit={handleProfileSubmit} className="space-y-4 px-5 py-6">
+          <fieldset disabled={!profileLoaded} className="contents">
           <div className="grid grid-cols-[110px_1fr] gap-4">
             {/* 좌: 아바타 슬롯 */}
             <div className="flex flex-col items-center gap-2">
@@ -403,12 +409,14 @@ export function SettingsProfilePage() {
           >
             {profileLoading ? '저장 중...' : '저장'}
           </Button>
+          </fieldset>
         </form>
       </Panel>
 
       {/* 블로그 설정 카드 (FR-SETTINGS-03) */}
       <Panel title="블로그" tone="primary">
         <form onSubmit={handleBlogSubmit} className="flex flex-col gap-[14px] px-5 py-6">
+          <fieldset disabled={!blogLoaded} className="contents">
           <FormField
             label="블로그 이름"
             type="text"
@@ -470,6 +478,7 @@ export function SettingsProfilePage() {
           >
             {blogLoading ? '저장 중...' : '저장'}
           </Button>
+          </fieldset>
         </form>
       </Panel>
 

@@ -274,6 +274,30 @@ class BlogSettingsControllerTest extends MySqlTestSupport {
                 .andExpect(jsonPath("$.data.urlSlug").value("nullslugger"));
     }
 
+    /**
+     * 상한도 도메인이 판정해야 한다. DTO에 `@Size(max = 30)`이 남아 있으면 31자가 도메인에 닿지
+     * 못해 `VALIDATION_001`이 되고, slug 형식 오류는 `BLOG_003`이라는 NFR-04·ADR-0004의 계약이
+     * 깨진다. 하한만 풀고 상한을 남겨 두면 이 경계에서만 오류코드가 갈린다.
+     */
+    @Test
+    @DisplayName("31자 slug는 VALIDATION_001이 아니라 BLOG_003으로 거부한다")
+    void initialSetupRejectsTooLongSlugWithBlog003() throws Exception {
+        User user = persistUser("longslug@test.com", "longslugger");
+        String token = jwtProvider.issueAccessToken(user, Instant.now()).token();
+
+        String body = objectMapper.writeValueAsString(
+                new com.zeroverse.domain.blog.dto.BlogSettingsDtos.InitialSetupRequest(
+                        "제목", "a".repeat(31), null));
+
+        mockMvc.perform(
+                        put("/api/v1/blogs/me/initial-setup")
+                                .header("Authorization", "Bearer " + token)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("BLOG_003"));
+    }
+
     /** 반면 비어 있지 않은 값의 형식 위반은 그대로 BLOG_003이어야 한다. 하한을 푼 대가가 아니다. */
     @Test
     @DisplayName("너무 짧은 slug는 BLOG_003으로 거부한다")

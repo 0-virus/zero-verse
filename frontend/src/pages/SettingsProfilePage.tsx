@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { FormField } from '../components/ui/FormField';
 import { Button } from '../components/ui/Button';
 import { Panel } from '../components/ui/Panel';
@@ -124,55 +124,63 @@ export function SettingsProfilePage() {
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [blogLoaded, setBlogLoaded] = useState(false);
 
-  // 초기 로드 — 프로필과 블로그는 서로 독립이라 한쪽 실패가 다른 쪽을 비우지 않는다.
   const userId = user?.id;
+
+  /**
+   * 카드별 조회. **재시도할 수 있어야 한다** — 실패했는데 다시 부를 방법이 없으면 잠긴 `fieldset`이
+   * 페이지를 다시 열 때까지 풀리지 않는다. 일시적인 네트워크 오류 한 번으로 설정을 못 하게 된다.
+   */
+  const loadProfile = useCallback(async () => {
+    const generation = ++profileLoadGeneration.current;
+    setProfileError(null);
+    try {
+      const profile = await getProfile();
+      if (profileLoadGeneration.current !== generation) return;
+      // 저장이 이미 끝난 뒤(dirty=false, 세대는 그대로)라면 폼은 최신이다. 값만 덮지 않고
+      // 로드 완료 표시는 올려 저장이 가능하게 한다.
+      if (!profileDirty.current) {
+        setProfileForm({
+          name: profile.name || '',
+          nickname: profile.nickname || '',
+          bio: profile.bio || '',
+          birthDate: profile.birthDate || '',
+          profileImageUrl: profile.profileImageUrl || '',
+        });
+      }
+      setProfileLoaded(true);
+    } catch {
+      if (profileLoadGeneration.current !== generation) return;
+      setProfileError('프로필을 불러올 수 없습니다.');
+    }
+  }, []);
+
+  const loadBlog = useCallback(async () => {
+    const generation = ++blogLoadGeneration.current;
+    setBlogError(null);
+    try {
+      const blog = await getBlog();
+      if (blogLoadGeneration.current !== generation) return;
+      if (!blogDirty.current) {
+        setBlogForm({
+          title: blog.title || '',
+          urlSlug: blog.urlSlug || '',
+          description: blog.description || '',
+        });
+      }
+      setBlogLoaded(true);
+    } catch {
+      if (blogLoadGeneration.current !== generation) return;
+      setBlogError('블로그 정보를 불러올 수 없습니다.');
+    }
+  }, []);
+
+  // 초기 로드 — 프로필과 블로그는 서로 독립이라 한쪽 실패가 다른 쪽을 비우지 않는다.
   useEffect(() => {
-    const profileGeneration = ++profileLoadGeneration.current;
-    const blogGeneration = ++blogLoadGeneration.current;
-
-    const loadProfile = async () => {
-      try {
-        const profile = await getProfile();
-        if (profileLoadGeneration.current !== profileGeneration) return;
-        // 저장이 이미 끝난 뒤(dirty=false, 세대는 그대로)라면 폼은 최신이다. 값만 덮지 않고
-        // 로드 완료 표시는 올려 저장이 가능하게 한다.
-        if (!profileDirty.current) {
-          setProfileForm({
-            name: profile.name || '',
-            nickname: profile.nickname || '',
-            bio: profile.bio || '',
-            birthDate: profile.birthDate || '',
-            profileImageUrl: profile.profileImageUrl || '',
-          });
-        }
-        setProfileLoaded(true);
-      } catch {
-        setProfileError('프로필을 불러올 수 없습니다.');
-      }
-    };
-
-    const loadBlog = async () => {
-      try {
-        const blog = await getBlog();
-        if (blogLoadGeneration.current !== blogGeneration) return;
-        if (!blogDirty.current) {
-          setBlogForm({
-            title: blog.title || '',
-            urlSlug: blog.urlSlug || '',
-            description: blog.description || '',
-          });
-        }
-        setBlogLoaded(true);
-      } catch {
-        setBlogError('블로그 정보를 불러올 수 없습니다.');
-      }
-    };
-
     if (userId != null) {
       loadProfile();
       loadBlog();
     }
-  }, [userId]);
+  }, [userId, loadProfile, loadBlog]);
 
   const handleProfileChange = (field: keyof ProfileForm, value: string) => {
     profileDirty.current = true;
@@ -410,6 +418,20 @@ export function SettingsProfilePage() {
             {profileLoading ? '저장 중...' : '저장'}
           </Button>
           </fieldset>
+
+          {/*
+            재시도는 잠긴 fieldset **바깥**에 둔다. 안에 두면 조회 실패로 잠긴 상태에서 버튼까지
+            비활성이라 사용자가 페이지를 다시 열기 전에는 빠져나올 방법이 없다.
+          */}
+          {!profileLoaded && profileError && (
+            <button
+              type="button"
+              onClick={() => loadProfile()}
+              className="border-2 border-ink bg-surface px-4 py-2 text-[13px] font-bold"
+            >
+              프로필 다시 불러오기
+            </button>
+          )}
         </form>
       </Panel>
 
@@ -479,6 +501,17 @@ export function SettingsProfilePage() {
             {blogLoading ? '저장 중...' : '저장'}
           </Button>
           </fieldset>
+
+          {/* 재시도는 잠긴 fieldset 바깥에 둔다 — 프로필 카드의 주석 참조. */}
+          {!blogLoaded && blogError && (
+            <button
+              type="button"
+              onClick={() => loadBlog()}
+              className="border-2 border-ink bg-surface px-4 py-2 text-[13px] font-bold"
+            >
+              블로그 정보 다시 불러오기
+            </button>
+          )}
         </form>
       </Panel>
 

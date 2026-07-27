@@ -3,7 +3,8 @@ package com.zeroverse.domain.user.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.zeroverse.common.exception.BusinessException;
-import com.zeroverse.common.exception.ErrorCode;
+import com.zeroverse.domain.blog.entity.Blog;
+import com.zeroverse.domain.blog.repository.BlogRepository;
 import com.zeroverse.domain.user.dto.UserSettingsDtos.ChangePasswordRequest;
 import com.zeroverse.domain.user.dto.UserSettingsDtos.UpdateProfileRequest;
 import com.zeroverse.domain.user.entity.User;
@@ -13,6 +14,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -24,6 +26,9 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 동시 프로필 업데이트 테스트(FR-SETTINGS-01).
@@ -47,6 +52,12 @@ class ConcurrentUpdateTest extends MySqlTestSupport {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private BlogRepository blogRepository;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     private User createUser(String email, String nickname) {
         User user = User.register(
@@ -166,7 +177,114 @@ class ConcurrentUpdateTest extends MySqlTestSupport {
                 .isTrue();
     }
 
+    /**
+     * 위 서비스 레벨 테스트는 두 작업을 서비스 <b>진입 전</b>에만 동시에 풀어 준다. 한쪽이 SELECT와
+     * 커밋을 모두 끝낸 뒤 다른 쪽이 읽으면 stale read가 생기지 않아 매핑이 잘못돼도 통과할 수 있다.
+     *
+     * <p>여기서는 **두 트랜잭션이 모두 행을 읽은 뒤에야** 쓰도록 barrier를 걸어 lost update 조건을
+     * 결정적으로 만든다. {@code @DynamicUpdate}가 없으면 나중 커밋이 상대 컬럼을 낡은 값으로 덮는다.
+     */
+    @Test
+    @DisplayName("두 트랜잭션이 같은 행을 읽은 뒤 각자 다른 컬럼을 써도 둘 다 남는다")
+    void staleReadThenWriteKeepsBothColumns() throws Exception {
+        User user = createUser("stale@test.com", "stalenick");
+        Long id = user.getId();
+        String originalHash = user.getPassword();
+        String newHash = passwordEncoder.encode("NewPassw0rd!");
+
+        TransactionTemplate tx = new TransactionTemplate(transactionManager);
+        tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+
+        CyclicBarrier bothRead = new CyclicBarrier(2);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+
+        Future<?> nameWriter = pool.submit(() -> tx.execute(status -> {
+            User loaded = userRepository.findByIdAndDeletedAtIsNull(id).orElseThrow();
+            awaitBarrier(bothRead); // 상대도 옛 행을 읽을 때까지 기다린다
+            loaded.updateProfile("바뀐이름", "stalenick", null, null, null);
+            userRepository.saveAndFlush(loaded);
+            return null;
+        }));
+
+        Future<?> passwordWriter = pool.submit(() -> tx.execute(status -> {
+            User loaded = userRepository.findByIdAndDeletedAtIsNull(id).orElseThrow();
+            awaitBarrier(bothRead);
+            loaded.changePassword(newHash);
+            userRepository.saveAndFlush(loaded);
+            return null;
+        }));
+
+        nameWriter.get(30, TimeUnit.SECONDS);
+        passwordWriter.get(30, TimeUnit.SECONDS);
+        pool.shutdownNow();
+
+        User reloaded = userRepository.findByIdAndDeletedAtIsNull(id).orElseThrow();
+        assertThat(reloaded.getName())
+                .as("이름 변경이 비밀번호 쓰기에 덮이면 안 된다")
+                .isEqualTo("바뀐이름");
+        assertThat(reloaded.getPassword())
+                .as("비밀번호 변경이 이름 쓰기에 덮이면 안 된다")
+                .isNotEqualTo(originalHash);
+    }
+
+    /**
+     * `Blog`도 같은 위험이 있다. `updateBlog`은 잠금 없이, `initialSetup`은 잠금으로 같은 행을 쓴다.
+     * 전체 컬럼 UPDATE라면 초기 설정과 겹친 수정이 {@code is_setup_completed}를 false로 되돌려
+     * 설정을 끝낸 사용자가 다시 `/blog/setup`으로 끌려간다.
+     */
+    @Test
+    @DisplayName("초기 설정과 겹친 블로그 수정이 완료 플래그를 되돌리지 않는다")
+    void staleBlogUpdateDoesNotRevertSetupFlag() throws Exception {
+        User user = createUser("blogstale@test.com", "blogstalenick");
+        Blog blog = blogRepository.saveAndFlush(
+                Blog.createDefault(user, "기본 제목", "blogstale-slug"));
+        Long blogId = blog.getId();
+
+        TransactionTemplate tx = new TransactionTemplate(transactionManager);
+        tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+
+        CyclicBarrier bothRead = new CyclicBarrier(2);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+
+        // 둘 다 is_setup_completed=false인 옛 행을 읽는다.
+        Future<?> setupWriter = pool.submit(() -> tx.execute(status -> {
+            Blog loaded = blogRepository.findByIdAndDeletedAtIsNull(blogId).orElseThrow();
+            awaitBarrier(bothRead);
+            loaded.initialSetup("설정한 제목", "blogstale-slug", null);
+            blogRepository.saveAndFlush(loaded);
+            return null;
+        }));
+
+        Future<?> descriptionWriter = pool.submit(() -> tx.execute(status -> {
+            Blog loaded = blogRepository.findByIdAndDeletedAtIsNull(blogId).orElseThrow();
+            awaitBarrier(bothRead);
+            loaded.updateInfo(loaded.getTitle(), loaded.getUrlSlug(), "나중에 쓴 소개");
+            blogRepository.saveAndFlush(loaded);
+            return null;
+        }));
+
+        setupWriter.get(30, TimeUnit.SECONDS);
+        descriptionWriter.get(30, TimeUnit.SECONDS);
+        pool.shutdownNow();
+
+        Blog reloaded = blogRepository.findByIdAndDeletedAtIsNull(blogId).orElseThrow();
+        assertThat(reloaded.getIsSetupCompleted())
+                .as("완료 플래그가 겹친 수정에 false로 되돌려지면 안 된다")
+                .isTrue();
+        assertThat(reloaded.getDescription())
+                .as("소개 변경도 남아야 한다")
+                .isEqualTo("나중에 쓴 소개");
+    }
+
     // --- helpers ---
+
+    private static void awaitBarrier(CyclicBarrier barrier) {
+        try {
+            barrier.await(10, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            throw new IllegalStateException("barrier 대기 실패", e);
+        }
+    }
 
     private record Result(boolean isSuccess, String errorCode) {}
 

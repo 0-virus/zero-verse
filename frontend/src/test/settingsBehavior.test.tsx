@@ -131,8 +131,16 @@ describe('/blog/setup — 초기 설정 행동', () => {
     );
   });
 
-  it('이미 완료된 설정이면 BLOG_004 안내를 보여주고 이동하지 않는다', async () => {
-    install([[/\/blogs\/me\/initial-setup/, () => failure(409, 'BLOG_004')]]);
+  /**
+   * BLOG_004는 오류가 아니라 **상태 불일치 신호**다. 서버는 커밋했는데 응답이 유실됐거나
+   * `refreshUser`만 실패하면 클라이언트는 미완료로 남고, 재시도하면 BLOG_004가 돌아온다.
+   * 그때 메시지만 띄우면 `SetupGuard`가 다른 화면을 계속 `/blog/setup`으로 되돌려 갇힌다.
+   */
+  it('이미 완료된 설정이면 BLOG_004에서 자기 블로그로 빠져나간다', async () => {
+    install([
+      [/\/blogs\/me\/initial-setup/, () => failure(409, 'BLOG_004')],
+      [/\/blogs\/me$/, () => envelope({ ...BLOG, urlSlug: 'already-done' })],
+    ]);
 
     render(
       <MemoryRouter initialEntries={['/blog/setup']}>
@@ -150,8 +158,33 @@ describe('/blog/setup — 초기 설정 행동', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /항해 시작하기/ }));
 
-    expect(await screen.findByText(/이미 초기 설정을 완료/)).toBeInTheDocument();
-    expect(screen.queryByText('도착: 블로그 페이지')).not.toBeInTheDocument();
+    expect(await screen.findByText('도착: 블로그 페이지')).toBeInTheDocument();
+  });
+
+  /** 복구 조회마저 실패하면 갇히지 않도록 안내라도 남겨야 한다. */
+  it('BLOG_004 복구 조회가 실패하면 새로고침 안내를 보여준다', async () => {
+    install([
+      [/\/blogs\/me\/initial-setup/, () => failure(409, 'BLOG_004')],
+      [/\/blogs\/me$/, () => failure(500, 'COMMON_500')],
+    ]);
+
+    render(
+      <MemoryRouter initialEntries={['/blog/setup']}>
+        <AuthProvider>
+          <HeroBlogProvider>
+            <Routes>
+              <Route path="/blog/setup" element={<BlogInitialSetupPage />} />
+              <Route path="/blog/:blogSlug" element={<div>도착: 블로그 페이지</div>} />
+            </Routes>
+          </HeroBlogProvider>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /항해 시작하기/ }));
+
+    expect(await screen.findByText(/새로고침/)).toBeInTheDocument();
   });
 
   it('중복된 주소면 BLOG_002 안내를 보여준다', async () => {
@@ -234,6 +267,39 @@ describe('/settings — 프로필·블로그·비밀번호 독립 상태', () =>
     await waitFor(() => expect(field).toHaveValue(expected));
     return field;
   }
+
+  /**
+   * 조회가 실패하면 `fieldset`이 잠긴 채로 남는다. 재시도 수단이 없으면 일시적인 5xx 한 번으로
+   * 페이지를 다시 열기 전까지 저장이 불가능해진다 — 잠금이 사용자를 가두면 안 된다.
+   */
+  it('블로그 조회가 실패해도 재시도하면 폼이 채워지고 잠금이 풀린다', async () => {
+    let attempt = 0;
+    install([
+      [/\/users\/me$/, () => envelope(USER)],
+      [
+        /\/blogs\/me$/,
+        (_u, init) => {
+          if (init?.method === 'PUT') return envelope(BLOG);
+          attempt += 1;
+          return attempt === 1 ? failure(500, 'COMMON_500') : envelope(BLOG);
+        },
+      ],
+    ]);
+
+    renderSettings();
+
+    const user = userEvent.setup();
+    expect(await screen.findByText('블로그 정보를 불러올 수 없습니다.')).toBeInTheDocument();
+
+    const titleInput = screen.getByLabelText(/블로그 이름/);
+    expect(titleInput).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: '블로그 정보 다시 불러오기' }));
+
+    await waitFor(() => expect(titleInput).toBeEnabled());
+    expect(titleInput).toHaveValue('테스터의 블로그');
+    expect(screen.getByLabelText(/블로그 소개/)).toHaveValue('기존 소개');
+  });
 
   it('블로그 설정을 불러와 입력에 채운다', async () => {
     install([[/\/users\/me$/, () => envelope(USER)], BLOG_GET]);

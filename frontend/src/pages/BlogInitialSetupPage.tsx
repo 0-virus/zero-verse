@@ -4,7 +4,7 @@ import { OnboardingScaffold } from './OnboardingScaffold';
 import { FormField } from '../components/ui/FormField';
 import { Button } from '../components/ui/Button';
 import { useAuth } from '../lib/authContext';
-import { initialSetup } from '../features/blog/blogApi';
+import { getBlog, initialSetup } from '../features/blog/blogApi';
 import { ApiRequestError } from '../lib/apiClient';
 
 /**
@@ -43,7 +43,20 @@ export function BlogInitialSetupPage() {
       if (err instanceof ApiRequestError) {
         // 서버 오류 메시지 표시
         if (err.code === 'BLOG_004') {
-          setError('이미 초기 설정을 완료했습니다.');
+          // 이미 완료된 설정이다 — 오류가 아니라 **상태 불일치 신호**로 다룬다.
+          //
+          // 서버는 커밋했는데 응답이 유실됐거나 refreshUser만 실패하면 클라이언트는 미완료로
+          // 남는다. 재시도하면 BLOG_004가 돌아오는데, 여기서 메시지만 띄우면 SetupGuard가 다른
+          // 보호 화면을 계속 `/blog/setup`으로 되돌려 사용자가 갇힌다(다른 탭에서 완료한 경우도 같다).
+          // 세션을 다시 읽어 완료 상태를 확인하고 자기 블로그로 내보낸다.
+          try {
+            await refreshUser();
+            const blog = await getBlog();
+            navigate(`/blog/${blog.urlSlug}`);
+            return;
+          } catch {
+            setError('이미 초기 설정을 완료했습니다. 페이지를 새로고침해 주세요.');
+          }
         } else if (err.code === 'BLOG_003') {
           setError('유효하지 않은 주소 형식입니다. 영문 소문자·숫자·하이픈, 3~30자를 입력하세요.');
         } else if (err.code === 'BLOG_002') {

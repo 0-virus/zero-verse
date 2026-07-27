@@ -479,7 +479,7 @@ describe('/settings — 프로필·블로그·비밀번호 독립 상태', () =>
    * 오지 못한 `description`·`bio` 등이 빈 값으로 전송돼 서버의 기존 값이 지워진다.
    * 화면에 보이지도 않은 값을 사용자가 지울 수는 없어야 하므로 **저장 자체가 막혀야 한다**.
    */
-  it('조회가 끝나기 전에는 저장할 수 없고, 끝나면 기존 값이 채워진다', async () => {
+  it('조회 전에는 입력·저장이 잠기고, 끝나면 미편집 필드도 서버 값으로 채워진다', async () => {
     let releaseGet: (() => void) | null = null;
     const getHeld = new Promise<void>((resolve) => {
       releaseGet = resolve;
@@ -489,7 +489,8 @@ describe('/settings — 프로필·블로그·비밀번호 독립 상태', () =>
       [/\/users\/me$/, () => envelope(USER)],
       [
         /\/blogs\/me$/,
-        async () => {
+        async (_u, init) => {
+          if (init?.method === 'PUT') return envelope(BLOG);
           await getHeld;
           return envelope({ ...BLOG, description: '서버에 있던 소개' });
         },
@@ -500,24 +501,38 @@ describe('/settings — 프로필·블로그·비밀번호 독립 상태', () =>
 
     const user = userEvent.setup();
     const titleInput = await screen.findByLabelText(/블로그 이름/);
-    await user.type(titleInput, '조회 전 입력');
-
-    // 조회가 오지 않은 동안에는 저장 버튼이 잠겨 있다.
     const blogForm = await formOf(/블로그 이름/);
     const saveButton = within(blogForm).getByRole('button', { name: '저장' });
+
+    // 조회가 오지 않은 동안에는 입력도 저장도 잠겨 있다. 입력이 열려 있으면 한 글자만 쳐도
+    // dirty가 서고, 그러면 도착한 응답이 폼을 채우지 못해 미편집 필드가 빈 채로 남는다.
+    expect(titleInput).toBeDisabled();
     expect(saveButton).toBeDisabled();
 
-    await user.click(saveButton);
-    expect(
-      fetchMock.mock.calls.filter(
-        (c) => String(c[0]).endsWith('/blogs/me') && (c[1] as RequestInit)?.method === 'PUT',
-      ),
-    ).toHaveLength(0);
+    await user.type(titleInput, '조회 전 입력');
+    expect(titleInput).toHaveValue('');
 
-    // 조회가 도착하면 잠금이 풀린다. 사용자가 이미 손댄 제목은 유지하고,
-    // 건드리지 않은 소개는 서버 값이 아니라 빈 값으로 남지 않아야 한다.
+    // 조회가 도착하면 잠금이 풀리고 폼이 서버 값으로 채워진다.
     releaseGet!();
     await waitFor(() => expect(saveButton).toBeEnabled());
+    expect(titleInput).toHaveValue('테스터의 블로그');
+    expect(screen.getByLabelText(/블로그 소개/)).toHaveValue('서버에 있던 소개');
+
+    // 제목만 고쳐 저장해도 건드리지 않은 소개가 그대로 실려야 한다.
+    await user.clear(titleInput);
+    await user.type(titleInput, '새 제목');
+    await user.click(saveButton);
+
+    await waitFor(() => {
+      const puts = fetchMock.mock.calls.filter(
+        (c) => String(c[0]).endsWith('/blogs/me') && (c[1] as RequestInit)?.method === 'PUT',
+      );
+      expect(puts).toHaveLength(1);
+      expect(JSON.parse(String((puts[0][1] as RequestInit).body))).toMatchObject({
+        title: '새 제목',
+        description: '서버에 있던 소개',
+      });
+    });
   });
 
   /**

@@ -475,33 +475,23 @@ describe('/settings — 프로필·블로그·비밀번호 독립 상태', () =>
   });
 
   /**
-   * dirty 플래그만으로는 부족한 경합. 초기 GET이 느릴 때 사용자가 값을 넣고 저장까지 마치면
-   * dirty가 풀리는데, 그 뒤 도착한 **저장 이전 상태를 읽은 GET**이 방금 저장한 값을 되돌린다.
-   * GET을 붙잡아 두고 편집 → 저장 성공 → 오래된 GET 해제 순서로 재현한다.
+   * `PUT`은 전체 교체다. 조회가 끝나기 전 폼은 비어 있으므로, 그 상태로 저장하면 아직 화면에
+   * 오지 못한 `description`·`bio` 등이 빈 값으로 전송돼 서버의 기존 값이 지워진다.
+   * 화면에 보이지도 않은 값을 사용자가 지울 수는 없어야 하므로 **저장 자체가 막혀야 한다**.
    */
-  it('저장에 성공한 뒤 도착한 오래된 초기 조회가 폼을 되돌리지 않는다', async () => {
+  it('조회가 끝나기 전에는 저장할 수 없고, 끝나면 기존 값이 채워진다', async () => {
     let releaseGet: (() => void) | null = null;
     const getHeld = new Promise<void>((resolve) => {
       releaseGet = resolve;
-    });
-    let markResolved: (() => void) | null = null;
-    const getResolved = new Promise<void>((resolve) => {
-      markResolved = resolve;
     });
 
     install([
       [/\/users\/me$/, () => envelope(USER)],
       [
         /\/blogs\/me$/,
-        async (_u, init) => {
-          if (init?.method === 'PUT') {
-            return envelope({ ...BLOG, title: '저장된 제목' });
-          }
-          // 초기 조회를 붙잡는다. 저장이 끝난 뒤에야 옛날 값을 들고 도착한다.
+        async () => {
           await getHeld;
-          const response = envelope({ ...BLOG, title: '저장 이전의 옛날 제목' });
-          markResolved!();
-          return response;
+          return envelope({ ...BLOG, description: '서버에 있던 소개' });
         },
       ],
     ]);
@@ -510,22 +500,24 @@ describe('/settings — 프로필·블로그·비밀번호 독립 상태', () =>
 
     const user = userEvent.setup();
     const titleInput = await screen.findByLabelText(/블로그 이름/);
-    await user.type(titleInput, '저장할 제목');
-    // 조회를 붙잡아 둔 상태라 폼이 비어 있다. required를 통과하도록 slug도 채운다.
-    await user.type(screen.getByRole('textbox', { name: '주소 (slug)' }), 'held-slug');
+    await user.type(titleInput, '조회 전 입력');
 
+    // 조회가 오지 않은 동안에는 저장 버튼이 잠겨 있다.
     const blogForm = await formOf(/블로그 이름/);
-    await user.click(within(blogForm).getByRole('button', { name: '저장' }));
-    expect(await screen.findByText('블로그 정보가 저장되었습니다.')).toBeInTheDocument();
+    const saveButton = within(blogForm).getByRole('button', { name: '저장' });
+    expect(saveButton).toBeDisabled();
 
-    // 이제서야 초기 조회가 도착한다.
+    await user.click(saveButton);
+    expect(
+      fetchMock.mock.calls.filter(
+        (c) => String(c[0]).endsWith('/blogs/me') && (c[1] as RequestInit)?.method === 'PUT',
+      ),
+    ).toHaveLength(0);
+
+    // 조회가 도착하면 잠금이 풀린다. 사용자가 이미 손댄 제목은 유지하고,
+    // 건드리지 않은 소개는 서버 값이 아니라 빈 값으로 남지 않아야 한다.
     releaseGet!();
-    // 호출 횟수로 세면 저장 시점에 이미 2회(GET+PUT)라 즉시 통과한다. 지연 GET 핸들러가
-    // 실제로 응답을 돌려준 시점을 직접 기다려야 경합 결과를 관찰할 수 있다.
-    await getResolved;
-    await waitFor(() => expect(titleInput).toHaveValue('저장된 제목'));
-
-    expect(titleInput).not.toHaveValue('저장 이전의 옛날 제목');
+    await waitFor(() => expect(saveButton).toBeEnabled());
   });
 
   /**

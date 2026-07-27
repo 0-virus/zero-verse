@@ -109,6 +109,17 @@ export function SettingsProfilePage() {
   const profileLoadGeneration = useRef(0);
   const blogLoadGeneration = useRef(0);
 
+  /**
+   * 조회가 끝나기 전에는 저장할 수 없다.
+   *
+   * <p>`PUT`은 부분 수정이 아니라 **전체 교체**다. 조회가 느린 동안 폼은 빈 상태로 그려지는데,
+   * 그때 한 필드만 채워 저장하면 아직 화면에 오지 못한 `bio`·`birthDate`·`profileImageUrl`·
+   * `description`이 전부 비어 있는 채로 전송되어 서버의 기존 값이 지워진다. 화면에 보이지도
+   * 않은 값을 사용자가 지울 수는 없어야 하므로, 로드 완료 전에는 저장 자체를 막는다.
+   */
+  const [profileLoaded, setProfileLoaded] = useState(false);
+  const [blogLoaded, setBlogLoaded] = useState(false);
+
   // 초기 로드 — 프로필과 블로그는 서로 독립이라 한쪽 실패가 다른 쪽을 비우지 않는다.
   const userId = user?.id;
   useEffect(() => {
@@ -118,14 +129,19 @@ export function SettingsProfilePage() {
     const loadProfile = async () => {
       try {
         const profile = await getProfile();
-        if (profileLoadGeneration.current !== profileGeneration || profileDirty.current) return;
-        setProfileForm({
-          name: profile.name || '',
-          nickname: profile.nickname || '',
-          bio: profile.bio || '',
-          birthDate: profile.birthDate || '',
-          profileImageUrl: profile.profileImageUrl || '',
-        });
+        if (profileLoadGeneration.current !== profileGeneration) return;
+        // 저장이 이미 끝난 뒤(dirty=false, 세대는 그대로)라면 폼은 최신이다. 값만 덮지 않고
+        // 로드 완료 표시는 올려 저장이 가능하게 한다.
+        if (!profileDirty.current) {
+          setProfileForm({
+            name: profile.name || '',
+            nickname: profile.nickname || '',
+            bio: profile.bio || '',
+            birthDate: profile.birthDate || '',
+            profileImageUrl: profile.profileImageUrl || '',
+          });
+        }
+        setProfileLoaded(true);
       } catch {
         setProfileError('프로필을 불러올 수 없습니다.');
       }
@@ -134,12 +150,15 @@ export function SettingsProfilePage() {
     const loadBlog = async () => {
       try {
         const blog = await getBlog();
-        if (blogLoadGeneration.current !== blogGeneration || blogDirty.current) return;
-        setBlogForm({
-          title: blog.title || '',
-          urlSlug: blog.urlSlug || '',
-          description: blog.description || '',
-        });
+        if (blogLoadGeneration.current !== blogGeneration) return;
+        if (!blogDirty.current) {
+          setBlogForm({
+            title: blog.title || '',
+            urlSlug: blog.urlSlug || '',
+            description: blog.description || '',
+          });
+        }
+        setBlogLoaded(true);
       } catch {
         setBlogError('블로그 정보를 불러올 수 없습니다.');
       }
@@ -379,7 +398,7 @@ export function SettingsProfilePage() {
             variant="primary"
             size="md"
             type="submit"
-            disabled={profileLoading}
+            disabled={profileLoading || !profileLoaded}
             className="w-full"
           >
             {profileLoading ? '저장 중...' : '저장'}
@@ -446,7 +465,7 @@ export function SettingsProfilePage() {
             variant="primary"
             size="md"
             type="submit"
-            disabled={blogLoading}
+            disabled={blogLoading || !blogLoaded}
             className="w-full"
           >
             {blogLoading ? '저장 중...' : '저장'}

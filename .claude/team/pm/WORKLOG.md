@@ -29,3 +29,19 @@
 - 추가 정합화: `docs/PM-M3-readiness.md` 출처의 `SecurityConfig`/`ErrorCode` 경로를 실제 `src/main/java/com/zeroverse/config/SecurityConfig.java`, `src/main/java/com/zeroverse/common/exception/ErrorCode.java`로 정정했다. 기존 M3 결정·권고 내용은 바꾸지 않았다.
 - 검증: `git branch --show-current`, `git status --short`, `git log --oneline -10`, `rg --files`/`rg -n`, 관련 정본·실제 파일 `Get-Content`를 실행해 근거를 재확인했다. 구현·테스트·git 조작은 하지 않았고 타 역할 변경을 보존했다.
 - 다음: M2 PR #8 머지와 M3 승인·정본 반영 후, 사용자 제공 S3 값 및 승인된 M3 계약을 readiness와 재대조한다.
+
+## 2026-09-06 — M2 merge 및 M3 사용자 결정 대기 상태 동기화
+
+- 한 일: 실제 GitHub PR #8 상태를 `gh pr view 8`로 확인했다. PR #8은 `MERGED`, merge SHA는 `4c129e20f58a6ccb9c61246d103934702516c295`, `mergedAt`은 `2026-09-05T20:41:12Z`이며 공유 checkout `dev` HEAD도 동일 merge commit이다.
+- 한 일: PM 소유 `docs/PM-M3-readiness.md`와 `docs/PM-M4-readiness.md`의 현재 스냅샷을 M2 완료 및 M3 `USER_DECISION_REQUIRED`로 정정했다. 이전 M2 `OPEN`/M3 `REVIEWING` 판단은 각 문서의 정정 기록과 기존 작업 기록으로 보존했다.
+- 한 일: M3 §4의 미승인 전달 항목인 generated `active_key`, 동일 ID 집합의 `last-write-wins`, M4 Post `category_id` 경로의 동일 `blog_id` lock 참여를 두 readiness 문서의 인계 목록에 연결했다. M4 `UNIVERSE` 권고는 M3 Q3 승인 결과와 M5 관계 구현에 종속된다는 점만 유지했다.
+- 산출물: `.claude/team/pm/STATE.md`, `docs/PM-M3-readiness.md`, `docs/PM-M4-readiness.md`의 상태·전달 목록 갱신.
+- 미해결: M3 Q1~Q4 및 위 동시성/lock 권고는 사용자 승인 전이며, M2 merge continuation worklog는 리더가 기록 중이다. PRD·REQUIREMENTS·governance 회의록·제품 코드·Git은 수정하지 않았다.
+- 검증: `git branch --show-current`, `git status --short`, `git log --oneline -6`, `gh pr view 8 --json ...`, M3 회의 §4 및 PM 문서 재독을 완료했다. 구현·테스트·git 조작은 하지 않았다.
+- 다음: M3 사용자 승인 및 정본/ADR 반영 전까지 M3/M4 구현을 시작하지 않고, 리더의 M2 merge continuation 기록을 확인한다.
+
+## 2026-09-06 — M2/M3 완료 기록 상태 정정
+
+- 정정: 리더의 M2 최종 `[머지]` 기록과 QA 확인이 완료된 실제 상태를 반영해 PM `STATE.md`, `PM-M3-readiness.md`, `PM-M4-readiness.md`의 `리더가 기록 중` 및 M2 continuation 미완료 표기를 완료로 갱신했다.
+- 정정: M3 Q1~Q4 독립 심의·worklog 기록은 완료로, 사용자 정책 승인은 미완료로 분리 표기했다. 회의 상태 `USER_DECISION_REQUIRED`, 정본 반영 전·제품 구현 보류는 유지한다.
+- 범위: PM 소유 상태·준비도·작업 기록만 갱신했으며 PRD·REQUIREMENTS·governance 회의록·제품 코드·Git은 수정하지 않았다.

@@ -54,3 +54,11 @@
 - 정정: stale guard 제거 mutation은 예정 상태가 아니라 부모가 05:26에 실제 완료했다. `build/m2-stale-mutation.mjs`의 Vitest/Vite 메모리 변환과 `build/m2-stale-mutation.log`에서 늦은 성공·늦은 실패 두 변형이 각각 expected failure(exit 1)로 드러났고, 원본 보호를 확인했다.
 - 보존 증거: 원본 `frontend/src/pages/BlogPage.tsx` SHA256가 mutation 전후 동일했으며, 검증 후 원본 전체 FE gate `npm test` 21 files/250 tests passed를 재확인했다. 해당 독립 검증 결과는 부모의 최종 기록을 따른다.
 - 동결: 이 정정은 역할 기록만 변경했다. 제품 코드, Git, `docs/worklog/M2-settings.md`는 변경하지 않았고 FE 소스 동결 상태를 유지한다.
+
+## 2026-09-06 05:42 KST — M2 머지 완료 및 M3 결정 대기
+
+- 상태: 부모가 PR #8을 `dev`에 fast-forward 머지했다(merge SHA `4c129e20f58a6ccb9c61246d103934702516c295`, GitHub mergedAt `2026-09-05T20:41:12Z` = 2026-09-06 05:41:12 KST). 공유 checkout도 `dev`로 동기화됐고 머지 전 검증 제품 tree와 동일함을 확인했다.
+- M2 판정: FE 21 files/250 tests, lint/build, Vite, 1440px·실제 API smoke, BE 348개, QA `APPROVE96` 기록을 인계받아 M2 FE 범위를 완료 처리한다.
+- M3 상태: `USER_DECISION_REQUIRED`. Q1~Q4 카테고리 계약에 대한 사용자 결정·승인 전에는 제품 변경이나 추가 테스트를 시작하지 않는다.
+- 동결: 이번 갱신은 [STATE.md](STATE.md)와 이 WORKLOG append만 수행했다. frontend 제품 코드, 추가 테스트, Git 조작, `docs/worklog/M2-settings.md` 수정은 없으며, 부모가 M2 merge 기록과 M3 계획을 문서화한다. 운영 HTTPS refresh-cookie `RISK-0005`는 배포 전 위험으로 유지한다.
+- 사실 정정: PR #8은 `gh pr merge --merge`로 merge commit `4c129e20f58a6ccb9c61246d103934702516c295`를 생성했으며, 이후 로컬 `dev`를 `origin/dev`에 fast-forward 동기화했다.

@@ -995,3 +995,13 @@ AGENTS.md와 `docs/governance/README.md`는 **`LOW`만 자동 승인**하고 나
 
 - `760e5e8`: M2 OpenAPI 보안·오류·200 DTO schema와 BE 회귀/역할 기록. `8b7daf3`: 설정/공개 블로그/실제 사용자 내비게이션 및 FE 회귀/역할 기록. 둘 다 Codex 실제 작성 참여를 기록했고 검증 후 코드 추가 변경은 없다.
 - PR #8의 최초 설명에는 과거 322/226 테스트, 포괄 위임 채택, 공개 owner 실명 검토 대기, 브라우저 미확인 문장이 남아 있었다. 최신 요약으로 대체해 2026-07-27 Q1=A/Q2=A/Q3=B 사용자 개별 승인, 현재 348/250, 공개 개인정보 비노출과 실제 브라우저 검증을 반영한다. 과거 실패/수정/심의 정정의 상세는 기존 worklog·커밋에서 보존하고 링크한다. 교정 대상은 PR의 오래된 현재 설명이며 과거 승인 결론을 변경하지 않는다.
+
+## [머지] — 최종 기록
+
+### 2026-09-06 05:41:12 KST · PR #8 dev 머지 완료
+
+- GitHub 확인: [PR #8](https://github.com/0-virus/zero-verse/pull/8) **MERGED**, base `dev`, head `13d8debbd8c6a9396291bdf72b248610d62a29a8`, merge commit `4c129e20f58a6ccb9c61246d103934702516c295`. 시각은 GitHub `mergedAt=2026-09-05T20:41:12Z` 기준이다.
+- 원격 feature의 기존 HEAD와 경쟁 변경 부재를 확인한 뒤 정상 push했다. PR의 head가 검증한 `13d8deb`, MERGEABLE/CLEAN임을 확인하고 `gh pr merge 8 --merge --match-head-commit 13d8debbd8c6a9396291bdf72b248610d62a29a8`로 머지했다. 보호 규칙 우회·force push·브랜치 삭제는 하지 않았다. PR 원격 CI checks는 등록된 항목이 없으므로 로컬·독립 실행 증거와 구분한다.
+- 로컬 dev를 origin/dev로 fast-forward했다. 검증한 HEAD가 origin/dev 조상이고 `src`/`frontend` 제품 tree가 검증본과 동일함을 확인했다. 테스트 이후 제품 변경 없이 문서 기록만 추가한다.
+- 최종 판정: **M2 완료**. BE348/FE250·빌드·독립 QA·실제 UI/API/OpenAPI·회귀 실효성 검증을 충족했다. RISK-0005/0007의 기존 배포 전 검토는 별도로 유지한다.
+- 연속 진행: `$brief`로 Git/역할/PRD/위험을 다시 대조하고 M3 계획·심의 인계를 이어간다. M3 Q1~Q4 사용자 결정 전 제품 구현은 보류한다. M4 준비 조사도 완료됐지만 M3 완료를 대체하지 않는다.

@@ -19,6 +19,13 @@ export function BlogPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // 이 effect가 낡았는지 표시한다.
+    //
+    // `/blog/A` → `/blog/B`로 옮기면 A 요청이 아직 떠 있다. cleanup은 히어로를 비울 뿐
+    // 이미 날아간 요청을 멈추지 못하므로, 늦게 도착한 A 성공이 B 화면을 A로 되돌리고
+    // 늦은 A 실패는 멀쩡한 B 화면을 404로 바꾼다. 낡은 응답은 아무것도 반영하지 않는다.
+    let cancelled = false;
+
     const loadBlog = async () => {
       if (!blogSlug) return;
 
@@ -27,21 +34,26 @@ export function BlogPage() {
 
       try {
         const data = await getPublicBlog(blogSlug);
+        if (cancelled) return;
         setBlog(data);
         setHeroBlog(data);
       } catch {
+        if (cancelled) return;
         setError('블로그를 찾을 수 없습니다.');
         setBlog(null);
         setHeroBlog(null);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
     };
 
     loadBlog();
 
-    // cleanup: 페이지 나갈 때 히어로 정보 초기화
+    // cleanup: 페이지 나갈 때 히어로 정보 초기화 + 진행 중 요청 무효화
     return () => {
+      cancelled = true;
       setHeroBlog(null);
     };
   }, [blogSlug, setHeroBlog]);

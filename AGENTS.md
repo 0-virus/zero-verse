@@ -1,14 +1,26 @@
-<!-- Generated: 2026-07-01 | Updated: 2026-07-24 -->
+<!-- Generated: 2026-07-01 | Updated: 2026-09-06 -->
 
 # zeroverse-server
 
+## 최우선: 에이전트 팀 헌법
+
+모든 Claude·Codex 에이전트는 작업 전에 다음을 순서대로 읽는다.
+
+1. `.claude/CONSTITUTION.md` — 사용자만 바꿀 수 있는 팀 헌법
+2. 이 파일과 루트 `CLAUDE.md` — 프로젝트 정본·공통 규칙
+3. 팀원이라면 `.claude/team/{역할}/CLAUDE.md` → `STATE.md`
+
+역할은 `backend`, `frontend`, `qa`, `pm` 네 가지다. Claude 정의는 `.claude/agents/`, Codex 정의는 `.codex/agents/`에 있지만, 역할 지침·현재 상태·이력은 `.claude/team/{역할}/`을 공동 정본으로 쓴다. 전체 판단 이력은 `.claude/team/JOURNAL.md`, 운영 방법은 `.claude/team/README.md`가 정본이다. 헌법과 하위 지침이 충돌하면 헌법이 우선한다.
+
+둘 이상의 역할 소유 영역에 걸친 팀 작업은 역할별 에이전트에 분할하고, 독립 작업만 병렬화한다. 한 파일을 둘 이상에게 동시에 맡기지 않는다. 주 에이전트는 모든 결과를 기다린 뒤 실제 파일과 검증 출력을 직접 확인한다. 세션 시작·재개·다음 작업 선정에는 `$brief`를 사용한다.
+
 ## Purpose
 
-ZeroVerse Blog MVP의 명세 저장소. 개인 블로그 플랫폼으로, 사용자는 자신의 블로그를 운영하고 "유니버스"라 부르는 단방향 신청-수락 관계로 서로의 글을 발견/공유한다. **현재 저장소에는 실제 소스 코드(Java/TypeScript)가 없다** — 백엔드(Spring Boot) + 프론트엔드(React) MVP는 아직 구현 전 단계이며, 요구사항·설계·계획 문서만 `docs/`에 존재한다.
+ZeroVerse Blog MVP 저장소. 개인 블로그 플랫폼으로, 사용자는 자신의 블로그를 운영하고 "유니버스"라 부르는 단방향 신청-수락 관계로 서로의 글을 발견/공유한다. Spring Boot 백엔드와 React 프론트엔드가 구현 중이며, 현재 위치는 Git·`docs/worklog/`·역할별 `STATE.md`를 직접 대조해 판정한다.
 
 ## Key Files & Docs
 
-핵심 명세는 모두 `docs/`에 있다(스펙 문서는 gitignore, `docs/worklog/`와 `docs/governance/`만 추적). 코드 작성 전 반드시 참조한다.
+핵심 명세는 모두 `docs/`에 있다. 스펙 원본은 gitignore 대상이고, 에이전트 지침·운영 가이드·`docs/worklog/`·`docs/governance/`는 추적한다. 코드 작성 전 반드시 참조한다.
 
 | Path | Description |
 |------|--------------|
@@ -16,6 +28,8 @@ ZeroVerse Blog MVP의 명세 저장소. 개인 블로그 플랫폼으로, 사용
 | `docs/PRD.md` | 요구사항 + 디자인 정본 + 사용자 결정을 통합한 **구현 실행 명세**(v2.0). 아키텍처/패키지 구조, 화면-API 매핑, 디자인 시스템 토큰(§6), 화면 명세(§7), 결정 로그(§9), 마일스톤 순서(§10), 테스트 전략, DoD. 실제 구현의 로드맵. |
 | `docs/design/` | **시각 디자인 정본**(2026-07-24 도입). Claude Design 프로젝트에서 가져온 `.dc.html` 원본 + `DESIGN-SYSTEM.md`(토큰·컴포넌트·13화면 스펙). `docs/design/AGENTS.md` 참고. |
 | `docs/governance/` | Codex 기획 심의팀 운영 규칙, 회의록 템플릿, ADR, 결정·위험 레지스터. **Git 추적 대상**. |
+| `.claude/CONSTITUTION.md` | Claude·Codex 공통 팀 헌법. 에이전트 편집 금지. |
+| `.claude/team/` | 네 역할의 지침·상태·append-only 작업 기록과 통합 저널. |
 | `docs/log.md` | 개발 학습/작업 로그(과거 JPA·Security·JWT 메모). 현재 소스와 동기화 보장 안 됨(참고용). |
 | `AGENTS.md` | (이 파일, 루트) 저장소 최상위 AI 에이전트 안내. git 추적 대상. |
 | `.gitignore` | 표준 Spring/Gradle/IDE ignore + `docs/*` 무시(단 `docs/worklog/`, `docs/governance/`는 추적) + `application-local.yml` 제외. |
@@ -28,11 +42,12 @@ ZeroVerse Blog MVP의 명세 저장소. 개인 블로그 플랫폼으로, 사용
 | `docs/design/` | 시각 디자인 정본(`.dc.html` 원본 + `DESIGN-SYSTEM.md`). 프론트엔드 작업 전 반드시 읽는다. `docs/design/AGENTS.md` 참고. |
 | `docs/worklog/` | 마일스톤별 개발 로그(`M{n}-<slug>.md`). **git 추적됨**(`!docs/worklog/`). "개발 프로세스" 섹션 참조. |
 | `docs/governance/` | 중요 결정과 대형 마일스톤을 심의하는 Codex 기획 심의팀의 정책·회의록·ADR·레지스터. **git 추적됨**. |
-| `.claude/` | Claude Code 프로젝트 설정(`CLAUDE.md`)과 oh-my-claudecode 스킬. AI 오케스트레이션용, 앱 코드 아님. |
-| `.agents/` | 비어있음. |
+| `.claude/` | 공통 팀 헌법, Claude 역할 정의·스킬, 역할별 상태·기록. 앱 코드 아님. |
+| `.codex/` | Codex custom agent 설정. 상태 파일은 두지 않고 `.claude/team/`을 공유. |
+| `.agents/` | Codex 저장소 스킬. `$brief` 포함. |
 | `.omc/` | oh-my-claudecode 런타임 상태. 무시 대상 운영 아티팩트. |
 
-## Planned Architecture (구현 예정, 미착수)
+## Architecture
 
 확정 스택(REQUIREMENTS §2 / PRD §2):
 
@@ -54,6 +69,8 @@ ZeroVerse Blog MVP의 명세 저장소. 개인 블로그 플랫폼으로, 사용
 - 에러코드 도메인 prefix(AUTH_/USER_/BLOG_/POST_/CAT_/UNI_/COM_/LIKE_/NOT_/ADMIN_/UPLOAD_) — REQUIREMENTS NFR-04.
 
 ## 개발 프로세스 (마일스톤 파이프라인)
+
+이 파이프라인은 프로젝트 고유 릴리스 절차이고, 역할 팀은 각 단계의 실행 단위다. 파일 소유권·상태 기록·완료 증거는 `.claude/CONSTITUTION.md`와 `.claude/team/README.md`를 함께 적용한다. 기존 `docs/worklog/`·`docs/governance/` 기록은 그대로 유지하며 역할별 기록으로 대체하지 않는다.
 
 모든 구현은 `docs/PRD.md`의 마일스톤(M0~M10) 단위로 진행하며, Codex(계획·리뷰) ↔ Claude(개발)를 오가는 아래 사이클을 마일스톤마다 반복한다.
 
@@ -106,7 +123,7 @@ ZeroVerse Blog MVP의 명세 저장소. 개인 블로그 플랫폼으로, 사용
 ### Working In This Directory
 
 - 어떤 기능이든 코드 작성 전에 **`docs/REQUIREMENTS.md`의 FR/NFR 번호와 `docs/PRD.md`의 대응 섹션(§5 백엔드 / §7 화면)** 을 먼저 확인한다. 프론트엔드라면 **`docs/design/DESIGN-SYSTEM.md`를 함께** 읽는다. 스펙을 임의로 바꾸지 않는다.
-- 실제 Spring Boot 프로젝트(`build.gradle`, `src/main/java/com/zeroverse/...`)와 React 프로젝트(`frontend/`)는 아직 스캐폴딩 전이다. 구현 순서는 **PRD §10 마일스톤(M0 스캐폴딩 → M1 인증 → … → M10 마감)** 을 따르며 M0→M1이 모든 것의 선행이다.
+- Spring Boot 프로젝트와 React 프로젝트는 구현 중이다. 현재 완료·진행 상태는 커밋 제목으로 추정하지 말고 Git, `docs/worklog/**`, 역할별 `STATE.md`를 대조한다. 구현 순서는 **PRD §10 마일스톤(M0 스캐폴딩 → M1 인증 → … → M10 마감)** 을 따른다.
 - 백엔드 패키지는 PRD §2.2(base `com.zeroverse`, 도메인 패키지 + 레이어드), 프론트는 §2.3. DB 컬럼 snake_case / Java 필드 camelCase(NFR-06), JPA 필드는 래퍼 타입.
 - **카테고리 타입은 `DEFAULT/GENERAL/LOCKED`** (SERIES 제거, §9-H). 미분류=DEFAULT(변경·삭제 불가), LOCKED=잠금(변경·삭제 불가). **공개범위 enum은 `UNIVERSE`이나 화면 표기는 "친구"**(§9-B).
 - **프론트엔드는 PRD §6 = `docs/design/DESIGN-SYSTEM.md` 토큰을 반드시 적용**(레트로 픽셀 × 크림 페이퍼 × 황혼의 우주):
@@ -128,7 +145,7 @@ ZeroVerse Blog MVP의 명세 저장소. 개인 블로그 플랫폼으로, 사용
 
 ### Common Patterns
 
-아직 코드가 없어 확정 패턴 없음. `docs/log.md`의 과거 메모(`@EntityListeners(AuditingEntityListener.class)`, `OncePerRequestFilter` JWT 필터, DTO record `@Valid`)는 참고용이며 현재 소스와 대조 없이 그대로 신뢰하지 말 것.
+현재 패턴은 실제 `src/**`와 `frontend/src/**`에서 확인한다. `docs/log.md`의 과거 메모(`@EntityListeners(AuditingEntityListener.class)`, `OncePerRequestFilter` JWT 필터, DTO record `@Valid`)는 참고용이며 현재 소스와 대조 없이 그대로 신뢰하지 말 것.
 
 ## Dependencies
 

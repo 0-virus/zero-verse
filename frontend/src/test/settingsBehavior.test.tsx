@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { BlogInitialSetupPage } from '../pages/BlogInitialSetupPage';
 import { SettingsProfilePage } from '../pages/SettingsProfilePage';
 import { BlogPage } from '../pages/BlogPage';
+import { AppShell } from '../components/layout/AppShell';
 import { AuthProvider } from '../lib/authContext';
 import { HeroBlogProvider, useHeroBlog } from '../lib/heroBlogContext';
 import { resetApiClient } from '../lib/apiClient';
@@ -770,6 +771,140 @@ describe('/blog/:slug — 공개 블로그 히어로 연동', () => {
       </MemoryRouter>,
     );
   }
+
+  /**
+   * `/blog/A` → `/blog/B`로 옮기면 A 요청이 아직 떠 있다. 늦게 도착한 A 응답이 B 화면을 A로
+   * 되돌리거나(성공) 멀쩡한 B를 404로 바꾸면(실패) 사용자는 자기가 연 페이지를 잃는다.
+   */
+  it('이전 slug의 늦은 응답이 현재 화면을 덮어쓰지 않는다', async () => {
+    let releaseA: (() => void) | null = null;
+    const aHeld = new Promise<void>((resolve) => {
+      releaseA = resolve;
+    });
+    let aResolved: (() => void) | null = null;
+    const aDone = new Promise<void>((resolve) => {
+      aResolved = resolve;
+    });
+
+    install([
+      [
+        /\/blogs\/slug\/a$/,
+        async () => {
+          await aHeld;
+          const res = envelope({ ...BLOG, title: '이전 블로그 A', urlSlug: 'a' });
+          aResolved!();
+          return res;
+        },
+      ],
+      [/\/blogs\/slug\/b$/, () => envelope({ ...BLOG, title: '현재 블로그 B', urlSlug: 'b' })],
+    ]);
+
+    // 같은 라우터 안에서 실제로 이동해야 A의 effect cleanup이 도는 전환이 재현된다.
+    function GoToB() {
+      const navigate = useNavigate();
+      return (
+        <button type="button" onClick={() => navigate('/blog/b')}>
+          B로 이동
+        </button>
+      );
+    }
+
+    render(
+      <MemoryRouter initialEntries={['/blog/a']}>
+        <HeroBlogProvider>
+          <HeroProbe />
+          <GoToB />
+          <Routes>
+            <Route path="/blog/:blogSlug" element={<BlogPage />} />
+          </Routes>
+        </HeroBlogProvider>
+      </MemoryRouter>,
+    );
+
+    // A가 아직 응답하지 않은 상태에서 B로 이동한다.
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'B로 이동' }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('hero')).toHaveTextContent('현재 블로그 B'),
+    );
+
+    // 이제서야 A가 도착한다. 화면은 B 그대로여야 한다.
+    releaseA!();
+    await aDone;
+
+    await waitFor(() =>
+      expect(screen.getByTestId('hero')).toHaveTextContent('현재 블로그 B'),
+    );
+    expect(screen.getByTestId('hero')).not.toHaveTextContent('이전 블로그 A');
+  });
+
+  /**
+   * REQUIREMENTS의 "블로그 헤더: 소유자 프로필". 소유자가 달라도 늘 같은 이모지가 나오면
+   * 응답의 owner를 화면이 전혀 쓰지 않는다는 뜻이다 — 값을 넣기만 하고 렌더를 확인하지 않으면
+   * 이 결함을 통과시킨다.
+   */
+  it('공개 블로그 히어로가 소유자 프로필 이미지를 렌더한다', async () => {
+    install([
+      [
+        /\/blogs\/slug\/owned$/,
+        () =>
+          envelope({
+            ...BLOG,
+            urlSlug: 'owned',
+            owner: {
+              id: 2,
+              nickname: '별지기',
+              profileImageUrl: 'https://cdn.test/avatar.png',
+              bio: null,
+            },
+          }),
+      ],
+    ]);
+
+    render(
+      <MemoryRouter initialEntries={['/blog/owned']}>
+        <HeroBlogProvider>
+          <AppShell>
+            <Routes>
+              <Route path="/blog/:blogSlug" element={<BlogPage />} />
+            </Routes>
+          </AppShell>
+        </HeroBlogProvider>
+      </MemoryRouter>,
+    );
+
+    const avatar = await screen.findByAltText('별지기의 프로필 이미지');
+    expect(avatar).toHaveAttribute('src', 'https://cdn.test/avatar.png');
+  });
+
+  it('프로필 이미지가 없으면 이모지로 떨어진다', async () => {
+    install([
+      [
+        /\/blogs\/slug\/noimage$/,
+        () =>
+          envelope({
+            ...BLOG,
+            urlSlug: 'noimage',
+            owner: { id: 3, nickname: '이미지없음', profileImageUrl: null, bio: null },
+          }),
+      ],
+    ]);
+
+    render(
+      <MemoryRouter initialEntries={['/blog/noimage']}>
+        <HeroBlogProvider>
+          <AppShell>
+            <Routes>
+              <Route path="/blog/:blogSlug" element={<BlogPage />} />
+            </Routes>
+          </AppShell>
+        </HeroBlogProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByLabelText('이미지없음의 블로그 아바타')).toBeInTheDocument();
+  });
 
   it('조회한 블로그의 제목·소개가 히어로에 반영된다', async () => {
     install([

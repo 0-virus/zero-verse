@@ -101,7 +101,7 @@ class BlogSettingsControllerTest extends MySqlTestSupport {
     }
 
     @Test
-    @DisplayName("slug는 필수다")
+    @DisplayName("slug는 필수다 — 빈 값은 BLOG_003")
     void slugIsRequired() throws Exception {
         User user = persistUser("slugreq@test.com", "slugreq");
         String token = jwtProvider.issueAccessToken(user, Instant.now()).token();
@@ -116,19 +116,44 @@ class BlogSettingsControllerTest extends MySqlTestSupport {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(body))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.code").value("VALIDATION_001"))
-                .andExpect(jsonPath("$.error.details[?(@.field=='urlSlug')]").exists());
+                .andExpect(jsonPath("$.error.code").value("BLOG_003"));
+    }
+
+    /**
+     * slug 형식 오류는 길이·경계와 무관하게 <b>모두 BLOG_003</b>이어야 한다(NFR-04·ADR-0004).
+     * DTO에 Bean Validation을 남겨 두면 `@Valid`가 서비스보다 먼저 돌아 이 경계에서만
+     * `VALIDATION_001`이 나가고 계약이 갈린다 — 초기 설정과 일반 수정 양쪽에서 같은 규칙이다.
+     */
+    @Test
+    @DisplayName("slug 길이 위반은 2자·31자 모두 BLOG_003")
+    void slugLengthViolationsUseBlog003() throws Exception {
+        User user = persistUser("sluglen@test.com", "sluglen");
+        String token = jwtProvider.issueAccessToken(user, Instant.now()).token();
+
+        for (String invalid : new String[] {"ab", "a".repeat(31)}) {
+            String body = objectMapper.writeValueAsString(
+                    new com.zeroverse.domain.blog.dto.BlogSettingsDtos.UpdateBlogRequest(
+                            "제목", invalid, null));
+
+            mockMvc.perform(
+                            put("/api/v1/blogs/me")
+                                    .header("Authorization", "Bearer " + token)
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error.code").value("BLOG_003"));
+        }
     }
 
     @Test
-    @DisplayName("slug 길이 3~30자 검증 (2자 거부)")
-    void slugMinLength() throws Exception {
-        User user = persistUser("slugmin@test.com", "slugmin");
+    @DisplayName("null slug도 BLOG_003으로 거부한다")
+    void slugNullUsesBlog003() throws Exception {
+        User user = persistUser("slugnull@test.com", "slugnull");
         String token = jwtProvider.issueAccessToken(user, Instant.now()).token();
 
         String body = objectMapper.writeValueAsString(
                 new com.zeroverse.domain.blog.dto.BlogSettingsDtos.UpdateBlogRequest(
-                        "제목", "ab", null));
+                        "제목", null, null));
 
         mockMvc.perform(
                         put("/api/v1/blogs/me")
@@ -136,8 +161,7 @@ class BlogSettingsControllerTest extends MySqlTestSupport {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(body))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.code").value("VALIDATION_001"))
-                .andExpect(jsonPath("$.error.details[?(@.field=='urlSlug')]").exists());
+                .andExpect(jsonPath("$.error.code").value("BLOG_003"));
     }
 
     @Test

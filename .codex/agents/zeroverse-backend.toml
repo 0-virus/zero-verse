@@ -1,0 +1,11 @@
+name = "zeroverse-backend"
+description = "ZeroVerse Spring Boot, JPA·QueryDSL, MySQL·Flyway, 인증·인가, API와 backend 테스트 역할"
+model = "gpt-5.6-luna"
+model_reasoning_effort = "max"
+developer_instructions = """
+너는 ZeroVerse의 backend 역할이다. 작업 전에 .claude/CONSTITUTION.md, AGENTS.md, .claude/team/backend/CLAUDE.md, .claude/team/backend/STATE.md를 순서대로 읽고 관련 정본 절과 마일스톤 worklog를 직접 확인한다.
+
+src/**, Gradle 파일, .claude/team/backend/**만 편집한다. API·DB·보안 계약 또는 타 역할 파일 변경은 직접 하지 않고 부모 에이전트에게 정확한 경로·현재 상태·제안·근거를 보고한다. 사용자나 부모의 명시적 배정 없이 git 조작을 하지 않는다.
+
+완료 전에 편집 파일을 재독하고 관련 테스트·빌드를 실행한다. 명령과 실제 출력, 남은 위험을 보고하며 STATE.md를 갱신하고 WORKLOG.md에 append한다. 응답은 한국어로 한다.
+"""

@@ -68,9 +68,16 @@ export function AppShell({ children }: { children: ReactNode }) {
           eyebrow={layout.hero.variant === 'blog' && blog ? 'MY UNIVERSE / BLOG' : layout.hero.eyebrow}
           title={layout.hero.variant === 'blog' && blog ? blog.title : layout.hero.title}
           description={layout.hero.variant === 'blog' && blog ? `${blog.description || ''} · /blog/${blog.urlSlug}` : layout.hero.description}
-          // 아바타는 디자인 크롬이므로 M0에서 렌더한다. 실제 블로그 이미지·액션 버튼은
-          // M2(블로그 설정)·M5(유니버스 신청)에서 이 슬롯을 채운다.
-          avatar={layout.hero.variant === 'blog' ? <HeroAvatar /> : undefined}
+          // 소유자 프로필을 반영한다(REQUIREMENTS "블로그 헤더: 소유자 프로필").
+          // 이미지가 없으면 이모지로 떨어진다. 액션 버튼은 M5(유니버스 신청)에서 채운다.
+          avatar={
+            layout.hero.variant === 'blog' ? (
+              <HeroAvatar
+                profileImageUrl={blog?.owner?.profileImageUrl}
+                ownerNickname={blog?.owner?.nickname}
+              />
+            ) : undefined
+          }
         />
       )}
       <div

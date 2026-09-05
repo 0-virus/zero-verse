@@ -136,13 +136,41 @@ export function Hero({
 }
 
 /** 블로그 히어로의 76px 아바타 슬롯(정본: 흰 배경 + 3px 잉크 보더 + 다크 그림자). */
-export function HeroAvatar({ emoji = '🪐' }: { emoji?: string }) {
+/**
+ * 블로그 히어로의 76px 아바타(정본 §8.2).
+ *
+ * <p>소유자 프로필 이미지가 있으면 그것을 쓰고, 없으면 이모지로 떨어진다. 소유자가 달라도 늘
+ * 같은 이모지가 나오면 REQUIREMENTS의 "블로그 헤더: 소유자 프로필"을 만족하지 못한다.
+ */
+export function HeroAvatar({
+  emoji = '🪐',
+  profileImageUrl,
+  ownerNickname,
+}: {
+  emoji?: string;
+  profileImageUrl?: string | null;
+  ownerNickname?: string | null;
+}) {
+  const size = { width: 76, height: 76, boxShadow: '5px 5px 0 rgba(43,27,61,.5)' };
+  const frame = 'grid shrink-0 place-items-center border-[3px] border-ink bg-surface';
+
+  if (profileImageUrl) {
+    return (
+      <img
+        src={profileImageUrl}
+        alt={ownerNickname ? `${ownerNickname}의 프로필 이미지` : '블로그 아바타'}
+        style={{ ...size, objectFit: 'cover' }}
+        className={frame}
+      />
+    );
+  }
+
   return (
     <span
       role="img"
-      aria-label="블로그 아바타"
-      style={{ width: 76, height: 76, boxShadow: '5px 5px 0 rgba(43,27,61,.5)', fontSize: 34 }}
-      className="grid shrink-0 place-items-center border-[3px] border-ink bg-surface"
+      aria-label={ownerNickname ? `${ownerNickname}의 블로그 아바타` : '블로그 아바타'}
+      style={{ ...size, fontSize: 34 }}
+      className={frame}
     >
       {emoji}
     </span>

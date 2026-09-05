@@ -15,6 +15,7 @@ import com.zeroverse.domain.auth.support.RefreshTokenCookieFactory;
 import com.zeroverse.domain.user.entity.User;
 import com.zeroverse.security.ZeroverseUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -67,6 +68,7 @@ public class AuthController {
      * "계정은 생성됨"으로 안내하고 재가입을 시도하지 않게 한다(ADR-0003 §4).
      */
     @PostMapping("/register")
+    @SecurityRequirements
     @Operation(summary = "회원가입", description = "기본 블로그와 미분류 카테고리를 함께 생성한다.")
     public ResponseEntity<ApiResponse<Void>> register(@Valid @RequestBody RegisterRequest request) {
         authService.register(request);
@@ -75,6 +77,7 @@ public class AuthController {
 
     /** 로그인(FR-AUTH-02). Access는 본문, Refresh는 HttpOnly 쿠키로 나간다. */
     @PostMapping("/signin")
+    @SecurityRequirements
     @Operation(summary = "로그인")
     public ResponseEntity<ApiResponse<AuthTokenResponse>> signin(
             @Valid @RequestBody SigninRequest request) {
@@ -86,6 +89,7 @@ public class AuthController {
 
     /** 토큰 갱신(FR-AUTH-04). rotation으로 이전 Refresh는 폐기된다. */
     @PostMapping("/refresh")
+    @SecurityRequirements
     @Operation(summary = "토큰 갱신", description = "Refresh Token rotation. 쿠키로 전달한다.")
     public ResponseEntity<ApiResponse<AuthTokenResponse>> refresh(
             @CookieValue(name = "${zeroverse.auth.cookie.name:refresh_token}", required = false)
@@ -99,6 +103,7 @@ public class AuthController {
 
     /** 로그아웃(FR-AUTH-03). 쿠키가 없어도 성공이며 항상 쿠키를 지운다. */
     @PostMapping("/signout")
+    @SecurityRequirements
     @Operation(summary = "로그아웃")
     public ResponseEntity<ApiResponse<Void>> signout(
             @CookieValue(name = "${zeroverse.auth.cookie.name:refresh_token}", required = false)

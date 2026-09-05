@@ -328,10 +328,34 @@ export function SettingsProfilePage() {
           <div className="grid grid-cols-[110px_1fr] gap-4">
             {/* 좌: 아바타 슬롯 */}
             <div className="flex flex-col items-center gap-2">
-              <div className="flex h-24 w-24 items-center justify-center border-[3px] border-ink bg-surface">
-                <span className="text-3xl">🪐</span>
+              <div className="flex h-[90px] w-[90px] items-center justify-center border-[3px] border-ink bg-surface-raise">
+                {profileForm.profileImageUrl ? (
+                  <img
+                    src={profileForm.profileImageUrl}
+                    alt={
+                      profileForm.nickname
+                        ? `${profileForm.nickname}의 프로필 이미지`
+                        : '프로필 이미지'
+                    }
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span role="img" aria-label="프로필 아바타" className="text-[42px]">
+                    🪐
+                  </span>
+                )}
               </div>
-              <button type="button" className="text-xs text-text-muted hover:text-ink">
+              <button
+                type="button"
+                className="border-2 border-ink bg-surface px-2.5 py-1 text-[11px] font-semibold text-ink hover:bg-surface-raise"
+                onClick={() => {
+                  const imageInput = document.getElementById('profile-image-url');
+                  if (imageInput instanceof HTMLElement) {
+                    imageInput.focus();
+                    imageInput.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+                  }
+                }}
+              >
                 변경
               </button>
             </div>
@@ -386,6 +410,7 @@ export function SettingsProfilePage() {
               />
               <FormField
                 label="프로필 이미지"
+                id="profile-image-url"
                 type="url"
                 value={profileForm.profileImageUrl}
                 onChange={(e) => handleProfileChange('profileImageUrl', e.target.value)}
@@ -393,6 +418,15 @@ export function SettingsProfilePage() {
                 orientation="inline"
                 surface="warm"
               />
+              <Button
+                variant="primary"
+                size="md"
+                type="submit"
+                disabled={profileLoading || !profileLoaded}
+                className="self-start px-[22px]"
+              >
+                {profileLoading ? '저장 중...' : '저장'}
+              </Button>
             </div>
           </div>
 
@@ -408,15 +442,6 @@ export function SettingsProfilePage() {
             </div>
           )}
 
-          <Button
-            variant="primary"
-            size="md"
-            type="submit"
-            disabled={profileLoading || !profileLoaded}
-            className="w-full"
-          >
-            {profileLoading ? '저장 중...' : '저장'}
-          </Button>
           </fieldset>
 
           {/*

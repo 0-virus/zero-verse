@@ -5,10 +5,10 @@ import { SideNav } from '../components/layout/SideNav';
 
 /** 디자인 정본 구조 검증 — `ZeroVerse Main Feed v2.dc.html` LEFT NAV, PRD §6.7. */
 describe('SideNav', () => {
-  const setup = (path = '/') =>
+  const setup = (path = '/', blogSlug?: string) =>
     render(
       <MemoryRouter initialEntries={[path]}>
-        <SideNav />
+        <SideNav blogSlug={blogSlug} />
       </MemoryRouter>,
     );
 
@@ -30,11 +30,18 @@ describe('SideNav', () => {
 
     expect(actual).toEqual([
       { label: 'Home', href: '/' },
-      { label: 'My Blog', href: '/blog/me' },
+      { label: 'My Blog', href: '/signin' },
       { label: 'Search', href: '/search' },
       { label: 'Universe', href: '/settings/universe' },
       { label: 'Settings', href: '/settings' },
     ]);
+  });
+
+  it('로그인 사용자의 기본 블로그 slug로 My Blog 링크를 만든다', () => {
+    setup('/', 'my-renamed-blog');
+
+    const myBlog = within(nav()).getByRole('link', { name: /My Blog/ });
+    expect(myBlog).toHaveAttribute('href', '/blog/my-renamed-blog');
   });
 
   it.each([

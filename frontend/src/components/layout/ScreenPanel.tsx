@@ -14,9 +14,9 @@ import { Panel } from '../ui/Panel';
 export type ScreenPanelKind = 'settings' | 'blog';
 
 const SETTINGS_NAV = [
-  { to: '/settings', label: '프로필' },
+  { to: '/settings', label: '프로필 · 계정' },
   { to: '/settings/universe', label: '유니버스' },
-  { to: '/settings/posts', label: '글·카테고리' },
+  { to: '/settings/posts', label: '카테고리 관리' },
 ];
 
 export function ScreenPanel({ kind }: { kind: ScreenPanelKind }) {

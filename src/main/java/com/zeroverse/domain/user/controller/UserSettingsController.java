@@ -6,6 +6,9 @@ import com.zeroverse.domain.user.dto.UserSettingsDtos.UserProfileResponse;
 import com.zeroverse.domain.user.service.UserSettingsService;
 import com.zeroverse.security.ZeroverseUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -39,7 +42,23 @@ public class UserSettingsController {
     @Operation(
             summary = "프로필 조회",
             description = "현재 로그인한 사용자의 프로필 정보를 조회한다.",
-            security = @SecurityRequirement(name = "bearer"))
+            security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200", description = "성공", useReturnTypeSchema = true),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "401",
+                description = "AUTH_002 — 토큰이 만료되었습니다.; AUTH_004 — 인증이 필요합니다.",
+                content = @Content(
+                        mediaType = "application/json",
+                        schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404",
+                description = "USER_001 — 사용자를 찾을 수 없습니다.",
+                content = @Content(
+                        mediaType = "application/json",
+                        schema = @Schema(implementation = ApiResponse.class)))
+    })
     public ResponseEntity<ApiResponse<UserProfileResponse>> getMe(
             @AuthenticationPrincipal ZeroverseUserPrincipal principal) {
         UserProfileResponse response = userSettingsService.getProfile(principal.userId());
@@ -60,7 +79,35 @@ public class UserSettingsController {
     @Operation(
             summary = "프로필 수정",
             description = "현재 사용자의 프로필을 수정한다. nickname 변경 시 블로그 slug는 유지된다.",
-            security = @SecurityRequirement(name = "bearer"))
+            security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200", description = "성공", useReturnTypeSchema = true),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "400",
+                description = "VALIDATION_001 — 요청 값 검증 실패.",
+                content = @Content(
+                        mediaType = "application/json",
+                        schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "401",
+                description = "AUTH_002 — 토큰이 만료되었습니다.; AUTH_004 — 인증이 필요합니다.",
+                content = @Content(
+                        mediaType = "application/json",
+                        schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404",
+                description = "USER_001 — 사용자를 찾을 수 없습니다.",
+                content = @Content(
+                        mediaType = "application/json",
+                        schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "409",
+                description = "USER_002 — 이미 사용 중인 닉네임입니다.",
+                content = @Content(
+                        mediaType = "application/json",
+                        schema = @Schema(implementation = ApiResponse.class)))
+    })
     public ResponseEntity<ApiResponse<UserProfileResponse>> updateMe(
             @AuthenticationPrincipal ZeroverseUserPrincipal principal,
             @Valid @RequestBody com.zeroverse.domain.user.dto.UserSettingsDtos.UpdateProfileRequest
@@ -83,7 +130,29 @@ public class UserSettingsController {
     @Operation(
             summary = "비밀번호 변경",
             description = "현재 비밀번호를 확인하고 새 비밀번호로 변경한다.",
-            security = @SecurityRequirement(name = "bearer"))
+            security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200", description = "성공", useReturnTypeSchema = true),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "400",
+                description = "VALIDATION_001 — 요청 값 검증 실패; USER_005 — 현재 비밀번호 불일치.",
+                content = @Content(
+                        mediaType = "application/json",
+                        schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "401",
+                description = "AUTH_002 — 토큰이 만료되었습니다.; AUTH_004 — 인증이 필요합니다.",
+                content = @Content(
+                        mediaType = "application/json",
+                        schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404",
+                description = "USER_001 — 사용자를 찾을 수 없습니다.",
+                content = @Content(
+                        mediaType = "application/json",
+                        schema = @Schema(implementation = ApiResponse.class)))
+    })
     public ResponseEntity<ApiResponse<Void>> changePassword(
             @AuthenticationPrincipal ZeroverseUserPrincipal principal,
             @Valid @RequestBody ChangePasswordRequest request) {

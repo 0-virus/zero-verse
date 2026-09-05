@@ -8,6 +8,9 @@ import com.zeroverse.domain.blog.dto.BlogSettingsDtos.UpdateBlogRequest;
 import com.zeroverse.domain.blog.service.BlogSettingsService;
 import com.zeroverse.security.ZeroverseUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -41,7 +44,23 @@ public class BlogSettingsController {
     @Operation(
             summary = "블로그 조회",
             description = "현재 사용자의 기본 블로그 정보를 조회한다.",
-            security = @SecurityRequirement(name = "bearer"))
+            security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200", description = "성공", useReturnTypeSchema = true),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "401",
+                description = "AUTH_002 — 토큰이 만료되었습니다.; AUTH_004 — 인증이 필요합니다.",
+                content = @Content(
+                        mediaType = "application/json",
+                        schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404",
+                description = "USER_001 — 사용자를 찾을 수 없습니다.; BLOG_001 — 블로그를 찾을 수 없습니다.",
+                content = @Content(
+                        mediaType = "application/json",
+                        schema = @Schema(implementation = ApiResponse.class)))
+    })
     public ResponseEntity<ApiResponse<BlogResponse>> getBlog(
             @AuthenticationPrincipal ZeroverseUserPrincipal principal) {
         BlogResponse response = blogSettingsService.getBlog(principal.userId());
@@ -62,7 +81,35 @@ public class BlogSettingsController {
     @Operation(
             summary = "블로그 정보 수정",
             description = "블로그 제목, 주소(slug), 소개를 수정한다.",
-            security = @SecurityRequirement(name = "bearer"))
+            security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200", description = "성공", useReturnTypeSchema = true),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "400",
+                description = "VALIDATION_001 — 요청 값 검증 실패; BLOG_003 — 주소 형식이 올바르지 않습니다.",
+                content = @Content(
+                        mediaType = "application/json",
+                        schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "401",
+                description = "AUTH_002 — 토큰이 만료되었습니다.; AUTH_004 — 인증이 필요합니다.",
+                content = @Content(
+                        mediaType = "application/json",
+                        schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404",
+                description = "USER_001 — 사용자를 찾을 수 없습니다.; BLOG_001 — 블로그를 찾을 수 없습니다.",
+                content = @Content(
+                        mediaType = "application/json",
+                        schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "409",
+                description = "BLOG_002 — 이미 사용 중인 주소입니다.",
+                content = @Content(
+                        mediaType = "application/json",
+                        schema = @Schema(implementation = ApiResponse.class)))
+    })
     public ResponseEntity<ApiResponse<BlogResponse>> updateBlog(
             @AuthenticationPrincipal ZeroverseUserPrincipal principal,
             @Valid @RequestBody UpdateBlogRequest request) {
@@ -86,7 +133,35 @@ public class BlogSettingsController {
     @Operation(
             summary = "블로그 초기 설정",
             description = "블로그를 처음 설정한다. 정확히 1회만 성공하며 이후 재호출은 409를 반환한다.",
-            security = @SecurityRequirement(name = "bearer"))
+            security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200", description = "성공", useReturnTypeSchema = true),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "400",
+                description = "VALIDATION_001 — 요청 값 검증 실패; BLOG_003 — 주소 형식이 올바르지 않습니다.",
+                content = @Content(
+                        mediaType = "application/json",
+                        schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "401",
+                description = "AUTH_002 — 토큰이 만료되었습니다.; AUTH_004 — 인증이 필요합니다.",
+                content = @Content(
+                        mediaType = "application/json",
+                        schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404",
+                description = "USER_001 — 사용자를 찾을 수 없습니다.; BLOG_001 — 블로그를 찾을 수 없습니다.",
+                content = @Content(
+                        mediaType = "application/json",
+                        schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "409",
+                description = "BLOG_002 — 이미 사용 중인 주소입니다.; BLOG_004 — 블로그 초기 설정이 이미 완료되었습니다.",
+                content = @Content(
+                        mediaType = "application/json",
+                        schema = @Schema(implementation = ApiResponse.class)))
+    })
     public ResponseEntity<ApiResponse<InitialSetupResponse>> initialSetup(
             @AuthenticationPrincipal ZeroverseUserPrincipal principal,
             @Valid @RequestBody InitialSetupRequest request) {

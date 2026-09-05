@@ -20,8 +20,11 @@ public class BlogSettingsDtos {
             @NotBlank(message = "제목은 필수입니다.")
             @Size(min = 1, max = 200, message = "제목은 200자 이하여야 합니다.")
             String title,
-            @NotBlank(message = "주소는 필수입니다.")
-            @Size(min = 3, max = 30, message = "주소는 3~30자여야 합니다.")
+            // slug에는 Bean Validation을 걸지 않는다 — `InitialSetupRequest`와 같은 이유다.
+            // `@Valid`가 서비스보다 먼저 돌기 때문에 여기서 막으면 빈 값·2자·31자가 도메인에
+            // 닿지 못하고 `VALIDATION_001`이 되어, "slug 형식 오류는 `BLOG_003`"이라는
+            // NFR-04·ADR-0004의 계약이 이 경계에서만 깨진다.
+            // 필수 여부·형식·길이·예약어는 `Blog.updateInfo`가 일관되게 BLOG_003으로 판정한다.
             String urlSlug,
             String description) {}
 

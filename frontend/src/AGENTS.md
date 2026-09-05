@@ -1,5 +1,7 @@
 # frontend/src
 
+상위 팀 규칙은 `.claude/CONSTITUTION.md`, 역할 규칙과 현재 상태는 `.claude/team/frontend/CLAUDE.md`와 `STATE.md`를 먼저 따른다.
+
 ## Purpose
 
 ZeroVerse Blog MVP 프론트엔드. React 19 + TypeScript + Vite + React Router(SPA) + TailwindCSS v4. **MVP 데스크톱 전용**.
@@ -38,9 +40,9 @@ src/
 - **`SideNav`는 `/`에서만** 렌더한다(PRD §6.7). 블로그·설정의 240px 패널은 별도 화면 전용 컴포넌트로 만든다.
 - 온보딩(`/signin`, `/signup`, `/blog/setup`)은 다크 레이아웃이며 사이드바가 없다.
 
-## M0 범위와 이후
+## 마일스톤 경계 참고
 
-M0는 **골격까지만**이다 — 디자인 토큰, 라우터 경계, AppShell, 공용 컴포넌트. 페이지는 제목·레이아웃·빈 상태만 렌더하며 **샘플 사용자나 가짜 API 데이터를 넣지 않는다**.
+M0는 골격, M1은 인증 경계를 도입한 완료 이력이다. 현재 범위는 Git·해당 `docs/worklog/M{n}-*.md`·frontend `STATE.md`에서 확인하며, 후속 마일스톤 기능을 앞당기지 않는다.
 
 - AuthContext, apiClient(401 자동 갱신), ProtectedRoute/GuestOnlyRoute/SetupGuard/AdminRoute → **M1**
 - TipTap 에디터, 이미지 업로드 → **M4**

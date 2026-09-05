@@ -134,6 +134,29 @@ class SettingsFlowTest extends MySqlTestSupport {
                         .content(setupBody2))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("BLOG_004"));
+
+        // 5. slug 변경 → 이전 URL 단절, 신규 URL 조회 (RISK-0007 완화책이 약속한 회귀)
+        //
+        // ADR-0004는 slug 변경을 허용하기로 했고, 그 대가로 "기존 URL이 끊긴다"는 위험을
+        // RISK-0007로 등록하면서 이 회귀 테스트를 완화책으로 명시했다. 실제로 끊기는지
+        // 확인하지 않으면 위험을 등록만 해 두고 검증은 하지 않은 셈이 된다.
+        String renameBody = """
+                {"title":"My Blog","urlSlug":"my-blog-renamed","description":"My description"}
+                """;
+        mockMvc.perform(put("/api/v1/blogs/me")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(renameBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.urlSlug").value("my-blog-renamed"));
+
+        mockMvc.perform(get("/api/v1/blogs/slug/my-blog"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("BLOG_001"));
+
+        mockMvc.perform(get("/api/v1/blogs/slug/my-blog-renamed"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.title").value("My Blog"));
     }
 
     // --- 시나리오 3: 동시 nickname/slug 변경 충돌 ---

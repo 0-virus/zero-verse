@@ -37,8 +37,21 @@ out/
 ### VS Code ###
 .vscode/
 
-### Claude Code / OMC — 로컬 에이전트 설정·런타임 상태(미추적) ###
-.claude/
+### Agent team source / runtime ###
+.claude/*
+!.claude/CONSTITUTION.md
+!.claude/agents/
+!.claude/agents/**
+!.claude/team/
+!.claude/team/**
+!.claude/skills/
+!.claude/skills/**
+.codex/
+!.codex/
+.codex/*
+!.codex/config.toml
+!.codex/agents/
+!.codex/agents/*.toml
 .omc/
 
 ### Frontend ###
@@ -48,8 +61,15 @@ frontend/.vite/
 *.tsbuildinfo
 *.local
 
-### Docs — 스펙 문서는 무시, worklog/governance만 추적 ###
+### Docs — 스펙 원본은 무시, 에이전트 지침·운영 기록만 추적 ###
 docs/*
+!docs/AGENTS.md
+!docs/CLAUDE.md
+!docs/design/
+docs/design/*
+!docs/design/AGENTS.md
 !docs/worklog/
 !docs/governance/
 !docs/governance/**
+!docs/에이전트-팀-운영-가이드.md
+!docs/Codex-에이전트-팀-운영-가이드.md

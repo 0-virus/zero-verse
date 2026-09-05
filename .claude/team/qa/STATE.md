@@ -2,13 +2,13 @@
 
 > 덮어쓰기 스냅샷. 시간순 이력은 `WORKLOG.md`, 심의·마일스톤 이력은 `docs/governance/**`와 `docs/worklog/**`를 본다.
 
-마지막 갱신: 2026-09-06 KST (M2 최종 독립 QA 승인·M3 선행조건)
+마지막 갱신: 2026-09-06 KST (M2 PR #8 dev 머지 확인·M3 선행조건)
 
 ## 현재 단계
 
 - M0와 M1은 머지 기록이 있다.
-- M2 최종 QA 판정은 **APPROVE (confidence 96/100)**다. FE 21 files/250 tests·lint/build, BE 53 XML/348 tests·0/0/0·bootJar/build, stale mutation, 새 JAR OpenAPI 및 리더 browser/API smoke가 통과했다. 배포 전 운영 위험과 문서 후속은 남지만 blocking finding은 없다.
-- M3는 카테고리 API·DB·공개 글 수·오류·초기 설정 연계 계약의 사용자 승인 전 Delivery & Risk 심의 단계이며 구현하지 않는다.
+- M2 최종 QA 판정은 **APPROVE (confidence 96/100)**다. FE 21 files/250 tests·lint/build, BE 53 XML/348 tests·0/0/0·bootJar/build, stale mutation, 새 JAR OpenAPI 및 리더 browser/API smoke가 통과했다. PR #8은 `dev`에 머지되었고 merge commit은 `4c129e20f58a6ccb9c61246d103934702516c295`(GitHub 2026-09-06 05:41:12 KST)다. 배포 전 운영 위험과 문서 후속은 남지만 blocking finding은 없다.
+- M3는 카테고리 API·DB·공개 글 수·오류·초기 설정 연계 계약의 독립 심의가 완료되었고 Q1~Q4 사용자 승인 전 대기 중이며 구현하지 않는다.
 
 ## 진행 중
 
@@ -21,13 +21,12 @@
 ## 다음 작업
 
 1. M2 최종 판정과 FE/BE/OpenAPI/stale/browser 증거를 `qa/M2-review.md`에 기록했다.
-2. 리더가 M2 최신 검증·`[리뷰]`/`[머지]`와 PR #8 `dev` 머지를 기록하는 것을 확인한다.
-3. 리더의 M2 worklog `[리뷰]`/`[머지]`·PR #8 `dev` 머지와 문서 정정 기록을 확인한다. `docs/PM-M3-readiness.md`의 과거 `PROPOSED` 참조는 준비 문서라는 한정 아래 후속 정합성 점검으로 남긴다. RISK-0005 HTTPS 쿠키·RISK-0007 slug link break는 배포 전 별도 gate다.
-4. M3 Q1~Q4 사용자 승인·정본/ADR 반영 전 구현을 승인하지 않고, 새 M3 심의 결과는 독립적으로만 기록한다.
+2. 리더의 M2 worklog `[리뷰]`/`[머지]`, PR #8 `dev` 머지, JOURNAL 및 M3 계획·승인대기 기록을 독립 확인했다.
+3. M3 Q1~Q4 사용자 승인·정본/ADR 반영 전 구현을 승인하지 않고, 새 M3 심의 결과는 독립적으로만 기록한다. `docs/PM-M3-readiness.md`의 준비 문서 한정과 일부 과거 `PROPOSED` 참조는 후속 정합성 점검으로 남긴다. RISK-0005 HTTPS 쿠키·RISK-0007 slug link break는 배포 전 별도 gate다.
 
 ## 차단 요인
 
-- M2 source/evidence blocking: 없음. 리더의 worklog/PR Git 절차와 문서 정정은 merge 전 남은 행정 후속이다.
+- M2 source/evidence blocking: 없음. PR #8 `dev` 머지와 리더의 worklog/JOURNAL 기록을 확인했으며 남은 것은 배포 전 운영 위험과 문서 후속이다.
 - M3 착수 차단: 공개 API/DB unique·soft delete/잠금·순서/공개 count/오류 계약과 Q1~Q4가 미확정이다. 심의 문서 현재 상태는 `USER_DECISION_REQUIRED`이며 사용자 승인 전 구현·승인은 금지된다.
 
 ## 주요 산출물

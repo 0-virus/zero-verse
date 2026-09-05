@@ -2,14 +2,14 @@
 
 > 덮어쓰기 스냅샷. 시간순 이력은 `WORKLOG.md`, 마일스톤 이력은 `docs/worklog/**`를 본다.
 
-마지막 갱신: 2026-09-06 05:39 KST
+마지막 갱신: 2026-09-06 05:42 KST
 
 ## 현재 단계
 
-- 기준 브랜치: `feature/M2-settings`.
+- 기준 브랜치: `dev` (PR #8 `feature/M2-settings` 머지 완료, merge SHA `4c129e20f58a6ccb9c61246d103934702516c295`, 2026-09-06 05:41:12 KST).
 - M0 스캐폴딩과 M1 인증은 `dev` 머지 기록이 있다.
-- M2 설정·블로그 화면은 구현과 다회 리뷰 후 아직 미머지다.
-- FE 자동 검증과 리더의 1440px 실제 브라우저·실제 API smoke가 통과했고, 리더 확인 기준 BE 348개와 QA M2 최종 APPROVE96도 완료됐다. M2 실제 머지만 남아 있다.
+- M2 설정·블로그 화면은 구현·다회 리뷰·QA 최종 승인 후 PR #8로 `dev`에 머지됐다.
+- FE 자동 검증과 리더의 1440px 실제 브라우저·실제 API smoke가 통과했고, 리더 확인 기준 BE 348개와 QA M2 최종 APPROVE96도 완료됐다.
 
 ## 진행 중
 
@@ -21,18 +21,16 @@
 - 늦은 slug 성공·404 오류 모두 실제 응답 본문 파싱과 React continuation 이후 stale guard를 검증했다. BLOG_004의 `/blog/already-done` pathname도 단정한다. 부모가 05:26 `build/m2-stale-mutation.mjs`(Vitest/Vite 메모리 변환)로 두 mutation을 expected failure(exit 1)로 확인했고, 원본 `BlogPage.tsx` SHA256 전후 동일 및 이후 원본 전체 250 통과를 확인했다.
 - Vite 개발 서버를 `http://127.0.0.1:5173/`에 hidden으로 기동했다(launcher PID 29744, intermediate PID 20908, listener PID 16332; HTTP 200, 866 bytes).
 - 현재 제품 코드 외 변경은 보존한다.
-- M2 FE 제품 소스는 동결했다. 추가 수정은 QA finding 배정 또는 부모의 새 범위 지시 전까지 하지 않는다.
+- M2 FE 제품 소스는 머지 시점 기준으로 동결했다. M3 사용자 결정 전 추가 수정은 하지 않는다.
 
 ## 다음 작업
 
-1. 리더가 M2 변경을 실제 머지한다.
-2. 사용자 Q1~Q4 승인 후 M3 FE를 시작한다.
-3. M3에서는 기존 `SettingsPostsPage`/`/settings/posts` 라우트와 `ScreenPanel` 카테고리 패널을 실제 카테고리 API·트리·정렬 UI로 확장한다.
+1. M3 Q1~Q4 사용자 결정과 계약 승인을 기다린다(`USER_DECISION_REQUIRED`).
+2. 승인 후 기존 `SettingsPostsPage`/`/settings/posts` 라우트와 `ScreenPanel` 카테고리 패널을 실제 카테고리 API·트리·정렬 UI로 확장한다.
 
 ## 차단 요인
 
-- M2 실제 머지가 아직 완료되지 않았다.
-- M3 Q1~Q4 사용자 승인 전에는 카테고리 FE 작업을 시작하지 않는다.
+- M3 Q1~Q4 사용자 승인 전에는 카테고리 FE 작업을 시작하지 않는다(`USER_DECISION_REQUIRED`).
 - 운영 HTTPS refresh-cookie smoke는 배포 전 `RISK-0005` 후속 게이트로 유지한다.
 
 ## 주요 산출물
@@ -42,6 +40,6 @@
 
 ## M3 FE 인계 메모
 
-- 선행: M2 PR 머지와 Q1~Q4 카테고리 계약 승인. M3 시작 전 `docs/governance/meetings/M3-20260906-categories.md`의 미확정 결정을 확인한다.
+- 선행: M2 PR #8 머지(`4c129e20f58a6ccb9c61246d103934702516c295`)는 완료됐다. 이제 Q1~Q4 카테고리 계약 승인과 사용자 결정이 필요하며, M3 시작 전 `docs/governance/meetings/M3-20260906-categories.md`의 미확정 결정을 확인한다.
 - 재사용 자산: `SettingsPostsPage`는 현재 `PageScaffold` placeholder, `routes/router.tsx`는 `/settings/posts` 보호 라우트, `ScreenPanel`은 카테고리·통계 패널 경계만 렌더한다.
 - 구현 시 정본: `DEFAULT/GENERAL/LOCKED`, 루트+1단계, DEFAULT/LOCKED 불변, soft delete/cascade·글의 DEFAULT 이동, 전체 order 배열 계약과 1440px 디자인을 백엔드 API 확정 후 반영한다.

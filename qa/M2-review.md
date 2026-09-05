@@ -1,6 +1,6 @@
 # M2 독립 QA 리뷰
 
-- 기준: `feature/M2-settings`의 2026-09-06 종료 검증 작업 트리. 원래 기준 HEAD는 `ed8f2c1`, PR #8 원격 HEAD는 `403eb31`이다.
+- 기준: `feature/M2-settings`의 2026-09-06 종료 검증 작업 트리. 원래 기준 HEAD는 `ed8f2c1`, PR #8 원격 HEAD는 `403eb31`이었다. 최종 검증본 `13d8debbd8c6a9396291bdf72b248610d62a29a8`은 PR #8로 `dev`에 머지되었고 merge commit은 `4c129e20f58a6ccb9c61246d103934702516c295`다(GitHub mergedAt 2026-09-05T20:41:12Z / 2026-09-06 05:41:12 KST).
 - 범위: FR-SETTINGS-01~04, FR-BLOG-01, NFR-04·09, PRD §7·§9-J/K·§10~§12, 디자인 정본, ADR-0004.
 - 판정: **APPROVE (최종 독립 QA, confidence 96/100)**. 최신 FE/BE 전체 gate, stale mutation, 새 JAR OpenAPI smoke 및 리더의 실제 가입→설정→공개·1440px smoke가 모두 통과했다. 배포 전 운영 위험과 문서 정합성 후속은 남지만 M2 소스·계약·테스트에 blocking finding은 없다.
 
@@ -59,12 +59,12 @@
 1. **통과:** F-M2-01 늦은 성공·실패 회귀는 실제 body read/React flush와 mutation으로 검증되었고 FE 전체 gate가 통과했다.
 2. **통과:** BE 전체 53 XML/348 tests/0/0/0·bootJar/build 및 새 JAR `/v3/api-docs`에서 보호 `bearerAuth`, 공개 GET·auth4 `security=[]`, M2 공통 envelope 오류/DTO를 확인했다.
 3. **통과:** 리더가 최신 산출물로 가입→initial-setup→settings 각 카드 저장/복구→slug 변경→공개 블로그 및 1440px 레이아웃과 guest/auth 셸을 재확인했다.
-4. **리더 절차:** `docs/worklog/M2-settings.md`에 실제 최신 검증과 `[머지]` 기록을 남기고 PR #8의 `dev` 머지 상태를 확인한다. QA는 해당 leader-owned 파일을 수정하지 않는다.
+4. **통과:** 리더 소유 `docs/worklog/M2-settings.md`에 실제 최신 검증과 `[머지]` 기록이 남았고, PR #8의 `dev` 머지 상태 및 merge SHA를 독립 확인했다. QA는 해당 leader-owned 파일을 수정하지 않았다.
 5. RISK-0005(운영 HTTPS Secure/Strict 쿠키 smoke)는 M2 완료와 별개로 배포 전 닫아야 한다.
 
 ## M3 acceptance 핵심 선행조건
 
-- M2 종료·PR 머지·worklog 증거와 Q1~Q4 사용자 승인 전에는 M3 구현을 시작하지 않는다. 현재 `docs/governance/meetings/M3-20260906-categories.md`는 심의 중이며 계약 제안은 미확정이다.
+- M2 종료·PR 머지·worklog 증거는 충족되었지만 Q1~Q4 사용자 승인 전에는 M3 구현을 시작하지 않는다. 현재 `docs/governance/meetings/M3-20260906-categories.md`는 `USER_DECISION_REQUIRED`이며 계약 제안은 미확정이다.
 - FR-CAT-01~05와 PRD §5.4·§7·§9-H/R·§10에 맞춰 owner write/public read, 루트+1단계, `DEFAULT/GENERAL/LOCKED`, DEFAULT/LOCKED 불변, soft delete·하위 cascade·실제 posts의 DEFAULT 이동·같은 부모 전체 order 배열을 먼저 고정한다.
 - V1의 categories name/order unique가 deleted_at을 포함하지 않고 posts/universes 테이블만 존재한다(`V1__init.sql:57–108,148–165`). Q1 forward migration/동시성, Q2 잠금·부모·순서, Q3 공개 글 수와 FR-BLOG-02 접근범위, Q4 setup 시작 카테고리 부분 실패 복구를 승인된 계약·실제 MySQL 테스트로 검증해야 한다.
 - M3 DoD는 가짜 글 수·stub·부분 목록 reorder를 허용하지 않으며, BE repository/controller/integration + FE Testing Library/1440px 독립 검증 및 복구/rollback 시나리오를 포함해야 한다.
@@ -87,9 +87,9 @@
 - `.claude/CONSTITUTION.md`는 `git diff`상 변경이 없고, 기존 `docs/worklog/**`·`docs/governance/**` 결론과 과거 위임 승인/정정 기록은 삭제·덮어쓰기되지 않았다. `git diff --check`도 clean이었다.
 - 최신 `docs/governance/README.md` diff는 Claude 전용 구현/분기 표현을 “구현 역할·리더 배정”으로 동기화한 운영 문구뿐이며, 독립 3인 심의·`LOW` 외 사용자 명시 승인·과거 회의/ADR 담당 기록 보존을 명시한다. 제품 계약·승인 등급을 새로 만들거나 우회하지 않는다.
 - `AGENTS.md:77–79`, `CLAUDE.md:15`, `.claude/team/README.md:28,35`, `docs/Codex-에이전트-팀-운영-가이드.md:17`의 신규 문구는 사용자의 명시 승인(“Codex backend/frontend 구현 + 독립 QA/리더 검토, 연속 마일스톤”)을 그대로 반영한다. 동시에 `AGENTS.md:92`, 팀 README 완료 규약, `docs/governance/README.md:84–87`의 `MEDIUM/HIGH/BLOCKED` 사용자 승인 규칙과 M2 worklog:965의 M3 구현 보류도 유지된다. 현재 문서에 M2 최종 승인·M3 구현 완료라는 허위 주장은 없다.
-- 비차단 정합성 위험 1: `AGENTS.md:79`·팀 README `:35`의 “연속 진행/새 승인 안건은 진행하면서 요청”은 인접한 승인 전 구현 보류 문구와 함께 읽어야 하며, M3 구현 전역 허가로 오독되지 않게 다음 문구에서 “승인 전에는 준비·독립 검토만”이라고 한정하는 편이 안전하다. 문서 소유자인 리더에게 보고만 하고 수정하지 않았다.
+- 비차단 정합성 위험 1(해소): `AGENTS.md:79`·팀 README `:35`의 연속 진행 문구는 리더가 승인 대기 안건 자체는 준비·독립 검토만 가능하고 구현은 보류한다고 명시해 M3 전역 허가로 오독되지 않게 정리했다.
 - 비차단 정합성 위험 2(해소): 이전 감사 시점에는 `docs/governance/meetings/M3-20260906-categories.md` 상단과 §7 상태가 혼재했으나, 리더가 현재 두 곳을 `USER_DECISION_REQUIRED`로 통일하고 §10 정정 기록을 append했다. 승인 증거로 오인되지 않도록 미확정·사용자 승인 대기 문구도 유지된다.
-- 비차단 절차 위험 3: `docs/worklog/M2-settings.md:935`의 기존 `[머지]`(“아직 없음”) 뒤에 새 `[개발 기록]`이 append되어 고정 섹션 순서(`AGENTS.md:106`)와 어긋난다. 과거 기록 보존을 위해 재배열하지 말고, 리더가 최종 최신 검증을 기존 `[리뷰]` continuation 또는 별도 명시된 종료 검증 항목으로 append할지 결정해야 한다.
+- 비차단 절차 위험 3(해소): `docs/worklog/M2-settings.md:935`의 과거 `[머지] 아직 없음`은 보존되었고, 뒤의 `[리뷰]` continuation에 최신 기준을 명시한 다음 실제 `[머지]`를 별도 append했다. 기록을 재배열하거나 과거 상태를 소급 변경하지 않았다.
 - 판정: 문서 변경은 사용자 승인 범위·역할 소유권 안에 있고, `qa/**`·`qa STATE/WORKLOG` 외 제품/리더 문서는 수정하지 않았다. 위 3건은 현재 M2 기능/보안 blocking이 아니며 리더의 정정 기록으로 모두 해소되었다. `docs/PM-M3-readiness.md`의 준비 문구에 남은 과거 `PROPOSED` 참조는 승인 문서가 아니라는 한정과 함께 별도 비차단 정합성 후속으로 남긴다.
 
 ## 2026-09-06 FE 최종 게이트 독립 대조
@@ -108,4 +108,4 @@
 - 가정·범위: QA는 FE/BE 전체 실행을 중복하지 않았고, FE/BE 명령 출력은 부모가 보존한 log와 현재 XML/JAR/API를 교차 확인했다. RISK-0005(운영 HTTPS Secure/Strict 쿠키)·RISK-0007(slug 변경 후 이전 URL 단절)은 M2 source approval과 별개로 배포 전에 닫는다.
 - 가장 강한 반론과 판단: 문서·운영 기록의 연속 진행 문구와 M2 worklog 섹션 순서가 정리되지 않은 채 merge될 수 있다는 우려가 있었고, M3 상태(`REVIEWING`/`PROPOSED`)도 초기에는 혼재했다. 리더의 승인대기 제한 문구·M3 단일 상태 정정·`[리뷰]` continuation 기록으로 현재는 해소되었다. 이는 기능·보안 결함이 아니며, 이를 이유로 이미 통과한 M2 실행 증거를 뒤집을 사유는 아니다.
 - 실패 시나리오: 신규 JAR가 아닌 구 프로세스의 Swagger 결과를 잘못 인용할 위험은 PID 기동 시각을 대조해 배제했다. 운영 HTTPS에서 쿠키가 차단되거나 slug 변경 후 외부 링크가 단절되는 위험은 배포 전 별도 gate로 남는다.
-- 필수 후속: 리더는 최신 M2 검증·`[리뷰]`/`[머지]` 및 PR #8 `dev` 머지를 기록한다. M3는 Q1~Q4 사용자 승인·정본/ADR 반영 전 구현·승인하지 않는다. `docs/PM-M3-readiness.md`의 과거 `PROPOSED` 참조는 준비 문서라는 성격을 유지한 채 후속 정합성 점검 대상으로 둔다.
+- 필수 후속: M2의 PR #8 `dev` 머지와 최신 검증 `[리뷰]`/`[머지]` 기록은 확인 완료했다. M3는 Q1~Q4 사용자 승인·정본/ADR 반영 전 구현·승인하지 않는다. `docs/PM-M3-readiness.md`의 준비 문서 한정과 일부 과거 `PROPOSED` 참조는 후속 정합성 점검 대상으로 둔다.

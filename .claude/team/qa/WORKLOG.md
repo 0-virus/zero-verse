@@ -50,3 +50,10 @@
 - `.claude/team/qa/CLAUDE.md`에 `qa/AGENTS.md` 하위 지침 진입점을 추가했다. QA 소유 범위 밖 파일은 수정하지 않았다.
 - 리더 최신 파일을 재확인했다. `docs/governance/meetings/M3-20260906-categories.md` 상단과 §7은 모두 `USER_DECISION_REQUIRED`이고 §10에 정정 사유가 보존되어 있다. M2 worklog `[리뷰]` continuation에는 과거 섹션 보존 및 최신 기준이 명시되어 문서 감사의 3개 finding은 해소되었다.
 - `STATE.md`의 오래된 `REVIEWING`/`PROPOSED` 혼재 차단 문구를 제거했다. M3 Q1~Q4 사용자 승인·정본/ADR 반영 전 구현·승인 금지와 `docs/PM-M3-readiness.md`의 준비 문서 한정은 유지한다.
+
+## 2026-09-06 — M2 PR #8 dev 머지 및 M3 인계 기록 독립 확인
+
+- 리더 최신 `docs/worklog/M2-settings.md`의 `[머지]`를 읽어 PR #8이 base `dev`에 **MERGED**임을 확인했다. GitHub mergedAt는 `2026-09-05T20:41:12Z`(2026-09-06 05:41:12 KST), merge commit은 `4c129e20f58a6ccb9c61246d103934702516c295`, 검증 head는 `13d8debbd8c6a9396291bdf72b248610d62a29a8`이다. 과거 `[머지] 아직 없음`은 기록 보존 목적의 과거 항목으로 남아 있다.
+- `.claude/team/JOURNAL.md` 최신 append, `docs/worklog/M3-categories.md`, `docs/governance/DECISION-REGISTER.md`를 독립 확인했다. M3는 계획·독립 심의 완료지만 Q1~Q4 사용자 승인 대기이며, 결정 레지스터도 `USER_DECISION_REQUIRED`다. 제품 구현·M3 승인·M4 착수 주장은 없다.
+- `docs/PM-M3-readiness.md`는 M2 Git/PR 종료를 반영하고, worklog continuation·사용자 승인·정본/ADR 동기화를 M3 선행조건으로 유지한다. 하단 체크리스트의 미완료 표기는 PM 소유 준비 문서의 후속 갱신 범위이며 M3 승인으로 오인할 근거가 아니다.
+- QA 판정은 변경되지 않는다: M2 **APPROVE (96/100)**, source/evidence blocking 없음. M3는 사용자 Q1~Q4 응답과 정본/ADR 반영 전 구현하지 않는다.

@@ -37,3 +37,10 @@
 - M3 Architecture 독립 검토 상세본을 `docs/governance/AGENT-BRIEFS.md` 공통 형식으로 제출했다. 권고 `APPROVE_WITH_CHANGES`, 확신도 92/100, 위험 HIGH. blog write lock은 동시 mutation 직렬화에는 유효하지만 전체 ID 집합 검증만으로 stale reorder를 거부할 수 없으므로 revision/ETag/snapshot precondition 또는 last-write-wins를 별도 확정해야 한다. M4 Post의 모든 `category_id` 변경 경로가 동일 blog lock에 참여해야 삭제 후 dangling category reference를 막을 수 있다는 인계 조건을 명시했다.
 - 진행자가 M3 Architecture 결과를 회의록에 취합했고 Q1~Q4 사용자 승인을 요청했다. 승인 전 M3 backend 구현은 시작하지 않는다.
 - 상태: M2 실제 Git stage/commit/merge와 M3 Q1~Q4 사용자 승인이 남은 유일한 현재 gate다. 부모가 이후 backend 소유 경로와 역할 기록을 명시적으로 stage/commit한다. 이 인계 후 backend STATE/WORKLOG와 M2 변경 파일을 동결한다. 제품 코드 추가 수정과 Git 조작은 하지 않았다.
+
+## 2026-09-06 05:42 KST — M2 merge 완료 및 M3 사용자 결정 대기
+
+- 부모가 M2 PR #8을 실제 merge했다. GitHub mergedAt은 `2026-09-05T20:41:12Z`(KST `2026-09-06 05:41:12`), merge SHA는 `4c129e20f58a6ccb9c61246d103934702516c295`다. 공유 checkout은 `dev`로 fast-forward 동기화됐고 검증 완료 제품 tree와 동일함을 확인했다.
+- M2 backend 작업은 검증·독립 QA·실제 smoke·OpenAPI 대조·merge까지 완료됐다. 이전 항목의 XML 53개/348 tests/실패·오류·skip 0과 JAR SHA 증거를 최종 근거로 유지한다. 이번 마감 인계에서는 추가 테스트나 제품 수정 없이 상태만 동기화했다.
+- M3 상태를 `USER_DECISION_REQUIRED`로 전환했다. Architecture 독립 검토(`APPROVE_WITH_CHANGES`, 92/100, HIGH)는 상세 제출·회의록 취합 완료이며, Q1~Q4 사용자 승인 전에는 제품 구현을 시작하지 않는다.
+- 이후 backend 소유 파일·STATE/WORKLOG는 동결한다. 부모가 M2 merge 기록과 M3 계획 기록을 포함한 문서 stage/commit을 수행한다. 본 항목 이후 Git 조작·제품 코드 변경·추가 테스트는 하지 않는다.

@@ -933,3 +933,65 @@ AGENTS.md와 `docs/governance/README.md`는 **`LOW`만 자동 승인**하고 나
 ## [머지]
 
 - 아직 없음.
+
+## [개발 기록] — 연속 개발 재개
+
+### 2026-09-06 · `ed8f2c1` 후속 변경의 기록 보완 및 종료 검증 착수
+
+- 기준: `feature/M2-settings` HEAD `ed8f2c1`, PR #8 원격 HEAD `403eb31`. `ed8f2c1`의 변경을 실제 diff로 확인했다. 아래는 이전 커밋의 변경 내용이며 이번 재개에서 새로 구현했다고 주장하지 않는다.
+- BE: `UpdateBlogRequest.urlSlug`의 Bean Validation을 제거해 일반 블로그 수정에서도 null·빈 값·2자·31자 오류를 도메인의 `BLOG_003`으로 일관되게 처리한다. `BlogSettingsControllerTest`가 HTTP 경계의 코드 계약을 확인한다. `SettingsFlowTest`는 slug 변경 후 이전 주소 404와 새 주소 조회를 검증한다(FR-SETTINGS-03, NFR-04, ADR-0004, RISK-0007).
+- FE: `BlogPage`는 slug 변경·언마운트 이후 이전 요청의 성공/실패/로딩 상태를 반영하지 않는다. `AppShell`/`HeroAvatar`는 공개 응답의 소유자 프로필 이미지를 표시하고 이미지가 없으면 이모지를 사용한다. 관련 행동 테스트가 추가됐다(FR-BLOG-01).
+- 기록 차이: 역할 STATE에 적힌 미커밋 변경은 이미 `ed8f2c1`에 커밋됐다. 과거 테스트 수치를 현재 HEAD의 통과 증거로 사용하지 않는다.
+- 배정: backend는 전체 BE 테스트·빌드, frontend는 테스트·lint·build, QA는 독립 계약·회귀 리뷰, 리더는 실제 브라우저 1440px 검증을 수행한다. PM은 확정된 설정 카드 결정을 PRD에 동기화하고 M3를 준비한다.
+- 사용자 승인: 구현은 Codex backend/frontend, 최종 검토는 독립 QA·리더가 담당한다(2026-09-06 명시 승인). M2 완료 후 M3 및 후속 마일스톤을 계속 진행한다. 운영 지침 변경의 상세 근거는 `.claude/team/JOURNAL.md`에 기록한다.
+- 현재 판정: **검증 진행 중**. 이 항목은 최종 리뷰 승인이나 머지 기록이 아니다. 실제 명령·출력과 잔여 결함은 후속 항목에 기록한다.
+
+### 2026-09-06 · PM 정합화 및 M3 준비 기록
+
+- **M2 사용자 결정 동기화:** 2026-07-26 19:20의 결정(한 줄 소개는 `user.bio` 유지, 블로그 설정은 별도 카드, 카드별 자기 API)을 `docs/PRD.md` §7·§9에 반영했다.
+- 대체된 PRD 기록은 다음과 같다. 기존 `/settings`의 프로필·비밀번호·위험 구역 3카드 서술을 프로필·블로그·비밀번호 변경 3카드로 바꾸고, 위험 구역/회원 탈퇴는 대응 FR/API가 없어 M2에서 렌더하지 않는 범위로 정리했다. 기존 탭 중심 서술은 좌측 SETTINGS 메뉴·라우트 분리로 정리했다. `한 줄 소개`는 `user.bio`, 블로그 카드의 제목/slug/소개는 `blog.title`/`blog.url_slug`/`blog.description`으로 명시했으며 저장 API도 `/users/me`, `/blogs/me`, `/users/me/password`로 카드별 분리했다. 이 변경은 새 사용자 결정을 추가한 것이 아니라 기존 worklog 결정을 PRD에 옮긴 것이다.
+- PRD §10 M3의 `SettingsPostsPage(트리, 상세 편집)` 표현은 §7·§9-R의 단일 리스트·인라인 편집·드래그 순서로 동기화했다. 기존 M2 범위 밖인 `/blog/setup` 시작 카테고리는 M3 준비 문서에서 기존 category CRUD 후속 호출과 재조회·중복 방지·부분 실패 복구 권고로 분리했다.
+- 산출물: `docs/PM-M3-readiness.md`. FR-CAT-01~05, PRD §9-H/R·§10, 실제 Category/V1 posts·SecurityConfig·ErrorCode·FE placeholder를 대조해 Q1 soft-delete unique, Q2 잠금/부모/순서/삭제, Q3 공개 글 수/오류·보안, Q4 초기 설정 시작 카테고리의 승인 전 권고를 기록했다. `docs/governance/meetings/M3-20260906-categories.md`는 리더 소유 `PROPOSED`로 독립 심의·사용자 승인 전이다.
+- 검증 기준: `feature/M2-settings` local HEAD `ed8f2c1`, PR #8 원격 HEAD `403eb31`, PR 상태 `OPEN`, 본 worklog `[머지]`는 여전히 없음. 테스트 수치를 재실행하지 않고 과거 worklog 수치를 현재 통과 증거로 사용하지 않았다.
+
+### 2026-09-06 05:04 KST · 리더 실행 검증과 잔여 결함 배정
+
+- BE 실행 증거: `build/test-results/test/TEST-*.xml` 53개를 리더가 직접 합산해 **347 tests / 0 failures / 0 errors / 0 skipped** 확인. backend 실행 기록은 `.\gradlew.bat cleanTest test`(12m18s), `bootJar`(9s), `build -x test`(6s), 모두 exit 0이다. 이후 OpenAPI 수정 전 기준이며 수정 후 재검증한다.
+- FE 1차 실행 보고: 21 files / 244 tests, lint/build exit 0. 메뉴 라벨을 정본 `프로필 · 계정`/`카테고리 관리`로 교정했다. 추가 수정 중이므로 이 수치를 최종 gate로 고정하지 않는다.
+- 리더가 별도 loopback MySQL 8.4(`zeroverse-m2-smoke-20260906`, port 13306)와 생성 JAR(port 8080), Vite(port 5173)로 실제 통합 smoke를 수행했다. 비밀은 프로세스 환경에만 전달했으며 사용자 데이터 대신 합성 테스트 계정을 사용했다. 로컬 HTTP 쿠키 예외는 ADR-0003의 개발 조건에 한정한다.
+- 브라우저 1440px: 가입→초기 설정→홈 전환, 설정 진입, 프로필 nickname/bio 저장, 별도 블로그 title/description/slug 저장, 새로고침 후 인증·각 저장값 복구를 확인했다. 공개 블로그 hero가 수정 title/description/소유자 fallback을 표시했다. DOM `innerWidth=scrollWidth=1440`, body `#f6ead8`, 확인한 button/input radius 0. 실제 API의 새 slug는 200, 이전 slug는 404이며 공개 owner DTO에 email/name/birthDate가 없음을 확인했다.
+- 실제 `/v3/api-docs` 결함: 등록 scheme은 `bearerAuth`인데 M2 보호 operation은 `bearer`를 참조하고, 공개 Blog GET이 root 인증을 상속하며 M2 오류 responses가 없다. backend에 기존 런타임 계약을 바꾸지 않는 문서 교정·자동 회귀를 배정했다.
+- FE 잔여 교정: 아바타 96→정본90px, 비404 오류 안내/재시도, 이미지 `변경` 버튼의 무동작, 저장 버튼의 정본 크기 확인. 기존 stale slug 테스트가 실제 응답 처리 전에 B 상태로 통과할 가능성을 발견해 독립 QA 검토와 격리 mutation 검증을 배정했다.
+- M3는 `docs/governance/meetings/M3-20260906-categories.md`에서 REVIEWING으로 진입했다. M2 수정·독립 검토·머지와 M3 새 계약의 사용자 승인 전에는 M3 구현을 시작하지 않는다. 마일스톤 완료는 연속 개발의 종료 조건이 아니다.
+
+### 2026-09-06 05:31 KST · FE 최종 실행 및 회귀 테스트 실효성 확인
+
+- 구현 저자: Codex frontend. 설정 아바타를 정본 90px/`#ffe9c9`로 교정하고 `변경`은 기존 이미지 URL 필드로 포커스·스크롤한다. 실제 업로드는 M4 범위로 유지한다. 프로필 저장 버튼은 내용 너비와 8px/22px padding을 적용했다. 공개 블로그의 404와 일반 오류를 구분하며 일반 오류에 재시도를 제공한다.
+- 실제 브라우저에서 발견한 고정 `/blog/me` 링크를 수정했다. 기존 AuthContext의 user/defaultBlog를 AppRoutes→AppShell→각 영역의 props로 전달해 실제 내 블로그 slug/title과 닉네임을 표시한다. 새 전역 상태·의존성은 추가하지 않았다. 게스트는 로그인 경로를 사용한다.
+- 리더 직접 FE 명령: `npm test -- --maxWorkers=1` **21파일/250테스트 통과**, exit 0, 104.58초. `npm run lint`, `npm run build` 모두 exit 0, Vite 63 modules. 증거: `build/m2-fe-final-test.log`, `build/m2-fe-final-lint.log`, `build/m2-fe-final-build.log`. 단일 worker는 자원 경합 제한이며 테스트 생략이 아니다.
+- stale 회귀 실효성: 로컬 검증 파일 `build/m2-stale-mutation.mjs`의 Vite transform으로 BlogPage의 취소 guard만 메모리에서 제거했다. 선택한 늦은 성공/실패 테스트 **2개 모두 예상대로 실패**(B가 A 또는 오류 화면으로 덮임), exit 1. 실행 전후 실제 BlogPage.tsx SHA256이 같아 제품 소스는 변경되지 않았다. 이 선택 실행의 나머지 28개 필터 제외는 전체 테스트의 skip이 아니며 위 최종 전체 실행은 250개 모두 통과했다. 증거: `build/m2-stale-mutation.log`.
+- 리더 실제 UI/API: 이미지 URL 저장 후 설정·공개 hero 양쪽 이미지가 `complete=true`, `naturalWidth=32`로 표시됐다. 홈의 My Blog href가 저장된 새 slug와 일치하고 클릭 시 올바른 공개 블로그로 이동했다. 우측 카드의 실제 title/slug와 상단 닉네임도 확인했다. 테스트 데이터·비밀값은 추적 문서에 기록하지 않는다.
+- 잔여 gate: BE OpenAPI 변경 후 전체 테스트 및 새 JAR의 실제 문서 확인, QA 독립 최종 판정, PR 원격 최신 HEAD와 머지 증거. 현재는 **검증 진행 중**이다.
+
+## [리뷰] — 2026-09-06 종료 검증 continuation
+
+### 2026-09-06 05:35 KST · 리더 최종 BE 산출물·네트워크 확인
+
+- 기존 고정 섹션과 과거 `[머지] 아직 없음`은 당시 기록으로 보존한다. 재개 이후 append된 개발 기록의 최종 판정은 이 `[리뷰]` continuation 및 뒤에 추가할 실제 `[머지]`가 최신 기준이다. 과거 항목을 재배열하거나 완료로 소급 변경하지 않는다.
+- 구현 저자 Codex backend의 변경은 4개 Controller annotation과 OpenApiConfigTest다. 런타임 정책/API/DB 변경 없이 등록 Bearer scheme, 공개 operation, 실제 오류 응답과 200 concrete DTO schema를 문서화했다. 중간 단계에서 200 schema가 사라지는 회귀 테스트 실패를 확인한 뒤 `useReturnTypeSchema=true`로 실제 원인을 교정했다.
+- 최종 명령: `.\gradlew.bat cleanTest test`(7m50s), `bootJar`(8s), `build -x test`(5s), 모두 성공. 리더가 실제 XML 53개를 다시 합산하여 **348 tests / 0 failures / 0 errors / 0 skipped**를 확인했다. JAR 64,560,071 bytes, 05:27:49 KST, SHA256 `5F9724EC3D38B7B3D9F41B00C6917B744937876A2423DCAA028390D76CE2A69B`도 대조했다.
+- 새 JAR로 loopback smoke API를 재기동(PID 24560)하고 실제 `/v3/api-docs`를 확인했다. M2 보호 6개 operation은 `bearerAuth`, 공개 Blog GET 및 auth 4개는 `security=[]`; 7개 operation의 200 concrete schema와 data DTO ref가 유지됐다. 오류 20개 응답은 application/json 공통 ApiResponse schema이며 401은 AUTH_002/AUTH_004를 포함한다.
+- 브라우저 새로고침 후 게스트 My Blog→`/signin` 실제 진입, 합성 계정 로그인→실제 nickname/title/slug 복구→설정 카드별 저장값과 이미지 복구를 확인했다. 앞선 가입·setup·각 카드 저장·오류/재시도·이미지·1440px smoke와 함께 최종 산출물의 회귀 증거로 사용한다. 이전 slug는 새 JAR에서도 실제 HTTP404다.
+- QA가 제안한 안내 명확화: AGENTS.md/팀 README에 승인 대기 안건 자체는 준비·독립 검토만 가능하고 구현은 보류한다고 명시했다. 기존 연속 진행의 범위나 승인 규칙을 바꾸지 않는다. M3 회의의 REVIEWING/PROPOSED 혼재는 세 심의 취합 시 단일 승인대기 상태와 정정 기록으로 정리한다.
+- 현재 판정: 제품 변경·실행 증거를 독립 QA에 전달했다. 최종 독립 승인 및 PR 원격 최신 HEAD 확인 전까지 머지는 수행하지 않았다. 운영 HTTPS(RISK-0005)와 slug 역사 보존(RISK-0007)은 기존 배포 전 위험으로 유지한다.
+
+### 2026-09-06 05:38 KST · 최종 독립 리뷰 승인
+
+- 독립 QA 최종 판정은 **APPROVE, confidence 96/100, blocking finding 없음**이다. QA는 소스/정본 diff, XML 53개/348 tests, FE250 실행 로그, JAR SHA/PID/실제 OpenAPI, stale mutation 증거와 리더 UI smoke를 교차 대조했다. 상세는 `qa/M2-review.md`의 최종 독립 QA 판정을 따른다.
+- 리더는 제품 코드 저자와 분리된 패스에서 실제 파일·명령 출력·브라우저를 직접 검증했고 M2 source/evidence gate 통과로 판정한다. QA의 운영 문서 3건도 승인대기 제한 문구, M3 단일 상태/정정, 이 리뷰 continuation으로 해소했다.
+- 다음은 검증된 수정의 원자적 커밋→PR #8 최신 HEAD 확인→dev 머지다. 실제 Git 완료 전에는 `[머지]`를 완료로 기록하지 않는다. M3는 독립 심의 완료·Q1~Q4 사용자 결정 대기이며 새 정책 구현은 아직 하지 않는다.
+
+### 2026-09-06 · 최종 커밋·PR 설명 정합화
+
+- `760e5e8`: M2 OpenAPI 보안·오류·200 DTO schema와 BE 회귀/역할 기록. `8b7daf3`: 설정/공개 블로그/실제 사용자 내비게이션 및 FE 회귀/역할 기록. 둘 다 Codex 실제 작성 참여를 기록했고 검증 후 코드 추가 변경은 없다.
+- PR #8의 최초 설명에는 과거 322/226 테스트, 포괄 위임 채택, 공개 owner 실명 검토 대기, 브라우저 미확인 문장이 남아 있었다. 최신 요약으로 대체해 2026-07-27 Q1=A/Q2=A/Q3=B 사용자 개별 승인, 현재 348/250, 공개 개인정보 비노출과 실제 브라우저 검증을 반영한다. 과거 실패/수정/심의 정정의 상세는 기존 worklog·커밋에서 보존하고 링크한다. 교정 대상은 PR의 오래된 현재 설명이며 과거 승인 결론을 변경하지 않는다.

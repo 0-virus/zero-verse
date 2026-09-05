@@ -28,6 +28,7 @@ ZeroVerse Blog MVP 저장소. 개인 블로그 플랫폼으로, 사용자는 자
 | `docs/PRD.md` | 요구사항 + 디자인 정본 + 사용자 결정을 통합한 **구현 실행 명세**(v2.0). 아키텍처/패키지 구조, 화면-API 매핑, 디자인 시스템 토큰(§6), 화면 명세(§7), 결정 로그(§9), 마일스톤 순서(§10), 테스트 전략, DoD. 실제 구현의 로드맵. |
 | `docs/design/` | **시각 디자인 정본**(2026-07-24 도입). Claude Design 프로젝트에서 가져온 `.dc.html` 원본 + `DESIGN-SYSTEM.md`(토큰·컴포넌트·13화면 스펙). `docs/design/AGENTS.md` 참고. |
 | `docs/governance/` | Codex 기획 심의팀 운영 규칙, 회의록 템플릿, ADR, 결정·위험 레지스터. **Git 추적 대상**. |
+| `docs/PM-*.md` | PM의 마일스톤 준비·정합성 분석. 미확정 권고를 포함하는 로컬 산출물이며 승인 정본은 governance/PRD에서 확인한다. |
 | `.claude/CONSTITUTION.md` | Claude·Codex 공통 팀 헌법. 에이전트 편집 금지. |
 | `.claude/team/` | 네 역할의 지침·상태·append-only 작업 기록과 통합 저널. |
 | `docs/log.md` | 개발 학습/작업 로그(과거 JPA·Security·JWT 메모). 현재 소스와 동기화 보장 안 됨(참고용). |
@@ -42,6 +43,7 @@ ZeroVerse Blog MVP 저장소. 개인 블로그 플랫폼으로, 사용자는 자
 | `docs/design/` | 시각 디자인 정본(`.dc.html` 원본 + `DESIGN-SYSTEM.md`). 프론트엔드 작업 전 반드시 읽는다. `docs/design/AGENTS.md` 참고. |
 | `docs/worklog/` | 마일스톤별 개발 로그(`M{n}-<slug>.md`). **git 추적됨**(`!docs/worklog/`). "개발 프로세스" 섹션 참조. |
 | `docs/governance/` | 중요 결정과 대형 마일스톤을 심의하는 Codex 기획 심의팀의 정책·회의록·ADR·레지스터. **git 추적됨**. |
+| `qa/` | 독립 QA 검토·재현 기록. `qa/AGENTS.md`를 따르며 제품 소스와 구현 테스트는 각 소유 역할에 요청한다. |
 | `.claude/` | 공통 팀 헌법, Claude 역할 정의·스킬, 역할별 상태·기록. 앱 코드 아님. |
 | `.codex/` | Codex custom agent 설정. 상태 파일은 두지 않고 `.claude/team/`을 공유. |
 | `.agents/` | Codex 저장소 스킬. `$brief` 포함. |
@@ -72,7 +74,9 @@ ZeroVerse Blog MVP 저장소. 개인 블로그 플랫폼으로, 사용자는 자
 
 이 파이프라인은 프로젝트 고유 릴리스 절차이고, 역할 팀은 각 단계의 실행 단위다. 파일 소유권·상태 기록·완료 증거는 `.claude/CONSTITUTION.md`와 `.claude/team/README.md`를 함께 적용한다. 기존 `docs/worklog/`·`docs/governance/` 기록은 그대로 유지하며 역할별 기록으로 대체하지 않는다.
 
-모든 구현은 `docs/PRD.md`의 마일스톤(M0~M10) 단위로 진행하며, Codex(계획·리뷰) ↔ Claude(개발)를 오가는 아래 사이클을 마일스톤마다 반복한다.
+모든 구현은 `docs/PRD.md`의 마일스톤(M0~M10) 단위로 아래 사이클을 반복한다. **2026-09-06 사용자 승인으로 Codex backend/frontend 역할이 구현하고 독립 QA·리더가 검토한다.** 구현자와 최종 검토자는 서로 다른 컨텍스트를 사용한다. 기존 Claude 개발 이력은 그대로 보존한다.
+
+사용자는 M2 검증 후 M3를 시작하고 이후에도 마일스톤마다 다음 단계로 연속 진행하도록 지시했다. 마일스톤 완료는 세션의 종료 조건이 아니다. 리더는 검증·기록·PR·머지와 다음 마일스톤 준비를 이어가며, 새로운 개별 승인 안건은 구체적인 근거를 갖춰 요청하고 독립 작업을 계속한다. 승인 대기 중인 안건 자체는 준비·독립 검토만 진행하며 구현하지 않는다.
 
 ### 브랜치 전략
 - `main` — 릴리스(안정) 브랜치.
@@ -83,24 +87,24 @@ ZeroVerse Blog MVP 저장소. 개인 블로그 플랫폼으로, 사용자는 자
 ### 사이클 (단계 · 담당 · 도구)
 | 단계 | 담당 | 도구/스킬 |
 |------|------|-----------|
-| 0. 분기 | Claude | Bash git / `git-master` 에이전트 |
-| 1. 계획 | **Codex** | `codex:rescue` 스킬(또는 `Agent(subagent_type="codex:codex-rescue")`) — `docs/PRD.md` + `docs/worklog/*`를 읽고 현재 마일스톤 파악 + 세부 작업계획 제안 → 워크로그 `[계획]` 기록 |
+| 0. 분기 | 리더 | `git` — 완료된 선행 마일스톤의 `dev`에서 분기 |
+| 1. 계획 | **Codex 리더·PM** | `docs/PRD.md` + `docs/worklog/*` + 역할 STATE를 대조하고 세부 계획 작성 → 리더가 워크로그 `[계획]` 기록 |
 | 1a. 조건부 기획 심의 | **Codex 진행자 + Codex 독립 에이전트 3명** | `docs/governance/README.md`의 소집 조건 충족 시 제품성·기술 실현성·전달/위험을 독립 검토. Claude는 심의에 참여하지 않음. `LOW`만 자동 승인, 나머지는 사용자 승인 후 진행 |
-| 2. 개발 | **Claude(Sonnet)** | `Agent(subagent_type="oh-my-claudecode:executor", model="sonnet")` — PRD+계획 기반 구현 + 테스트(PRD §11, TDD) |
-| 점검 | Claude | `verifier` 에이전트 / 빌드·테스트 — 자체 통과 확인(자기 승인 아님, 최종 리뷰는 Codex) |
-| 3a. 커밋·PR | Claude | `git-master` / Bash+`gh` — 원자적 커밋(OMC 커밋 규약, co-author 라인) → `gh pr create --base dev` |
-| 3b. 리뷰 | **Codex** | `codex:rescue` — diff(`dev...feature/M{n}`) + 워크로그로 충돌/코드 꼬임/로그-작업 일치/테스트 적정성 리뷰 → 워크로그 `[리뷰]` 기록 |
-| 수정 루프 | Claude(Sonnet) | executor — 리뷰 반영 → 재리뷰, 클린될 때까지 반복 |
-| 4. 머지 | Claude | `gh pr merge` / `git-master` — `dev`로 머지 → 워크로그 `[머지]` 기록 |
+| 2. 개발 | **Codex backend·frontend** | 역할별 소유 경로에서 PRD+계획 기반 구현 + 테스트(PRD §11, TDD) |
+| 점검 | 구현 역할 | 빌드·테스트·동작 점검 — 자체 통과 확인이며 최종 승인은 아님 |
+| 3a. 커밋·PR | 리더 또는 명시 배정된 역할 | 명시한 파일만 원자적 커밋 → `gh pr create --base dev`. 실제 저자만 기록 |
+| 3b. 리뷰 | **독립 Codex QA·리더** | diff(`dev...feature/M{n}`) + 정본·워크로그·실측 출력 대조 → 리더가 워크로그 `[리뷰]` 기록 |
+| 수정 루프 | 원 구현 역할 → 독립 검토자 | 리뷰 반영 → 재리뷰, 완료 조건 충족까지 반복 |
+| 4. 머지 | 리더 또는 명시 배정된 역할 | `gh pr merge` — `dev`로 머지 → 워크로그 `[머지]` 기록 → 다음 마일스톤 |
 
-- **저자(Claude)와 검토자(Codex)는 항상 분리** — 같은 컨텍스트에서 자기 승인 금지(OMC 원칙).
+- **저자와 최종 검토자는 항상 분리** — Codex 역할끼리도 같은 컨텍스트에서 자기 승인 금지.
 - 기획 심의가 소집되면 독립 에이전트끼리 메시지나 중간 결과를 공유하지 않는다. Codex 진행자만 결과를 취합하며, 상세 운영 규칙은 `docs/governance/README.md`를 따른다.
-- 사이클 동안 `TaskCreate`/`TaskUpdate`로 세부 작업을 추적한다.
+- 사이클 동안 역할별 STATE·WORKLOG와 리더 JOURNAL로 배정·완료·의존을 추적한다. 실행기가 제공하면 `TaskCreate`/`TaskUpdate`도 사용한다.
 
 ### 워크로그 규약
 - 위치: `docs/worklog/M{n}-<slug>.md` — **마일스톤당 Markdown 1파일**. `docs/`는 gitignore이나 `docs/worklog/`와 `docs/governance/`는 예외로 추적됨(PR diff에 로그와 결정 문서 포함).
 - 기록: 파일 내부에 timestamp 항목을 **append**(새 파일 남발 금지).
-- 고정 섹션: `[계획]`(Codex) → `[개발 기록]`(Claude, 시각별) → `[이슈·결정]` → `[리뷰]`(Codex) → `[머지]`.
+- 고정 섹션: `[계획]` → `[개발 기록]`(실제 구현자와 시각 명시) → `[이슈·결정]` → `[리뷰]`(독립 검토자) → `[머지]`. 리더가 단계별 단일 작성자를 배정한다.
 - 목적: 3b 리뷰의 "로그 ↔ 실제 작업 일치" 검증 및 이후 마일스톤 참고.
 
 ## For AI Agents

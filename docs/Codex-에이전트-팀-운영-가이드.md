@@ -14,6 +14,8 @@
 
 Codex 전용 STATE나 WORKLOG를 만들지 않는다.
 
+2026-09-06 사용자는 Codex backend/frontend 구현과 독립 QA·리더 검토를 승인했다. M2 종료 검증 이후 M3부터 마일스톤마다 다음 단계로 연속 진행한다. 동일 컨텍스트의 자기 승인은 금지하며, 현재 배정과 Git 단계 전환은 `AGENTS.md`와 리더 JOURNAL을 따른다.
+
 ## 2. 시작 예시
 
     $brief를 사용해 backend, frontend, qa, pm의 상태와 최우선 다음 행동을 보고해.

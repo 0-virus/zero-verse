@@ -1,6 +1,8 @@
 package com.zeroverse.domain.user.entity;
 
 import com.zeroverse.common.entity.BaseSoftDeleteEntity;
+import com.zeroverse.common.exception.BusinessException;
+import com.zeroverse.common.exception.ErrorCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -10,6 +12,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
+import org.hibernate.annotations.DynamicUpdate;
 
 /**
  * 사용자(REQUIREMENTS §4 User, FR-AUTH-01).
@@ -19,7 +22,18 @@ import java.time.LocalDate;
  * 생성 등 다른 경로의 사용자는 값이 없을 수 있어 컬럼만 열어둔 것이다.
  * soft delete 대상이며 {@code deletedAt}이 채워진 사용자는 없는 계정과 동일하게 취급한다.
  */
+/*
+ * @DynamicUpdate가 필요한 이유: 프로필 수정(FR-SETTINGS-01)과 비밀번호 변경(FR-SETTINGS-02)은
+ * 서로 다른 트랜잭션에서 같은 행을 쓴다. Hibernate 기본 UPDATE는 **모든 컬럼**을 쓰므로, 두 요청이
+ * 옛 행을 함께 읽으면 나중 flush가 상대의 변경을 자기가 읽은 낡은 값으로 덮는다 — 비밀번호를 바꾸고
+ * 성공 응답까지 받았는데 동시에 저장된 프로필이 옛 해시를 되돌려 놓는 식이다. 변경된 컬럼만 쓰면
+ * 서로 다른 필드를 만지는 두 요청이 겹치지 않는다.
+ *
+ * 같은 컬럼을 동시에 고치는 경우의 last-write-wins는 그대로 남는다. 그건 낙관적 잠금(@Version)이
+ * 필요한 범위이며 스키마 변경을 동반하므로 M2에서 다루지 않는다.
+ */
 @Entity
+@DynamicUpdate
 @Table(name = "users")
 public class User extends BaseSoftDeleteEntity {
 
@@ -122,5 +136,59 @@ public class User extends BaseSoftDeleteEntity {
     /** 로그인·토큰 갱신이 가능한 상태인지. soft delete된 사용자는 활성이 아니다. */
     public boolean isActive() {
         return status == UserStatus.ACTIVE && !isDeleted();
+    }
+
+    /**
+     * 사용자 프로필을 업데이트한다(FR-SETTINGS-01).
+     *
+     * <p>name, nickname, bio, birthDate, profileImageUrl을 변경할 수 있다. nickname을 바꿔도
+     * Blog slug는 건드리지 않는다(blob의 urlSlug는 유지). null/blank/길이 검증은 엔티티 수준에서 방어한다.
+     *
+     * @param name 이름, NOT NULL이고 1~100자
+     * @param nickname 닉네임, NOT NULL이고 2~20자, unique는 서비스 레이어에서 검증(FR-AUTH-01·REQUIREMENTS §6.2)
+     * @param bio 소개글, nullable
+     * @param birthDate 생년월일, nullable
+     * @param profileImageUrl 프로필 이미지 URL, nullable
+     * @throws BusinessException name 또는 nickname이 null/blank이거나 길이 초과(VALIDATION_001)
+     */
+    public void updateProfile(String name, String nickname, String bio, LocalDate birthDate,
+                             String profileImageUrl) {
+        if (name == null || name.isBlank()) {
+            throw new BusinessException(ErrorCode.VALIDATION_001, "이름은 필수입니다.");
+        }
+        if (name.length() > 100) {
+            throw new BusinessException(ErrorCode.VALIDATION_001, "이름은 100자 이하여야 합니다.");
+        }
+        if (nickname == null || nickname.isBlank()) {
+            throw new BusinessException(ErrorCode.VALIDATION_001, "닉네임은 필수입니다.");
+        }
+        if (nickname.length() < 2) {
+            throw new BusinessException(ErrorCode.VALIDATION_001, "닉네임은 2자 이상이어야 합니다.");
+        }
+        if (nickname.length() > 20) {
+            throw new BusinessException(ErrorCode.VALIDATION_001, "닉네임은 20자 이하여야 합니다.");
+        }
+
+        this.name = name;
+        this.nickname = nickname;
+        this.bio = bio;
+        this.birthDate = birthDate;
+        this.profileImageUrl = profileImageUrl;
+    }
+
+    /**
+     * 비밀번호를 변경한다(FR-SETTINGS-02).
+     *
+     * <p>이미 BCrypt로 인코딩된 해시를 받는다. 엔티티는 PasswordEncoder에 의존하지 않으며, 현재 비밀번호
+     * 검증은 service 레이어에서 수행한다. 여기서는 받은 hash를 그대로 저장한다.
+     *
+     * @param encodedPassword BCrypt로 인코딩된 비밀번호 해시
+     * @throws BusinessException encodedPassword가 null/blank(VALIDATION_001)
+     */
+    public void changePassword(String encodedPassword) {
+        if (encodedPassword == null || encodedPassword.isBlank()) {
+            throw new BusinessException(ErrorCode.VALIDATION_001, "인코딩된 비밀번호는 필수입니다.");
+        }
+        this.password = encodedPassword;
     }
 }

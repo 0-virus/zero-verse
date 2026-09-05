@@ -61,6 +61,28 @@ describe('RightPanel', () => {
     expect(headings).toEqual(['■ 내 블로그', '■ 최근 알림', '■ 유니버스 현황']);
   });
 
+  it('기본 블로그 제목·slug와 관리/새 글 링크를 렌더한다', () => {
+    render(
+      <MemoryRouter>
+        <RightPanel
+          blog={{ id: 1, title: '나의 별', urlSlug: 'my-renamed-blog', isSetupCompleted: true }}
+        />
+      </MemoryRouter>,
+    );
+
+    const panel = screen.getByRole('complementary', { name: '사이드 패널' });
+    expect(within(panel).getByText('나의 별')).toBeInTheDocument();
+    expect(within(panel).getByText('/blog/my-renamed-blog')).toBeInTheDocument();
+    expect(within(panel).getByRole('link', { name: '블로그 관리' })).toHaveAttribute(
+      'href',
+      '/settings',
+    );
+    expect(within(panel).getByRole('link', { name: '새 글 작성' })).toHaveAttribute(
+      'href',
+      '/write',
+    );
+  });
+
   it('폭 300px에 sticky다', () => {
     render(
       <MemoryRouter>
@@ -87,9 +109,9 @@ describe('ScreenPanel', () => {
     );
 
     expect(links.map((l) => ({ label: l.textContent, href: l.getAttribute('href') }))).toEqual([
-      { label: '프로필', href: '/settings' },
+      { label: '프로필 · 계정', href: '/settings' },
       { label: '유니버스', href: '/settings/universe' },
-      { label: '글·카테고리', href: '/settings/posts' },
+      { label: '카테고리 관리', href: '/settings/posts' },
     ]);
   });
 

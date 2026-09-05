@@ -1,10 +1,11 @@
 import { Route, Routes } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell';
+import { useAuth } from '../lib/authContext';
 import { GuestOnlyRoute, SetupGuard } from './guards';
 import { MainPage } from '../pages/MainPage';
 import { SigninPage } from '../pages/SigninPage';
 import { SignupPage } from '../pages/SignupPage';
-import { BlogSetupPage } from '../pages/BlogSetupPage';
+import { BlogInitialSetupPage } from '../pages/BlogInitialSetupPage';
 import { BlogPage } from '../pages/BlogPage';
 import { PostDetailPage } from '../pages/PostDetailPage';
 import { WritePage } from '../pages/WritePage';
@@ -34,8 +35,10 @@ import { NotFoundPage } from '../pages/NotFoundPage';
  * M2 이후에 쓴다.
  */
 export function AppRoutes() {
+  const { user } = useAuth();
+
   return (
-    <AppShell>
+    <AppShell user={user}>
       <Routes>
         <Route path="/" element={<MainPage />} />
         <Route
@@ -58,7 +61,7 @@ export function AppRoutes() {
           path="/blog/setup"
           element={
             <SetupGuard>
-              <BlogSetupPage />
+              <BlogInitialSetupPage />
             </SetupGuard>
           }
         />

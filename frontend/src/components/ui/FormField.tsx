@@ -7,6 +7,18 @@ export interface FormFieldProps extends InputHTMLAttributes<HTMLInputElement> {
   /** slug 입력의 접두 span */
   prefix?: string;
   trailing?: ReactNode;
+  /**
+   * 라벨 배치. 기본은 라벨이 위(`/blog/setup` 등 온보딩 카드 정본).
+   * `inline`은 `/settings` 정본의 `90px 1fr` 그리드 — 라벨이 입력 왼쪽에 온다.
+   */
+  orientation?: 'stacked' | 'inline';
+  /** 입력 배경. `/blog/setup` 정본은 흰색, `/settings` 정본은 surface-warm. */
+  surface?: 'plain' | 'warm';
+  /**
+   * 라벨 색·굵기. 기본은 잉크/700(`/blog/setup` 정본).
+   * `muted`는 `/settings` 비밀번호 카드 정본의 `12px/600/#9b8aa8`.
+   */
+  labelTone?: 'ink' | 'muted';
 }
 
 export function FormField({
@@ -17,18 +29,18 @@ export function FormField({
   id,
   disabled = false,
   className = '',
+  orientation = 'stacked',
+  surface = 'plain',
+  labelTone = 'ink',
   ...rest
 }: FormFieldProps) {
   const inputId = id ?? `field-${label}`;
   const inputClass = disabled
     ? 'border-2 border-shadow bg-surface-inert text-text-muted'
-    : 'border-2 border-ink bg-surface';
+    : `border-2 border-ink ${surface === 'warm' ? 'bg-surface-warm' : 'bg-surface'}`;
 
-  return (
-    <div className={className}>
-      <label htmlFor={inputId} className="mb-[5px] block text-xs font-bold">
-        {label}
-      </label>
+  const control = (
+    <>
       <div className="flex items-center">
         {prefix && (
           <span className="border-2 border-r-0 border-ink bg-surface-inert px-3 py-2 text-[13px] text-text-muted">
@@ -44,6 +56,29 @@ export function FormField({
         {trailing}
       </div>
       {hint && <p className="mt-[5px] text-[11px] text-text-muted">{hint}</p>}
+    </>
+  );
+
+  if (orientation === 'inline') {
+    return (
+      <div className={`grid grid-cols-[90px_1fr] items-center gap-3 ${className}`}>
+        <label htmlFor={inputId} className="text-[13px] font-semibold text-text-muted">
+          {label}
+        </label>
+        <div>{control}</div>
+      </div>
+    );
+  }
+
+  const stackedLabelClass =
+    labelTone === 'muted' ? 'font-semibold text-text-muted' : 'font-bold';
+
+  return (
+    <div className={className}>
+      <label htmlFor={inputId} className={`mb-[5px] block text-xs ${stackedLabelClass}`}>
+        {label}
+      </label>
+      {control}
     </div>
   );
 }

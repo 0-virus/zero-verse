@@ -1,10 +1,14 @@
 # com.zeroverse (백엔드)
 
+상위 팀 규칙은 `.claude/CONSTITUTION.md`, 역할 규칙과 현재 상태는 `.claude/team/backend/CLAUDE.md`와 `STATE.md`를 먼저 따른다.
+
 ## Purpose
 
 ZeroVerse Blog MVP 백엔드. Spring Boot 3.5 / Java 21 / MySQL 8.x / Flyway. base package는 `com.zeroverse`로 고정한다(PRD §2.2).
 
-## 현재 구조 (M0)
+## 기본 구조
+
+아래는 M0에서 만든 공통 기반이다. 이후 도메인의 현재 구조는 이 표에 고정하지 않고 실제 `src/**`와 backend `STATE.md`에서 확인한다.
 
 ```text
 com/zeroverse/

@@ -1,0 +1,4 @@
+interface:
+  display_name: "ZeroVerse Brief"
+  short_description: "역할 상태와 저장소 현실을 교차 검증해 다음 일을 제안"
+  default_prompt: "Use $brief to summarize ZeroVerse's current role states, blockers, contradictions, and single highest-priority next action."

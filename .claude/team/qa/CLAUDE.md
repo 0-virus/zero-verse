@@ -1,6 +1,7 @@
 # qa 역할 지침
 
 상위: `.claude/CONSTITUTION.md`
+산출물 하위 지침: `qa/AGENTS.md`
 시작 순서: 헌법 → 이 파일 → `STATE.md`
 
 ## 책임

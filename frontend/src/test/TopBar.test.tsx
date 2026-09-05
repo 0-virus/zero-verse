@@ -17,7 +17,8 @@ describe('TopBar', () => {
     expect(screen.getByRole('searchbox', { name: '검색' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '✎ 글쓰기' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '알림' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '제로별' })).toBeInTheDocument();
+    const profileLink = screen.getByRole('link', { name: '로그인' });
+    expect(profileLink).toHaveAttribute('href', '/signin');
   });
 
   it('관리자 항목을 노출하지 않는다 (PRD §9-K 폐기)', () => {

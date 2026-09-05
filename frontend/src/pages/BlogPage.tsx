@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { Button } from '../components/ui/Button';
 import { getPublicBlog } from '../features/blog/blogApi';
+import { ApiRequestError } from '../lib/apiClient';
 import { useHeroBlog } from '../lib/heroBlogContext';
 import type { PublicBlogResponse } from '../features/settings/types';
 
@@ -17,6 +19,8 @@ export function BlogPage() {
   const [blog, setBlog] = useState<PublicBlogResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [canRetry, setCanRetry] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     // 이 effect가 낡았는지 표시한다.
@@ -31,15 +35,22 @@ export function BlogPage() {
 
       setIsLoading(true);
       setError(null);
+      setCanRetry(false);
 
       try {
         const data = await getPublicBlog(blogSlug);
         if (cancelled) return;
         setBlog(data);
         setHeroBlog(data);
-      } catch {
+      } catch (err: unknown) {
         if (cancelled) return;
-        setError('블로그를 찾을 수 없습니다.');
+        if (err instanceof ApiRequestError && err.status === 404) {
+          setError('블로그를 찾을 수 없습니다.');
+          setCanRetry(false);
+        } else {
+          setError('블로그를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
+          setCanRetry(true);
+        }
         setBlog(null);
         setHeroBlog(null);
       } finally {
@@ -56,7 +67,7 @@ export function BlogPage() {
       cancelled = true;
       setHeroBlog(null);
     };
-  }, [blogSlug, setHeroBlog]);
+  }, [blogSlug, retryKey, setHeroBlog]);
 
   if (isLoading) {
     return (
@@ -69,7 +80,19 @@ export function BlogPage() {
   if (error) {
     return (
       <div className="border-[3px] border-ink bg-surface px-6 py-16 text-center shadow-card">
-        <p className="text-[13px] text-danger">{error}</p>
+        <p role="alert" className="text-[13px] text-danger">
+          {error}
+        </p>
+        {canRetry && (
+          <Button
+            variant="neutral"
+            size="sm"
+            className="mt-4"
+            onClick={() => setRetryKey((key) => key + 1)}
+          >
+            다시 시도
+          </Button>
+        )}
       </div>
     );
   }

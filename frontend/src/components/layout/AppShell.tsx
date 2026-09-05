@@ -8,6 +8,7 @@ import { ScreenPanel } from './ScreenPanel';
 import { AUTH_STARS, PixelRocket, PixelStars, SETUP_STARS } from './StarField';
 import { resolveLayout } from '../../lib/layout';
 import { useHeroBlog } from '../../lib/heroBlogContext';
+import type { AuthUser } from '../../types/auth';
 
 /**
  * 앱 셸 = 상단바(PRD §9-L). 사이드바와 컨테이너 폭은 화면별 옵션이다.
@@ -20,7 +21,13 @@ import { useHeroBlog } from '../../lib/heroBlogContext';
  * - `/blog/:slug`: 190px `blog` 히어로 + `240px 1fr`(화면 전용 패널).
  * - 그 외: 화면별 max-width와 컬럼 구성.
  */
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({
+  children,
+  user = null,
+}: {
+  children: ReactNode;
+  user?: AuthUser | null;
+}) {
   const { pathname } = useLocation();
   const { blog } = useHeroBlog();
   const layout = resolveLayout(pathname);
@@ -29,7 +36,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     const decor = layout.onboardingDecor;
     return (
       <div className="min-h-screen bg-paper">
-        <TopBar />
+        <TopBar nickname={user?.nickname} />
         <div
           data-layout="onboarding"
           style={{ background: 'var(--gradient-auth)', minHeight: 'calc(100vh - 118px)' }}
@@ -60,7 +67,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-paper">
-      <TopBar />
+      <TopBar nickname={user?.nickname} />
       {layout.hero && (
         <Hero
           variant={layout.hero.variant}
@@ -92,10 +99,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         }}
         className="mx-auto"
       >
-        {layout.appNav && <SideNav />}
+        {layout.appNav && <SideNav blogSlug={user?.defaultBlog?.urlSlug} />}
         {layout.screenPanel && <ScreenPanel kind={layout.screenPanel} />}
         <main className="min-w-0">{children}</main>
-        {layout.rightPanel && <RightPanel />}
+        {layout.rightPanel && <RightPanel blog={user?.defaultBlog} />}
       </div>
     </div>
   );

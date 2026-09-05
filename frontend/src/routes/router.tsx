@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell';
+import { useAuth } from '../lib/authContext';
 import { GuestOnlyRoute, SetupGuard } from './guards';
 import { MainPage } from '../pages/MainPage';
 import { SigninPage } from '../pages/SigninPage';
@@ -34,8 +35,10 @@ import { NotFoundPage } from '../pages/NotFoundPage';
  * M2 이후에 쓴다.
  */
 export function AppRoutes() {
+  const { user } = useAuth();
+
   return (
-    <AppShell>
+    <AppShell user={user}>
       <Routes>
         <Route path="/" element={<MainPage />} />
         <Route

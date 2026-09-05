@@ -10,13 +10,16 @@ import { Link } from 'react-router-dom';
  * - 좌: 14px 정사각 accent 마크(`4px 4px 0 shadow, -3px 3px 0 ink`) + `ZERO`(잉크)`VERSE`(accent),
  *   Press Start 2P 15px `letter-spacing:1px`.
  * - 중앙: 520px 검색바 — 3px 보더 + `shadow-btn`, 흰 입력 + 잉크 검색 버튼(`#ffd9a0`, `tracking:2px`).
- * - 우(gap 12px): `✎ 글쓰기`(accent) / `알림`(중립) / `제로별`(중립).
+ * - 우(gap 12px): `✎ 글쓰기`(accent) / `알림`(중립) / `user.nickname`(중립, 비로그인은 `로그인`).
  *
  * **관리자 전용 버튼은 없다**(PRD §9-K 폐기). `/admin` 진입은 프로필 메뉴 경유.
  *
  * M0는 구조와 스타일만 확정한다. 검색 실행·알림 카운트 배지·프로필 메뉴 동작은 후속 마일스톤이다.
  */
-export function TopBar() {
+export function TopBar({ nickname }: { nickname?: string | null }) {
+  const isSignedIn = Boolean(nickname);
+  const profileLabel = nickname || '로그인';
+
   return (
     <header
       style={{ height: 64, padding: '0 28px', gap: 20, zIndex: 10 }}
@@ -76,11 +79,11 @@ export function TopBar() {
           알림
         </Link>
         <Link
-          to="/settings"
+          to={isSignedIn ? '/settings' : '/signin'}
           style={{ padding: '7px 14px' }}
           className="border-[3px] border-ink bg-surface text-[13px] font-semibold text-ink shadow-btn hover:bg-surface-raise"
         >
-          제로별
+          {profileLabel}
         </Link>
       </nav>
     </header>

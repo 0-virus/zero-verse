@@ -14,15 +14,20 @@ import { NavLink } from 'react-router-dom';
  * - `/blog/:slug`·`/settings*`의 240px 좌측 패널은 앱 내비가 아니라 **화면 전용 패널**이므로
  *   이 컴포넌트가 아니라 각 화면에서 만든다.
  */
-const ITEMS = [
-  { to: '/', icon: '▲', label: 'Home' },
-  { to: '/blog/me', icon: '■', label: 'My Blog' },
-  { to: '/search', icon: '◎', label: 'Search' },
-  { to: '/settings/universe', icon: '✦', label: 'Universe' },
-  { to: '/settings', icon: '▤', label: 'Settings' },
-];
+interface SideNavProps {
+  /** AuthUser.defaultBlog.urlSlug. 비로그인 상태에서는 로그인 경로로 연결한다. */
+  blogSlug?: string | null;
+}
 
-export function SideNav() {
+export function SideNav({ blogSlug }: SideNavProps) {
+  const items = [
+    { to: '/', icon: '▲', label: 'Home' },
+    { to: blogSlug ? `/blog/${blogSlug}` : '/signin', icon: '■', label: 'My Blog' },
+    { to: '/search', icon: '◎', label: 'Search' },
+    { to: '/settings/universe', icon: '✦', label: 'Universe' },
+    { to: '/settings', icon: '▤', label: 'Settings' },
+  ];
+
   return (
     <nav
       aria-label="주 메뉴"
@@ -34,7 +39,7 @@ export function SideNav() {
       </h2>
 
       <ul>
-        {ITEMS.map((item) => (
+        {items.map((item) => (
           <li key={item.label}>
             <NavLink
               to={item.to}

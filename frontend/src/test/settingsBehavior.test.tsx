@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { BlogInitialSetupPage } from '../pages/BlogInitialSetupPage';
 import { SettingsProfilePage } from '../pages/SettingsProfilePage';
 import { BlogPage } from '../pages/BlogPage';
 import { AppShell } from '../components/layout/AppShell';
-import { AuthProvider } from '../lib/authContext';
+import { AppRoutes } from '../routes/router';
+import { AuthProvider, useAuth } from '../lib/authContext';
 import { HeroBlogProvider, useHeroBlog } from '../lib/heroBlogContext';
 import { resetApiClient } from '../lib/apiClient';
 
@@ -49,6 +50,19 @@ function failure(status: number, code: string, message = '실패') {
   } as unknown as Response;
 }
 
+/** API 응답 파싱과 React 후속 갱신까지 기다릴 수 있도록 본문 읽기를 관측한다. */
+function trackText(response: Response, onRead: () => void) {
+  const readText = response.text.bind(response);
+  return {
+    ...response,
+    text: async () => {
+      const body = await readText();
+      onRead();
+      return body;
+    },
+  } as unknown as Response;
+}
+
 /** 라우트별 응답을 지정하고, 못 맞춘 경로는 명시적으로 실패시킨다. */
 function stubFetch(routes: Array<[RegExp, Handler]>) {
   return vi.fn(async (url: string, init?: RequestInit) => {
@@ -85,6 +99,11 @@ function install(routes: Array<[RegExp, Handler]>) {
 
 function callsTo(pattern: RegExp) {
   return fetchMock.mock.calls.filter((c) => pattern.test(String(c[0])));
+}
+
+function PathProbe() {
+  const { pathname } = useLocation();
+  return <div data-testid="pathname">{pathname}</div>;
 }
 
 describe('/blog/setup — 초기 설정 행동', () => {
@@ -147,6 +166,7 @@ describe('/blog/setup — 초기 설정 행동', () => {
       <MemoryRouter initialEntries={['/blog/setup']}>
         <AuthProvider>
           <HeroBlogProvider>
+            <PathProbe />
             <Routes>
               <Route path="/blog/setup" element={<BlogInitialSetupPage />} />
               <Route path="/blog/:blogSlug" element={<div>도착: 블로그 페이지</div>} />
@@ -160,6 +180,7 @@ describe('/blog/setup — 초기 설정 행동', () => {
     await user.click(screen.getByRole('button', { name: /항해 시작하기/ }));
 
     expect(await screen.findByText('도착: 블로그 페이지')).toBeInTheDocument();
+    expect(screen.getByTestId('pathname')).toHaveTextContent('/blog/already-done');
   });
 
   /** 복구 조회마저 실패하면 갇히지 않도록 안내라도 남겨야 한다. */
@@ -253,7 +274,10 @@ describe('/settings — 프로필·블로그·비밀번호 독립 상태', () =>
 
     const user = userEvent.setup();
     const profileForm = await formOf(/닉네임/);
-    await user.click(within(profileForm).getByRole('button', { name: '저장' }));
+    const saveButton = within(profileForm).getByRole('button', { name: '저장' });
+    expect(saveButton).toHaveClass('self-start', 'px-[22px]');
+    expect(saveButton).not.toHaveClass('w-full');
+    await user.click(saveButton);
 
     // setProfileSuccess(true)를 지우면 여기서 걸린다.
     expect(await screen.findByText('프로필이 저장되었습니다.')).toBeInTheDocument();
@@ -428,6 +452,25 @@ describe('/settings — 프로필·블로그·비밀번호 독립 상태', () =>
 
     await awaitLoadedValue(/생년월일/, '1995-01-01');
     expect(screen.getByLabelText('프로필 이미지')).toHaveValue('https://a.dev/x.png');
+
+    const avatarImage = screen.getByAltText('behaver의 프로필 이미지');
+    expect(avatarImage).toHaveAttribute('src', 'https://a.dev/x.png');
+    const avatar = avatarImage.parentElement;
+    expect(avatar).toHaveClass('h-[90px]', 'w-[90px]', 'bg-surface-raise');
+  });
+
+  it('프로필 이미지 변경 버튼은 URL 입력으로 포커스를 옮긴다', async () => {
+    install([[/\/users\/me$/, () => envelope(USER)], BLOG_GET]);
+
+    renderSettings();
+
+    const user = userEvent.setup();
+    const profileForm = await formOf(/닉네임/);
+    const imageInput = screen.getByLabelText('프로필 이미지');
+    expect(screen.getByRole('img', { name: '프로필 아바타' })).toHaveTextContent('🪐');
+    await user.click(within(profileForm).getByRole('button', { name: '변경' }));
+
+    expect(imageInput).toHaveFocus();
   });
 
   /**
@@ -453,6 +496,10 @@ describe('/settings — 프로필·블로그·비밀번호 독립 상태', () =>
     const image = screen.getByLabelText('프로필 이미지');
     await user.clear(image);
     await user.type(image, 'https://a.dev/new.png');
+    expect(screen.getByAltText('behaver의 프로필 이미지')).toHaveAttribute(
+      'src',
+      'https://a.dev/new.png',
+    );
 
     const profileForm = await formOf(/닉네임/);
     await user.click(within(profileForm).getByRole('button', { name: '저장' }));
@@ -781,9 +828,9 @@ describe('/blog/:slug — 공개 블로그 히어로 연동', () => {
     const aHeld = new Promise<void>((resolve) => {
       releaseA = resolve;
     });
-    let aResolved: (() => void) | null = null;
-    const aDone = new Promise<void>((resolve) => {
-      aResolved = resolve;
+    let aParsed: (() => void) | null = null;
+    const aResponseParsed = new Promise<void>((resolve) => {
+      aParsed = resolve;
     });
 
     install([
@@ -791,9 +838,10 @@ describe('/blog/:slug — 공개 블로그 히어로 연동', () => {
         /\/blogs\/slug\/a$/,
         async () => {
           await aHeld;
-          const res = envelope({ ...BLOG, title: '이전 블로그 A', urlSlug: 'a' });
-          aResolved!();
-          return res;
+          return trackText(
+            envelope({ ...BLOG, title: '이전 블로그 A', urlSlug: 'a' }),
+            aParsed!,
+          );
         },
       ],
       [/\/blogs\/slug\/b$/, () => envelope({ ...BLOG, title: '현재 블로그 B', urlSlug: 'b' })],
@@ -823,6 +871,7 @@ describe('/blog/:slug — 공개 블로그 히어로 연동', () => {
 
     // A가 아직 응답하지 않은 상태에서 B로 이동한다.
     const user = userEvent.setup();
+    await waitFor(() => expect(callsTo(/\/blogs\/slug\/a$/)).toHaveLength(1));
     await user.click(screen.getByRole('button', { name: 'B로 이동' }));
 
     await waitFor(() =>
@@ -830,13 +879,82 @@ describe('/blog/:slug — 공개 블로그 히어로 연동', () => {
     );
 
     // 이제서야 A가 도착한다. 화면은 B 그대로여야 한다.
-    releaseA!();
-    await aDone;
+    await act(async () => {
+      releaseA!();
+      await aResponseParsed;
+      // apiClient의 JSON 파싱과 BlogPage의 async continuation까지 flush한다.
+      await Promise.resolve();
+      await Promise.resolve();
+    });
 
     await waitFor(() =>
       expect(screen.getByTestId('hero')).toHaveTextContent('현재 블로그 B'),
     );
     expect(screen.getByTestId('hero')).not.toHaveTextContent('이전 블로그 A');
+  });
+
+  it('이전 slug의 늦은 오류도 현재 화면을 덮어쓰지 않는다', async () => {
+    let releaseA: (() => void) | null = null;
+    const aHeld = new Promise<void>((resolve) => {
+      releaseA = resolve;
+    });
+    let aParsed: (() => void) | null = null;
+    const aResponseParsed = new Promise<void>((resolve) => {
+      aParsed = resolve;
+    });
+
+    install([
+      [
+        /\/blogs\/slug\/a-error$/,
+        async () => {
+          await aHeld;
+          return trackText(failure(404, 'BLOG_001'), aParsed!);
+        },
+      ],
+      [
+        /\/blogs\/slug\/b-error$/,
+        () => envelope({ ...BLOG, title: '현재 블로그 B', urlSlug: 'b-error' }),
+      ],
+    ]);
+
+    function GoToB() {
+      const navigate = useNavigate();
+      return (
+        <button type="button" onClick={() => navigate('/blog/b-error')}>
+          B로 이동
+        </button>
+      );
+    }
+
+    render(
+      <MemoryRouter initialEntries={['/blog/a-error']}>
+        <HeroBlogProvider>
+          <HeroProbe />
+          <GoToB />
+          <Routes>
+            <Route path="/blog/:blogSlug" element={<BlogPage />} />
+          </Routes>
+        </HeroBlogProvider>
+      </MemoryRouter>,
+    );
+
+    const user = userEvent.setup();
+    await waitFor(() => expect(callsTo(/\/blogs\/slug\/a-error$/)).toHaveLength(1));
+    await user.click(screen.getByRole('button', { name: 'B로 이동' }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('hero')).toHaveTextContent('현재 블로그 B|기존 소개'),
+    );
+
+    await act(async () => {
+      releaseA!();
+      await aResponseParsed;
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId('hero')).toHaveTextContent('현재 블로그 B|기존 소개');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   /**
@@ -935,5 +1053,90 @@ describe('/blog/:slug — 공개 블로그 히어로 연동', () => {
     renderBlog('missing');
 
     await waitFor(() => expect(screen.getByTestId('hero')).toHaveTextContent('없음'));
+    expect(screen.getByRole('alert')).toHaveTextContent('블로그를 찾을 수 없습니다.');
+    expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument();
+  });
+
+  it('일시적인 500 오류는 재시도로 블로그를 다시 불러온다', async () => {
+    let attempt = 0;
+    install([
+      [
+        /\/blogs\/slug\/transient$/,
+        () => {
+          attempt += 1;
+          return attempt === 1
+            ? failure(500, 'COMMON_500')
+            : envelope({ ...BLOG, title: '복구된 블로그', urlSlug: 'transient' });
+        },
+      ],
+    ]);
+
+    renderBlog('transient');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '블로그를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.',
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: '다시 시도' }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('hero')).toHaveTextContent('복구된 블로그|기존 소개'),
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument();
+  });
+});
+
+describe('/ — 기본 블로그 내비게이션 연동', () => {
+  it('로그인 후 기본 블로그 slug를 My Blog와 우측 패널에 반영하고 갱신한다', async () => {
+    let meCalls = 0;
+    const renamedUser = {
+      ...USER,
+      nickname: 'renamed-user',
+      defaultBlog: { ...USER.defaultBlog, title: '이름 바뀐 별', urlSlug: 'renamed-blog' },
+    };
+    install([[/\/auth\/me$/, () => envelope(meCalls++ === 0 ? USER : renamedUser)]]);
+
+    function RefreshUserButton() {
+      const { refreshUser } = useAuth();
+      return (
+        <button type="button" onClick={() => void refreshUser()}>
+          세션 다시 불러오기
+        </button>
+      );
+    }
+
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <AuthProvider>
+          <HeroBlogProvider>
+            <AppRoutes />
+            <RefreshUserButton />
+          </HeroBlogProvider>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: /My Blog/ })).toHaveAttribute(
+        'href',
+        '/blog/behaver',
+      ),
+    );
+    expect(screen.getByRole('link', { name: 'behaver' })).toBeInTheDocument();
+    expect(screen.getByText('테스터의 블로그')).toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: '세션 다시 불러오기' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: /My Blog/ })).toHaveAttribute(
+        'href',
+        '/blog/renamed-blog',
+      ),
+    );
+    expect(screen.getByRole('link', { name: 'renamed-user' })).toBeInTheDocument();
+    expect(screen.getByText('/blog/renamed-blog')).toBeInTheDocument();
+    expect(screen.getByText('이름 바뀐 별')).toBeInTheDocument();
   });
 });

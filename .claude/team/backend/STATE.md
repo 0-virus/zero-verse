@@ -2,39 +2,41 @@
 
 > 덮어쓰기 스냅샷. 시간순 이력은 `WORKLOG.md`, 마일스톤 이력은 `docs/worklog/**`를 본다.
 
-마지막 갱신: 2026-09-06 05:42 KST
+마지막 갱신: 2026-09-06 17:49 KST
 
-## 현재 단계
+## 현재 기준
 
-- 기준 브랜치: `dev`, M2 PR #8 merge commit `4c129e20f58a6ccb9c61246d103934702516c295` (GitHub mergedAt `2026-09-05T20:41:12Z`, 2026-09-06 05:41:12 KST).
-- M0 스캐폴딩과 M1 인증은 `dev` 머지 기록이 있다.
-- M2 backend 검증과 OpenAPI 문서 최소 보완은 완료됐고 루트·QA 독립 대조 결과 최종 APPROVE 및 실제 merge됐다. 공유 checkout의 `dev` tree가 검증 완료 제품 tree와 동일함을 확인했다. 수정은 Controller annotation과 OpenAPI 회귀 테스트로 한정했다.
+- 기준 브랜치: `feature/M3-categories`, 기준 HEAD 표기 `1690731`. Git 조작은 이 역할에서 수행하지 않는다.
+- M3 category 계약은 [ADR-0005](../../../docs/governance/decisions/ADR-0005-categories-contract.md) `ACCEPTED`, M3 회의록 `APPROVED`, 사용자 `시작` 승인에 근거한다. REQUIREMENTS FR-CAT01~05/NFR04~09와 PRD §5.4/§9.5/§10~12를 함께 따른다.
+- 구현 저자는 초안 `m3_backend`와 후속 `m3_backend_resume`이며, migration/wrapper/policy 보완의 제한 작업도 `m3_backend`가 담당했다. 독립 QA 최종 검토와 root 최종 승인은 아직 끝나지 않았다.
 
-## 진행 중
+## M3 구현 현황
 
-- M2 최신 DTO 변경, HTTP 계약, 보안 allowlist, 동시성 및 전체 backend gate 결과를 부모에게 전달했고 merge로 마감했다.
-- Controller annotation에서 M2 보호 operation의 `bearerAuth` 참조, 공개 Blog/auth 발급 operation의 `security=[]`, M2 실제 오류 코드·JSON envelope 응답을 문서화했다.
-- `@ApiResponses` 추가로 자동 200 concrete schema가 사라지는 회귀를 발견해 모든 M2 operation에 `200 + useReturnTypeSchema=true`를 추가했다. OpenAPI 회귀는 media type과 무관하게 concrete `ApiResponse<...>` `$ref`를 확인한다.
-- 새 JAR의 실제 `/v3/api-docs` JSON을 루트·QA가 직접 대조해 `bearerAuth`, 공개 `security=[]`, concrete 성공 schema와 오류 응답을 확인했다. XML 53개/348 tests/실패·오류·skip 0 및 JAR SHA 증거도 대조 완료했다.
-- M3 Architecture 독립 검토(`APPROVE_WITH_CHANGES`, 92/100, HIGH)가 상세 제출됐고 진행자가 회의록에 취합했다. 현재 M3 상태는 `USER_DECISION_REQUIRED`이며 Q1~Q4 사용자 승인 전에는 M3 구현을 시작하지 않는다.
-- 사용자·타 역할의 워킹트리 변경은 보존하며 다른 역할 변경과 섞지 않았다.
+- `src/main/java/com/zeroverse/domain/category/`에 entity·DTO·repository·service·controller와 실제 MySQL count/visibility/order/delete 규칙이 구현되어 있다.
+- `src/main/resources/db/migration/V2__category_active_unique.sql`은 V1을 수정하지 않고 active-key unique를 추가하는 forward migration이다. 활성 name/order 제약, soft-delete 후 재사용, parent 경로 및 blog owner 삭제 검증을 포함한다.
+- `BlogRepository`의 category 경로는 active blog와 active owner를 확인하고, 쓰기는 blog lock 후 재조회한다. `ErrorCode`의 CAT_004 고정 문구, `GlobalExceptionHandler`의 request binding 400 경계, `JacksonConfig`의 strict numeric/enum 입력 정책이 반영되어 있다.
+- category HTTP/OpenAPI 테스트에는 공개 root `parentId: null`, trim-before-size, CAT_004/AUTH 오류, malformed JSON/numeric/enum 입력, 삭제 owner 경계 및 GET `security: []` 구조 검증이 있다. controller 6번째 테스트와 LWW assertion 변경도 최신 full suite에 포함됐다.
 
-## 다음 작업
+## 검증 사실
 
-1. 진행자가 M3 Q1~Q4 사용자 결정을 수령한다.
-2. 승인된 결정만 PRD/REQUIREMENTS/ADR·위험·worklog에 반영하고 M3 구현 범위를 확정한다.
-3. M3 backend 구현 배정 전까지 제품 파일은 동결한다.
+- root full 검증은 `build/m3-root-full-build.log`에서 exit 0, `BUILD SUCCESSFUL in 10m 24s`로 끝났다. XML 직접 집계는 56 suites/370 tests, failures 0/errors 0/skips 0이며 `CategoryServiceMySqlTest` 14, `CategoryControllerMySqlTest` 6, `CategoryMigrationTest` 1, `GlobalExceptionHandlerTest` 5를 포함한다.
+- 산출 JAR는 `build/libs/zeroverse-server-0.0.1-SNAPSHOT.jar`이며 2026-09-06 17:13:54 KST 생성됐다. root가 이를 PID 4904로 127.0.0.1:8080에 기동해 local profile을 확인했다.
+- API/DB smoke는 기동 전 V1/success=1 및 users/blogs/categories/posts = 1/1/1/0, 기동 후 V1/V2 success=1/1 및 동일 행수 보존을 확인했다. Swagger 실제 JSON에서 category GET `security=[]`, POST `bearerAuth`를 확인했고 QA HTTP script도 exit 0이었다. 이후 2계정 추가로 행 수가 증가한 것은 정상 smoke 데이터이며 삭제하지 않는다.
+- 이전 25-test snapshot과 numeric enum 21-test 실패는 진행 중간의 역사 기록으로 `WORKLOG.md`에 보존한다. 최신 full 결과가 이를 대체한다.
 
-## 차단 요인
+## 다음 작업과 위험
 
-- M3 Q1~Q4 사용자 승인이 아직 완료되지 않았다(`USER_DECISION_REQUIRED`).
+1. 브라우저 FE 검증과 QA/root 최종 검토를 완료한다. 현재 M3 최종 승인·merge는 브라우저 검증 전까지 보류한다.
+2. 최신 JAR·API smoke 및 full XML 증거를 독립 검토 기록과 대조한다.
+3. M4의 Post category_id 경로는 ADR-0005대로 동일 blog lock에 참여해야 한다.
 
-## 후속 위험
+## 역사 요약
 
-- RISK-0005의 실제 HTTPS Refresh-cookie smoke는 최초 배포 전 운영 후속 게이트로 남아 있다.
-- 실제 현황은 이 스냅샷보다 Git과 M2 worklog를 우선한다.
+- M0 스캐폴딩과 M1 인증은 `dev`에 머지됐다.
+- M2 backend 검증·OpenAPI 보완은 XML 53개/348 tests, failures/errors/skips 0과 JAR/API 문서 smoke를 root·QA가 독립 대조해 완료했고, M2 PR #8은 merge됐다. 상세 명령·SHA·시각은 기존 `WORKLOG.md` 항목을 보존한다.
+- M3 이전 상태의 Q1~Q4 결정 대기 기록과 중간 25/21-test 기록은 역사로만 남기며, 현재 구현 판단은 ACCEPTED ADR-0005와 최신 full 검증 증거를 따른다.
 
-## 주요 산출물
+## 주요 소유 경로
 
 - `src/main/java/com/zeroverse/**`
 - `src/test/java/com/zeroverse/**`

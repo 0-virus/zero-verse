@@ -45,3 +45,22 @@
 - 정정: 리더의 M2 최종 `[머지]` 기록과 QA 확인이 완료된 실제 상태를 반영해 PM `STATE.md`, `PM-M3-readiness.md`, `PM-M4-readiness.md`의 `리더가 기록 중` 및 M2 continuation 미완료 표기를 완료로 갱신했다.
 - 정정: M3 Q1~Q4 독립 심의·worklog 기록은 완료로, 사용자 정책 승인은 미완료로 분리 표기했다. 회의 상태 `USER_DECISION_REQUIRED`, 정본 반영 전·제품 구현 보류는 유지한다.
 - 범위: PM 소유 상태·준비도·작업 기록만 갱신했으며 PRD·REQUIREMENTS·governance 회의록·제품 코드·Git은 수정하지 않았다.
+
+## 2026-09-06 — M3 사용자 진행 지시와 정본 계약 동기화
+
+- 한 일: 리더가 회의록 §4 Q1~Q4의 구체 권고안·정확한 계약을 제시하고 승인 응답을 기다리던 직후 사용자가 원문 `시작`으로 진행을 지시한 맥락을 확인했다. 리더가 반영한 ADR-0005 `ACCEPTED`, REQUIREMENTS 및 회의록 `APPROVED`와 대조해 새 승인·정책을 만들지 않았다.
+- 산출물: `docs/PRD.md`에 active-only `active_key` unique, root page+children/CategoryResponse, 조회자별 count·`includeDrafts`, `CAT_004~007`, 생성 시에만 parent 선택, DEFAULT/LOCKED·last-write-wins, 기존 setup 뒤 순차 CRUD 복구, M4 동일 `blog_id` lock을 반영했다. SettingsPosts 삭제 안내는 `미분류`로 정합화했다.
+- 산출물: `docs/PM-M3-readiness.md`를 승인된 현재 계약과 승인 전 심의 이력으로 분리하고, `docs/PM-M4-readiness.md`에 승인 계약 인계와 M4 미확정 항목을 갱신했다. `.claude/team/pm/STATE.md`를 현재 단계·진행·차단·다음 작업 구조로 덮어썼다.
+- 검증: `rg -n`으로 PRD/REQUIREMENTS/ADR/회의록의 FR-CAT-01~05·FR-BLOG-02·CAT 코드·active_key·last-write-wins·blog lock·`미분류`를 대조하고, 세 편집 문서를 재독했다. `git diff --check`는 다음 독립 점검에서 리더가 실행할 수 있도록 남겼다. 제품 코드·테스트·Git 조작은 하지 않았다.
+- 미해결: M3 backend/frontend 구현, 실제 MySQL·권한·부분 실패 검증, BE·FE·QA 공통 계약 확인. M4의 S3 bucket/region/IAM 및 별도 권고 안건은 이 승인 범위에 포함하지 않는다.
+
+## 2026-09-06 — M3 정본 최종 대조
+
+- 검증: PRD §5.4의 CAT_006(LOCKED 숫자 순서·불변 변경·잠금 subtree), CAT_007(`displayOrder` 중복·부적합 전체 ID 배열), page 기본값 0/size 20·최대 100, DEFAULT 순서 재배치·LOCKED 숫자 보존, 로그인 비소유자 `PUBLIC + viewer→owner ACCEPTED UNIVERSE` count를 REQUIREMENTS/ADR-0005와 재대조했다.
+- 검증 명령: `rg -n` 핵심 계약 검색(종료코드 0), `rg -n -P "[ \\t]+$"` 편집 파일 trailing whitespace 검사(출력 없음), `git diff --check -- .claude/team/pm/STATE.md .claude/team/pm/WORKLOG.md`(오류 없음; CRLF 경고만). 제품 코드·테스트·Git 조작은 하지 않았다.
+- 상태: PRD·PM-M3/M4 readiness·PM STATE/WORKLOG 반영은 완료됐다. M3 backend/frontend 구현·실제 DB/권한/부분 실패 검증과 BE·FE·QA 공통 계약 확인은 미해결로 유지하며, M4 승인으로 확대하지 않는다.
+
+## 2026-09-06 — 현재 checkout 표기 정정
+
+- 정정: 실제 `git branch --show-current`=`feature/M3-categories`, `git rev-parse --short HEAD`=`1690731`을 확인해 PM-M3 §1, PM-M4 §1, PM `STATE.md`의 현재 위치를 갱신했다. `4c129e20f58a6ccb9c61246d103934702516c295`는 M2의 `dev` merge 이력으로만 표기했다.
+- 범위: 현재 checkout/HEAD 구분만 정정했으며 M3 계약·M4 승인 범위·제품 코드·Git 상태는 변경하지 않았다.

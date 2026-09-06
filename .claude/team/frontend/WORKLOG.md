@@ -62,3 +62,65 @@
 - M3 상태: `USER_DECISION_REQUIRED`. Q1~Q4 카테고리 계약에 대한 사용자 결정·승인 전에는 제품 변경이나 추가 테스트를 시작하지 않는다.
 - 동결: 이번 갱신은 [STATE.md](STATE.md)와 이 WORKLOG append만 수행했다. frontend 제품 코드, 추가 테스트, Git 조작, `docs/worklog/M2-settings.md` 수정은 없으며, 부모가 M2 merge 기록과 M3 계획을 문서화한다. 운영 HTTPS refresh-cookie `RISK-0005`는 배포 전 위험으로 유지한다.
 - 사실 정정: PR #8은 `gh pr merge --merge`로 merge commit `4c129e20f58a6ccb9c61246d103934702516c295`를 생성했으며, 이후 로컬 `dev`를 `origin/dev`에 fast-forward 동기화했다.
+
+## 2026-09-06 06:05 KST — M3 FE 계약·디자인 사전 대조
+
+- 한 일: 헌법→루트 지침→frontend 역할 지침/상태를 순서대로 재확인하고, `docs/design/AGENTS.md`·`DESIGN-SYSTEM.md` 전체와 `ZeroVerse Pages.dc.html`의 `/blog/setup`·`/blog/:slug`·`/settings/posts` 원본 스타일, PRD §5.4·§6·§7·§9·§10~§12, REQUIREMENTS FR-CAT-01~05/FR-BLOG-02/FR-SETTINGS-04, M3 회의록·ADR-0005를 읽었다. `SettingsPostsPage`, `ScreenPanel`, `BlogPage`, `BlogInitialSetupPage`, `settingsApi`/`blogApi`, `apiClient`/`AuthContext`, 공통 UI와 기존 테스트를 읽어 재사용 경계를 확인했다.
+- 산출물: 제품 코드 변경 없음. FE 구현 대상은 기존 `/settings/posts` 보호 라우트·`SettingsPostsPage` placeholder·`ScreenPanel` 카테고리 경계이며, 새 DnD/상태관리 의존성은 추가하지 않는다.
+- 검증: `git status --short`로 공유 작업자의 docs/governance 변경만 확인했고, 현재 backend에는 M3 category controller/service/DTO가 아직 없어 실제 응답 shape를 확정할 수 없음을 확인했다. 디자인·PRD·REQUIREMENTS 계약의 핵심은 전체 root 페이지를 읽어 children을 합친 뒤에만 write/reorder를 허용하고, setup은 initial-setup 성공 후 GET→누락 루트 GENERAL 순차 POST→GET 재확인으로 복구하는 것이다.
+- 미해결: 리더/BE의 계약 검증 전달 전에는 `frontend/**` 제품 파일을 수정하지 않는다. 실제 BE DTO·오류 코드·페이지 응답·LOCKED 순서/삭제 결과를 받은 뒤 타입/API와 행동 테스트를 구현한다.
+
+## 2026-09-06 15:57 KST — M3 승인·FE 구현 게이트 해제 정정
+
+- 정정: 위 06:05 KST 기록은 당시 실제 시각을 확인하지 않고 작성한 사전 대조 기록이다. `Get-Date -Format 'yyyy-MM-dd HH:mm:ss K'` 실제 출력 `2026-09-06 15:57:24 +09:00`을 기준으로 현재 기록 시각을 정정한다. 과거 항목은 append-only 규칙에 따라 보존한다.
+- 승인 상태: 사용자 "시작" 후 M3 회의록 상태 `APPROVED`, ADR-0005 상태 `ACCEPTED`를 확인했다. Q1~Q4 승인 대기 문구는 과거 기록이며 현재 FE 구현을 차단하지 않는다.
+- 게이트: 리더가 MySQL CategoryService/Controller 테스트와 실패·skip 0, DTO/경로/trim/OpenAPI 기본 계약을 확인해 FE 게이트를 해제했다. API 형태는 backend 최종 동시성·추가 입력·migration 검증 중에도 유지된다.
+- 다음: 실제 `categoryApi`·타입·SettingsPostsPage·ScreenPanel·BlogPage·BlogInitialSetupPage 연동과 필수 행동 테스트를 frontend 소유 경로에서 진행한다.
+
+## 2026-09-06 16:25 KST — M3 FE 구현·검증 완료 인계
+
+- 구현: `frontend/src/features/category/categoryApi.ts`에 BE PageResponse/CategoryType(`DEFAULT/GENERAL/LOCKED`)과 GET 전체 root page 병합, 생성·수정·삭제·sibling 전체 ID 순서 API를 추가했다. `categoryApi.test.ts`에서 `includeDrafts`, 101개 루트 2페이지, body/path 계약을 검증했다.
+- 구현: `SettingsPostsPage`를 단일 카드 관리 화면으로 교체했다. 전체 root page 로드 완료 전 mutation/reorder를 잠그고, root+하위 1단계 생성, inline GENERAL 이름 수정, DEFAULT/LOCKED 불변, GENERAL→LOCKED 및 신규 LOCKED 되돌릴 수 없음 확인, 삭제 시 ‘미분류’ 안내, native DnD·ArrowUp/Down 순서와 LOCKED numeric slot 보호, CAT_007 재조회/error 표시를 연결했다.
+- 구현: 공개 `ScreenPanel`은 hero context가 채운 blog id로 `includeDrafts=false` category tree/count를 실제 조회하고, 글 목록·필터는 M4 범위로 만들지 않았다. `BlogPage` stale/auth 동작은 유지했다.
+- 구현: `BlogInitialSetupPage`는 initial-setup 성공(또는 GET 확인 가능한 응답 유실/ BLOG_004 복구) 뒤에만 전체 category GET → 누락 root GENERAL 순차 POST를 수행한다. POST 부분 실패·응답 유실은 GET으로 이미 저장된 항목을 보존하고 남은 항목만 재시도하며 initial-setup을 재호출하지 않는다. 완료된 category 확인 뒤 `refreshUser()`와 blog 이동을 수행한다.
+- 테스트: `categoryBehavior.test.tsx`에서 공개 tree/count, 전체 페이지 로드, child 생성, inline rename, lock/default 보호, keyboard/native DnD, CAT_007 재조회를 실제 행동으로 검증했다. `BlogInitialSetupPage.test.tsx`에 partial failure·lost response·initial-setup 1회 검증을 추가했고 기존 M2 setup 응답도 갱신했다.
+- 검증 명령/핵심 출력: `npm.cmd test` → 23 files / 261 tests passed, 0 failures, 0 skipped; `npm.cmd run lint` → exit 0; `npm.cmd run build` → exit 0, Vite 64 modules; `git diff --check -- frontend .claude/team/frontend` → 오류 없음(공유 checkout의 LF→CRLF 경고만).
+- 현재 환경: checkout `feature/M3-categories`, HEAD `1690731`; root가 관리하는 Vite `http://localhost:5173` launcher PID 24196을 재사용했다. BE API/JAR가 아직 최종 연결되지 않아 1440px 실제 API smoke는 리더·독립 QA 인계로 남겼다.
+- 미해결/위험: BE 최종 동시성·추가 잘못된 입력·migration 검증과 root의 실제 API 브라우저 smoke, 독립 QA diff review 대기. API 형태는 변경하지 않았다.
+
+## 2026-09-06 16:28 KST — 카테고리 단일 조회 기본 페이지 크기 정합화
+
+- 정합화: 서버 계약의 단일 목록 기본값(`page=0`, `size=20`, `includeDrafts=false`)에 맞춰 `getCategories`의 선택적 `size` 기본값을 20으로 조정했다. 관리·공개 전체 로더는 모든 루트 페이지를 읽기 위해 기존처럼 최대 허용값 `size=100`을 명시한다.
+- 검증: 실제 시각 `Get-Date -Format 'yyyy-MM-dd HH:mm:ss K'` 출력 `2026-09-06 16:28:53 +09:00`을 사용했다. `npm.cmd test` → 23 files / 261 tests passed, 0 failures, 0 skipped; `npm.cmd run lint` → exit 0; `npm.cmd run build` → exit 0, Vite 64 modules.
+
+## 2026-09-06 16:45 KST — QA F-M3-FE-01~04 수정·회귀 검증
+
+- F-M3-FE-01 수정: `SettingsPostsPage`에 현재 blog ID와 operation generation 경계를 추가해 blog A→B/null→A 전환 중 늦은 load/mutation/finally가 현재 상태·notice를 덮지 않게 했다. null 전환 시 loading도 해제하고 mutation controls를 초기화한다.
+- F-M3-FE-02 수정: mutation 후 `loadCategories()`의 성공 여부를 확인한 뒤에만 성공 notice를 남긴다. reload 실패는 미확인 결과로 표시하고, CAT_001/CAT_007 문구도 실제 재조회 성공을 주장하지 않도록 바꿨다. retry는 이전 성공 notice를 지운다.
+- F-M3-FE-03 수정: `BlogInitialSetupPage`에 `completedBlog`를 보존하는 `카테고리 관리에서 이어서 하기` 경로를 추가했다. location state로 `/settings/posts` 의도를 보존한 뒤 `refreshUser()`를 수행하고, `SetupGuard`가 완료 세션을 해당 고정 경로로 넘긴다. initial-setup 재호출은 하지 않는다.
+- F-M3-FE-04 수정: 공개 `ScreenPanel`이 `useOptionalAuth().user.id`와 blog identity를 함께 감시하고 요청 시작 시 categories를 비운다. 통계는 로딩 중 `…`, 실패 시 `—`를 표시해 이전 count/미확인 0을 노출하지 않는다.
+- 회귀 테스트: `categoryBehavior.test.tsx`에 mutation 성공→reload 실패→retry, A mutation pending→B/null→A, 공개 blog 전환 loading/failure count, viewer identity 전환 count를 추가했다. `BlogInitialSetupPage.test.tsx`에 partial setup→refreshUser→SetupGuard→관리 경로와 initial-setup 1회 유지를 추가했다.
+- 검증: 실제 시각 `Get-Date -Format 'yyyy-MM-dd HH:mm:ss K'` 출력 `2026-09-06 16:45:40 +09:00` 기준. `npm.cmd test` → 23 files / 266 tests passed, 0 failures, 0 skipped; `npm.cmd run lint` → exit 0; `npm.cmd run build` → exit 0, Vite 64 modules; `git diff --check -- frontend .claude/team/frontend` → 오류 없음(LF→CRLF 및 공유 git ignore 권한 경고만).
+- 남은 범위: 독립 QA·root diff 재검토와 BE/JAR 연결 후 실제 API·1440px 브라우저 smoke 대기. 이번 라운드에서 API 형태·Post/Universe CRUD·새 의존성은 추가하지 않았다.
+
+## 2026-09-06 17:25 KST — QA F-M3-FE-05~07 수정·회귀 검증
+
+- F-M3-FE-05 수정: `SettingsPostsPage`의 create 응답이 `isCurrentOperation` 확인 전에 `newName`을 비우던 순서를 뒤집었다. A blog create가 pending인 동안 B로 전환해 입력한 이름이 늦은 A 응답 때문에 사라지지 않도록 현재 operation과 loaded blog 경계를 먼저 확인한다.
+- F-M3-FE-06 수정: 실제 성공한 category GET의 blog ID를 `loadedBlogId` state로 보존하고 현재 blog ID와 일치할 때만 reorder/create/rename/type/delete/DnD를 허용한다. blog 전환 렌더와 passive effect 사이에도 이전 목록으로 mutation을 시작하지 않으며, 입력 handler와 조작 UI도 같은 준비 상태를 사용한다.
+- F-M3-FE-07 수정: category 부분 실패가 확인되는 즉시 `/blog/setup`의 `setupRecoveryTo: '/settings/posts'` history state를 기록한다. 버튼 클릭 전 새로고침에서도 `SetupGuard`가 관리 화면으로 보낼 수 있고, 전체 성공 시에는 기존 blog 완료 이동과 state 정리를 유지한다. 새 storage/API는 추가하지 않았다.
+- 회귀 테스트: `categoryBehavior.test.tsx`에 delayed create→B 새 입력 보존과 B GET pending 중 이전 loaded 목록 mutation 차단을 추가했다. `BlogInitialSetupPage.test.tsx`에 부분 실패→AuthProvider 재마운트(브라우저 새로고침 동등)→history state 기반 관리 진입과 initial-setup 1회 유지를 추가했다.
+- 검증: 실제 시각 `Get-Date -Format 'yyyy-MM-dd HH:mm:ss K'` 출력 `2026-09-06 17:25:22 +09:00` 기준. `npm.cmd test -- src/test/categoryBehavior.test.tsx src/test/BlogInitialSetupPage.test.tsx` → 2 files / 24 tests passed, 0 failures/0 skipped; `npm.cmd run lint` → exit 0; `npm.cmd run build` → exit 0, Vite 64 modules. 초기 build에서 테스트 callback narrowing 오류 2건이 발생했으나 명시적 callback cast로 보정 후 재빌드 통과했다.
+- 남은 범위: root의 전체 FE test 재실행·diff 독립 검토, BE/JAR 연결 후 실제 API 및 1440px 브라우저 smoke. 제품 파일은 이번 수정 범위에서 동결한다.
+
+## 2026-09-06 18:08 KST — setup 완료 navigation intent 경합 수정·관련 회귀
+
+- 수정: `BlogInitialSetupPage`가 완료 블로그 ref를 유지한 채 `/blog/setup`에 `setupCompletionTo: 'blog'` history state를 먼저 커밋한다. location effect가 해당 intent의 실제 commit과 완료 ref를 확인한 뒤 한 번만 `refreshUser()`를 시작하고, cleanup 시 늦은 continuation을 무시한다. 부분 실패 재시도와 BLOG_004 복구 성공에도 같은 경로를 사용하며, 관리 버튼의 `setupRecoveryTo` 경로는 유지했다.
+- 수정: `SetupGuard`는 완료 사용자이면서 유효한 completion intent일 때 임의 state URL이 아니라 `user.defaultBlog.urlSlug`에서 `/blog/{slug}`를 계산한다. intent가 없으면 기존 `/settings/posts` recovery 또는 `/` 기본 정책을 유지한다.
+- 테스트: 실제 앱과 같은 `/blog/setup`만 Guard, `/blog/myblog`는 공개 목적지인 fixture에서 partial 실패→동일 화면 retry→자기 블로그 이동을 통과시켰고, Guard intent slug 회귀를 추가했다. 초기 설정 1회, 관리 버튼, 새로고침 recovery, 응답 유실/부분 실패, 기존 stale continuation drain을 보존했다. 완료 세션 fixture의 slug도 서버 응답과 일치하도록 정합화했다.
+- 검증: `npm.cmd test -- --run src/test/BlogInitialSetupPage.test.tsx` → 1 file / 13 tests passed; `npm.cmd test -- --run src/test/BlogInitialSetupPage.test.tsx src/test/guards.test.tsx` → 2 files / 25 tests passed; `npm.cmd test -- --run src/test/categoryBehavior.test.tsx src/test/settingsBehavior.test.tsx` → 2 files / 42 tests passed; `npm.cmd run lint` → exit 0; `npm.cmd run build` → exit 0, Vite 64 modules, JS 296.60 kB (gzip 90.75 kB). 실제 시각은 `Get-Date -Format 'yyyy-MM-dd HH:mm:ss K'` 출력 `2026-09-06 18:08:23 +09:00` 기준이다.
+- 실험 정리: plain clear→refresh→navigate는 stale recovery state를 Guard가 먼저 소비해 관리/홈으로 빠졌고, `flushSync`와 `setTimeout(0)` 실험도 제품에서 제거했다. 최종 구현은 명시 intent commit 경로만 남겼다. 전체 FE 269 재실행과 실제 API/1440px 브라우저 smoke는 root/리더 검증으로 남는다.
+
+## 2026-09-06 18:10 KST — refreshUser 실패 회귀 보강·최종 관련 검증
+
+- `BlogInitialSetupPage.test.tsx`에 completion intent 이후 첫 `refreshUser()`만 실패하는 fixture를 추가했다. 완료 블로그로 잘못 이동하지 않고 recovery/관리 재시도로 이어지며 initial-setup 호출이 1회인 것을 확인한다.
+- 최종 관련 실행: `npm.cmd test -- --run src/test/BlogInitialSetupPage.test.tsx src/test/guards.test.tsx src/test/categoryBehavior.test.tsx src/test/settingsBehavior.test.tsx` → 4 files / 68 tests passed, 0 failures/0 skipped; `npm.cmd run lint` → exit 0; `npm.cmd run build` → exit 0, Vite 64 modules, JS 296.60 kB (gzip 90.75 kB). 실제 시각은 `Get-Date -Format 'yyyy-MM-dd HH:mm:ss K'` 출력 `2026-09-06 18:10:56 +09:00` 기준이다.

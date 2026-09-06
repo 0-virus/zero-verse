@@ -44,3 +44,23 @@
 - M2 backend 작업은 검증·독립 QA·실제 smoke·OpenAPI 대조·merge까지 완료됐다. 이전 항목의 XML 53개/348 tests/실패·오류·skip 0과 JAR SHA 증거를 최종 근거로 유지한다. 이번 마감 인계에서는 추가 테스트나 제품 수정 없이 상태만 동기화했다.
 - M3 상태를 `USER_DECISION_REQUIRED`로 전환했다. Architecture 독립 검토(`APPROVE_WITH_CHANGES`, 92/100, HIGH)는 상세 제출·회의록 취합 완료이며, Q1~Q4 사용자 승인 전에는 제품 구현을 시작하지 않는다.
 - 이후 backend 소유 파일·STATE/WORKLOG는 동결한다. 부모가 M2 merge 기록과 M3 계획 기록을 포함한 문서 stage/commit을 수행한다. 본 항목 이후 Git 조작·제품 코드 변경·추가 테스트는 하지 않는다.
+
+## 2026-09-06 17:15 KST — M3 구현 상태·지침 갱신
+
+- 한 일: 현재 `feature/M3-categories` HEAD 표기 `1690731`의 M3 구현 현실을 확인하고 `src/main/java/com/zeroverse/AGENTS.md`, backend `STATE.md`를 M3 category 계약·Jackson strict input·검증 경계에 맞춰 갱신했다. 기존 M2 이력은 역사 요약으로 보존했다.
+- 저자/소유: 초안 `m3_backend`, 후속 `m3_backend_resume`, 제한 migration/wrapper/policy 보완 `m3_backend`; 독립 QA 최종 검토와 root 최종 승인은 미완료다. CategoryMigrationTest와 wrapper의 별도 작업자 소유 이력을 덮어쓰지 않았다.
+- 구현 근거: ADR-0005 `ACCEPTED`, M3 회의 `APPROVED`, 사용자 `시작` 승인. category service/controller/repository, V2 forward migration, CAT_004·binding 400·strict numeric 설정의 현재 경로를 source와 대조했다.
+- 검증 사실: root XML 최신 snapshot은 service14/controller5/migration1/common5 = 25 tests, failures/errors/skips 0, `BUILD SUCCESSFUL` 2m55s다. 이후 controller 6번째 HTTP 경계와 LWW assertion 변경은 그 snapshot에 포함되지 않아 통과로 기록하지 않는다. 별도 관련 실행은 `build/m3-backend-related.log`에 21 tests/1 failure(numeric enum), exit 1로 남아 있다.
+- 미실행/대기: 이 문서 전용 턴에는 테스트·Gradle·Git을 실행하지 않았다. 최신 변경을 포함한 full backend test/build/bootJar, JAR/API smoke, QA 최종 검토는 root 인계 상태로 결과 대기다. API 8080은 미기동이며 Vite 5173과 합성 DB 13306은 준비 상태다.
+
+## 2026-09-06 17:49 KST — M3 full 검증·smoke 결과 동기화
+
+- 한 일: root가 전달한 최종 실행 증거를 backend `STATE.md`에 반영하고, 기존 25-test snapshot과 21-test numeric-enum 실패를 중간 역사로 유지했다. 제품 소스·테스트·Gradle·Git은 이 문서 턴에서 수정하지 않았다.
+- 검증: `build/m3-root-full-build.log` 기준 full build exit 0, `BUILD SUCCESSFUL in 10m 24s`. XML 직접 집계 56 suites/370 tests, failures 0, errors 0, skipped 0. service14/controller6/migration1/common5가 포함되어 owner HTTP 경계와 LWW 변경까지 통과했다.
+- 산출물·smoke: `build/libs/zeroverse-server-0.0.1-SNAPSHOT.jar`가 2026-09-06 17:13:54 KST 생성됐다. PID 4904 local API(127.0.0.1:8080) 기동 후 V1/V2 success=1/1, users/blogs/categories/posts 행 수 1/1/1/1/0 보존을 확인했다. 기동 전 V1 success=1도 확인했다.
+- API/QA: 실제 Swagger JSON에서 category GET `security=[]`, POST `bearerAuth`를 확인했고 QA HTTP script는 exit 0이었다. smoke 중 2계정 추가로 행 수가 증가했으며 해당 데이터는 삭제하지 않는다.
+- 남은 gate: 브라우저 FE 검증과 QA/root 독립 최종 검토 전 M3 최종 승인·merge는 보류한다.
+
+## 2026-09-06 17:50 KST — smoke 행수 표기 정정
+
+- 정정: 직전 항목의 네 테이블 행수는 `users/blogs/categories/posts = 1/1/1/0`이다. V1/V2 Flyway success 값은 별도이며, 기존 `1/1/1/1/0` 표기는 오타다.

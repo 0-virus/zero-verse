@@ -52,6 +52,7 @@ function renderWithSession(
   user: AuthUser | null,
   initialPath: string,
   children: React.ReactNode,
+  locationState?: unknown,
 ) {
   const fetchMock = vi.fn(async (url: string) => {
     if (url.includes('/auth/refresh')) {
@@ -65,13 +66,18 @@ function renderWithSession(
   vi.stubGlobal('fetch', fetchMock);
 
   return render(
-    <MemoryRouter initialEntries={[initialPath]}>
+    <MemoryRouter
+      initialEntries={[
+        locationState === undefined ? initialPath : { pathname: initialPath, state: locationState },
+      ]}
+    >
       <AuthProvider>
         <Routes>
           <Route path={initialPath} element={children} />
           <Route path="/" element={<p>홈</p>} />
           <Route path="/signin" element={<p>로그인 화면</p>} />
           <Route path="/blog/setup" element={<p>초기 설정</p>} />
+          <Route path="/blog/tester" element={<p>completion destination</p>} />
         </Routes>
       </AuthProvider>
     </MemoryRouter>,
@@ -162,6 +168,17 @@ describe('라우팅 가드', () => {
       renderWithSession(SETUP_PENDING, '/blog/setup', <SetupGuard><p>설정 폼</p></SetupGuard>);
 
       await waitFor(() => expect(screen.getByText('설정 폼')).toBeInTheDocument());
+    });
+    it('completion intent uses the authenticated blog slug', async () => {
+      renderWithSession(
+        SETUP_DONE,
+        '/blog/setup',
+        <SetupGuard><p>setup form</p></SetupGuard>,
+        { setupCompletionTo: 'blog' },
+      );
+
+      await waitFor(() => expect(screen.getByText('completion destination')).toBeInTheDocument());
+      expect(screen.queryByText('setup form')).not.toBeInTheDocument();
     });
   });
 });

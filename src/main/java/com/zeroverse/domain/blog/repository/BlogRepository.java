@@ -19,6 +19,15 @@ public interface BlogRepository extends JpaRepository<Blog, Long> {
 
     Optional<Blog> findByIdAndDeletedAtIsNull(Long id);
 
+    @Query("SELECT b FROM Blog b JOIN FETCH b.user "
+            + "WHERE b.id = :blogId AND b.deletedAt IS NULL AND b.user.deletedAt IS NULL")
+    Optional<Blog> findByIdAndDeletedAtIsNullAndUserDeletedAtIsNull(@Param("blogId") Long blogId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT b FROM Blog b JOIN FETCH b.user "
+            + "WHERE b.id = :blogId AND b.deletedAt IS NULL AND b.user.deletedAt IS NULL")
+    Optional<Blog> findByIdAndDeletedAtIsNullForUpdate(@Param("blogId") Long blogId);
+
     /** 사용자의 기본 블로그. 현재는 사용자당 1개이며 가장 먼저 만들어진 것을 기본으로 본다. */
     Optional<Blog> findFirstByUserIdAndDeletedAtIsNullOrderByIdAsc(Long userId);
 

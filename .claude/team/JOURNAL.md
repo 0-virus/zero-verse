@@ -58,3 +58,65 @@
 - 리더 소유 `docs/worklog/M3-categories.md`를 기존 마일스톤당 1파일 규약으로 만들었다. 계획/심의 승인대기만 기록했고 제품 구현·승인·머지를 주장하지 않는다. 결정 레지스터에 USER_DECISION_REQUIRED 안건을 연결했다. root/docs 지침의 기존 worklog 경로 규약은 그대로 적용된다.
 - 운영 문구 동기화: `docs/worklog/README.md`의 개발 기록 담당 `Claude`를 현재 사용자 승인 `구현 역할`로 교체했다. 이유는 AGENTS/헌법의 실제 배정과 일치시키기 위함이며 과거 worklog 저자 기록은 변경하지 않았다. 이 안내 파일은 리더가 소유한다.
 - M2 마감 후에도 M3 준비를 이어갔다. 다음 제품 작업은 Q1~Q4 승인→정본/ADR 동기화→M3 분기/구현이다. 승인에 종속되지 않은 M4 준비도 이미 끝났으며 새로운 제품 범위를 만들지 않는다.
+
+## 2026-09-06 12:28 KST — project-lead 재개·M3 결정 대기
+
+- 실행 상태: **대기**. 사용자 `$project-lead` 호출로 연속 지휘를 재개했다. 리더 `/root`만 실행 중이며 살아 있는 하위 에이전트는 없다. 과거 heartbeat 기록은 현재 등록 증거가 아니고, 이 실행기에 예약 관리 도구가 없어 활성 여부를 확인하지 못했다. 이번 실행은 제공되는 60초 이내 대기 도구로 사용자 입력을 기다린다.
+- brief 직접 대조: 헌법·루트/역할 지침·네 STATE/최근 WORKLOG·JOURNAL·M2/M3 worklog·결정/위험 레지스터·PRD §9/10과 FR-CAT-01~05를 읽었다. 현재 `dev` HEAD `1690731`, M2 merge `4c129e2`는 검증 HEAD `13d8deb`를 포함하며 `git diff 13d8deb HEAD -- src frontend`는 비어 있다. Category는 DEFAULT 생성/기본 조회만, SettingsPostsPage는 scaffold여서 M3 제품 구현 전이라는 기록과 일치한다.
+- 원격 확인: 샌드박스의 `gh`는 401/invalid token을 반환했으나 승인된 외부 샌드박스 조회에서 keyring 인증이 정상임을 확인했다. `gh pr view 8 --json ...`는 MERGED/base dev/head 13d8deb/merge 4c129e2, `gh pr list --state open --json ...`는 빈 배열, exit 0이다. 자격증명 변경은 필요하지 않다.
+- 보존: 시작 전 운영 스킬 이전의 미커밋 4개 파일 및 `.agents/skills/project-lead/`를 그대로 두었다. 제품 소스·브랜치·커밋·PR 변경과 이미 통과한 M2 전체 테스트 재실행은 하지 않았다. 역할별 승인 대기 상태와 M3/M4 준비가 이미 최신이라 중복 배정하지 않았다.
+- 미결: M3 회의 §4 Q1~Q4는 USER_DECISION_REQUIRED이며 새 사용자 응답이 없다. 기존 질문을 중복 생성하지 않고 대화에 승인 대상 요약과 회의록을 연결했다. HIGH 개별 정책 승인 전 REQUIREMENTS/PRD/ADR·DB/API/FE 구현은 보류한다.
+- 다음 행동: Q1~Q4 응답을 수령하면 승인 범위를 기록하고 리더 REQUIREMENTS/ADR 및 PM PRD 반영 → M3 분기 → backend 계약/DB 구현 → frontend 연동 → 독립 QA로 이어간다. 사용자 정지 시 이 대기와 새 배정을 중단한다.
+
+## 2026-09-06 — M3 Q1~Q4 사용자 승인·역할 배정
+
+- 실행 상태: **진행**. 기존 Q1~Q4 권고·회의 §4를 구체적으로 안내하고 대기하던 중 사용자가 **"시작"**이라고 응답했다. 리더는 해당 안으로 진행하라는 지시로 기록·고지했다. 승인된 내용과 원문은 M3 회의 §10 및 ADR-0005에 남겼으며 M4 미결 정책·외부 프로비저닝으로 확대하지 않는다.
+- Git: 승인된 `git switch -c feature/M3-categories` exit 0. 기준 dev `1690731`, 기존 운영 스킬 이전 미커밋 변경 보존, 아직 stage/commit/push 없음.
+- 단일 소유권 배정: `/root/m3_pm` PRD·PM readiness/기록, `/root/m3_backend` src/Gradle/backend 기록, `/root/m3_frontend` frontend/기록, `/root/m3_qa` qa/M3-review.md/QA 기록. 리더는 REQUIREMENTS·governance/ADR-0005·AGENTS·M3 worklog·JOURNAL을 소유한다. FE 실제 연동은 BE 계약 검증 후, QA는 별도 컨텍스트로 최종 검토한다.
+- 문서 변경 근거: REQUIREMENTS의 SERIES/is_default는 기존 PRD §9-H 결정과 불일치하여 DEFAULT enum으로 정합화했고 승인된 active_key/API/count/초기 설정 후속 저장을 추가했다. 변경 전 승인대기·독립 검토와 반론은 회의/작업 기록에 보존한다. RISK-0008은 V2 재사용 이후 복구, RISK-0009는 M4 Post 쓰기의 같은 blog lock 참여를 추적한다.
+- 다음: 실제 저장된 정본·PM 변경을 직접 대조해 backend 편집을 개시하고, 검증 증거와 구현 버전을 확인하며 FE/QA 후속 배정 및 마일스톤 Git 절차까지 이어간다.
+
+## 2026-09-06 14:13 KST — M3 backend 구현·조기 리뷰
+
+- 실행 상태: **진행**, feature/M3-categories HEAD 1690731 위 미커밋 구현. PM 정본 반영을 직접 검증한 뒤 `/root/m3_backend`에 제품 편집을 개시했다. `/root/m3_frontend`는 사전 디자인/코드 조사를 완료하고 BE 계약 검증을 기다리며 `/root/m3_qa`는 독립 acceptance matrix와 정본 대조를 완료했다.
+- 리더가 CategoryService/Repository/DTO/Controller/V2 초안을 직접 읽어 LOCKED 요청 위치 검증·삭제 owner·trim 길이·parentId null·OpenAPI 오류 계약의 조기 회귀를 backend로 돌려보냈다. QA에도 동일 재현 경계를 전달했다. 구현 중 산출물을 최종 승인하지 않는다.
+- 환경: 설치된 Docker Desktop 기동 후 docker ps exit 0을 확인했다. 새 앱 설치·기존 컨테이너/데이터 삭제는 없었다. 현재 후속은 BE 관련 테스트/실제 MySQL 증거→FE 연동→독립 QA/리더 smoke다.
+
+## 2026-09-06 14:48 KST — M3 구현 인계·실제 업그레이드 점검 준비
+
+- 실행 상태: **진행**. 기존 backend 컨텍스트의 응답·검증 보고 지연으로 `/root/m3_backend`를 중단하고 파일 쓰기 소유권을 회수했다. 기존 변경을 보존한 채 새 `/root/m3_backend_resume`에 src/Gradle/backend 기록을 단독 인계했다. 원 구현 초안에 대한 조기 지적과 검증 경계를 함께 전달했으며 이전 컨텍스트는 재개하지 않는다.
+- QA는 `qa/m3-api-smoke.ps1`을 작성하고 PowerShell 문법 검사 exit 0을 보고했다. 리더는 localhost 제한, redirect/cookie 차단, 배열 JSON 보존, 메모리 내 임의 합성 비밀번호와 응답 dispose 보완을 직접 확인했다. 실제 HTTP 실행·M3 승인은 아직 하지 않았다.
+- 리더가 보존되어 있던 합성 테스트용 `zeroverse-m2-smoke-20260906`만 시작했다. 업그레이드 전 읽기 전용 SQL 결과는 Flyway V1/success=1, users=1/blogs=1/categories=1/posts=0이다. 다른 컨테이너와 데이터는 변경·삭제하지 않았으며 새 M3 JAR 적용 후 보존 여부를 비교한다.
+- `.gradle-home/`, `.gradle-home2/`는 backend 실행 중 생긴 로컬 캐시다. `.gitignore`에 두 루트 캐시 경로를 추가하고 `git check-ignore`로 확인했다. 캐시 삭제는 하지 않았으며 제품 의존성·버전은 변경하지 않았다.
+
+## 2026-09-06 15:58 KST — M3 첫 직접 실행·FE 연동 개시
+
+- 이전 항목의 backend 전체 소유권 회수는 유지한다. 다만 스레드 한도 때문에 `/root/m3_backend`를 `CategoryMigrationTest.java` 한 파일의 편집 전용으로 재배정했다. 독립 MySQL에서 V1→V2 보존 검증을 작성했으며 이후 활성 행 재조회와 V1의 기존 삭제행 보존 검증을 수정했다. 다른 src/Gradle/backend 기록은 `/root/m3_backend_resume` 소유이고, 현재 Gradle 실행만 리더가 인수했다.
+- 리더 직접 실행 `--no-daemon --max-workers=1 test --tests com.zeroverse.domain.category.* --tests com.zeroverse.migration.CategoryMigrationTest` 결과: 11개 중 서비스 6/컨트롤러 4 통과, migration 1 실패. XML은 failures=1/errors=0/skipped=0이며 실패 원인은 테스트 helper가 삭제행과 재생성행 둘을 조회한 `IncorrectResultSizeDataAccessException`이다. 이를 제품 성공으로 기록하지 않는다. 파일 수정은 해당 컴파일 이후이므로 재실행이 필요하다. 원 출력은 `build/m3-root-category-tests.log`에 있다. PowerShell 실행기의 종료 코드 0과 달리 Gradle 본문/XML은 실패이므로 XML/본문 판정을 우선했다.
+- 기본 API/DTO·접근·trim·OpenAPI 테스트 10개의 실측을 근거로 `/root/m3_frontend`의 실제 연동을 개시했다. API JSON 계약은 동결하고, backend의 추가 잘못된 입력/동시성/migration 검증과 FE 구현을 병행한다. 이는 M3 최종 승인이나 backend 전체 완료 판정이 아니다.
+- 독립 QA 신규 지적: CAT_004 고정 문구 및 잘못된 JSON/자료형의 VALIDATION_001 공통 응답. backend가 수정을 반영했고 리더는 추가로 Jackson 타입 coercion과 서버 반환값 검증 오류의 500 유지 경계를 재검토하도록 배정했다. QA의 최종 판정은 실제 새 테스트/JAR/FE 검증 이후다.
+
+## 2026-09-06 16:19 KST — M3 회귀·Windows 실패 코드·브라우저 연결
+
+- 리더의 두 번째 관련 실행은 21개 중 서비스 10/HTTP 5/V1→V2 migration 1 통과, 공통 handler 5개 중 잘못된 메시지 기대값 1개만 실패했다. 실제 입력 오류 응답 문구는 기존 VALIDATION_001과 일치했고 테스트 기대값을 수정했다. 숫자 enum 추가 회귀는 다음 실행 대상이다. Jackson 기본 설정을 사용해 임의 숫자 변환을 막고 임시 custom parser 두 개는 제거했다.
+- 두 차례 BUILD FAILED인데 wrapper가 exit 0을 반환한 원인을 gradlew.bat의 미정의 ERRORCODE 참조로 확인했다. /root/m3_backend가 해당 파일만 단독 수정해 초기 오류 코드 1 및 ERRORLEVEL 캡처를 적용했다. 역할 실행에서 nonexistent task=1/help=0/invalid JAVA_HOME=1, 리더 직접 invalid JAVA_HOME=1을 확인했다. 현재 Gradle 세션은 모두 종료했으며 실행 소유권을 /root/m3_backend_resume에 인계해 관련 재회귀→전체 test/build/bootJar를 진행한다.
+- 리더가 Vite를 Hidden으로 시작했다(launcher 24196, localhost:5173, build/m3-vite.log 및 m3-vite.err.log). API 8080은 아직 기동하지 않았다. computer-use의 실제 인벤토리는 apps=[]/browsers=[]였고 내장 iab 생성도 unavailable이었다. plugin-management의 검색/제안 수단도 현재 도구 목록에 없어 임의 설치·권한 변경은 하지 않았다. 사용자에게 Chrome/Edge 연결을 비동기 요청했으며 1440px 실제 검증만 대기한다. FE 구현·BE 자동 검증·QA 독립 검토는 계속한다.
+
+## 2026-09-06 16:37 KST — M3 FE 독립 회귀·실패 복구 재검토
+
+- 리더 직접 FE 실행은 23 files/261 tests, lint, production build 모두 통과했다. 독립 QA의 F-M3-FE-01~04와 리더의 auth 전환 count 대조를 근거로 `/root/m3_frontend`에 오래된 응답 폐기·재조회 실패 문구·setup 관리 진입·공개 count 갱신의 제한 수정 및 회귀를 배정했다. FE 원 구현자의 최종 자체 보고는 독립 승인으로 취급하지 않는다.
+- `/root/m3_backend_resume`가 BE 전 영역의 단독 실행·편집을 유지한다. 기존 `/root/m3_backend`의 migration/정책 테스트 보완은 인계 완료됐고 현재 실행하지 않는다. 최근 관련 21개 중 numeric enum 입력 1개 실패를 정정한 뒤 관련→전체 test/build/bootJar 순서로 진행한다. QA는 제품 파일을 쓰지 않고 최신 계약 변경만 독립 대조한다.
+- 실행 상태 **진행**, feature/M3-categories 미커밋 상태와 기존 사용자 운영 변경을 보존한다. 새 JAR/API 검증·브라우저 연결/1440px·최종 독립 승인·Git 릴리스는 남아 있다.
+
+## 2026-09-06 17:50 KST — M3 전체 backend·JAR·HTTP 통과
+
+- 리더가 Gradle 실행을 인수했고 제품/테스트 소유권은 각 구현자에게 제한 유지했다. 최신 full `build bootJar` exit 0/10m24s, XML 56 suites/370 tests 및 failures/errors/skips 0을 직접 확인했다. `/root/m3_backend`의 lock 내 TransactionTemplate LWW 보완과 `/root/m3_backend_resume`의 삭제 owner HTTP·명시 security[] 검증도 포함된다.
+- 새 JAR SHA256 `422f7216e6b70a8bc533c9f84605c9e3368b961c0f0ac1f58a6b9113819fe369`, local API PID 4904가 127.0.0.1:8080에서 실행 중이다. 기존 합성 DB V1→V2 후 4개 테이블 행수 1/1/1/0 보존을 확인했고 Swagger GET security[]/POST bearerAuth도 실제 JSON으로 확인했다. 이후 QA HTTP smoke exit 0이 추가 합성 두 계정을 만들었으며 삭제하지 않았다.
+- 리더 FE full 269 tests/lint/build는 통과했고, 마지막 setup 성공 시 state 정리 시점 및 지연 응답 assertion의 제한 수정은 `/root/m3_frontend`가 담당한다. QA는 최신 파일과 full XML/실제 HTTP의 증거를 취합하며 제품 최종 승인과 브라우저 gate를 구분한다.
+- 실행 상태 **진행**, feature/M3-categories HEAD 1690731 위 변경 보존. 기존 사용자 스킬 이전 변경은 계속 분리한다. 브라우저 연결 요청에 아직 응답이 없어 실제 1440px/FE API 상호작용은 미검증이다. 최종 검토·Git 릴리스 후 다음 마일스톤으로 이어가는 계획은 유지한다.
+
+## 2026-09-06 18:16 KST — M3 FE 최종 회귀·검토용 PR 준비
+
+- 추가 Guard 회귀에서 partial setup 재시도 성공의 잘못된 관리 화면 이동을 재현했다. frontend는 타이밍 실험을 제거하고 Router completion intent 관측 후 세션 갱신·자기 블로그 이동으로 보완했다. 리더가 최종 관련 4 files/68 tests, lint/build exit 0을 직접 확인했다. 기존 full FE269 이후의 영향 범위 재검증으로 구분한다.
+- QA는 실제 outer transaction/blog lock/Future 결과를 대조해 LWW 증거 부족 판단을 정정·closure했다. BE370 및 HTTP 통과는 유지한다. 마지막 FE intent 패치의 독립 재검토 후 Draft PR을 정리하며, 실제 1440px과 브라우저 API 상호작용은 여전히 미검증이다.
+- 단일 작성자: 제품 frontend는 동결, QA 기록은 `/root/m3_qa`, Git·마일스톤·JOURNAL은 리더다. 사용자 스킬 이전 변경은 분리 보존하며 M3 파일만 커밋/PR 대상으로 삼는다. 현재까지 stage/commit/push/PR은 아직 실행하지 않았다.

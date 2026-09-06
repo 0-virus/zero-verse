@@ -11,4 +11,5 @@
 | ADR-0003 | 2026-07-25 | M1 인증 토큰·세션 및 오류 계약 | HIGH | ACCEPTED | 사용자 | [ADR-0003](decisions/ADR-0003-m1-auth-token-session-contract.md) |
 | M2-20260726-settings | 2026-07-26 | M2 설정 오류·slug 정책·E2E 게이트 | HIGH | APPROVED | **사용자**(2026-07-27 명시 승인) | [회의록](meetings/M2-20260726-settings.md) |
 | ADR-0004 | 2026-07-26 | M2 설정 오류 계약(`USER_005`·`BLOG_004`)·slug 변경 정책·M2 검증 범위 | HIGH | ACCEPTED | **사용자**(2026-07-27 명시 승인) | [ADR-0004](decisions/ADR-0004-error-codes-and-slug-policy.md) |
-| M3-20260906-categories | 2026-09-06 | M3 카테고리 활성 unique·잠금/순서·공개 count·시작 칩 복구 | HIGH | USER_DECISION_REQUIRED | 미정(사용자 Q1~Q4 응답 대기) | [회의록](meetings/M3-20260906-categories.md), [M3 계획](../worklog/M3-categories.md) |
+| M3-20260906-categories | 2026-09-06 | M3 카테고리 활성 unique·잠금/순서·공개 count·시작 칩 복구 | HIGH | APPROVED | 사용자(구체 Q1~Q4 제시 후 "시작", 회의 §10) | [회의록](meetings/M3-20260906-categories.md), [M3 계획](../worklog/M3-categories.md) |
+| ADR-0005 | 2026-09-06 | M3 카테고리 무결성·조회·편집·초기 설정 계약 | HIGH | ACCEPTED | 사용자(회의 §10) | [ADR-0005](decisions/ADR-0005-categories-contract.md) |

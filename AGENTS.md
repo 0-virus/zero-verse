@@ -130,6 +130,7 @@ ZeroVerse Blog MVP 저장소. 개인 블로그 플랫폼으로, 사용자는 자
 - Spring Boot 프로젝트와 React 프로젝트는 구현 중이다. 현재 완료·진행 상태는 커밋 제목으로 추정하지 말고 Git, `docs/worklog/**`, 역할별 `STATE.md`를 대조한다. 구현 순서는 **PRD §10 마일스톤(M0 스캐폴딩 → M1 인증 → … → M10 마감)** 을 따른다.
 - 백엔드 패키지는 PRD §2.2(base `com.zeroverse`, 도메인 패키지 + 레이어드), 프론트는 §2.3. DB 컬럼 snake_case / Java 필드 camelCase(NFR-06), JPA 필드는 래퍼 타입.
 - **카테고리 타입은 `DEFAULT/GENERAL/LOCKED`** (SERIES 제거, §9-H). 미분류=DEFAULT(변경·삭제 불가), LOCKED=잠금(변경·삭제 불가). **공개범위 enum은 `UNIVERSE`이나 화면 표기는 "친구"**(§9-B).
+- M3 카테고리의 상세 예외·계약은 사용자 승인 [ADR-0005](docs/governance/decisions/ADR-0005-categories-contract.md)와 REQUIREMENTS §6.4를 따른다. DEFAULT 순서는 변경 가능하고 LOCKED 숫자 순서는 불변이다. 활성 unique, 공개 count, 초기 설정 후속 카테고리 저장 및 M4 blog lock 인계도 이 계약을 따른다.
 - **프론트엔드는 PRD §6 = `docs/design/DESIGN-SYSTEM.md` 토큰을 반드시 적용**(레트로 픽셀 × 크림 페이퍼 × 황혼의 우주):
   - 배경 `#f6ead8`(paper) · 잉크/보더 `#2b1b3d` · 강조 `#e85d75`(accent) · 하드 오프셋 그림자 `#d8c7b0`.
   - 표면 `#fff` / `#fff8ec` / `#ffe9c9` / `#fff3dd`, 텍스트 `#3d2f52`·`#5c4a72`·`#9b8aa8`, 잉크 위 텍스트 `#ffd9a0`.

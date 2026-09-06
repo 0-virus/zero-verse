@@ -174,3 +174,11 @@ export function useAuth(): AuthContextValue {
   }
   return context;
 }
+
+/**
+ * 앱 셸처럼 인증 공급자 없이도 독립 렌더링될 수 있는 공용 화면용 선택적 인증 조회.
+ * 실제 앱에서는 AuthProvider의 user id가 viewer 권한 경계를 만든다.
+ */
+export function useOptionalAuth(): AuthContextValue | null {
+  return useContext(AuthContext);
+}

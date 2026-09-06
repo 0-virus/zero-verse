@@ -32,6 +32,13 @@ com/zeroverse/
 - **Auditing**: 공통 엔티티는 `BaseEntity` 상속. soft delete가 필요하면 `BaseSoftDeleteEntity`. `@EnableJpaAuditing`을 다른 곳에 중복 선언하면 `jpaAuditingHandler` 빈이 충돌한다.
 - **마이그레이션**: `db/migration/V1__init.sql`은 공유 환경 적용 후 수정 금지. V2 이상 forward migration만 추가한다(RISK-0003).
 
+## M3 카테고리 계약
+
+- M3 category 구현은 승인된 [ADR-0005](../../../../../docs/governance/decisions/ADR-0005-categories-contract.md)와 REQUIREMENTS FR-CAT01~05/NFR04~09를 따른다. `DEFAULT/GENERAL/LOCKED` 타입, 활성 형제 name/order unique, soft-delete 재사용, root page + 직속 children, 실제 post count 및 owner/universe 공개범위를 임의로 축약하지 않는다.
+- 모든 category 쓰기는 blog 소유자·활성 owner 확인과 blog lock 뒤 재조회가 필요하다. reorder는 같은 부모의 활성 ID 전체를 정확히 한 번 받고, LOCKED numeric slot과 subtree 불변 규칙을 보존한다. 삭제 subtree의 live/deleted posts는 활성 DEFAULT로 이동한다.
+- V1은 수정하지 않고 `src/main/resources/db/migration/V2__category_active_unique.sql` 같은 forward migration만 추가한다. category HTTP/OpenAPI 회귀와 MySQL Testcontainers 검증은 `src/test/java/com/zeroverse/domain/category/**`에서 기존 `MySqlTestSupport`/MockMvc 패턴을 재사용한다.
+- JSON 숫자 입력은 `src/main/java/com/zeroverse/config/JacksonConfig.java`의 표준 Jackson coercion 설정을 따른다. 숫자 문자열·float-to-integer·숫자 enum을 조용히 수용하는 category 전용 파서를 새로 만들지 않는다.
+
 ## 보안 설정 — M1에서 교체 완료 (RISK-0002 CLOSED)
 
 `SecurityConfig`는 `anyRequest().authenticated()` + `/api/v1/admin/**`는 `hasRole("ADMIN")`이다. M0의 임시 `anyRequest().permitAll()`은 M1(PR #7)에서 제거했고 `RISK-0002`는 CLOSED다.

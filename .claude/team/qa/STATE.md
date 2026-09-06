@@ -2,35 +2,49 @@
 
 > 덮어쓰기 스냅샷. 시간순 이력은 `WORKLOG.md`, 심의·마일스톤 이력은 `docs/governance/**`와 `docs/worklog/**`를 본다.
 
-마지막 갱신: 2026-09-06 KST (M2 PR #8 dev 머지 확인·M3 선행조건)
+마지막 갱신: 2026-09-06 KST (M3 FE completion-intent 최종 제한 패치 대조)
 
 ## 현재 단계
 
-- M0와 M1은 머지 기록이 있다.
-- M2 최종 QA 판정은 **APPROVE (confidence 96/100)**다. FE 21 files/250 tests·lint/build, BE 53 XML/348 tests·0/0/0·bootJar/build, stale mutation, 새 JAR OpenAPI 및 리더 browser/API smoke가 통과했다. PR #8은 `dev`에 머지되었고 merge commit은 `4c129e20f58a6ccb9c61246d103934702516c295`(GitHub 2026-09-06 05:41:12 KST)다. 배포 전 운영 위험과 문서 후속은 남지만 blocking finding은 없다.
-- M3는 카테고리 API·DB·공개 글 수·오류·초기 설정 연계 계약의 독립 심의가 완료되었고 Q1~Q4 사용자 승인 전 대기 중이며 구현하지 않는다.
+- M2는 PR #8이 `dev`에 머지됐고 QA 최종 판정은 APPROVE(96/100)다. M2 전체 증거를 반복 실행하지 않는다.
+- M3는 사용자의 `시작` 지시로 Q1~Q4 계약이 승인된 뒤 실행 준비 단계다. 제품 acceptance PASS/APPROVE는 아직 아니다.
+- 현재 기준선은 `feature/M3-categories`의 M3 backend 구현 진행본과 FE 구현 진행본이다. M3 제품 acceptance PASS/APPROVE는 아직 아니며 QA는 구현 파일을 수정하지 않는다.
 
 ## 진행 중
 
-- `qa/M2-review.md`에 FR-SETTINGS-01~04/FR-BLOG-01, NFR-04·09/PRD/ADR 근거, 최신 셸 교정 및 문서 감사 결과를 기록했다.
-- FE 최신 diff는 `AppRoutes → AppShell(user) → TopBar/SideNav/RightPanel` props 흐름이며 `/blog/me`, `제로별`, `useOptionalAuth` 의존을 제거했다. 로그인 slug·우측 패널·guest `/signin` 경계를 소스/테스트와 부모 1440px smoke 보고로 대조했다.
-- stale 늦은 성공·실패 테스트는 response body read 관측, `act`, 실제 요청 진입, 후속 flush로 강화되었고 BLOG_004 복구는 `/blog/already-done` path assertion을 추가했다. FE 최종 보고는 21 files/250 tests, failures·skips 0, lint/build exit 0이다.
-- BE 전체 `cleanTest test`는 `build/test-results/test` 53 XML·348 tests·failures/errors/skipped 0으로 독립 재집계했다. bootJar/build exit 0·SHA-256을 부모 로그와 대조했고, 새 JAR PID 24560(05:33:05) `/v3/api-docs`에서 보호·공개 security와 오류/DTO envelope를 직접 확인했다.
-- 루트/팀 지침·운영 가이드·JOURNAL·M2 worklog를 헌법/승인/소유권/과거 기록 보존 관점에서 독립 감사했다. 헌법 diff는 없고, 연속 진행 오독·worklog 섹션 순서의 비차단 위험은 리더 정정 기록으로 해소되었다. 이전 M3 상태 표기 혼재도 리더가 상단과 §7을 `USER_DECISION_REQUIRED`로 통일하고 정정 기록을 남겼다.
+- `qa/M3-review.md`에 FR-CAT-01~05/FR-BLOG-02/NFR-04·08·09 및 승인 계약의 독립 acceptance matrix를 작성했다.
+- V1→V2 active-key unique, 잠금·subtree 삭제, 전체 order 배열·last-write-wins, 실제 posts 이동/count, 방향성 UNIVERSE, setup 부분 실패 복구, Swagger/보안, 1440px 디자인의 증거 요구를 구체화했다.
+- 기존 `MySqlTestSupport`·보안/OpenAPI/Blog 테스트와 FE `apiClient`·초기 설정 테스트 자산을 재사용 대상으로 확인했다.
+- 리더 동기화 후 회의록 `APPROVED`, ADR-0005 `ACCEPTED`, 결정 레지스터, REQUIREMENTS §6.4/NFR-04·08, PRD §9.5·§10~§12, M3 worklog의 승인 맥락을 독립 대조했다. 과거 대기 문구는 회의 §10 역사 기록으로 보존되어 있다.
+- BE 초안에서 전달된 LOCKED reorder no-op, 삭제 owner GET, trim 전 validation, root `parentId=null`, GET CAT_004 문서 status, DELETE/order OpenAPI 항목을 acceptance 재검증 행으로 추가했다. BE 수정 후 독립 검증 대기다.
+- QA 소유 `qa/m3-api-smoke.ps1`를 추가했다. loopback만 허용하고 합성 계정 2개·실제 auth/initial-setup DTO·공통 envelope·401/403·카테고리 CRUD/잠금/순서/삭제 경계를 메모리 내 토큰·비밀번호로 점검하도록 작성했으며, PowerShell `Parser::ParseFile` 문법 검사와 loopback HTTP smoke를 종료 코드 0으로 완료했다.
+- 준비된 `http://127.0.0.1:8080` fresh API에서 `qa/m3-api-smoke.ps1`를 실제 실행해 종료 코드 0을 확인했다. 출력에는 fixture prefix `m3sdab71e3d`만 남았고 합성 owner/viewer 계정은 cleanup하지 않았다. HTTP envelope/timestamp·auth/setup DTO·anonymous/owner/non-owner 보안·trim/duplicate·child/tree·GENERAL→LOCKED·DEFAULT/LOCKED 보호·full-ID reorder·subtree delete/recreate·stale CAT_007 assertion이 통과했다. 이 결과는 SQL post 이동/count·101 root·numeric enum·Swagger·FE/1440px 증거가 아니다.
+- 최신 backend full build 결과를 직접 읽었다. `build/m3-root-full-build.log:38`은 `BUILD SUCCESSFUL in 10m 24s`이며 parent가 보고한 wrapper exit는 0이다. `build/test-results/test/TEST-*.xml` 56개를 재실행 없이 XML 파싱해 합계 370 tests, failures/errors/skips 모두 0을 확인했다.
+- 관련 XML 증거: `CategoryServiceMySqlTest` 14/0은 101 root/page·direct child, full sibling/CAT_007, LOCKED slot/CAT_006, DEFAULT·LOCKED 불변, GENERAL→LOCKED, LOCKED child subtree 보호, live/deleted post의 DEFAULT 이동, owner/draft·direct count·UNIVERSE 방향, create/reorder/delete 경쟁을 포함한다. `CategoryControllerMySqlTest` 6/0은 anonymous/non-owner write, 삭제 owner GET/POST BLOG_001, root null/children, trim 후 100자, malformed enum/string/array/query `VALIDATION_001`, generated OpenAPI status/security를 포함한다. `CategoryMigrationTest` 1/0은 V1 기존행·삭제 history·active_key/name/order scope와 V2 재사용을 확인한다. `GlobalExceptionHandlerTest` 5/0은 JSON/query binding 400을 포함한다. `BlogPublicControllerTest` 8/0도 deleted-owner blog 404를 통과했다.
+- 이전 F-M3-ERR-03은 현재 source `JacksonConfig.java:15–18`의 `featuresToEnable(FAIL_ON_NUMBERS_FOR_ENUMS)`와 controller numeric enum case(`CategoryControllerMySqlTest.java:128–175`)가 full XML 6/0으로 통과해 **현재 열린 결함이 아님**으로 정리한다. 삭제 owner HTTP/OpenAPI/공통 오류도 같은 full 결과로 정적·실행 증거가 보강됐다.
+- LWW는 `CategoryServiceMySqlTest.xml`의 동시 same-ID reorder가 통과하고 `CategoryService.java:180–261`이 blog `PESSIMISTIC_WRITE` lock·전체 sibling ID 검증·임시/최종 flush를 수행한다. `CategoryServiceMySqlTest.java:607–610`의 callback은 outer `TransactionTemplate` 안에서 실행되지만 같은 blog lock이 outer commit까지 유지되므로, T2 callback은 T1 성공 commit 뒤에만 도달한다. 두 `Future.get()` null assertion이 outer commit 성공을 확인하므로 최신 소스·테스트 경계에서 last-write-wins 증거 공백은 해소로 정정한다.
+- 최신 completion-intent 패치까지 실제 source/관련 회귀 소스를 재독해했다. `BlogInitialSetupPage`는 `setupCompletionTo:'blog'` history intent를 먼저 커밋한 뒤 effect에서 `refreshUser`하고, `SetupGuard`는 인증된 `defaultBlog.urlSlug`로 own-blog 목적지를 고정한다. partial management·refresh failure·retry success·remount recovery 및 F05/F06 async drain 회귀를 확인했다. parent의 관련 68 tests와 FE 269/lint/build exit 0은 구현자 참고 결과이며 QA는 npm/Vitest를 재실행하지 않았다. 새 critical 실제 결함은 발견하지 못했다.
+- FE 테스트 소스에는 mutation reload 실패·A→B→null→A 전환·지연 create/order response drain·count/동일 viewer 재조회·partial/lost category POST·completion intent own-blog·refresh failure management recovery·remount history recovery가 추가되어 있다. 실제 브라우저 1440px layout/copy/loading/error와 OS 수준 full reload 관찰은 미검증이다.
 
 ## 다음 작업
 
-1. M2 최종 판정과 FE/BE/OpenAPI/stale/browser 증거를 `qa/M2-review.md`에 기록했다.
-2. 리더의 M2 worklog `[리뷰]`/`[머지]`, PR #8 `dev` 머지, JOURNAL 및 M3 계획·승인대기 기록을 독립 확인했다.
-3. M3 Q1~Q4 사용자 승인·정본/ADR 반영 전 구현을 승인하지 않고, 새 M3 심의 결과는 독립적으로만 기록한다. `docs/PM-M3-readiness.md`의 준비 문서 한정과 일부 과거 `PROPOSED` 참조는 후속 정합성 점검으로 남긴다. RISK-0005 HTTPS 쿠키·RISK-0007 slug link break는 배포 전 별도 gate다.
+1. loopback smoke와 backend full build/XML 및 FE completion-intent/LWW closure를 `qa/M3-review.md` 최신 결론으로 고정한다.
+2. 실제 브라우저 full-refresh·1440px layout/copy/loading/error gate를 수행한다.
+3. 브라우저 gate가 끝날 때까지 M3 최종 PASS/APPROVE를 보류한다.
 
 ## 차단 요인
 
-- M2 source/evidence blocking: 없음. PR #8 `dev` 머지와 리더의 worklog/JOURNAL 기록을 확인했으며 남은 것은 배포 전 운영 위험과 문서 후속이다.
-- M3 착수 차단: 공개 API/DB unique·soft delete/잠금·순서/공개 count/오류 계약과 Q1~Q4가 미확정이다. 심의 문서 현재 상태는 `USER_DECISION_REQUIRED`이며 사용자 승인 전 구현·승인은 금지된다.
+- backend full build와 관련 MySQL/MockMvc/migration/OpenAPI XML 및 LWW lock-serialized commit 범위는 통과했지만, FE 실제 브라우저는 미검증이다.
+- loopback HTTP smoke 자체는 종료 코드 0이다. fixture 계정이 서버에 남아 있으며 cleanup/delete는 수행하지 않았다. parser/HTTP smoke 성공은 제품 전체 acceptance 통과를 의미하지 않는다.
+- numeric enum, owner HTTP, migration, count/move, 101 roots, DEFAULT/LOCKED/subtree, malformed binding, generated OpenAPI는 full XML 통과로 현재 blocking 결함이 아니다.
+- LWW callback 순서가 outer commit 전이라는 점만으로는 반례가 되지 않는다. 동일 blog `PESSIMISTIC_WRITE` lock과 Future null(commit 성공) 경계로 현재 acceptance 범위는 해소다.
+- FE F-M3-FE-01~07 및 completion-intent는 최신 source/관련 회귀 구조상 정적 closure다. FE full 실행은 parent 참고 결과이며, 실제 브라우저 1440px/full-refresh는 미검증이다.
+- 계약 승인 상태는 정합하다. PM의 최종 PRD 기록과 backend/frontend 구현·검증 산출물은 아직 acceptance 전제조건으로 남아 있다.
+- QA 소유권 밖인 제품 코드·제품 테스트·governance/worklog 원본은 변경하지 않는다.
 
 ## 주요 산출물
 
 - `qa/AGENTS.md`
 - `qa/M2-review.md`
+- `qa/M3-review.md`
 - `.claude/team/qa/WORKLOG.md`

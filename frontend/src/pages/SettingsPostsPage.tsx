@@ -488,13 +488,17 @@ export function SettingsPostsPage() {
       <div key={category.id} data-category-id={category.id}>
         <div
           draggable={isReadyForBlog && canReorder && !isMutating}
-          onDragStart={() => {
-            if (canReorder && isReadyForBlog && !isMutating) setDraggedId(category.id);
+          onDragStart={(event) => {
+            if (canReorder && isReadyForBlog && !isMutating) {
+              setDraggedId(category.id);
+              event.dataTransfer?.setData('text/plain', String(category.id));
+              if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+            }
           }}
           onDragEnd={() => setDraggedId(null)}
           onDragOver={(event) => event.preventDefault()}
           onDrop={(event) => void handleDrop(event, category)}
-          className={`flex items-center gap-2 border-b-2 border-shadow px-4 py-3 ${
+          className={`flex items-center gap-3 border-b border-line px-5 py-[13px] ${
             depth > 0 ? 'bg-surface-soft' : 'bg-surface'
           }`}
           style={{ paddingLeft: depth > 0 ? 42 : 16 }}
@@ -509,7 +513,7 @@ export function SettingsPostsPage() {
                 void moveCategory(category, event.key === 'ArrowUp' ? -1 : 1);
               }
             }}
-            className="w-6 shrink-0 border-2 border-transparent text-lg leading-none text-text-muted enabled:cursor-grab enabled:hover:border-ink disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-6 shrink-0 border-2 border-transparent text-[15px] leading-none text-shadow enabled:cursor-grab enabled:hover:border-ink disabled:cursor-not-allowed disabled:opacity-50"
           >
             ⠿
           </button>
@@ -524,19 +528,19 @@ export function SettingsPostsPage() {
               className="min-w-0 flex-1 border-2 border-ink bg-surface-warm px-2 py-1 text-[13px] outline-0"
             />
           ) : (
-            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-ink">
+            <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink">
               {category.name}
             </span>
           )}
-          <span className="shrink-0 text-[11px] text-text-muted">{category.postCount}개의 글</span>
+          <span className="shrink-0 text-xs text-text-muted">{category.postCount}개의 글</span>
           <span className="shrink-0 border border-shadow px-1.5 py-0.5 text-[10px] font-bold text-text-muted">
             {category.type}
           </span>
-          {canRename && editingId !== category.id && (
+          {editingId !== category.id && (
             <Button
               variant="inert"
               size="sm"
-              disabled={!isReadyForBlog || isMutating}
+              disabled={!isReadyForBlog || isMutating || !canRename}
               onClick={() => beginRename(category)}
               aria-label={`${category.name} 이름 변경`}
             >
@@ -553,17 +557,15 @@ export function SettingsPostsPage() {
               저장
             </Button>
           )}
-          {canRename && (
-            <Button
-              variant="danger"
-              size="sm"
-              disabled={!isReadyForBlog || isMutating}
-              onClick={() => void handleDelete(category)}
-              aria-label={`${category.name} 삭제`}
-            >
-              삭제
-            </Button>
-          )}
+          <Button
+            variant={canRename ? 'danger' : 'inert'}
+            size="sm"
+            disabled={!isReadyForBlog || isMutating || !canRename}
+            onClick={() => void handleDelete(category)}
+            aria-label={`${category.name} 삭제`}
+          >
+            삭제
+          </Button>
           <select
             aria-label={`${category.name} 타입`}
             value={category.type}
@@ -585,11 +587,6 @@ export function SettingsPostsPage() {
     <div>
       <h1 className="sr-only">글·카테고리 관리</h1>
       <Panel title="카테고리 관리 — 드래그로 순서 변경" tone="primary">
-        <div className="border-b-2 border-shadow bg-surface-soft px-5 py-3 text-[12px] text-text-body">
-          카테고리를 삭제하면 글은 '미분류'로 이동합니다. 글이 있는 카테고리는 삭제 전 확인을
-          거칩니다.
-        </div>
-
         {isLoading && (
           <p className="px-5 py-10 text-center text-[13px] text-text-muted">카테고리를 불러오는 중...</p>
         )}
@@ -621,7 +618,7 @@ export function SettingsPostsPage() {
           </p>
         )}
 
-        <form onSubmit={handleCreate} className="flex flex-wrap items-end gap-3 border-t-[3px] border-ink bg-surface-raise px-5 py-5">
+        <form onSubmit={handleCreate} className="flex flex-wrap items-end gap-2.5 px-5 py-4">
           <label className="min-w-[220px] flex-1 text-[12px] font-bold text-text-muted">
             새 카테고리 이름
             <input
@@ -670,6 +667,10 @@ export function SettingsPostsPage() {
           </Button>
         </form>
       </Panel>
+      <p className="mt-2 px-1 text-xs text-text-muted">
+        카테고리를 삭제하면 글은 '미분류'로 이동합니다. 글이 있는 카테고리는 삭제 전 확인을
+        거칩니다.
+      </p>
     </div>
   );
 }

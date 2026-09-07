@@ -164,3 +164,21 @@
 - 성공 경계: setup 완료 후 `/blog/setup`에 `setupCompletionTo:'blog'`를 history로 먼저 커밋하고 effect에서 `refreshUser()` 후 완료 blog slug로 이동한다(`BlogInitialSetupPage.tsx:102–150,220–254`). refresh 실패는 recovery state/관리 재시도로 전환한다. `SetupGuard.tsx:73–100`은 인증된 `defaultBlog.urlSlug`로 own-blog 목적지를 고정하고 recovery fallback을 유지한다.
 - 실제 route 회귀: `BlogInitialSetupPage.test.tsx:81–140,301–350`의 `/blog/setup`·`/settings/posts`·`/blog/myblog` route 모델에서 partial retry 성공, completion refresh 실패, remount history recovery를 확인한다. `guards.test.tsx:172–182`는 completion intent slug를 확인한다. F05/F06 delayed response는 `categoryBehavior.test.tsx:346–354,426–433`에서 `act` drain 후 assert한다.
 - 최신 intent 구현/관련 테스트에는 timer/`flushSync` 실험이 남아 있지 않다. 새 critical 실제 결함은 발견하지 못했고 FE 정적/자동/API 범위 검토를 완료로 정리한다. 실제 browser 1440px/full-refresh만 pending이며 M3 최종 승인은 보류한다.
+
+## 2026-09-07 — M3 FE 시각·native DnD 최종 패치 독립 재대조
+
+- 작업: 동결된 `BlogInitialSetupPage`, `SettingsPostsPage`와 최신 관련 회귀 테스트를 ADR-0005 Q2~Q4, REQUIREMENTS FR-CAT/FR-BLOG-02/FR-SETTINGS-04, PRD §7·§9.5, `DESIGN-SYSTEM.md` §3·§7.8·§8.6~§8.7과 읽기 전용 대조했다. 제품 소스·제품 테스트·npm·브라우저는 실행/수정하지 않았다.
+- 결과: 시작 칩/`+ 추가` 점선 스타일, category row spacing/typography, native drag `text/plain` ID와 `effectAllowed=move`, DEFAULT/LOCKED rename/delete `inert+disabled`, 카드 밖 삭제 안내를 정본과 연결했다. 삭제 안내 `미분류`는 디자인 원문의 `전체`와 다르지만 ADR-0005:34·REQUIREMENTS FR-CAT-04:519의 승인 정책 override이므로 finding이 아니다. 신규 critical/high 결함은 발견하지 않았다.
+- 회귀/실행: `BlogInitialSetupPage.test.tsx:267–279`, `categoryBehavior.test.tsx:657–734`의 보강 assertion을 확인했다. `Get-Content build/m3-final-frontend-tests.log`에서 parent 결과 `23 files/273 tests pass`, exit 0을 읽었으며, parent가 보고한 lint·tsc+Vite build exit 0은 참고 증거로만 기록한다. QA는 FE 명령을 재실행하지 않았다. BE full 370 tests/0 failure·error·skip 및 LWW closure는 기존 기록을 유지한다.
+- 잔여/다음 gate: 실제 브라우저 1440px computed layout·카피·loading/error/disabled 상태와 OS full-refresh/session 복원은 상세 증거 도착 전 pending이다. 해당 gate 전 M3 전체 PASS/APPROVE 및 dev 머지 완료를 주장하지 않으며, M3 마감 후 M4는 시작하지 않는다.
+
+## 2026-09-07 — M3 브라우저 부분 증거 재판정
+
+- parent 전달 중간 증거: 가입→setup→자기 blog slug, 새로고침/session 복원, 자식 카테고리 생성 및 ArrowUp 순서 PUT/GET·notice, inline rename·notice, 중복 거부·기존 목록 보존, 새 탭 재조회와 native screenshot의 단일 카드/들여쓰기/행/타이포/DEFAULT disabled/미분류 안내. 이는 QA가 독립 조작한 결과가 아닌 parent 실행 보고로 기록한다.
+- 잔여 실패/미실행: CUA mouse drag가 핸들 focus만 만들고 HTML5 dragstart/dragover/drop lifecycle을 완료하지 않아 실제 마우스 DnD PUT/notice는 미검증이다. LOCKED 경고는 AX에서 확인됐으나 confirm 수락은 timeout/`No dialog is showing`으로 저장되지 않았다. 코드·회귀 테스트 통과를 이 두 브라우저 실측으로 대체하지 않는다.
+- 판정/다음 gate: 정적 FE 패치와 parent 자동/API/부분 브라우저 경로에서 신규 critical/high finding은 없지만 M3 독립 최종 acceptance는 보류한다. 수동 DnD와 LOCKED confirm 수락, 독립 1440px computed layout/copy/loading/error 대조 뒤에만 최종 판단하며, M3 마감 후 M4는 착수하지 않는다.
+
+## 2026-09-07 — 브라우저 evidence 상태 정정
+
+- frontend 작성자와 별도 컨텍스트인 root의 직접 실행·관측으로 signup/setup/self-blog/full-refresh/session, keyboard reorder, rename, duplicate rejection, new-tab persistence 및 1440px native screenshot(단일 카드·들여쓰기·행·타이포·DEFAULT disabled·미분류 안내)을 완료 근거로 반영한다. 이를 QA 직접 실행으로 표기하지 않으며, root 독립 검토 evidence로 대조했다.
+- 남은 게이트는 CUA mouse-DnD가 HTML5 lifecycle을 완료하지 못한 실제 마우스 순서 PUT/notice와 LOCKED confirm 수락 후 불변 상태뿐이다. confirm은 timeout/`No dialog is showing`으로 저장되지 않았다. 사용자 확인/도구 제약을 해소하기 전 M3 최종 acceptance와 dev 머지는 보류한다.

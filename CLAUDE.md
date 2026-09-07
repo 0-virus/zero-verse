@@ -2,6 +2,8 @@
 
 개인 블로그 플랫폼 ZeroVerse의 Spring Boot + React MVP 저장소다.
 
+로컬 테스트 서버와 웹 화면 실행 방법은 리더 소유의 루트 `README.md`를 따른다.
+
 ## 시작 전 필독
 
 1. `.claude/CONSTITUTION.md` — 모든 에이전트에 우선하는 팀 헌법

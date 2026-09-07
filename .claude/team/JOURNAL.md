@@ -59,6 +59,15 @@
 - 운영 문구 동기화: `docs/worklog/README.md`의 개발 기록 담당 `Claude`를 현재 사용자 승인 `구현 역할`로 교체했다. 이유는 AGENTS/헌법의 실제 배정과 일치시키기 위함이며 과거 worklog 저자 기록은 변경하지 않았다. 이 안내 파일은 리더가 소유한다.
 - M2 마감 후에도 M3 준비를 이어갔다. 다음 제품 작업은 Q1~Q4 승인→정본/ADR 동기화→M3 분기/구현이다. 승인에 종속되지 않은 M4 준비도 이미 끝났으며 새로운 제품 범위를 만들지 않는다.
 
+## 2026-09-06 — 연속 지휘 스킬의 프로젝트 이전·범용화
+
+- 사용자 요청: 글로벌 스킬을 프로젝트 `.agents/`로 옮기고 범용 스킬로 작성한다. 이번 작업은 스킬 수정이며 제품 연속 실행의 시작이나 M3 정책 승인을 뜻하지 않는다.
+- 이전: `C:/Users/PC/.codex/skills/zeroverse-lead/`의 `SKILL.md`·`agents/openai.yaml`을 제거하고 `.agents/skills/project-lead/`의 같은 두 파일로 대체했다. 새 스킬과 이 운영 문서는 리더 소유다. 기존 글로벌 위치에는 빈 폴더만 남았으며, 비재귀 빈 폴더 정리 명령은 실행 정책에 의해 차단되어 재시도하지 않았다.
+- 범용화: 특정 프로젝트명·custom role·PRD 절 번호·팀 기록 경로·브랜치·심의 인원·OS 명령 고정을 프로젝트 지침 탐색으로 대체했다. brief가 있으면 그 읽기 전용 경계를 지키고, 없으면 실제 상태·명세·검증을 직접 대조한다. Git·상설 역할·상태 파일이 없는 프로젝트도 기존 산출물과 대화 기록을 사용한다.
+- 보존: 사용자 정지만 자발적 종료 조건으로 삼고, 마일스톤·에이전트 완료 후 다음 작업, 승인 대기·작업 소진 시 실제 대기, 정지 후 명시적 재개, 독립 검증과 기존 승인 경계를 유지했다. 기존 brief·헌법·제품 소스·승인 정본은 변경하지 않았다.
+- 참조 동기화: `AGENTS.md`, 팀 `README.md`, Codex 운영 가이드의 실행법·스킬 목록에 `$project-lead`를 연결했다. 기존 역할 지침·STATE에는 이전 이름 참조가 없어 별도 변경하지 않았다. 이 항목의 이전 이름은 이전 경위를 보존하는 기록이다.
+- 검증: bundled `quick_validate.py`는 `Skill is valid!`/exit 0, `git diff --check`는 오류 없음, 새 스킬은 Git ignore 대상이 아니다. 실제 파일 재독과 특정 프로젝트 문자열 검색에서 종속 고정값이 없음을 확인했다. 글로벌 두 파일은 부재, 프로젝트 두 파일은 존재한다. 독립 에이전트가 다른 명세 경로·역할·trunk 브랜치, Git/brief/상태 파일 부재, 읽기 전용 brief 이후 배정, 승인 대기 중 상태 질문·정지 사례를 검토했다.
+
 ## 2026-09-06 12:28 KST — project-lead 재개·M3 결정 대기
 
 - 실행 상태: **대기**. 사용자 `$project-lead` 호출로 연속 지휘를 재개했다. 리더 `/root`만 실행 중이며 살아 있는 하위 에이전트는 없다. 과거 heartbeat 기록은 현재 등록 증거가 아니고, 이 실행기에 예약 관리 도구가 없어 활성 여부를 확인하지 못했다. 이번 실행은 제공되는 60초 이내 대기 도구로 사용자 입력을 기다린다.
@@ -142,3 +151,16 @@
 - 실제 브라우저에서 합성 블로그의 root/child 키보드 순서 저장, child rename, duplicate 오류·기존 목록 보존 및 새 탭 세션/데이터 복구를 확인했다. 최신 스크린샷의 단일 카드·들여쓰기·disabled 보호 버튼·카드 밖 캡션도 대조했다.
 - native drag payload를 최소 보완했지만 CUA pointer drag로는 실제 drop이 완료되지 않았다. 제품 결함이나 도구 제약을 확정하지 않고, 사용자에게 실제 마우스 이동과 저장 notice 확인을 요청했다. 확인창 처리 도구 오류가 난 LOCKED 저장도 실제 UI PASS로 보고하지 않는다. 상세 증거 경계는 M3 worklog와 독립 QA 기록을 따른다.
 - /root/m3_qa가 최신 변경을 독립 검토 중이며 /root/m3_frontend는 소유 STATE의 오래된 HEAD·브라우저 완료 표현만 정정한다. root는 명시 파일의 README/검증 체크포인트 커밋을 준비하며 Draft PR #9는 최종 승인 전 머지하지 않는다. M4 미착수, 사용자 운영 변경·합성 DB·서버 보존.
+
+## 2026-09-07 23:10 KST — README·최종 패치 push, 실제 조작 확인 대기
+
+- `4fc9ae22701c99db031af03fd7ddf120fe74ae92`(14 files, +408/-46)을 명시 stage해 커밋·push했다. README, FE 시각/native payload 보완·회귀, 독립 QA와 역할/리더 기록을 포함한다. 기존 사용자 변경은 JOURNAL9줄·팀README1줄·AGENTS3추가/1삭제·운영가이드9추가/1삭제 및 untracked project-lead 스킬로 그대로 남았다. staged diff check와 AGENTS/JOURNAL BOM 부재를 확인했다.
+- GitHub PR #9의 head=4fc9ae2/base=dev/OPEN/Draft/MERGEABLE/CLEAN/checks=[]를 직접 조회했고 본문을 BE370·FE273/실제 브라우저 확인 범위·남은 mouse-DnD와 LOCKED confirm으로 갱신했다. QA는 신규 critical/high 없음, root 독립 화면/기능 증거 반영, 두 실제 조작 미확인으로 최종 acceptance 보류를 보고했다.
+- 실행 상태 **대기**. 요청한 마우스 정렬 수동 확인 응답은 아직 없다. LOCKED 경고 이후 저장 완료도 도구가 처리하지 못했다. 지원되지 않는 이벤트 주입·브라우저 우회는 하지 않으며 사용자 확인 전 M3 완료·머지를 주장하지 않는다. 재개: 두 조작 결과→필요 시 원 작성자 수정/관련 회귀→QA 최종 검토→dev 머지·마감 후 종료. M4 미착수.
+- 실행 중 하위 에이전트/테스트는 없다. API·Vite·합성 DB를 보존하고 임시 viewport override는 reset했다. 수동 확인 탭은 handoff로 유지했다. 본 checkpoint는 다음 마감 커밋용으로 stage하며 실제 머지 기록은 아직 없다.
+
+## 2026-09-07 23:19 KST — 사용자 요청으로 staged·unstaged 변경 통합 커밋 준비
+
+- 사용자 명시 요청: `스테이징된 내용, 스테이징 안된 내용 보고 같이 커밋 푸시 해줘`. 이전에 제외했던 사용자 소유 운영 문서·project-lead 스킬도 이번 커밋에 포함하도록 승인받았다. 기존 기록의 제외 설명은 당시 경위를 보존하며 변경하지 않는다.
+- 리더가 staged M3 체크포인트와 unstaged 운영 문서, 신규 SKILL.md/openai.yaml 총 7개 파일의 원문을 검토했다. 제품 코드·비밀값·실행 산출물은 없고 diff whitespace 검증을 통과했다. 원격 feature/M3-categories를 fetch한 결과 HEAD와 ahead/behind 0/0이다. 앱 변경이 없어 BE/FE 테스트는 재실행하지 않았다.
+- 범위는 현재 feature/M3-categories의 문서·스킬 커밋과 같은 origin 브랜치 push다. PR 머지·M3 acceptance·브라우저 검증 완료를 의미하지 않으며 두 실제 조작 확인 대기와 M4 미착수는 유지한다. 리더가 명시 파일만 stage하고 최종 원격 SHA/작업 트리를 확인한다.

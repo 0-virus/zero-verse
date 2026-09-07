@@ -321,7 +321,7 @@ export function BlogInitialSetupPage() {
             {startCategories.map((category) => (
               <span
                 key={category}
-                className="inline-flex items-center gap-1 border-2 border-ink bg-surface-raise px-2.5 py-1.5 text-[11px] font-bold"
+                className="inline-flex items-center gap-1 border-2 border-ink bg-surface-raise px-3 py-[5px] text-xs font-bold"
               >
                 {category}
                 <button
@@ -352,9 +352,13 @@ export function BlogInitialSetupPage() {
               className="min-w-0 flex-1 border-2 border-ink bg-surface px-3 py-2 text-[12px] outline-0"
               maxLength={100}
             />
-            <Button variant="inert" size="sm" type="button" onClick={addStartCategory}>
+            <button
+              type="button"
+              onClick={addStartCategory}
+              className="cursor-pointer border-2 border-dashed border-shadow bg-transparent px-3 py-[5px] text-xs text-text-muted disabled:cursor-not-allowed disabled:opacity-60"
+            >
               + 추가
-            </Button>
+            </button>
           </div>
         </fieldset>
 

@@ -264,6 +264,20 @@ describe('BlogInitialSetupPage', () => {
     expect(screen.getByRole('button', { name: /항해 시작하기/ })).toBeInTheDocument();
   });
 
+  it('시작 카테고리 칩과 추가 버튼은 정본의 크기·점선 경계를 유지한다', async () => {
+    renderComponent();
+    const user = userEvent.setup();
+
+    const backendChip = screen.getByRole('button', { name: '백엔드 시작 카테고리 삭제' }).parentElement;
+    expect(backendChip).toHaveClass('px-3', 'py-[5px]', 'text-xs', 'font-bold');
+    const addButton = screen.getByRole('button', { name: '+ 추가' });
+    expect(addButton).toHaveClass('border-2', 'border-dashed', 'border-shadow', 'px-3', 'py-[5px]', 'text-xs');
+
+    await user.type(screen.getByRole('textbox', { name: '시작 카테고리 추가' }), '새 루트');
+    await user.click(addButton);
+    expect(screen.getByRole('button', { name: '새 루트 시작 카테고리 삭제' })).toBeInTheDocument();
+  });
+
   it('카테고리 일부 실패 뒤 재시도해도 initial-setup은 다시 호출하지 않는다', async () => {
     const stub = createCategoryRecoveryStub('partial');
     renderComponent(stub.fetchStub);

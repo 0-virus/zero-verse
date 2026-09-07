@@ -670,8 +670,28 @@ describe('M3 카테고리 관리 행동', () => {
     await screen.findByRole('button', { name: '잠금 순서 이동' });
     expect(screen.getByRole('combobox', { name: '기본 타입' })).toBeDisabled();
     expect(screen.getByRole('combobox', { name: '잠금 타입' })).toBeDisabled();
-    expect(screen.queryByRole('button', { name: '기본 이름 변경' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '잠금 이름 변경' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '기본 이름 변경' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '기본 삭제' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '잠금 이름 변경' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '잠금 삭제' })).toBeDisabled();
+
+    const defaultItem = screen
+      .getByRole('button', { name: '기본 순서 이동' })
+      .closest('[data-category-id]') as HTMLElement;
+    const defaultRow = defaultItem.firstElementChild as HTMLElement;
+    expect(defaultRow).toHaveClass('gap-3', 'border-b', 'border-line', 'px-5', 'py-[13px]');
+    expect(within(defaultRow).getByText('기본')).toHaveClass('text-sm', 'font-bold');
+    expect(within(defaultRow).getByText('1개의 글')).toHaveClass('text-xs');
+    expect(screen.getByRole('button', { name: '기본 순서 이동' })).toHaveClass('text-[15px]', 'text-shadow');
+
+    const panel = screen
+      .getByRole('heading', { level: 2, name: /카테고리 관리/ })
+      .closest('section') as HTMLElement;
+    expect(panel.querySelector('form')).toHaveClass('gap-2.5', 'px-5', 'py-4');
+    expect(panel.querySelector('form')).not.toHaveClass('border-t-[3px]', 'bg-surface-raise');
+    const caption = screen.getByText(/카테고리를 삭제하면 글은 '미분류'로 이동합니다/);
+    expect(caption).toHaveClass('mt-2', 'px-1', 'text-xs', 'text-text-muted');
+    expect(caption.closest('section')).toBeNull();
   });
 
   it('키보드와 native DnD는 sibling 전체 ID를 보내고 LOCKED 숫자 자리는 지킨다', async () => {
@@ -704,7 +724,10 @@ describe('M3 카테고리 관리 행동', () => {
       .getByRole('button', { name: '잠금 순서 이동' })
       .closest('[data-category-id]') as HTMLElement;
     await waitFor(() => expect(screen.getByText('카테고리 순서를 저장했습니다.')).toBeInTheDocument());
-    fireEvent.dragStart(generalRow.firstElementChild as HTMLElement);
+    const dataTransfer = { setData: vi.fn(), effectAllowed: '' };
+    fireEvent.dragStart(generalRow.firstElementChild as HTMLElement, { dataTransfer });
+    expect(dataTransfer.setData).toHaveBeenCalledWith('text/plain', '2');
+    expect(dataTransfer.effectAllowed).toBe('move');
     await new Promise((resolve) => setTimeout(resolve, 0));
     fireEvent.drop(lockedRow.firstElementChild as HTMLElement);
     expect(screen.getByRole('alert')).toHaveTextContent('잠금 카테고리의 숫자 순서는 변경할 수 없습니다');

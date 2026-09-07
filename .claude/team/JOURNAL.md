@@ -120,3 +120,25 @@
 - 추가 Guard 회귀에서 partial setup 재시도 성공의 잘못된 관리 화면 이동을 재현했다. frontend는 타이밍 실험을 제거하고 Router completion intent 관측 후 세션 갱신·자기 블로그 이동으로 보완했다. 리더가 최종 관련 4 files/68 tests, lint/build exit 0을 직접 확인했다. 기존 full FE269 이후의 영향 범위 재검증으로 구분한다.
 - QA는 실제 outer transaction/blog lock/Future 결과를 대조해 LWW 증거 부족 판단을 정정·closure했다. BE370 및 HTTP 통과는 유지한다. 마지막 FE intent 패치의 독립 재검토 후 Draft PR을 정리하며, 실제 1440px과 브라우저 API 상호작용은 여전히 미검증이다.
 - 단일 작성자: 제품 frontend는 동결, QA 기록은 `/root/m3_qa`, Git·마일스톤·JOURNAL은 리더다. 사용자 스킬 이전 변경은 분리 보존하며 M3 파일만 커밋/PR 대상으로 삼는다. 현재까지 stage/commit/push/PR은 아직 실행하지 않았다.
+
+## 2026-09-06 18:43 KST — M3 Draft PR #9·실제 화면 검증 대기
+
+- 실행 상태 **대기**. QA의 최종 staged 패치/증거 확인 후 M3 구현 `067cd1174aeec1452b6c74402e750fdad75c3c05`를 커밋·push했다. 실제 GitHub PR #9는 OPEN/Draft, base dev, head feature/M3-categories/067cd117이다. 기존 사용자 스킬 이전의 4개 문서·새 스킬 파일은 미커밋 상태로 보존하며 제품 소스와 최종 검증본은 일치한다.
+- BE370/JAR/API smoke, FE 전체269 이후 최종 영향68/lint/build 및 독립 코드 재검토는 통과했다. 실제 1440px 검증은 미실행이므로 Ready·최종 승인·merge는 하지 않았다. 자세한 증거와 PR URL은 M3 worklog에 기록했다.
+- 현재 실행 중 하위 에이전트·Gradle/npm 검증은 없다. API PID 4904(127.0.0.1:8080), Vite localhost:5173와 합성 MySQL fixture를 보존한다. CUA inventory apps=[]/browsers=[]이며 기존 브라우저 연결 요청에 응답이 없어 동일 질문을 반복하지 않는다.
+- 다음: 브라우저 연결→1440px/키보드·DnD/실제 API/setup reload→독립 QA/리더 승인→PR/dev 머지→brief와 M4 준비 대조. 그 전에는 새 기능·중복 테스트·승인 범위 확대 없이 실제 대기로 입력·연결 변화를 기다린다. 사용자 정지가 최우선이다.
+
+## 2026-09-07 22:45 KST — 재개·실행 README·M3 종료 범위 확정
+
+- 사용자 `계속` 후 brief를 직접 대조했다. 현재 feature/M3-categories/067cd117, PR #9 OPEN/Draft/base dev는 유지됐고 이전 PR 생성 기록 두 파일만 staged였다. 역할 STATE의 1690731·구현 준비 문구는 과거 스냅샷이며 최신 Git·마일스톤 증거가 현재 상태다. 기존 사용자 스킬 이전 변경은 보존했다.
+- 사용자 요청 `테스트로 서버 실행하는 법을 readme로 작성해줘.`에 따라 리더 소유 README.md를 신규 작성하고 AGENTS/CLAUDE 진입점을 연결했다. 별도 실행 스크립트·의존성·제품 설정 변경 없이 PowerShell 로컬 DB/설정/bootRun·JAR/FE/테스트/종료를 안내한다. 문법 11 blocks·로컬 링크·32바이트 JWT 생성 확인, 기존 합성 MySQL ping 및 API/FE GET 200을 직접 검증했다. 새 DB 생성·기존 서버 재시작·데이터 삭제는 없고, 별도 QA도 읽기 전용 대조를 통과했다.
+- Chrome 연결이 확인돼 실제 1440 CSS px 검증을 재개했다. 합성 계정의 가입→시작 칩 편집→initial-setup→자기 블로그 이동·4개 카테고리와 전체 새로고침 후 세션/목록 복구를 확인했다. 날짜 fill의 DOM값이 React 입력으로 확정되지 않는 도구 경로는 실제 키보드 입력으로 해결했고 제품 결함으로 단정하지 않는다.
+- 정본 시각 대조에서 관리 행 1px/14px/700, 카드 밖 삭제 캡션, DEFAULT/LOCKED 버튼 disabled 표시 및 setup 칩 표현의 차이를 확인해 `/root/m3_frontend`에 해당 FE/회귀/역할 기록만 제한 배정했다. 서버/DB/API/승인 계약은 바꾸지 않는다. 리더가 최종 실제 조작·독립 QA·Git 마감을 이어간다.
+- 사용자 최신 지시 원문: **`m3 완료 시점을 작업 종료 시점으로 해서 계속 진행해.`** 이번 실행의 종료점은 M3 검증·dev PR 머지·마감 기록 완료다. 이전 M4 연속 착수 계획은 이번 실행에서 적용하지 않으며 **M4를 시작하지 않는다.** 현재 상태는 진행이다.
+
+## 2026-09-07 23:04 KST — 최종 FE273·실제 UI 확인·마우스 정렬 확인 요청
+
+- 리더 직접 최종 FE 전체 23 files/273 tests, lint/build가 exit 0으로 완료됐다. BE370 이후 backend 변경은 없다. README는 독립 QA·PowerShell 11 blocks·실제 설정 대조 완료 상태다.
+- 실제 브라우저에서 합성 블로그의 root/child 키보드 순서 저장, child rename, duplicate 오류·기존 목록 보존 및 새 탭 세션/데이터 복구를 확인했다. 최신 스크린샷의 단일 카드·들여쓰기·disabled 보호 버튼·카드 밖 캡션도 대조했다.
+- native drag payload를 최소 보완했지만 CUA pointer drag로는 실제 drop이 완료되지 않았다. 제품 결함이나 도구 제약을 확정하지 않고, 사용자에게 실제 마우스 이동과 저장 notice 확인을 요청했다. 확인창 처리 도구 오류가 난 LOCKED 저장도 실제 UI PASS로 보고하지 않는다. 상세 증거 경계는 M3 worklog와 독립 QA 기록을 따른다.
+- /root/m3_qa가 최신 변경을 독립 검토 중이며 /root/m3_frontend는 소유 STATE의 오래된 HEAD·브라우저 완료 표현만 정정한다. root는 명시 파일의 README/검증 체크포인트 커밋을 준비하며 Draft PR #9는 최종 승인 전 머지하지 않는다. M4 미착수, 사용자 운영 변경·합성 DB·서버 보존.

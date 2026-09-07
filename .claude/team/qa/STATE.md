@@ -2,7 +2,7 @@
 
 > 덮어쓰기 스냅샷. 시간순 이력은 `WORKLOG.md`, 심의·마일스톤 이력은 `docs/governance/**`와 `docs/worklog/**`를 본다.
 
-마지막 갱신: 2026-09-06 KST (M3 FE completion-intent 최종 제한 패치 대조)
+마지막 갱신: 2026-09-07 KST (M3 FE 시각·native DnD 최종 패치 독립 재대조)
 
 ## 현재 단계
 
@@ -25,20 +25,23 @@
 - LWW는 `CategoryServiceMySqlTest.xml`의 동시 same-ID reorder가 통과하고 `CategoryService.java:180–261`이 blog `PESSIMISTIC_WRITE` lock·전체 sibling ID 검증·임시/최종 flush를 수행한다. `CategoryServiceMySqlTest.java:607–610`의 callback은 outer `TransactionTemplate` 안에서 실행되지만 같은 blog lock이 outer commit까지 유지되므로, T2 callback은 T1 성공 commit 뒤에만 도달한다. 두 `Future.get()` null assertion이 outer commit 성공을 확인하므로 최신 소스·테스트 경계에서 last-write-wins 증거 공백은 해소로 정정한다.
 - 최신 completion-intent 패치까지 실제 source/관련 회귀 소스를 재독해했다. `BlogInitialSetupPage`는 `setupCompletionTo:'blog'` history intent를 먼저 커밋한 뒤 effect에서 `refreshUser`하고, `SetupGuard`는 인증된 `defaultBlog.urlSlug`로 own-blog 목적지를 고정한다. partial management·refresh failure·retry success·remount recovery 및 F05/F06 async drain 회귀를 확인했다. parent의 관련 68 tests와 FE 269/lint/build exit 0은 구현자 참고 결과이며 QA는 npm/Vitest를 재실행하지 않았다. 새 critical 실제 결함은 발견하지 못했다.
 - FE 테스트 소스에는 mutation reload 실패·A→B→null→A 전환·지연 create/order response drain·count/동일 viewer 재조회·partial/lost category POST·completion intent own-blog·refresh failure management recovery·remount history recovery가 추가되어 있다. 실제 브라우저 1440px layout/copy/loading/error와 OS 수준 full reload 관찰은 미검증이다.
+- 최신 FE 동결 패치도 정본과 정적 정합하다. `BlogInitialSetupPage.tsx:321–361`의 시작 칩/점선 `+ 추가`, `SettingsPostsPage.tsx:490–579`의 native DnD payload·행 토큰·DEFAULT/LOCKED inert+disabled 조작, `:621–673`의 카드 밖 `미분류` 안내를 `DESIGN-SYSTEM` 및 ADR-0005/REQUIREMENTS override와 대조해 신규 critical/high finding을 찾지 못했다. 관련 회귀 소스 `BlogInitialSetupPage.test.tsx:267–279`, `categoryBehavior.test.tsx:657–734`도 확인했다.
+- parent 최신 FE 참고 결과는 `build/m3-final-frontend-tests.log` 23 files/273 tests pass, exit 0이며 lint·tsc+Vite build도 exit 0으로 보고됐다. QA는 npm을 재실행하지 않았다. BE full 370-test 결론과 LWW closure는 유지한다.
+- frontend 작성자와 별도 컨텍스트인 root가 직접 실행·관측한 브라우저 evidence에는 가입→setup→자기 blog slug, 새로고침/session 복원, 자식 생성·ArrowUp 순서 PUT/GET·notice, inline rename·notice, 중복 거부·기존 목록 보존, 새 탭 재조회 및 1440px native screenshot의 단일 카드/들여쓰기/행/타이포/DEFAULT disabled/미분류 안내가 포함된다. 이 evidence를 QA 직접 실행으로 표기하지 않되 root 독립 검토 근거로 반영한다. CUA mouse DnD는 HTML5 lifecycle을 완료하지 못했고 LOCKED confirm 수락도 timeout/`No dialog is showing`으로 저장되지 않아 수동 DnD와 LOCKED mutation은 미검증이다.
 
 ## 다음 작업
 
-1. loopback smoke와 backend full build/XML 및 FE completion-intent/LWW closure를 `qa/M3-review.md` 최신 결론으로 고정한다.
-2. 실제 브라우저 full-refresh·1440px layout/copy/loading/error gate를 수행한다.
-3. 브라우저 gate가 끝날 때까지 M3 최종 PASS/APPROVE를 보류한다.
+1. loopback smoke와 backend full build/XML, LWW closure 및 최신 FE 시각/native DnD 정적 closure를 `qa/M3-review.md` 최신 결론으로 고정한다.
+2. 수동 HTML5 mouse-DnD 순서 저장/notice와 LOCKED confirm 수락 후 불변 상태를 실제 브라우저에서 확인하거나, 사용자 확인·도구 한계를 명시한 대체 증거를 검토한다. root가 확인한 1440px 화면·full-refresh/session·키보드/rename/duplicate 경로는 완료 근거로 유지한다.
+3. 브라우저 잔여 게이트가 끝날 때까지 M3 최종 PASS/APPROVE 및 dev 머지 완료 주장을 보류하고, 사용자 종료 조건인 M3 마감 기록 뒤 M4는 착수하지 않는다.
 
 ## 차단 요인
 
-- backend full build와 관련 MySQL/MockMvc/migration/OpenAPI XML 및 LWW lock-serialized commit 범위는 통과했지만, FE 실제 브라우저는 미검증이다.
+- backend full build와 관련 MySQL/MockMvc/migration/OpenAPI XML 및 LWW lock-serialized commit 범위는 통과했다. root 독립 브라우저에서 signup/setup/self-blog/full-refresh/session·keyboard/rename/duplicate/new-tab·1440px 화면을 확인했지만, 수동 mouse-DnD lifecycle과 LOCKED confirm 수락 mutation은 미검증이다.
 - loopback HTTP smoke 자체는 종료 코드 0이다. fixture 계정이 서버에 남아 있으며 cleanup/delete는 수행하지 않았다. parser/HTTP smoke 성공은 제품 전체 acceptance 통과를 의미하지 않는다.
 - numeric enum, owner HTTP, migration, count/move, 101 roots, DEFAULT/LOCKED/subtree, malformed binding, generated OpenAPI는 full XML 통과로 현재 blocking 결함이 아니다.
 - LWW callback 순서가 outer commit 전이라는 점만으로는 반례가 되지 않는다. 동일 blog `PESSIMISTIC_WRITE` lock과 Future null(commit 성공) 경계로 현재 acceptance 범위는 해소다.
-- FE F-M3-FE-01~07 및 completion-intent는 최신 source/관련 회귀 구조상 정적 closure다. FE full 실행은 parent 참고 결과이며, 실제 브라우저 1440px/full-refresh는 미검증이다.
+- FE F-M3-FE-01~07, completion-intent 및 최신 시각/native DnD 패치는 최신 source/관련 회귀 구조상 정적 closure다. FE 273-test/lint/build 결과와 root의 1440px/full-refresh·기능 브라우저 evidence는 독립 검토 참고로 반영했으며, 실제 mouse-DnD·LOCKED confirm만 pending이다.
 - 계약 승인 상태는 정합하다. PM의 최종 PRD 기록과 backend/frontend 구현·검증 산출물은 아직 acceptance 전제조건으로 남아 있다.
 - QA 소유권 밖인 제품 코드·제품 테스트·governance/worklog 원본은 변경하지 않는다.
 

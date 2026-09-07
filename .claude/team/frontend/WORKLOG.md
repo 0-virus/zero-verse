@@ -124,3 +124,25 @@
 
 - `BlogInitialSetupPage.test.tsx`에 completion intent 이후 첫 `refreshUser()`만 실패하는 fixture를 추가했다. 완료 블로그로 잘못 이동하지 않고 recovery/관리 재시도로 이어지며 initial-setup 호출이 1회인 것을 확인한다.
 - 최종 관련 실행: `npm.cmd test -- --run src/test/BlogInitialSetupPage.test.tsx src/test/guards.test.tsx src/test/categoryBehavior.test.tsx src/test/settingsBehavior.test.tsx` → 4 files / 68 tests passed, 0 failures/0 skipped; `npm.cmd run lint` → exit 0; `npm.cmd run build` → exit 0, Vite 64 modules, JS 296.60 kB (gzip 90.75 kB). 실제 시각은 `Get-Date -Format 'yyyy-MM-dd HH:mm:ss K'` 출력 `2026-09-06 18:10:56 +09:00` 기준이다.
+
+## 2026-09-07 22:49:08 KST — M3 정본 시각 보완·immutable 접근성 회귀
+
+- 한 일: 리더의 제한 배정에 따라 `SettingsPostsPage` 행을 정본(`gap:12px`, `padding:13px 20px`, `1px solid #eadbc4`, 이름 14px/700, count 12px, handle 15px/#d8c7b0)에 맞췄다. DEFAULT/LOCKED의 `이름 변경`·`삭제` 버튼을 숨기지 않고 `inert` variant + `disabled`로 렌더했으며, 기존 handler guard와 GENERAL 동작은 유지했다.
+- 한 일: 카테고리 관리 하단 form을 정본 `gap:10px; padding:16px 20px`로 조정하고 불필요한 raise 배경·3px 상단 보더를 제거했다. 삭제 안내를 카드 밖 12px muted/4px padding 캡션으로 이동했다. `BlogInitialSetupPage`의 시작 칩은 12px/700·padding 5px 12px, `+ 추가`는 2px dashed shadow 경계로 맞췄고 입력·Enter 추가 흐름은 유지했다. slug availability API·새 의존성·다른 영역은 추가하지 않았다.
+- 테스트: `categoryBehavior.test.tsx`에 immutable 버튼 disabled와 row/form/caption class boundary를 추가하고, `BlogInitialSetupPage.test.tsx`에 setup chip/add class 및 click 추가 회귀를 추가했다. 첫 실행의 테스트 선택자 오류(outer wrapper와 중복 heading)를 수정한 뒤 관련 2 files / 27 tests passed, 0 failures/0 skipped.
+- 검증: `npm test ...`는 PowerShell execution policy로 `npm.ps1`가 차단됐고, 동일 테스트를 `npm.cmd test -- --run src/test/categoryBehavior.test.tsx src/test/BlogInitialSetupPage.test.tsx`로 재실행해 exit 0을 확인했다. `npm.cmd run lint` exit 0, `npm.cmd run build` exit 0(Vite 64 modules)이다. 실제 시각은 `Get-Date -Format 'yyyy-MM-dd HH:mm:ss K'` 출력 `2026-09-07 22:49:08 +09:00`을 사용했다.
+- 미해결: 리더의 실제 1440px 브라우저 재확인은 리더가 수행한다. M3 마감·PR/dev 반영 이후 M4는 시작하지 않는다.
+
+## 2026-09-07 22:51:10 KST — native DnD payload 보완·회귀 검증
+
+- 한 일: 리더의 CUA 재현에서 확인된 native DnD 미이동 원인(dataTransfer payload 부재)을 `SettingsPostsPage`의 기존 `onDragStart`에 한정해 보완했다. ready·reorder 가능 행에서만 `dataTransfer.setData('text/plain', String(category.id))`와 `effectAllowed = 'move'`를 설정한다. drop 대상 ID는 계속 내부 `draggedId`를 사용하고, 동일 부모 sibling·전체 ID·LOCKED numeric slot 검증은 변경하지 않았다.
+- 테스트: `categoryBehavior.test.tsx` native DnD 회귀에서 `setData('text/plain', '2')`와 `effectAllowed === 'move'`를 확인하고 LOCKED drop 보호를 유지했다. `npm.cmd test -- --run src/test/categoryBehavior.test.tsx src/test/BlogInitialSetupPage.test.tsx` → 2 files / 27 tests passed, 0 failures/0 skipped.
+- 검증: `npm.cmd run lint` exit 0, `npm.cmd run build` exit 0(Vite 64 modules; JS 296.76 kB, gzip 90.81 kB). 실제 시각은 `Get-Date -Format 'yyyy-MM-dd HH:mm:ss K'` 출력 `2026-09-07 22:51:10 +09:00`을 사용했다.
+- 미해결: 실제 native drag 재검증은 리더가 공유 브라우저에서 수행한다. M3 종료 범위이며 M4·DnD 의존성은 추가하지 않는다.
+
+## 2026-09-07 23:04:00 KST — STATE/WORKLOG 사실관계 정정
+
+- 정정: 공유 checkout의 현재 FE 상태는 `feature/M3-categories`, HEAD `067cd117`이다. 최신 root 독립 FE 검증은 전체 273 tests, lint/build exit 0이다. 기존 22:51 기록은 보존하며 덮어쓰지 않았다.
+- 브라우저 범위: 리더가 1440px에서 실제 signup/setup/self blog/reload, 루트·하위 keyboard 순서 저장, rename, duplicate·재조회 및 시각 대조를 확인했다. 이 검증과 native mouse DnD는 별도 항목으로 구분한다.
+- DnD 원인 정정: 22:51의 `dataTransfer payload 부재`는 원인 확정이 아니다. payload/effectAllowed 보완 후에도 CUA drag에서 AX 순서·notice 변화가 없었고, 소스 handler 및 관련 회귀는 정상이다. 현재는 CUA가 HTML5 `dragstart`→`dragover`→`drop` lifecycle을 완성하지 못한 도구 한계로 추정하며, 사용자 수동 native mouse 확인을 대기한다.
+- 미해결/범위: 제품 변경은 없었다. M3 마감·PR/dev 반영을 기다리며 M4는 시작하지 않는다.

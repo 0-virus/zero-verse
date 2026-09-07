@@ -2,7 +2,7 @@
 
 - 범위: FR-CAT-01~05, PRD §5.4·§7·§9-H/R·§10.
 - 단일 기록 담당: 리더. 구현은 backend/frontend, 독립 검토는 QA·리더.
-- 현재 단계: **BE 전체 370개·JAR/API, FE 전체 269개 이후 최종 관련 68개·lint/build 통과. Draft PR 준비, 실제 1440px 검증 대기.** 과거 승인 대기와 중간 실패 기록은 아래에 보존한다.
+- 현재 단계: **Draft PR #9, BE370·최종 FE273/lint/build 통과. 실제 가입·설정·새로고침·키보드/수정·오류·시각 확인 후 마우스 DnD 수동 확인과 독립 최종 QA 대기. 이번 실행은 M3 머지·마감 시 종료한다.** 과거 승인 대기와 중간 실패 기록은 아래에 보존한다.
 
 ## [계획]
 
@@ -100,3 +100,28 @@
 - QA는 latest backend XML과 실제 코드의 transaction 경계를 직접 대조했다. outer TransactionTemplate 안에서 service REQUIRED와 blog PESSIMISTIC_WRITE lock을 공유하고, callback 기록 후 commit 전에는 다른 요청이 같은 lock을 획득할 수 없으며 두 Future의 성공도 확인한다. 이에 따라 과거 LWW 증거 부족 판단은 정정·closure됐다. 최종 FE intent 패치의 독립 재검토는 QA에 배정했다.
 - 리더는 QA smoke prefix의 실제 DB 잔여 상태도 읽었다: 합성 users=2/blogs=2, active DEFAULT=2/GENERAL=1/LOCKED=1 및 deleted GENERAL=3. 이는 삭제·재사용 검증의 합성 데이터이며 추가 삭제는 하지 않는다.
 - 검토용 Draft PR을 준비한다. M3 관련 파일만 명시적으로 stage하며, 기존 사용자 project-lead 스킬 이전의 AGENTS/JOURNAL 부분 변경과 팀 README·운영 가이드·스킬 파일은 제외한다. 실제 1440px/브라우저 검증 전에는 최종 승인·머지하지 않는다.
+
+## [리뷰]·[이슈·결정] — 2026-09-06 18:43 KST Draft PR·브라우저 대기
+
+- QA가 마지막 FE intent/Guard staged 패치와 독립 검토본의 일치 및 PR 증거 표현을 재확인했다. 신규 critical 없음, `git diff --cached --check` exit 0. 통과한 테스트를 변경 없이 반복 실행하지 않았다.
+- M3 구현 커밋 `067cd1174aeec1452b6c74402e750fdad75c3c05`(47 files, +5553/-117)을 생성하고 `origin/feature/M3-categories`에 push했다. 실제 구현 역할은 위 기록대로이며 리더가 커밋·통합 검증을 담당했다. 인덱스 문서 두 개의 BOM은 커밋 전에 제거했고, 기존 사용자 운영 변경은 작업 트리에 그대로 보존했다.
+- [PR #9](https://github.com/0-virus/zero-verse/pull/9) 생성 후 GitHub 조회로 OPEN / isDraft=true / base=dev / head=feature/M3-categories / head SHA=067cd117을 확인했다. 최종 QA 승인·Ready 전환·머지는 하지 않았다.
+- 실행 상태 **대기**. 현재 브라우저 inventory apps=[]/browsers=[]이며 요청한 Chrome/Edge 연결 응답은 없다. 재개 조건은 연결된 브라우저에서 1440px 디자인, 키보드/DnD, 실제 API, setup 새로고침 검증 후 독립 최종 검토다. API 127.0.0.1:8080 및 Vite localhost:5173와 합성 fixture는 보존한다.
+- M4 준비 자료는 이미 존재하며 미결 정책·외부 입력을 승인으로 간주하지 않는다. 새로운 기능·중복 검증을 만들지 않고 `$project-lead`의 실제 대기 기능으로 입력·연결 변화를 기다린다.
+
+## [개발 기록]·[리뷰]·[이슈·결정] — 2026-09-07 22:45 KST README·실제 브라우저 검증 재개
+
+- 사용자 요청으로 리더가 루트 README.md를 작성했다. Windows PowerShell/JDK21/Node22.x, 기존 테스트 DB 재사용 또는 신규 loopback13307 MySQL, 비밀값 비출력 환경변수, local cookie/Origin, bootRun/JAR, frontend, 별도 Testcontainers, smoke 데이터 잔류 및 비파괴 종료를 설명한다. README 소유권·진입점을 AGENTS/CLAUDE에 동기화했다. 기존 문서를 삭제·대체하지 않았고 새 제품 스크립트/설정/의존성은 없다.
+- 리더 검증: 11개 PowerShell block의 Parser 오류0, 상대 링크 존재, 랜덤 키의 Base64 decode32바이트, 기존 MySQL `mysqld is alive`, OpenAPI/FE HTTP200. QA도 별도 읽기 전용 문법/실제 설정 대조에서 실행 불가·과장 문제 없음을 확인했다. README의 신규 DB·서버 명령을 전부 새로 실행했다고 주장하지 않는다.
+- Chrome 연결을 확인해 1440 CSS px에서 실제 가입/initial-setup/시작 칩 저장/자기 블로그 이동/전체 reload 세션 복구를 수행했다. 신규 합성 계정·블로그 `m3-ui-20260907`은 검증 데이터로 남긴다. 비밀값은 기록하지 않는다.
+- frontend의 정본 재대조와 root의 실제 소스 확인에서 관리 행 경계/폰트, 삭제 안내 위치, 보호 항목 버튼 미표시, setup 칩 스타일의 차이를 발견했다. 해당 두 FE 화면과 최소 회귀만 원 구현자에게 재배정했으며 변경 후 관련 테스트·lint/build·1440px 재확인과 독립 QA가 필요하다.
+- 사용자 명시로 **M3 완료(검증·PR dev머지·기록)를 이번 작업의 종료점**으로 변경했다. M4는 시작하지 않는다. PR #9는 최종 게이트 통과 전 Draft로 유지한다.
+
+## [리뷰]·[이슈·결정] — 2026-09-07 23:04 KST 최종 회귀·브라우저 증거 경계
+
+- 리더가 최종 FE 소스에서 `npm.cmd test`를 실행했다. `build/m3-final-frontend-tests.log`: 23 files/273 tests PASS, `M3_FINAL_FE_EXIT=0`(22:52:29 시작, 24.29초). `npm.cmd run lint` 및 `npm.cmd run build`도 exit 0, Vite 64 modules다. BE는 370개 전체 통과 이후 소스 변경이 없어 중복 실행하지 않았다.
+- 실제 합성 블로그에서 루트/하위 카테고리 생성, 루트와 하위의 키보드 정렬 후 저장 notice, 인라인 이름 변경 후 notice, 동일 부모 중복 이름 오류와 기존 목록 보존을 확인했다. 새 탭에서도 세션과 변경된 순서·이름이 복구됐다. native screenshot으로 단일 카드·하위 들여쓰기·보호 버튼 disabled·카드 아래 삭제 캡션을 확인했다.
+- native draggable의 payload 누락을 보완했다. [MDN HTML Drag and Drop API](https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API)에 따라 dragstart에 text/plain과 move 효과를 설정했고 외부 payload를 신뢰하지 않는 내부 ID/전체 sibling/LOCKED 검증은 유지했다. 새 라이브러리는 없다. 다만 보완 후에도 CUA pointer drag는 focus만 바꾸고 drop 저장을 완료하지 않아 payload 누락을 실측 원인으로 확정하지 않는다.
+- 실제 마우스 DnD는 미검증이다. 구현자 읽기 전용 검토와 자동 회귀에서는 결함을 찾지 못했지만 도구 lifecycle 제약이라는 판단도 추정이다. 사용자에게 `/settings/posts`에서 프론트엔드를 화면검증 위로 이동해 순서와 저장 notice를 확인하도록 요청했다. 응답 전에는 DnD PASS나 M3 최종 승인을 기재하지 않는다.
+- LOCKED 전환 경고 문구는 실제 AX에서 확인했으나 확인창 처리 도구가 timeout/No dialog is showing을 반환했고 새 탭의 타입은 GENERAL이었다. 이 브라우저 저장 사례는 PASS가 아니며 기존 HTTP/자동 회귀와 구분한다. 사용자 데이터·검증 fixture를 삭제하지 않았고 서버도 재시작하지 않았다.
+- 최신 FE diff·273개 결과·README·브라우저 확인 및 한계를 독립 QA에 전달했다. GitHub PR #9는 OPEN/Draft/MERGEABLE/CLEAN, base dev, CI checks 없음으로 조회됐다. M3 종료 조건과 기존 사용자 미커밋 변경 보존은 유지한다.

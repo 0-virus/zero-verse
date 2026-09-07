@@ -14,6 +14,8 @@
 
 둘 이상의 역할 소유 영역에 걸친 팀 작업은 역할별 에이전트에 분할하고, 독립 작업만 병렬화한다. 한 파일을 둘 이상에게 동시에 맡기지 않는다. 주 에이전트는 모든 결과를 기다린 뒤 실제 파일과 검증 출력을 직접 확인한다. 세션 시작·재개·다음 작업 선정에는 `$brief`를 사용한다.
 
+연속 지휘의 시작·재개에는 프로젝트 스킬 `$project-lead`(`.agents/skills/project-lead/SKILL.md`)를 사용한다. 이 범용 스킬은 이 저장소의 정본·역할·승인·마일스톤 규칙을 읽고 적용하며, 사용자 정지까지 작업 배정·검증·다음 단계 또는 필요한 대기를 이어간다.
+
 ## Purpose
 
 ZeroVerse Blog MVP 저장소. 개인 블로그 플랫폼으로, 사용자는 자신의 블로그를 운영하고 "유니버스"라 부르는 단방향 신청-수락 관계로 서로의 글을 발견/공유한다. Spring Boot 백엔드와 React 프론트엔드가 구현 중이며, 현재 위치는 Git·`docs/worklog/`·역할별 `STATE.md`를 직접 대조해 판정한다.
@@ -47,7 +49,7 @@ ZeroVerse Blog MVP 저장소. 개인 블로그 플랫폼으로, 사용자는 자
 | `qa/` | 독립 QA 검토·재현 기록. `qa/AGENTS.md`를 따르며 제품 소스와 구현 테스트는 각 소유 역할에 요청한다. |
 | `.claude/` | 공통 팀 헌법, Claude 역할 정의·스킬, 역할별 상태·기록. 앱 코드 아님. |
 | `.codex/` | Codex custom agent 설정. 상태 파일은 두지 않고 `.claude/team/`을 공유. |
-| `.agents/` | Codex 저장소 스킬. `$brief` 포함. |
+| `.agents/` | Codex 프로젝트 스킬. 읽기 전용 `$brief`, 범용 연속 지휘 `$project-lead`. |
 | `.omc/` | oh-my-claudecode 런타임 상태. 무시 대상 운영 아티팩트. |
 
 ## Architecture

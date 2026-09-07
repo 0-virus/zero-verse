@@ -125,3 +125,9 @@
 - 실제 마우스 DnD는 미검증이다. 구현자 읽기 전용 검토와 자동 회귀에서는 결함을 찾지 못했지만 도구 lifecycle 제약이라는 판단도 추정이다. 사용자에게 `/settings/posts`에서 프론트엔드를 화면검증 위로 이동해 순서와 저장 notice를 확인하도록 요청했다. 응답 전에는 DnD PASS나 M3 최종 승인을 기재하지 않는다.
 - LOCKED 전환 경고 문구는 실제 AX에서 확인했으나 확인창 처리 도구가 timeout/No dialog is showing을 반환했고 새 탭의 타입은 GENERAL이었다. 이 브라우저 저장 사례는 PASS가 아니며 기존 HTTP/자동 회귀와 구분한다. 사용자 데이터·검증 fixture를 삭제하지 않았고 서버도 재시작하지 않았다.
 - 최신 FE diff·273개 결과·README·브라우저 확인 및 한계를 독립 QA에 전달했다. GitHub PR #9는 OPEN/Draft/MERGEABLE/CLEAN, base dev, CI checks 없음으로 조회됐다. M3 종료 조건과 기존 사용자 미커밋 변경 보존은 유지한다.
+
+## [리뷰]·[이슈·결정] — 2026-09-07 23:10 KST 최종 패치·README push와 수동 확인 대기
+
+- 커밋 `4fc9ae22701c99db031af03fd7ddf120fe74ae92`를 push했다(14 files, +408/-46). README·최신 FE와 회귀·QA 기록이 PR #9에 반영됐고 GitHub head 일치, OPEN/Draft/MERGEABLE/CLEAN/checks=[]를 확인했다. 사용자 기존 운영 변경은 제외·보존했다.
+- 독립 QA는 신규 critical/high 없음, root의 실제 화면·setup/full-refresh/keyboard/rename/duplicate 증거 반영을 확인했지만 mouse-DnD와 LOCKED confirm 수락 후 저장 미검증으로 최종 acceptance를 보류했다. 실제 사용자 조작 확인 또는 해당 경로를 검증할 수 있는 지원된 도구가 필요하다. 코드·회귀 PASS를 실제 mouse/confirm PASS로 대신하지 않는다.
+- 다음은 두 조작 확인→필요한 제한 수정/회귀→QA/리더 최종 승인→PR dev 머지·마감 후 작업 종료다. M4를 시작하지 않으며 아직 `[머지]` 완료 기록을 남기지 않는다. 실행 중 에이전트/테스트는 없고 서버·DB는 보존, 임시 viewport는 복원했다.

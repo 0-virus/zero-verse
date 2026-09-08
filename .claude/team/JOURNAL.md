@@ -164,3 +164,34 @@
 - 사용자 명시 요청: `스테이징된 내용, 스테이징 안된 내용 보고 같이 커밋 푸시 해줘`. 이전에 제외했던 사용자 소유 운영 문서·project-lead 스킬도 이번 커밋에 포함하도록 승인받았다. 기존 기록의 제외 설명은 당시 경위를 보존하며 변경하지 않는다.
 - 리더가 staged M3 체크포인트와 unstaged 운영 문서, 신규 SKILL.md/openai.yaml 총 7개 파일의 원문을 검토했다. 제품 코드·비밀값·실행 산출물은 없고 diff whitespace 검증을 통과했다. 원격 feature/M3-categories를 fetch한 결과 HEAD와 ahead/behind 0/0이다. 앱 변경이 없어 BE/FE 테스트는 재실행하지 않았다.
 - 범위는 현재 feature/M3-categories의 문서·스킬 커밋과 같은 origin 브랜치 push다. PR 머지·M3 acceptance·브라우저 검증 완료를 의미하지 않으며 두 실제 조작 확인 대기와 M4 미착수는 유지한다. 리더가 명시 파일만 stage하고 최종 원격 SHA/작업 트리를 확인한다.
+
+## 2026-09-08 09:38 KST — project-lead 재개·M3 잔여 검증 배정
+
+- 실행 상태: **진행**. 사용자 `$project-lead` 호출로 재개했으며, 기존 사용자 결정인 M3 검증·dev 머지·마감 후 종료 범위를 유지한다. M4는 착수하지 않는다.
+- 리더 brief 실측: `feature/M3-categories` HEAD `08239e0514b6a1a78f090c3b0961e8fd4a60403e`, 시작 시 작업 트리는 깨끗하다. PR #9는 동일 HEAD/OPEN/Draft/base dev/MERGEABLE/CLEAN/checks=[]다. `4fc9ae2` 이후 제품 변경이 없고 backend는 `067cd11` 이후 불변이다. 기존 XML 직접 집계는 56 suites/370 tests/실패·오류·skip 0, FE 최종 로그는 23 files/273 tests PASS, 검증 JAR SHA256도 이전 기록과 일치한다. 이번 턴에 전체 테스트를 새로 실행한 결과는 아니다.
+- 상태 차이: backend/pm STATE의 HEAD `1690731` 및 준비·미구현 설명, frontend STATE의 HEAD `067cd117`, QA STATE 일부 준비 문구는 과거 스냅샷이다. PR 본문의 project-lead 변경 제외 설명도 `08239e0`의 실제 포함 범위와 다르다. 정본 계약은 ADR-0005/PRD §9.5와 일치하며 새 사용자 정책 결정은 필요하지 않다.
+- 배정: `/root/m3_final_qa`가 `qa/M3-review.md`와 QA STATE/WORKLOG를 단독 소유해 기존 증거·현재 소스의 독립 재대조와 새 브라우저 증거의 최종 판정을 담당한다. 리더는 실제 브라우저·로컬 실행 환경, M3 worklog/JOURNAL·Git을 소유한다. 제품 파일은 아직 편집하지 않는다.
+- 현재 검증 환경: Chrome 연결은 확인됐지만 API/Vite/Docker가 꺼져 있었다. 기존 node_modules로 Vite localhost:5173을 재기동했고 Docker Desktop을 시작 중이다. 검증된 JAR·기존 합성 DB를 재사용하며 비밀값·사용자 데이터는 보존한다. 재개 검증은 native mouse DnD 저장/notice와 LOCKED confirm 수락 후 불변 상태다.
+
+## 2026-09-08 09:54 KST — 환경 복구·native DnD 통과·확인창 응답 대기
+
+- 실행 상태: **진행**, LOCKED 확인창만 사용자 조작 결과 대기. root의 실제 Chrome drag 뒤 프론트엔드/백엔드 순서 변경·저장 notice와 DB ID/order 일치를 확인했다. 현재 브라우저 도구는 confirm accept 이후 timeout이며 회고 ID 22는 아직 GENERAL이다. 성공을 추정하지 않고 사용자에게 열린 OK 클릭 후 LOCKED/disabled 결과를 요청했다. 상세 증거와 화면 배율 경계는 M3 worklog의 같은 시각 항목에 남겼다.
+- Docker 복구 중 임시 소켓만 보존 이동했다: `C:/Users/PC/AppData/Local/Docker/run.m3-backup-20260908-0941`(기존 2개), `Docker/run.m3-backup-20260908-0943`(재기동 중 생성된 1개), `C:/Users/PC/AppData/Local/docker-secrets-engine.m3-backup-20260908-0943`(기존 1개). 원본 내용을 지우지 않아 백업에 남아 있으며 DB·볼륨·설정 초기화는 없다. API PID 8712/Vite PID 34144와 기존 M3 합성 MySQL을 사용한다.
+- 상태 정합화 단일 작성자: `/root/m3_state_backend`는 backend STATE/WORKLOG, `/root/m3_state_frontend`는 frontend STATE/WORKLOG, `/root/m3_state_pm`은 PM STATE/WORKLOG·기존 readiness, `/root/m3_final_qa`는 QA 기록이다. root가 결과를 실제 diff/본문과 대조한 뒤 명시 파일로 M3 기록 커밋을 준비한다. 공유 checkout의 제품은 동결한다.
+- PR #9의 공개 본문에서 project-lead 제외→포함 문장만 정정 완료. 자동 승인 검토에서 거절된 전체 갱신안은 실행하지 않았으며, 기존 공개 정보만 사용하는 제한 요청은 새 근거 확인 후 승인됐다. 최종 QA와 실제 merge는 아직이다. M3 마감이 종료점이며 M4는 시작하지 않는다.
+
+## 2026-09-08 10:02 KST — LOCKED 확인 대기·중복 없는 예약 재개 등록
+
+- 실행 상태: **대기**. native mouse DnD PASS는 독립 QA 기록에 반영됐고, 사용자에게 요청한 LOCKED 확인창 직접 OK 클릭 결과는 아직 도착하지 않았다. 도구 timeout을 새 증거 없이 반복하거나 저장 성공으로 추정하지 않는다. 역할별 STATE 정합화 검토 외 새 제품 작업·전체 테스트·M4 착수는 없다.
+- `project-lead`의 반복 재개 지침에 따라 기존 자동화 중 이 프로젝트/M3 항목이 없음을 확인한 뒤 Codex heartbeat `zeroverse-m3`("ZeroVerse M3 마감 이어가기")를 현재 작업에 등록했다. 실제 조회 결과 ACTIVE/15분 간격이며, 상태 불변 시 알리지 않고 의미 있는 변화·완료·실패·필수 사용자 조작만 알리도록 설정했다. M3 종료 경계나 사용자 정지 시 이 예약을 취소한다.
+- 재개 조건: 사용자 확인 또는 지원되는 브라우저 기능의 복구 → LOCKED 저장·GET/DB 및 disabled 상태 확인 → `/root/m3_final_qa` 독립 최종 판정 → 명시 파일 커밋·PR #9 dev 머지·마감 기록 후 종료. API·Vite·합성 DB와 검증 탭은 보존한다. 확인창 때문에 임시 viewport reset은 아직 수행하지 못했다.
+
+## 2026-09-08 10:05 KST — LOCKED 인앱 브라우저 통과·최종 QA 재개
+
+- 실행 상태: **진행**. 별도 지원 인앱 브라우저의 새 합성 blog ID 7에서 native 타입 선택→경고 confirm→수락→LOCKED 저장 notice와 네 조작 disabled를 확인했다. full reload/session 복구 후에도 같은 상태이며 DB ID 26 LOCKED/order 3을 읽었다. 세부 증거는 M3 worklog 같은 시각 기록을 따른다. Chrome ID 22의 미완료 시도는 당시 이력으로 보존한다.
+- 사용자 수동 OK 확인은 더 이상 필요하지 않음을 알렸고 `/root/m3_final_qa`에 최종 acceptance 판정을 배정했다. root는 실제 diff와 판정 확인 뒤 명시 파일 커밋·PR #9 Ready/dev merge를 담당한다. 제품 변경·새 전체 테스트는 없다. M3 마감 뒤 이번 실행을 종료하며 M4는 착수하지 않는다.
+
+## 2026-09-08 10:11 KST — QA APPROVE·리더 승인·마감 Git 배정
+
+- 독립 `/root/m3_final_qa` 최종 APPROVE와 실제 기록을 리더가 확인했다. 현재 역할 상태·이력 및 M3 검증 문서 11개만 변경됐고 제품 tree는 `4fc9ae2` 이후 불변, diff check exit 0이다. 모든 역할 쓰기 작업이 끝났으며 원격 feature와 HEAD는 0/0, base dev는 `1690731`로 재확인했다.
+- 리더 최종 승인 및 명시 배정: root가 위 11개 파일만 stage/commit하고 origin `feature/M3-categories`로 push한 뒤, PR #9의 동일 HEAD/base dev·checks·mergeability를 확인해 Ready/merge한다. 실제 결과 확인 전 merge 완료로 기록하지 않는다. 이후 마감 기록·예약 재개 취소 후 이번 실행을 종료하며 M4는 시작하지 않는다.

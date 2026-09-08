@@ -64,3 +64,25 @@
 ## 2026-09-06 17:50 KST — smoke 행수 표기 정정
 
 - 정정: 직전 항목의 네 테이블 행수는 `users/blogs/categories/posts = 1/1/1/0`이다. V1/V2 Flyway success 값은 별도이며, 기존 `1/1/1/1/0` 표기는 오타다.
+
+## 2026-09-08 09:55 KST — M3 backend 상태·브라우저 게이트 정합화
+
+- 한 일: 헌법→루트 지침→backend 지침/STATE 순서와 ADR-0005, REQUIREMENTS §6.4/FR-CAT-01~05, PRD §5.4/§9.5/§10~§12, `docs/worklog/M3-categories.md`, `qa/M3-review.md`, QA 최신 STATE를 직접 대조했다. 기존 STATE의 M3 기준 HEAD `1690731`과 “브라우저 전체 대기” 표현을 현재 산출물에 맞게 `STATE.md`에 갱신했다. 제품 source/test, Gradle, 서버·DB, Git 상태는 변경하지 않았다.
+- 현재 근거: 실제 Git 읽기에서 branch는 `feature/M3-categories`, HEAD는 `08239e0`이며 `067cd11..08239e0`의 backend `src/**`·Gradle 경로 diff는 없다. M3 backend 구현 커밋은 `067cd1174aeec1452b6c74402e750fdad75c3c05`다. `build/m3-root-full-build.log`/XML의 기존 결과는 `BUILD SUCCESSFUL in 10m 24s`, 56 suites/370 tests, failures/errors/skips `0/0/0`; JAR SHA-256은 `422F7216E6B70A8BC533C9F84605C9E3368B961C0F0AC1F58A6B9113819FE369`다.
+- 최신 실행 기록 반영: root API PID 8712(`127.0.0.1:8080`)와 기존 M3 합성 DB 13306 재기동, Flyway V1/V2 success `1/1`, 기동 시 `users/blogs/categories/posts = 5/5/18/0` 보존 및 이후 UI 합성 계정 추가를 기록했다. QA HTTP smoke exit 0도 유지했다.
+- 브라우저 상태: root가 frontend 구현자와 분리된 CUA에서 native mouse DnD로 `프론트엔드`를 `백엔드` 위로 이동했고 UI notice `카테고리 순서를 저장했습니다.`와 DB active ID/order `19:0, 21:1, 20:2, 22:3`을 확인했다. 이 gate는 root 독립 evidence로 PASS다. `회고` LOCKED 전환 경고·확인창은 보였지만 accept가 timeout/`No dialog is showing`으로 끝났고 DB ID 22가 GENERAL이라 LOCKED 저장·불변 상태는 미검증이다.
+- 검증: 상태·로그·정본 재독 후 `STATE.md`를 재독하고 `git diff --check -- .claude/team/backend/STATE.md .claude/team/backend/WORKLOG.md`를 실행해 exit 0을 확인했다. 이 턴에는 Gradle/test/JAR/API/DB를 재실행하지 않았으며, LOCKED 확인 수락 후 QA/root 최종 acceptance와 PR #9 `dev` merge가 남은 gate다. M3 마감 전 M4는 시작하지 않는다.
+
+## 2026-09-08 10:01 KST — LOCKED 확인 결과 시점·실행 종료 경계 정정
+
+- 정정: 앞선 09:55 항목의 `timeout/No dialog is showing` 병기는 두 시점을 압축한 표현이다. 2026-09-08 현재 LOCKED accept 시도는 `timeout → kernel reset`, 이어진 `getTab`도 timeout으로 끝났다. `No dialog is showing`은 2026-09-07 과거 재시도의 결과이며 현재 시도 결과에 포함하지 않는다.
+- 종료 경계: 사용자 지시에 따라 M3 검증, PR #9의 `dev` merge, M3 마감 기록 완료 후 이번 실행을 종료한다. M4는 이번 실행에서 착수하지 않으며, 향후 별도 착수 시 동일 blog lock/category 재검증을 참고 인계로만 남긴다.
+- 검증 범위: 오늘 상태 정합화 턴에는 Swagger·전체 backend test/build·JAR/API/DB를 재실행하지 않았다. full XML/JAR/Swagger/HTTP와 browser DnD 결과는 기존 root/QA evidence로 표시하고, LOCKED 저장·후속 GET·보호 상태는 미검증으로 유지한다.
+- 미해결: 사용자의 OK 직접 조작 또는 지원되는 대체 evidence, QA/root 최종 acceptance, `dev` merge 및 `[머지]` 기록.
+
+## 2026-09-08 10:05 KST — LOCKED 실측 완료 상태 반영
+
+- 한 일: 최신 `docs/worklog/M3-categories.md` 10:05 항목을 읽고 backend STATE의 잔여 UI gate를 정정했다. 기존 Chrome fixture category ID 22 `GENERAL` 및 accept timeout→kernel reset/getTab timeout은 과거 실패로 보존하고, 2026-09-07 `No dialog is showing`도 별도 과거 evidence로 유지했다.
+- 현재 근거: root가 frontend 구현자와 분리된 IAB에서 새 blog ID 7을 만들고 category ID 26을 `LOCKED`, `displayOrder=3`으로 저장·재조회했다. 새로고침 후에도 LOCKED가 복원되고 순서 이동·이름 변경·삭제·타입 선택 4개 조작이 disabled, 잠금 저장 성공 notice가 표시됐다. 새 결과는 root 독립 실제 UI·DB evidence로 LOCKED gate PASS이며 QA 직접 조작으로 표기하지 않는다.
+- 상태/종료: 차단은 LOCKED가 아니라 독립 QA 최종 acceptance와 PR #9 `dev` merge·M3 마감 기록이다. M3 검증→merge→마감 기록 완료 후 이번 실행을 종료하며, M4는 이번 실행에서 착수하지 않는다. 향후 별도 M4 착수 시 참고할 category lock 인계만 유지한다.
+- 검증 범위: 제품 source/test/UI/서버/DB/Git 실행 변경은 없고, 이 상태 정합화 턴에는 테스트·빌드·Swagger·API를 재실행하지 않았다. 위 IAB·DB와 기존 full XML/JAR/Swagger/HTTP는 각각 root 또는 기존 evidence로 구분한다.

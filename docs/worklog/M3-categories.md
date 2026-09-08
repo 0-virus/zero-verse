@@ -131,3 +131,27 @@
 - 커밋 `4fc9ae22701c99db031af03fd7ddf120fe74ae92`를 push했다(14 files, +408/-46). README·최신 FE와 회귀·QA 기록이 PR #9에 반영됐고 GitHub head 일치, OPEN/Draft/MERGEABLE/CLEAN/checks=[]를 확인했다. 사용자 기존 운영 변경은 제외·보존했다.
 - 독립 QA는 신규 critical/high 없음, root의 실제 화면·setup/full-refresh/keyboard/rename/duplicate 증거 반영을 확인했지만 mouse-DnD와 LOCKED confirm 수락 후 저장 미검증으로 최종 acceptance를 보류했다. 실제 사용자 조작 확인 또는 해당 경로를 검증할 수 있는 지원된 도구가 필요하다. 코드·회귀 PASS를 실제 mouse/confirm PASS로 대신하지 않는다.
 - 다음은 두 조작 확인→필요한 제한 수정/회귀→QA/리더 최종 승인→PR dev 머지·마감 후 작업 종료다. M4를 시작하지 않으며 아직 `[머지]` 완료 기록을 남기지 않는다. 실행 중 에이전트/테스트는 없고 서버·DB는 보존, 임시 viewport는 복원했다.
+
+## [리뷰]·[이슈·결정] — 2026-09-08 09:54 KST 재개·마우스 정렬 통과
+
+- 기준 HEAD `08239e0514b6a1a78f090c3b0961e8fd4a60403e`와 PR #9 OPEN/Draft/base dev/동일 HEAD를 확인했다. 작업 시작 시 clean이며 `4fc9ae2` 이후 제품 변경은 없다. 리더와 독립 QA가 기존 BE XML 56 suites/370 tests/실패·오류·skip 0, FE 23 files/273 tests PASS 로그, JAR SHA256 `422f7216e6b70a8bc533c9f84605c9e3368b961c0f0ac1f58a6b9113819fe369`를 재대조했다. 전체 테스트를 새로 실행한 것은 아니다. QA의 직접 의존성 17개 lock/설치 비교도 일치하며 Vite는 8.1.5다.
+- 실행 환경 복구: Docker Desktop이 기존 `dockerInference`, 이어서 `engine.sock` 임시 소켓 접근 오류로 시작하지 못했다. 소켓만 있는 경로를 검증한 뒤 백업 이름으로 옮겨 보존하고 재시작해 복구했다. DB·볼륨·Docker 설정을 삭제하거나 초기화하지 않았다. 기존 `zeroverse-m2-smoke-20260906`만 기동했고 V1/V2 success=1/1 및 기동 시 users/blogs/categories/posts=5/5/18/0을 읽었다. 검증 JAR API PID 8712/127.0.0.1:8080, Vite PID 34144/localhost:5173을 사용한다. 비밀값은 프로세스 환경으로 전달했고 기록·커밋하지 않는다.
+- 리더 실제 UI: 새 합성 블로그 `m3-close-20260908`에서 가입→초기 설정→기본 시작 카테고리 생성→관리 화면 진입을 확인했다. 날짜 입력은 브라우저 기본 키보드 조작으로 확정했다. 기존 합성 데이터와 새 fixture는 남긴다.
+- **native mouse DnD PASS**: 화면의 프론트엔드 핸들을 백엔드 행 위로 `drag([515,281],[515,223])`했다. 직후 AX는 `미분류 / 프론트엔드 / 백엔드 / 회고`와 `카테고리 순서를 저장했습니다.`를 표시했다. `persistOrder`는 PUT 성공과 GET 재조회 성공 뒤에만 이 notice를 표시한다. 별도 DB 읽기에서도 active ID `19/21/20/22`, displayOrder `0/1/2/3`을 확인했다. 이번 화면은 viewport override 요청 1440에도 브라우저 배율 때문에 실제 innerWidth=1600, devicePixelRatio=0.9였으므로 이번 동작을 1440 CSS px 시각 검증으로 표기하지 않는다. 기존 1440px 시각 증거는 그대로 유지한다.
+- **LOCKED 저장은 미완료**: 회고 타입을 LOCKED로 선택했을 때 되돌릴 수 없음 안내·Cancel/OK 버튼과 `confirm` 타입을 실제 관측했다. `getJsDialog().accept()`는 30초 timeout 후 세션이 reset됐고 재선택도 timeout이었다. 이후 DB에서 회고 ID 22가 GENERAL인 것을 확인해 저장 성공으로 처리하지 않는다. 사용자에게 열린 확인창의 OK를 직접 누른 뒤 LOCKED 및 이름 변경·삭제·순서 이동 disabled 결과를 알려 달라고 비동기 요청했다.
+- 독립 QA `/root/m3_final_qa`는 위 새 증거를 대조한다. PM과 backend/frontend 소유자가 오래된 STATE를 최신 HEAD·잔여 gate에 맞추고 있다. 제품 소스·테스트 변경은 없다. 마지막 남은 UI gate는 LOCKED 확인창 수락 후 저장·보호 상태이며, 이어서 최종 QA→dev merge·마감 후 종료한다. M4는 시작하지 않는다.
+- PR 본문의 기존 project-lead 변경 제외 설명은 실제 포함 범위와 달라 한 문장만 포함으로 정정했다. 전체 갱신안은 자동 승인 검토에서 공개 승인 부족으로 거절됐지만, 공개 PR 파일 목록·기존 본문을 먼저 확인해 이미 공개된 범위 설명만 정정한 제한 요청은 승인돼 `gh pr edit` exit 0으로 반영됐다. Draft·잔여 acceptance 조건은 유지한다.
+
+## [리뷰] — 2026-09-08 10:05 KST LOCKED 실제 저장·재조회 통과
+
+- root는 Chrome의 실패한 확인창을 반복 호출하지 않고 지원되는 별도 인앱 브라우저에서 새 합성 블로그 `m3-iab-close-20260908`을 만들었다. 실제 signup→setup→자기 블로그 이동 후 `/settings/posts`에 진입했다. 제품 소스와 테스트·의존성은 변경하지 않았다.
+- 회고 타입의 기본 선택 컨트롤에서 click→Down→Return으로 LOCKED를 선택했고, 도구는 실제 `잠금 카테고리로 저장하면 이름·타입·순서를 되돌릴 수 없습니다. 저장할까요?` confirm을 보고했다. `getJsDialog()`의 confirm을 수락한 뒤 저장·재조회가 끝난 AX에서 `회고 0 개의 글 LOCKED`, 순서 이동·이름 변경·삭제·타입 선택의 disabled, `카테고리를 잠금 상태로 저장했습니다. 잠금은 되돌릴 수 없습니다.` notice를 확인했다.
+- 브라우저 full reload 후 세션 복구와 같은 LOCKED/disabled 상태를 다시 확인했다. DB 읽기 전용 명령 exit 0: blog ID 7, active category ID/type/order는 `23/DEFAULT/0`, `24/GENERAL/1`, `25/GENERAL/2`, `26/LOCKED/3`이다. 이전 Chrome fixture의 ID 22 GENERAL과 별개로 구분한다. 이번 결과는 root 독립 실제 UI·DB evidence이며 QA 직접 조작으로 표기하지 않는다.
+- LOCKED 브라우저 gate는 이 증거로 해소됐고 앞선 사용자 수동 확인 요청은 더 이상 필요하지 않음을 알렸다. `/root/m3_final_qa`가 기존 증거와 함께 최종 acceptance를 검토한다. 최종 판정 전 merge를 실행하지 않으며, M3 merge·마감 후 종료하고 M4는 시작하지 않는다.
+
+## [리뷰] — 2026-09-08 10:11 KST 독립 QA·리더 최종 승인
+
+- `/root/m3_final_qa`가 `qa/M3-review.md`에 최종 **APPROVE**를 기록했다. 리더가 실제 최신 판정·QA STATE/WORKLOG, 역할별 상태 변경 및 검증 출력을 재독했다. ADR-0005 Q1~Q4, 기존 BE370/FE273·DB/API·디자인 증거와 이번 native DnD·LOCKED 실측을 대조했고 새 critical/high finding은 없다.
+- 리더는 `SettingsPostsPage.changeType`의 실제 confirm→PUT→GET 성공→notice 경로와 UI·DB 결과의 일치를 확인했다. `git diff --name-status 4fc9ae2 -- src frontend`는 출력이 없어 검증 제품 tree가 유지되며 문서만 바뀌었다. `git diff --check` exit 0이다. 원격 fetch 후 feature HEAD와 origin은 ahead/behind 0/0이고 base dev는 `1690731`이다.
+- 리더 최종 승인 후 root에 현재 11개 변경 파일(네 역할 STATE/WORKLOG, QA review, M3 worklog, JOURNAL)의 명시 stage·commit·origin feature push와 PR #9 Ready/merge를 배정한다. 비밀값·실행 로그·ignored PM 준비 문서·임시 PR 본문은 stage하지 않는다. 실제 merge 결과와 종료 기록은 이후 별도로 남긴다.
+- Chrome 임시 viewport reset은 성공했다. 멈춘 기존 Chrome 검증 탭의 close는 timeout이라 닫힘을 주장하지 않으며, 정상 IAB 검증 결과 탭은 보존했다. 합성 DB·API·Vite를 삭제하거나 초기화하지 않았다.

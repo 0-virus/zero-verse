@@ -182,3 +182,27 @@
 
 - frontend 작성자와 별도 컨텍스트인 root의 직접 실행·관측으로 signup/setup/self-blog/full-refresh/session, keyboard reorder, rename, duplicate rejection, new-tab persistence 및 1440px native screenshot(단일 카드·들여쓰기·행·타이포·DEFAULT disabled·미분류 안내)을 완료 근거로 반영한다. 이를 QA 직접 실행으로 표기하지 않으며, root 독립 검토 evidence로 대조했다.
 - 남은 게이트는 CUA mouse-DnD가 HTML5 lifecycle을 완료하지 못한 실제 마우스 순서 PUT/notice와 LOCKED confirm 수락 후 불변 상태뿐이다. confirm은 timeout/`No dialog is showing`으로 저장되지 않았다. 사용자 확인/도구 제약을 해소하기 전 M3 최종 acceptance와 dev 머지는 보류한다.
+
+## 2026-09-08 09:39 KST — M3 종료 재개·완료 주장 및 설치 상태 감사
+
+- 한 일: 헌법·root/QA 지침·STATE를 순서대로 읽고, ADR-0005 Q1~Q4, REQUIREMENTS FR-CAT-01~05/FR-SETTINGS-04·NFR-04·08·09, PRD §5.4·§7·§9.5·§10~§12, M3 worklog와 `qa/M3-review.md`를 현재 HEAD와 교차 대조했다. 제품 source/test와 타 역할 파일은 변경하지 않았다.
+- 검증: HEAD `08239e0514b6a1a78f090c3b0961e8fd4a60403e`, working tree clean, `4fc9ae2..HEAD`의 `src`·`frontend` diff 없음. 기존 `build/m3-root-full-build.log`/XML은 `BUILD SUCCESSFUL in 10m 24s`, 56 files/370 tests/failures·errors·skips 0/0/0이며, FE log는 23 files/273 tests PASS다. FE/BE 실행 자체는 이번 턴에 재실행하지 않았다. 검증 JAR SHA-256 `422F7216E6B70A8BC533C9F84605C9E3368B961C0F0AC1F58A6B9113819FE369`도 기존 기록과 일치한다.
+- 설치 상태: `package.json`·`package-lock.json`·직접 `node_modules` manifest를 읽기 전용 비교해 17개 직접 의존성 lock/설치 version exact match를 확인했다. Vite는 선언 `^8.1.1`, lock/설치/실행 로그 `8.1.5`로 mismatch가 아니다. `npm ls --depth=0` exit 0, @emnapi 계열·`tslib` 6개 extraneous만 보고했으며 install/update/정리는 하지 않았다.
+- delivery metadata: local PR body의 “project-lead 스킬 이전 변경은 이 PR에서 제외” 문구는 HEAD `08239e0`가 `.agents/skills/project-lead/**`와 운영 문서를 포함한 실제 파일 목록과 모순된다. PR/Git는 root 소유이므로 수정하지 않고 root 교정 대상으로 보고한다. 제품 acceptance에는 영향이 없다.
+- 미해결: root의 이전 독립 브라우저 evidence(가입/setup·reload/session·keyboard·rename·duplicate·new-tab·1440px screenshot)는 유지하되, HTML5 mouse-DnD drop→순서 PUT→성공 notice 및 LOCKED confirm 수락→불변 상태 재조회는 새 증거 전까지 pending이다. 이 gate 전 M3 최종 PASS/APPROVE·dev merge를 주장하지 않으며 M4는 시작하지 않는다.
+
+## 2026-09-08 09:53 KST — native DnD 실측 PASS·LOCKED confirm 잔여 gate
+
+- 한 일: root가 frontend 구현자와 분리된 Chrome 컨텍스트에서 `/blog/m3-close-20260908`의 실제 CUA pointer drag `[515,281] → [515,223]`를 수행해 `프론트엔드`를 `백엔드` 위로 이동했다는 증거를 검토했다. 직후 AX에서 `미분류/프론트엔드/백엔드/회고`와 정확한 `카테고리 순서를 저장했습니다.` notice가 보였고, DB read-only 재조회에서 active IDs/orders `19 DEFAULT=0`, `21 GENERAL=1`, `20 GENERAL=2`, `22 GENERAL=3`이 확인됐다.
+- 판정: `SettingsPostsPage.tsx:193–224`의 `persistOrder`가 reorder await→GET 재조회 성공→notice 순서인 현재 source와 root의 UI/DB 결과가 일치한다. QA가 직접 브라우저를 조작한 결과는 아니므로 root 독립 evidence로 native mouse-DnD 저장 gate를 PASS로 승격했으며 새 critical/high finding은 없다.
+ - 범위 경계: 오전 Chrome native DnD 시 viewport override 요청 후 브라우저 zoom 90%로 `innerWidth=1600`, `dpr=0.9`가 관측되어 해당 동작을 1440 CSS px 실측으로 주장하지 않는다. 이후 임시 viewport는 reset됐다. 기존 1440 screenshot의 단일 카드·들여쓰기·행·타이포·disabled·미분류 안내 evidence는 유지한다.
+- 미해결: `회고` type을 LOCKED로 선택한 뒤 경고 `잠금 카테고리로 저장하면 이름·타입·순서를 되돌릴 수 없습니다. 저장할까요?`와 AX confirm/OK focus는 확인했으나 `getJsDialog.accept` timeout/세션 reset으로 저장이 완료되지 않았다. DB에서 id 22는 여전히 GENERAL이므로 LOCKED 저장·GET 재조회·불변 disabled 상태는 미검증이며 현재 유일한 UI gate다. 사용자 직접 OK 클릭 또는 지원 대체 evidence 전 최종 M3 APPROVE/dev merge는 보류한다.
+- 전달: root가 remote PR body의 project-lead 공개 범위를 `제외`에서 `포함`으로 정정해 gh 성공했다고 보고했다. GitHub API 인증 실패로 QA는 직접 확인하지 않았고, PR/Git·마일스톤 기록은 root 소유로 유지한다. M4는 시작하지 않는다.
+
+## 2026-09-08 10:05 KST — M3 최종 LOCKED 실측·QA APPROVE
+
+- 한 일: root가 frontend 구현자와 분리된 IAB tab 1에서 `http://localhost:5173/settings/posts`를 열고 합성 slug `m3-iab-close-20260908`로 가입→초기 설정→자기 블로그 이동 후 `회고` 타입을 native click→Down→Return으로 `LOCKED`로 변경했다. confirm 경고 `잠금 카테고리로 저장하면 이름·타입·순서를 되돌릴 수 없습니다. 저장할까요?`에 `getJsDialog.accept`가 성공했다.
+- 검증: 저장 후 AX에서 `회고 0 개의 글 LOCKED`, 순서 이동·이름 변경·삭제·타입 4개 조작 disabled, notice `카테고리를 잠금 상태로 저장했습니다. 잠금은 되돌릴 수 없습니다.`를 확인했다. reload 후 session 복원과 fresh AX에서도 동일 LOCKED/disabled 상태가 유지됐다. 10:05 KST DB read-only exit 0에서 blog 7/category 23 `미분류 DEFAULT order=0`, 24 `백엔드 GENERAL order=1`, 25 `프론트엔드 GENERAL order=2`, 26 `회고 LOCKED order=3`을 확인했다.
+ - 경계: 이 브라우저 조작은 QA가 직접 수행한 것이 아니라 root 독립 evidence다. 이전 Chrome fixture blog 6/category 22가 GENERAL인 상태는 별도 fixture이며 성공 결과에 혼합하지 않았다. 오전 Chrome native DnD 시점의 zoom 90%(`innerWidth=1600`, `dpr=0.9`) 관측은 IAB 동작에 해당하지 않는다. IAB에는 viewport override를 설정하지 않았고 치수도 측정하지 않았으므로 1440 CSS 수치로 주장하지 않으며, 기존 native 1440 screenshot evidence만 유지한다.
+- 종합: 기존 BE 370 tests/XML 0 failure·error·skip, FE 273 tests/lint/build, JAR SHA-256, loopback smoke, V1→V2/SQL count·move/권한/OpenAPI, signup/setup/reload/session·keyboard/rename/duplicate/new-tab·1440px·native DnD 저장/notice/DB 재조회 근거와 이번 LOCKED confirm 저장/재조회 근거를 승인 정본 ADR-0005 Q1~Q4 및 FR-CAT-01~05/FR-SETTINGS-04에 대조했다. 새 critical/high finding은 없다.
+- 판정: **QA 최종 APPROVE.** M3 acceptance의 마지막 UI gate가 해소됐으며 root가 PR `OPEN/Draft/head=08239e0`의 remote scope 문장 `포함` 정정도 완료했다고 보고했다. root의 dev merge와 M3 `[머지]` 마감은 별도 후속이며, merge 완료로 기록하지 않는다. M4는 시작하지 않는다.

@@ -146,3 +146,17 @@
 - 브라우저 범위: 리더가 1440px에서 실제 signup/setup/self blog/reload, 루트·하위 keyboard 순서 저장, rename, duplicate·재조회 및 시각 대조를 확인했다. 이 검증과 native mouse DnD는 별도 항목으로 구분한다.
 - DnD 원인 정정: 22:51의 `dataTransfer payload 부재`는 원인 확정이 아니다. payload/effectAllowed 보완 후에도 CUA drag에서 AX 순서·notice 변화가 없었고, 소스 handler 및 관련 회귀는 정상이다. 현재는 CUA가 HTML5 `dragstart`→`dragover`→`drop` lifecycle을 완성하지 못한 도구 한계로 추정하며, 사용자 수동 native mouse 확인을 대기한다.
 - 미해결/범위: 제품 변경은 없었다. M3 마감·PR/dev 반영을 기다리며 M4는 시작하지 않는다.
+
+## 2026-09-08 09:56:46 KST — M3 종료 게이트 상태 정합화
+
+- 한 일: 헌법·루트/역할 지침·frontend `STATE.md`, 디자인 정본과 `/blog/setup`·`/settings/posts` 원본, PRD §5.4·§7·§9.5·§10~§12, REQUIREMENTS FR-CAT-01~05/FR-SETTINGS-04, M3 worklog·QA 최신 기록을 재독했다. 현재 FE checkout과 native DnD/LOCKED 잔여 게이트를 최신 root 증거에 맞췄다.
+- 산출물: `.claude/team/frontend/STATE.md`의 HEAD를 `08239e0`로, 제품 tree 불변 기준을 `4fc9ae2`로 갱신했다. native mouse DnD 저장 gate는 PASS로, LOCKED confirm 후 저장·GET·disabled 확인은 pending으로 정리했다. 이 `WORKLOG.md`와 `STATE.md`만 수정했으며 frontend source/test/deps, Git, UI, 서버는 변경하지 않았다.
+- 검증: `git branch --show-current`=`feature/M3-categories`, `git rev-parse HEAD`=`08239e0514b6a1a78f090c3b0961e8fd4a60403e`; `git diff --name-status 4fc9ae2..HEAD -- src frontend` 출력 없음. 기존 FE `23 files/273 tests`, lint/build exit 0, 직접 의존성 17개 lock/설치 exact match, Vite `8.1.5`, `npm ls --depth=0` exit 0 증거를 재확인했다. root의 분리 Chrome CUA drag(`[515,281]`→`[515,223]`) 후 AX 순서·성공 notice·DB `19/0, 21/1, 20/2, 22/3` 결과를 native DnD PASS 근거로 기록했다.
+- 미해결: viewport override는 browser zoom 90%로 `innerWidth=1600`이어서 이번 관측을 1440 CSS px 실측으로 세지 않으며 기존 1440px 시각 검증은 유지한다. `회고` id `22`는 DB에서 아직 GENERAL이고 dialog accept timeout 후 세션 reset됐으므로 사용자 직접 `OK` 클릭 뒤 LOCKED 저장·GET 재조회·rename/delete disabled를 확인해야 한다. QA 최종 승인·`dev` merge 전 M3는 미완료이며 M4는 시작하지 않는다.
+
+## 2026-09-08 10:08:36 KST — LOCKED 실제 저장·reload gate 해소 반영
+
+- 한 일: M3 worklog `2026-09-08 10:05 KST` 항목을 읽고, 새 인앱 브라우저 실측을 frontend 상태에 반영했다. 기존 Chrome fixture id `22`의 GENERAL 결과는 과거 사실로 보존하고 새 evidence와 구분했다.
+- 산출물: `.claude/team/frontend/STATE.md`의 현재 상태·다음 작업·차단을 LOCKED gate 해소 및 QA 최종 판정/PR #9 `dev` merge 대기로 최소 정정했다. 이 `WORKLOG.md`와 `STATE.md`만 수정했으며 제품 source/test/UI/deps/server/Git는 변경하지 않았다.
+- 검증 근거: root 독립 인앱 브라우저에서 새 합성 blog ID `7`/category ID `26`의 `회고`를 LOCKED로 저장하고 order `3`, `카테고리를 잠금 상태로 저장했습니다. 잠금은 되돌릴 수 없습니다.`, `회고 0개의 글 LOCKED`를 확인했다. full reload 후에도 LOCKED/order `3` 및 순서 이동·이름 변경·삭제·타입 선택 4개 조작의 disabled 상태를 확인했다. QA 직접 조작으로 표기하지 않는다.
+- 미해결: 남은 단계는 독립 QA 최종 acceptance와 리더의 PR #9 `dev` merge·M3 마감이다. 이번 IAB 관측은 1440 CSS px 실측으로 확대하지 않고 기존 1440px 시각 evidence를 유지한다. M4는 시작하지 않는다.

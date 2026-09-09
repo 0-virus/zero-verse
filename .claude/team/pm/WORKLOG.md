@@ -45,3 +45,50 @@
 - 정정: 리더의 M2 최종 `[머지]` 기록과 QA 확인이 완료된 실제 상태를 반영해 PM `STATE.md`, `PM-M3-readiness.md`, `PM-M4-readiness.md`의 `리더가 기록 중` 및 M2 continuation 미완료 표기를 완료로 갱신했다.
 - 정정: M3 Q1~Q4 독립 심의·worklog 기록은 완료로, 사용자 정책 승인은 미완료로 분리 표기했다. 회의 상태 `USER_DECISION_REQUIRED`, 정본 반영 전·제품 구현 보류는 유지한다.
 - 범위: PM 소유 상태·준비도·작업 기록만 갱신했으며 PRD·REQUIREMENTS·governance 회의록·제품 코드·Git은 수정하지 않았다.
+
+## 2026-09-06 — M3 사용자 진행 지시와 정본 계약 동기화
+
+- 한 일: 리더가 회의록 §4 Q1~Q4의 구체 권고안·정확한 계약을 제시하고 승인 응답을 기다리던 직후 사용자가 원문 `시작`으로 진행을 지시한 맥락을 확인했다. 리더가 반영한 ADR-0005 `ACCEPTED`, REQUIREMENTS 및 회의록 `APPROVED`와 대조해 새 승인·정책을 만들지 않았다.
+- 산출물: `docs/PRD.md`에 active-only `active_key` unique, root page+children/CategoryResponse, 조회자별 count·`includeDrafts`, `CAT_004~007`, 생성 시에만 parent 선택, DEFAULT/LOCKED·last-write-wins, 기존 setup 뒤 순차 CRUD 복구, M4 동일 `blog_id` lock을 반영했다. SettingsPosts 삭제 안내는 `미분류`로 정합화했다.
+- 산출물: `docs/PM-M3-readiness.md`를 승인된 현재 계약과 승인 전 심의 이력으로 분리하고, `docs/PM-M4-readiness.md`에 승인 계약 인계와 M4 미확정 항목을 갱신했다. `.claude/team/pm/STATE.md`를 현재 단계·진행·차단·다음 작업 구조로 덮어썼다.
+- 검증: `rg -n`으로 PRD/REQUIREMENTS/ADR/회의록의 FR-CAT-01~05·FR-BLOG-02·CAT 코드·active_key·last-write-wins·blog lock·`미분류`를 대조하고, 세 편집 문서를 재독했다. `git diff --check`는 다음 독립 점검에서 리더가 실행할 수 있도록 남겼다. 제품 코드·테스트·Git 조작은 하지 않았다.
+- 미해결: M3 backend/frontend 구현, 실제 MySQL·권한·부분 실패 검증, BE·FE·QA 공통 계약 확인. M4의 S3 bucket/region/IAM 및 별도 권고 안건은 이 승인 범위에 포함하지 않는다.
+
+## 2026-09-06 — M3 정본 최종 대조
+
+- 검증: PRD §5.4의 CAT_006(LOCKED 숫자 순서·불변 변경·잠금 subtree), CAT_007(`displayOrder` 중복·부적합 전체 ID 배열), page 기본값 0/size 20·최대 100, DEFAULT 순서 재배치·LOCKED 숫자 보존, 로그인 비소유자 `PUBLIC + viewer→owner ACCEPTED UNIVERSE` count를 REQUIREMENTS/ADR-0005와 재대조했다.
+- 검증 명령: `rg -n` 핵심 계약 검색(종료코드 0), `rg -n -P "[ \\t]+$"` 편집 파일 trailing whitespace 검사(출력 없음), `git diff --check -- .claude/team/pm/STATE.md .claude/team/pm/WORKLOG.md`(오류 없음; CRLF 경고만). 제품 코드·테스트·Git 조작은 하지 않았다.
+- 상태: PRD·PM-M3/M4 readiness·PM STATE/WORKLOG 반영은 완료됐다. M3 backend/frontend 구현·실제 DB/권한/부분 실패 검증과 BE·FE·QA 공통 계약 확인은 미해결로 유지하며, M4 승인으로 확대하지 않는다.
+
+## 2026-09-06 — 현재 checkout 표기 정정
+
+- 정정: 실제 `git branch --show-current`=`feature/M3-categories`, `git rev-parse --short HEAD`=`1690731`을 확인해 PM-M3 §1, PM-M4 §1, PM `STATE.md`의 현재 위치를 갱신했다. `4c129e20f58a6ccb9c61246d103934702516c295`는 M2의 `dev` merge 이력으로만 표기했다.
+- 범위: 현재 checkout/HEAD 구분만 정정했으며 M3 계약·M4 승인 범위·제품 코드·Git 상태는 변경하지 않았다.
+
+## 2026-09-08 — M3 종료 재개 상태·준비도 정합화
+
+- 한 일: 헌법 → `AGENTS.md`/`CLAUDE.md` → PM 지침/`STATE.md`를 순서대로 읽고, `project-lead` 및 `brief` 지침을 확인했다. backend/frontend/qa STATE·최근 WORKLOG, `docs/worklog/M3-categories.md`, ADR-0005, PRD §5.4·§7·§9.5·§10~§12, REQUIREMENTS FR-CAT/FR-SETTINGS/NFR, `qa/M3-review.md`와 현재 Git/source를 교차 대조했다.
+- 산출물: `.claude/team/pm/STATE.md`의 현재 기준을 `feature/M3-categories` HEAD `08239e0514b6` 및 제품 tree `4fc9ae2` 이후 불변 상태로 정정했다. `docs/PM-M3-readiness.md`에는 구현·검증 현황과 실제 잔여 gate/소유자/해소조건을 추가하고, `docs/PM-M4-readiness.md`에는 HEAD·M3 검증 인계·M4 대기 상태만 정정했다. M4 범위·권고·승인과 새 제품 결정은 추가하지 않았다.
+- 검증: `git branch --show-current`=`feature/M3-categories`, `git rev-parse --short=12 HEAD` 및 `origin/feature/M3-categories`=`08239e0514b6`; `git diff --name-status 4fc9ae2..HEAD -- src frontend` 출력 없음. `git status --short`의 기존 `.claude/team/JOURNAL.md`, `.claude/team/qa/STATE.md`, `qa/M3-review.md` 변경은 보존했다. 기존 산출물에서 BE `BUILD SUCCESSFUL`, 56 files/370 tests, failures/errors/skips 0/0/0, FE 23 files/273 tests PASS, lint/build exit 0, QA HTTP smoke exit 0 및 JAR SHA-256 `422F7216E6B70A8BC533C9F84605C9E3368B961C0F0AC1F58A6B9113819FE369`를 재확인했다.
+- PR 상태: `gh pr view 9` 재조회는 local GitHub 인증 401로 실패했다. 따라서 PR #9 `OPEN`/Draft 표기는 M3 worklog의 마지막 GitHub 조회와 origin head에 근거해 유지하며, live 상태로 과장하지 않았다.
+- 미해결: root 소유 브라우저 mouse DnD의 drop→순서 PUT→성공 notice와 LOCKED confirm 수락→불변 상태 재조회 두 gate, `/root/m3_final_qa` 독립 최종 acceptance, root의 PR #9 `dev` merge 및 M3 `[머지]` 기록. M3 마감 전 M4는 시작하지 않는다. backend/frontend/qa STATE의 타임스탬프·HEAD 모순은 소유자 파일을 직접 수정하지 않고 root에 보고한다.
+
+## 2026-09-08 — M3 DnD gate 종료 및 LOCKED gate 단일화
+
+- 한 일: root가 전달한 최신 브라우저·SQL evidence를 PM 기준에 반영했다. mouse drag의 drop→backend reorder→`카테고리 순서를 저장했습니다.` AX notice가 확인됐고, active category id `19/21/20/22`의 `display_order=0/1/2/3` 재조회가 완료됐다.
+- 정정: 잔여 브라우저 gate를 두 개에서 하나로 변경했다. LOCKED 경고는 AX와 `getJsDialog` confirm까지 확인됐지만 accept 메서드가 timeout됐고, DB 재조회가 `GENERAL`로 남아 `LOCKED` 저장·이름/타입/숫자 순서/삭제 불변 상태 재조회는 PASS가 아니다. 사용자에게 경고 OK 클릭 결과를 요청한 상태다.
+- 산출물: `.claude/team/pm/STATE.md`, `docs/PM-M3-readiness.md`, `docs/PM-M4-readiness.md`의 현재 판정·다음 작업·차단 요인을 단일 LOCKED gate, `/root/m3_final_qa` 최종 acceptance, root의 PR #9 `dev` merge 대기로 정정했다. root의 `gh pr edit` 성공으로 PR body 포함 범위 한 문장 정정도 반영된 상태를 기록했다.
+- 검증: 편집 후 PM STATE/WORKLOG와 PM-M3/M4 readiness의 현재 섹션·최신 정정 기록을 재독하고, `rg`로 두 gate/`저장되지 않음` 등 잘못된 현재 표현과 `08239e0514b6`·DnD notice·LOCKED 저장 pending·`m3_final_qa` 참조를 확인했다. `git diff --check`는 exit 0이었다. 제품 source/test, 서버, UI 브라우저, Git 조작은 하지 않았고 타인 변경을 보존했다.
+- 미해결: LOCKED confirm 승인 후 실제 `LOCKED` 저장 및 불변 상태 목록/DB 재조회, `/root/m3_final_qa` 독립 최종 acceptance, root의 PR #9 `dev` merge와 M3 `[머지]` 기록. M3 마감 전 M4는 시작하지 않는다.
+
+## 2026-09-08 — M3 사용자 종료 경계 문구 정정
+
+- 정정: 현재 PM `STATE.md`와 PM-M3/M4 readiness의 범위 표현을 `M3 검증 → PR #9 dev merge → M3 마감 기록 후 이번 실행 종료`로 통일하고, `이번 실행에서 M4는 착수하지 않는다`를 명시했다. 기존 WORKLOG 이력은 보존했다.
+- 범위: LOCKED 잔여 gate, 독립 최종 acceptance, PR #9 `dev` merge와 M3 `[머지]` 기록을 마친 뒤 이번 실행을 종료한다. M4 요구·계획·승인을 추가하거나 착수하지 않는다.
+- 검증: 세 PM 문서의 현재 섹션을 재독하고 `git diff --check -- .claude/team/pm/STATE.md docs/PM-M3-readiness.md docs/PM-M4-readiness.md` exit 0을 확인했다. 제품·테스트·서버·UI 브라우저·Git 조작은 하지 않았고 타인 변경을 보존했다.
+
+## 2026-09-08 — LOCKED 실측 완료 및 잔여 절차 축소
+
+- 정정 근거: M3 worklog `[리뷰]` 10:05 KST의 root 독립 IAB evidence를 반영했다. 새 합성 블로그 blog ID `7`에서 active category ID `26`이 `LOCKED`·`display_order=3`으로 저장·DB 재조회됐고, full reload 후에도 동일 상태와 순서 이동·이름 변경·삭제·타입 선택 disabled 및 `카테고리를 잠금 상태로 저장했습니다. 잠금은 되돌릴 수 없습니다.` notice가 확인됐다.
+- 구분: 기존 Chrome fixture의 ID `22` `GENERAL`은 과거 실패 사실로 보존하고 새 IAB 결과와 혼동하지 않는다. 이에 따라 PM `STATE.md`와 현재 PM-M3/M4 readiness에서 LOCKED UI gate를 완료로 정정하고, 남은 절차를 `/root/m3_final_qa` 독립 최종 acceptance와 PR #9 `dev` merge·M3 `[머지]` 기록으로 축소했다.
+- 범위: M3 최종 QA·PR merge·마감 기록 후 이번 실행을 종료하며, 이번 실행에서 M4는 착수하지 않는다. 제품·테스트·서버·UI 브라우저·Git 조작은 하지 않았고 타인 변경을 보존했다.

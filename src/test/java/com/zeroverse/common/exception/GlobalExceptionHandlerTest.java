@@ -23,9 +23,11 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import org.assertj.core.api.Assertions;
@@ -86,6 +88,11 @@ class GlobalExceptionHandlerTest {
             throw new IllegalStateException(SECRET_DETAIL);
         }
 
+        @GetMapping("/type")
+        ApiResponse<Void> type(@RequestParam Integer value) {
+            return ApiResponse.empty();
+        }
+
         record Payload(@NotBlank(message = "닉네임은 필수입니다.") String nickname) {}
     }
 
@@ -102,6 +109,23 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.error.details[0].field").value("nickname"))
                 .andExpect(jsonPath("$.error.details[0].reason").value("닉네임은 필수입니다."))
                 .andExpect(jsonPath("$.timestamp").exists());
+    }
+
+    @Test
+    @DisplayName("JSON 역직렬화와 요청 파라미터 변환 오류는 400 VALIDATION_001을 반환한다")
+    void requestBindingFailureReturns400() throws Exception {
+        mockMvc.perform(post("/test/validate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_001"))
+                .andExpect(jsonPath("$.error.message").value("요청 값이 올바르지 않습니다."));
+
+        mockMvc.perform(get("/test/type").param("value", "not-a-number"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_001"));
     }
 
     @Test

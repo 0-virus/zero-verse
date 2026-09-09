@@ -57,3 +57,152 @@
 - `.claude/team/JOURNAL.md` 최신 append, `docs/worklog/M3-categories.md`, `docs/governance/DECISION-REGISTER.md`를 독립 확인했다. M3는 계획·독립 심의 완료지만 Q1~Q4 사용자 승인 대기이며, 결정 레지스터도 `USER_DECISION_REQUIRED`다. 제품 구현·M3 승인·M4 착수 주장은 없다.
 - `docs/PM-M3-readiness.md`는 M2 Git/PR 종료를 반영하고, worklog continuation·사용자 승인·정본/ADR 동기화를 M3 선행조건으로 유지한다. 하단 체크리스트의 미완료 표기는 PM 소유 준비 문서의 후속 갱신 범위이며 M3 승인으로 오인할 근거가 아니다.
 - QA 판정은 변경되지 않는다: M2 **APPROVE (96/100)**, source/evidence blocking 없음. M3는 사용자 Q1~Q4 응답과 정본/ADR 반영 전 구현하지 않는다.
+
+## 2026-09-06 — M3 승인 계약 독립 대조 및 acceptance 준비
+
+- 한 일: 사용자의 구체 Q1~Q4 안내 후 원문 `"시작"` 승인 맥락을 회의록 §10, ADR-0005, 결정 레지스터, REQUIREMENTS §6.4/NFR-04·08, PRD §9.5·§10~§12, M3 worklog와 교차 대조했다. 회의 현재 상태 `APPROVED`, ADR-0005 `ACCEPTED`, 사용자 결정 주체가 일치하며 과거 `USER_DECISION_REQUIRED`는 역사 기록으로 보존됨을 확인했다.
+- 산출물: `qa/M3-review.md`에 M3-DB/API/CAT/ORDER/DELETE/COUNT/SETUP/FE/DOC/M4 독립 acceptance matrix, 오류 경계, 기존 테스트 자산, 실행 전제조건을 기록했다. CAT_006은 LOCKED 숫자 순서·불변 변경/잠금 subtree, CAT_007은 displayOrder 중복·부적합 전체 ID 배열로 분리했다. `.claude/team/qa/STATE.md`를 현재 승인·준비 상태로 갱신했다.
+- 검증: `Test-Path docs/governance/decisions/ADR-0005-categories-contract.md`가 `True`; ADR/회의록/레지스터/REQUIREMENTS/PRD 검색에서 승인·Q1~Q4·active_key·last-write-wins·includeDrafts·CAT_006/007 근거를 확인했다. `git status --short`로 리더/타 역할 변경을 보존했고 QA 소유 파일만 편집했다.
+- 문서 후속: 회의록 상단 `관련 ADR` 목록의 ADR-0005 누락과 §9의 승인 전 문장을 발견했다. §7·§10 및 ADR/레지스터가 현재 승인 상태를 명확히 하므로 비차단이지만 리더의 정정 기록이 필요하다.
+- 미해결: backend/frontend 제품 구현, V2 실제 MySQL migration·동시성·posts 이동/count, 공개 보안·Swagger, setup 부분 실패/응답 유실 복구, FE 1440px 검증은 아직 실행하지 않았다. PM PRD 산출물 최종본과 구현 버전 고정 후 targeted acceptance를 실행한다. M3 PASS/APPROVE를 주장하지 않는다.
+
+## 2026-09-06 — M3 BE 초안 회귀 후보 acceptance 반영
+
+- 한 일: 리더가 전달한 BE 초안 후보를 실제 현재 소스와 대조해 `qa/M3-review.md`에 M3-API-03, M3-CAT-03, M3-ORDER-03, M3-DOC-02와 재검증 항목으로 추가했다. 대상은 LOCKED 위치 변경 요청의 no-op 허용 가능성, 삭제 owner GET, trim 전 `@Size`, root `parentId=null` 보존, GET CAT_004 HTTP 문서 상태, DELETE/order OpenAPI 노출이다.
+- 정본 확인: 회의록 상단 승인된 ADR-0005 링크와 §9 현재 상태 갱신을 재독했다. 과거 준비 문구는 역사 기록으로 한정되어 기존 비차단 문서 finding은 해소됐다.
+- 검증: 제품 테스트·빌드·별도 acceptance는 실행하지 않았다. `CategoryService`, `CategoryDtos`, `CategoryController`, `ErrorCode`, `SecurityConfig`를 읽기 전용으로 확인했으며 현재 소스는 수정 중이므로 최종 FAIL/APPROVE를 내리지 않았다.
+- 미해결: backend 수정 후 V2/MySQL·MockMvc/OpenAPI 실제 출력 및 frontend 산출물 도착을 기다린다.
+
+## 2026-09-06 — M3 loopback API smoke 도구 작성 및 parser-only 검증
+
+- 한 일: QA 소유 `qa/m3-api-smoke.ps1`를 추가했다. `localhost`/`127.0.0.1`의 http(s) authority만 허용하고, 실행마다 합성 계정 2개를 생성해 실제 register/signin/auth-me/initial-setup/blog-settings DTO를 호출한다. 이후 anonymous GET/root `parentId=null`·owner draft GET·non-owner draft/mutation 403·anonymous write 401·trim/duplicate·GENERAL→LOCKED·LOCKED 숫자 순서 CAT_006·DEFAULT 보호·subtree delete/recreate·full-ID reorder·stale set CAT_007을 공통 envelope와 HTTP 상태/오류코드로 확인한다.
+- 안전 경계: 토큰·비밀번호는 메모리에만 두고 출력하지 않는다. fixture 결과는 랜덤 prefix만 출력한다. `HttpClientHandler` 쿠키/자동 redirect를 끄고, loopback 외 BaseUri·관리자/계정삭제·M4 Post CRUD는 다루지 않는다. posts SQL 이동/count와 101-root 페이지 경계는 별도 BE 증거로 남긴다.
+- 교정: Windows PowerShell 5.1의 `System.Net.Http` 로딩을 위해 assembly를 명시하고, request body는 `ConvertTo-Json -InputObject`로 배열 형태를 보존하며, response도 dispose한다. 실행 비밀번호는 매회 GUID로 생성한다. UTF-8 BOM을 유지해 Windows PowerShell 파일 parser가 한글 계약값을 오독하지 않게 했다.
+- 검증 명령: `$tokens=$null; $errors=$null; [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'qa/m3-api-smoke.ps1').Path, [ref]$tokens, [ref]$errors) | Out-Null; if ($errors.Count -gt 0) { $errors | ForEach-Object { $_.Message }; exit 1 }; 'M3_API_SMOKE_PARSE_EXIT=0'` → `M3_API_SMOKE_PARSE_EXIT=0` (exit 0).
+- 미실행·다음 gate: HTTP smoke, 제품 테스트/build, Swagger/JAR, DB/count/move/101 경계는 실행하지 않았다. API/JAR 준비 및 리더 지시 뒤에만 smoke를 실행하고 실제 출력·fixture prefix·실패 원인을 별도 기록한다.
+
+## 2026-09-06 — M3 smoke 경계 보강 재검증
+
+- 추가 확인: trim 전 `@Size` 회귀를 놓치지 않도록 앞뒤 공백을 붙인 100자 카테고리 생성·trim 결과 assertion을 추가했고, 비소유자 POST mutation 403/CAT_004도 포함했다. 기존 HTTP 실행 보류와 SQL/count/101-root 별도 증거 경계는 유지한다.
+- 재검증: 동일 `Parser::ParseFile` 명령을 재실행해 `M3_API_SMOKE_PARSE_EXIT=0`(exit 0)을 확인했다. HTTP smoke·제품 테스트·build는 실행하지 않았다.
+
+## 2026-09-06 — M3 backend 승인 계약 정적 대조
+
+- 한 일: 현재 `CategoryService`, `CategoryRepository`, `CategoryController`, `CategoryDtos`, `BlogRepository`, `SecurityConfig`, `ErrorCode`, V2 migration 및 추가 category/migration 테스트를 승인 ADR-0005·REQUIREMENTS §6.4/NFR-04·PRD §5.4와 읽기 전용으로 대조했다. blog lock 이후 category 재조회, LOCKED numeric slot/full sibling ID, owner soft-delete query, 실제 posts 이동·visibility/direction count SQL을 추적했다.
+- 신규 blocking finding: `ErrorCode.java:56`의 CAT_004 message가 정본의 `카테고리에 대한 권한이 없습니다.`가 아닌 `카테고리 관리 권한이 없습니다.`다. 또한 `GlobalExceptionHandler.java:34–65`는 `MethodArgumentNotValidException`만 VALIDATION_001로 매핑하고 Jackson invalid enum/body 및 query type binding을 포괄 COMMON_500으로 보내므로, M3가 요구하는 형식 오류 400/VALIDATION_001 계약을 보장하지 않는다. 재현 입력과 파일/라인은 `qa/M3-review.md` F-M3-ERR-01/02에 기록했다.
+- 중복/현재 상태: 기존 root 후보(LOCKED 필터 no-op, deleted owner, trim 전 길이, root parentId, GET CAT_004 문서)는 현재 소스에서 각각 조기 LOCKED 비교, owner `deletedAt` 조건, DTO trim/ALWAYS, 403 annotation으로 수정된 흔적을 확인했다. 실제 MySQL/MockMvc/JAR이 없어 최종 PASS로 올리지 않았다.
+- 증거 공백: `CategoryMigrationTest`는 fresh schema만 확인해 V1 기존행 forward 적용을 증명하지 않는다. category 테스트에도 same-ID LWW 경쟁, owner soft-delete endpoint, malformed binding/message, duplicate/missing/cross-parent order CAT_007 증거가 없다. 제품 소스/테스트/Gradle/HTTP는 실행하지 않았다.
+- 다음 gate: BE가 두 error contract를 수정한 뒤 invalid enum/body/query와 CAT_004 message를 targeted MockMvc/OpenAPI에서 확인하고, 별도 MySQL migration/lock/count/move/owner-soft-delete 증거를 수집한다. M3 PASS/APPROVE는 보류한다.
+
+## 2026-09-06 — M3 BE 최신 정적 재대조·wrapper 검토
+
+- 한 일: 최신 `CategoryService`/`CategoryRepository`/`BlogRepository`/`CategoryController`/DTO/`JacksonConfig`/`GlobalExceptionHandler`와 category·migration 테스트를 ADR-0005 Q1~Q3 및 REQUIREMENTS §6.4/NFR-04·08에 읽기 전용으로 대조했다. 제품 코드·제품 테스트·Gradle 파일은 수정하지 않았다.
+- 정적 해소: CAT_004 고정 message는 `ErrorCode.java:56`에서 정본과 일치했고, `GlobalExceptionHandler.java:49–58`은 malformed JSON/enum/query binding을 `VALIDATION_001`로 보낼 경로를 추가했다. V1 target→V2 forward 기존행/삭제 이력·재사용 테스트(`CategoryMigrationTest.java:42–99`)도 이전 fresh-schema 공백을 보강했다.
+- 신규 blocker: `JacksonConfig.java:13–17`은 scalar coercion/float-to-int만 차단하고 `FAIL_ON_NUMBERS_FOR_ENUMS`를 설정하지 않는다. 승인 계약상 `type:1`은 `VALIDATION_001`이어야 하나 enum ordinal 수용 위험이 있어 `F-M3-ERR-03`을 `qa/M3-review.md`에 기록했다. `CategoryControllerMySqlTest.java:121–126`의 숫자 enum 회귀 케이스는 마지막 실행 후 추가되어 미실행이다.
+- 계약 경계 대조: blog/user soft-delete query, 실제 posts count/move SQL, flush→bulk→clear, root 101 page/children, full sibling ID/LOCKED slot 검사, 두 barrier 경쟁 테스트의 방향은 승인 계약과 일치한다. 동시성은 same-ID LWW 최종 행을 확인하지만 create 경쟁·락 대기·commit 순서를 계측하지 않아 중간 이상 증거로만 분류했다. DEFAULT/LOCKED 필드별 PUT·DELETE·LOCKED child subtree 거부와 owner soft-delete HTTP는 테스트 증거 공백이다.
+- 실행 참고: parent 전달 targeted 결과는 CategoryService 10/10, CategoryController 5/5, CategoryMigration 1/1 통과다. QA가 재실행한 결과가 아니며, `GlobalExceptionHandlerTest` XML에는 교정 전 고정문구 assertion 1건 실패가 남아 있어 현재 소스 수정 후 재실행이 필요하다. 전체 test/build/bootJar·HTTP smoke·Swagger·FE/1440px은 실행하지 않았다.
+- wrapper: `gradlew.bat:33` 초기 `ERROR_CODE=1`, `:79` `%ERRORLEVEL%` 캡처를 정적으로 확인했다. parent의 invalid `JAVA_HOME` 직접 확인은 exit 1이며, 미정의 `ERRORCODE`로 실패가 exit 0이 되던 원본 회귀의 수정 방향은 타당하다. wrapper 수정은 QA가 하지 않았다.
+- 산출물: `qa/M3-review.md`, `.claude/team/qa/STATE.md`만 갱신했다. `git diff --check -- qa/M3-review.md .claude/team/qa/STATE.md .claude/team/qa/WORKLOG.md`를 다음 기록 검증으로 수행한다.
+- 다음 gate: 숫자 enum 거부 설정 및 고정문구 테스트 재실행, V1→V2/동시성/SQL count·move/owner HTTP/불변 subtree 독립 증거, FE 전체 로드 전 쓰기 잠금·setup 복구·Swagger/1440px을 순서대로 확인한다. M3 최종 PASS/APPROVE는 보류한다.
+
+## 2026-09-06 — M3 FE 승인 계약 정적 대조
+
+- 한 일: `frontend/src/features/category/categoryApi.ts`, `SettingsPostsPage.tsx`, `ScreenPanel.tsx`, `BlogInitialSetupPage.tsx`, routes/관련 FE 테스트를 ADR-0005 Q2~Q4·REQUIREMENTS FR-CAT-01~05/FR-SETTINGS-04·PRD §7/§9.5·DESIGN-SYSTEM §6.2/§8.2/§8.6~§8.7과 읽기 전용으로 대조했다. 제품 소스·제품 테스트는 수정하지 않았고 npm/Vitest/브라우저를 실행하지 않았다.
+- 정적 정합: category API는 root page를 `size=100`으로 `totalPages`까지 순차 로드하고, 설정 화면은 전체 로드 전 mutation을 막으며 full sibling ID와 LOCKED numeric slot을 검사한다. 공개 `ScreenPanel`은 `includeDrafts=false`와 서버 direct `postCount`를 사용하고, blog 전환 cleanup으로 늦은 응답을 폐기한다. setup은 initial-setup 성공 후 누락 root GENERAL을 순차 POST하고 partial/lost POST를 GET으로 확인하며 같은 mount에서 initial-setup 재호출을 피한다.
+- 신규 FE 후보: (1) `SettingsPostsPage`의 blog 전환 중 오래된 mutation/load callback이 공유 `loadGeneration`을 탈취해 현재 blog에 이전 categories·notice·isMutating을 반영할 수 있는 F-M3-FE-01, (2) mutation 후 reload 실패가 내부 resolve되어 성공 notice가 남고 retry 뒤 stale success가 노출되는 F-M3-FE-02, (3) category partial failure에서 `refreshUser` 없이 setup 세션이 미완료로 남아 안내한 `/settings/posts`를 SetupGuard가 다시 setup으로 보내는 F-M3-FE-03, (4) `ScreenPanel` blog 전환 중 이전 blog totalCount를 잠시 표시하는 F-M3-FE-04를 `qa/M3-review.md`에 파일/라인·재현 흐름과 함께 append했다.
+- 기존 CAT_001 FE mapping은 이름 validation이 아니라 category not-found로 현재 승인 오류 의미와 맞음을 확인했다. monthly/UNIVERSE 통계의 em dash는 M3 category count API stub으로 세지 않았으며, 1440px 시각 검증은 미실행이다.
+- 증거 공백: 구현자 FE 결과(23 files/261 tests, lint/build exit 0)는 parent 전달 참고로만 취급하며 QA가 재실행하지 않았다. auth/defaultBlog 전환, mutation 후 reload failure/retry, setup refresh/guard 경로와 실제 1440px은 아직 미검증이다. BE F-M3-ERR-03 숫자 enum 및 API/JAR/DB/Swagger gate도 유지한다.
+- 다음 gate: FE가 F-M3-FE-01~03을 보완한 뒤 static re-review, 독립 targeted FE race/reload/setup 테스트, API/JAR smoke와 1440px 브라우저 실측을 순서대로 수행한다. M3 PASS/APPROVE는 보류한다.
+
+## 2026-09-06 — M3 BE 최신 변경 정적 재대조
+
+- 최신 `JacksonConfig`, category service concurrency test, 삭제 owner 경로와 category controller/OpenAPI annotation·테스트를 ADR-0005 및 M3 계약과 읽기 전용으로 대조했다. 제품 코드·제품 테스트는 수정하지 않았고 Gradle/HTTP/JAR을 실행하지 않았다.
+- **F-M3-ERR-03 유지(blocking)**: `JacksonConfig.java:15-18`이 `FAIL_ON_NUMBERS_FOR_ENUMS`를 `featuresToDisable(...)`에 넣어 numeric enum ordinal 차단 극성이 반대다. `CategoryControllerMySqlTest.java:121-126`의 `type:1` 400/`VALIDATION_001` 기대는 아직 미검증이며 수정 후 재실행이 필요하다.
+- **F-M3-ORDER-02 증거 공백**: `CategoryServiceMySqlTest.java:357,363-385,582-610`은 transactional service 반환 뒤 callback 순서로 `lastCompletedOrder`를 기록한다. commit과 callback 사이 스케줄링으로 callback 순서가 실제 commit 순서를 대표하지 않아 LWW를 독립 증명하지 못하고 가짜 실패도 가능하다. 제품 FAIL 판정이 아니라 테스트 증거 강도 부족으로 기록한다.
+- 삭제 owner service 직접 테스트(`CategoryServiceMySqlTest.java:512-533`)와 repository soft-delete 조건은 방향이 맞지만, anonymous/authenticated MockMvc GET에서 `BLOG_001` 및 비노출 envelope를 확인하는 HTTP 증거는 없다.
+- `CategoryController.java:45-46`의 public GET `@SecurityRequirements`, write `bearerAuth` 및 `CategoryControllerMySqlTest.java:180-208`의 security/응답 문서는 정적 방향이 맞다. 생성 `/v3/api-docs`와 최종 JAR 실행은 보류한다.
+- 명령: `rg` 읽기 전용 대조(exit 0). 미실행: Gradle 전체/targeted, HTTP smoke, Swagger/JAR. 다음 gate는 enum 설정 교정·400 실측, commit-order 증거, deleted-owner MockMvc, 생성 OpenAPI다. M3 PASS/APPROVE는 보류한다.
+
+## 2026-09-06 — M3 FE 제한 수정본 독립 정적 재대조
+
+- 범위: 최신 `SettingsPostsPage`, `ScreenPanel`, `BlogInitialSetupPage`, `SetupGuard`, `SideNav`와 관련 FE 테스트를 ADR-0005 Q2~Q4·REQUIREMENTS FR-CAT-01~05/FR-SETTINGS-04·PRD §7/§9.5·DESIGN-SYSTEM과 읽기 전용 대조했다. 제품 코드·제품 테스트는 수정하지 않았고 npm/Vitest/lint/build·브라우저를 실행하지 않았다.
+- 정적 해소 확인: F-M3-FE-01~04의 주 경로(현재 blog/operation generation, mutation 후 reload 실패, in-app partial setup recovery, viewer/blog 전환 count)가 최신 소스와 테스트에 반영됐다. parent의 `266 tests/lint/build exit 0`은 구현자 자체 결과로만 기록하며 QA acceptance PASS로 승격하지 않았다.
+- 잔여 후보: `SettingsPostsPage.tsx:432–441`의 F-M3-FE-05 stale create 응답이 현재 blog의 `newName`을 지울 수 있고, `:106–169` 및 `:322–375`의 F-M3-FE-06은 blog 전환 직후 passive effect 전 stale `isLoaded/categories` write window를 남긴다. `BlogInitialSetupPage.tsx:112–130`/`SetupGuard.tsx:73–89`와 `SideNav.tsx:27–31`을 대조한 F-M3-FE-07은 부분 실패 화면을 full refresh하면 recovery state가 사라져 `/`로 가며 settings를 거쳐야 하는 Q4 안내 공백이다. 세 항목 모두 runtime/browser 재현 전 제품 FAIL로 단정하지 않고 `qa/M3-review.md`에 근거를 append했다.
+- 다음 gate: 준비된 `127.0.0.1:8080` fresh API에서 QA smoke를 실행한다. smoke는 HTTP envelope/보안/category 계약만 확인하며 SQL post 이동/count·101 root 페이지·1440px은 별도 증거로 유지한다. M3 PASS/APPROVE는 보류한다.
+
+## 2026-09-06 — M3 loopback API smoke 실측
+
+- 실행: `& 'C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe' -NoProfile -ExecutionPolicy Bypass -File '.\qa\m3-api-smoke.ps1' -BaseUri 'http://127.0.0.1:8080'; $exit=$LASTEXITCODE; Write-Output ('M3_API_SMOKE_EXIT='+$exit); exit $exit`
+- 결과: `M3 API smoke passed. Fixture prefix: m3sdab71e3d. Accounts remain for cleanup.` 및 `M3_API_SMOKE_EXIT=0` (exit 0). owner/viewer 합성 계정은 남겼고 cleanup/delete하지 않았다. 실제 비밀번호·token·계정 전체 식별자는 출력하지 않았다.
+- assertion 범위: register/signin/auth-me·initial-setup/blog settings DTO, 공통 envelope/timestamp, anonymous/owner/non-owner GET·write 보안(401/403), root null parent/owner drafts, trim·trim 후 100자·duplicate, child/tree, GENERAL→LOCKED·idempotent update, LOCKED/DEFAULT 보호 및 CAT_006, full-ID reorder, subtree delete 후 name/order 재사용, stale CAT_007이 통과했다.
+- 범위 제한: 이 스크립트는 posts SQL 이동/count·101 root pagination·V1→V2·same-ID commit-order·deleted-owner HTTP·numeric enum 400·생성 Swagger·FE/1440px을 검증하지 않는다. smoke PASS를 M3 전체 PASS/APPROVE로 확대하지 않는다.
+
+## 2026-09-06 — M3 backend full build/test XML 독립 대조
+
+- 재실행 없이 `build/m3-root-full-build.log`, `build/test-results/test/TEST-*.xml`, 관련 source/test를 읽었다. build log `:38`은 `BUILD SUCCESSFUL in 10m 24s`; parent 전달 wrapper exit는 0이다. XML 56개를 파싱해 370 tests, failures/errors/skips 0/0/0을 확인했다.
+- 계약 연결: CategoryService 14/14가 101 roots/children, full sibling ID와 LOCKED slot, DEFAULT·LOCKED 불변·GENERAL→LOCKED, LOCKED subtree 보호, live/deleted post DEFAULT 이동, owner draft/direct count·UNIVERSE 방향, create/reorder/delete 경쟁을 통과했다. CategoryController 6/6이 owner/non-owner/anonymous security, deleted-owner BLOG_001 HTTP, root null/children, trim 100, malformed enum/body/query `VALIDATION_001`, generated OpenAPI security/status를 통과했다. CategoryMigration 1/1이 V1→V2 기존행/삭제 이력/active_key/범위 unique·재사용을 통과했고, GlobalExceptionHandler 5/5와 BlogPublicController deleted-owner 404도 통과했다.
+- F-M3-ERR-03은 현재 `JacksonConfig.java:15–18` `featuresToEnable(FAIL_ON_NUMBERS_FOR_ENUMS)` 및 `CategoryControllerMySqlTest.java:128–175` numeric enum 400 case의 full XML 6/6 통과로 현재 열린 결함이 아님을 기록했다. 과거 `featuresToDisable` finding은 역사로 유지한다.
+- F-M3-ORDER-02는 product FAIL이 아닌 증거 공백으로 유지한다. `CategoryServiceMySqlTest.java:607–610` callback 기록이 `TransactionTemplate` commit 전에 실행되어 실제 commit-order LWW를 독립 증명하지 않는다. 소스의 blog lock/full sibling/flush와 concurrent test 자체는 통과했다.
+- 다음: frontend 마지막 FE05~07 제한 패치 뒤 closure 재독해, 실제 브라우저 full-refresh/1440px gate. M3 전체 PASS/APPROVE는 보류한다.
+
+## 2026-09-06 — M3 FE05~07 최종 제한 패치 정적 closure
+
+- 최신 `SettingsPostsPage.tsx`, `BlogInitialSetupPage.tsx`, `SetupGuard` 경로와 관련 회귀 소스를 F-M3-FE-05~07 범위로만 재독해했다. 제품 파일·테스트는 수정하지 않았고 npm/Vitest/browser는 실행하지 않았다.
+- F05 closure: create response 뒤 current operation/`isReadyForBlog` 확인 후 `setNewName`을 실행하며, delayed A create→B 입력 보존·B POST 없음 회귀가 `categoryBehavior.test.tsx:357–440`에 있다. F06 closure: `loadedBlogId`/`isReadyForBlog`가 전환 직후 stale 목록 쓰기를 막고 모든 mutation/control guard에 연결되며, delayed B GET 중 disabled/no POST 회귀가 `:442–478`에 있다.
+- F07 closure: `markCategoryRecovery`가 partial failure 즉시 history state를 보존하고, normal retry/BLOG_004 success는 `flushSync`로 state를 먼저 정리한 뒤 `refreshUser` 및 목적지 이동을 수행한다(`BlogInitialSetupPage.tsx:100–107,178–216`). `BlogInitialSetupPage.test.tsx:295–327`이 retry-success blog destination과 remount/full-refresh management path를 확인한다.
+- parent의 FE 269 tests/lint/build exit 0은 참고 자체 결과로 기록했고 QA 독립 PASS로 승격하지 않았다. F-M3-FE-05~07은 정적 closure지만 실제 브라우저 full-refresh/1440px layout/copy/loading/error는 미검증이다. LWW commit-order evidence gap과 함께 M3 최종 PASS/APPROVE는 보류한다.
+
+## 2026-09-06 — F-M3-ORDER-02 LWW 증거 재판정 정정
+
+- 최신 실제 source/test를 재독해해 기존 “precommit callback이라 불충분” 기록을 정정했다. `CategoryServiceMySqlTest.java:603–610`은 각 worker의 outer `TransactionTemplate` 안에서 `categoryService.reorder`(REQUIRED)에 합류한 뒤 callback을 기록한다.
+- `CategoryService.java:179–181,269–275`와 `BlogRepository.java:26–29`의 `PESSIMISTIC_WRITE` blog row lock은 outer transaction commit까지 유지된다. T1 callback 후 commit 전에는 T2가 같은 blog lock을 획득해 callback할 수 없다. callback 순서가 성공 commit 순서와 일치하며, `firstResult.get()`/`secondResult.get()` null(`CategoryServiceMySqlTest.java:375–376`)이 outer commit 성공을 확인한다. rollback/commit 실패 callback이 성공 결과로 남는 반례도 없다.
+- 따라서 `CategoryServiceMySqlTest.xml` same-ID concurrent reorder 통과는 lock-serialized successful commit의 last-write-wins 범위를 증명한다. 구체 반례는 발견하지 못했고 F-M3-ORDER-02는 현재 제품 결함·증거 blocker가 아님으로 QA 정정 append했다. 브라우저 1440px/full-refresh는 별도 미검증 gate다.
+
+## 2026-09-06 — FE completion-intent 최종 제한 패치 독립 대조
+
+- 최신 `BlogInitialSetupPage.tsx`, `guards.tsx`, `BlogInitialSetupPage.test.tsx`, `guards.test.tsx` 및 F05/F06 async 회귀 소스를 읽기 전용으로 대조했다. parent가 전달한 관련 68 tests 및 FE 269/lint/build exit 0은 재실행하지 않았다.
+- 성공 경계: setup 완료 후 `/blog/setup`에 `setupCompletionTo:'blog'`를 history로 먼저 커밋하고 effect에서 `refreshUser()` 후 완료 blog slug로 이동한다(`BlogInitialSetupPage.tsx:102–150,220–254`). refresh 실패는 recovery state/관리 재시도로 전환한다. `SetupGuard.tsx:73–100`은 인증된 `defaultBlog.urlSlug`로 own-blog 목적지를 고정하고 recovery fallback을 유지한다.
+- 실제 route 회귀: `BlogInitialSetupPage.test.tsx:81–140,301–350`의 `/blog/setup`·`/settings/posts`·`/blog/myblog` route 모델에서 partial retry 성공, completion refresh 실패, remount history recovery를 확인한다. `guards.test.tsx:172–182`는 completion intent slug를 확인한다. F05/F06 delayed response는 `categoryBehavior.test.tsx:346–354,426–433`에서 `act` drain 후 assert한다.
+- 최신 intent 구현/관련 테스트에는 timer/`flushSync` 실험이 남아 있지 않다. 새 critical 실제 결함은 발견하지 못했고 FE 정적/자동/API 범위 검토를 완료로 정리한다. 실제 browser 1440px/full-refresh만 pending이며 M3 최종 승인은 보류한다.
+
+## 2026-09-07 — M3 FE 시각·native DnD 최종 패치 독립 재대조
+
+- 작업: 동결된 `BlogInitialSetupPage`, `SettingsPostsPage`와 최신 관련 회귀 테스트를 ADR-0005 Q2~Q4, REQUIREMENTS FR-CAT/FR-BLOG-02/FR-SETTINGS-04, PRD §7·§9.5, `DESIGN-SYSTEM.md` §3·§7.8·§8.6~§8.7과 읽기 전용 대조했다. 제품 소스·제품 테스트·npm·브라우저는 실행/수정하지 않았다.
+- 결과: 시작 칩/`+ 추가` 점선 스타일, category row spacing/typography, native drag `text/plain` ID와 `effectAllowed=move`, DEFAULT/LOCKED rename/delete `inert+disabled`, 카드 밖 삭제 안내를 정본과 연결했다. 삭제 안내 `미분류`는 디자인 원문의 `전체`와 다르지만 ADR-0005:34·REQUIREMENTS FR-CAT-04:519의 승인 정책 override이므로 finding이 아니다. 신규 critical/high 결함은 발견하지 않았다.
+- 회귀/실행: `BlogInitialSetupPage.test.tsx:267–279`, `categoryBehavior.test.tsx:657–734`의 보강 assertion을 확인했다. `Get-Content build/m3-final-frontend-tests.log`에서 parent 결과 `23 files/273 tests pass`, exit 0을 읽었으며, parent가 보고한 lint·tsc+Vite build exit 0은 참고 증거로만 기록한다. QA는 FE 명령을 재실행하지 않았다. BE full 370 tests/0 failure·error·skip 및 LWW closure는 기존 기록을 유지한다.
+- 잔여/다음 gate: 실제 브라우저 1440px computed layout·카피·loading/error/disabled 상태와 OS full-refresh/session 복원은 상세 증거 도착 전 pending이다. 해당 gate 전 M3 전체 PASS/APPROVE 및 dev 머지 완료를 주장하지 않으며, M3 마감 후 M4는 시작하지 않는다.
+
+## 2026-09-07 — M3 브라우저 부분 증거 재판정
+
+- parent 전달 중간 증거: 가입→setup→자기 blog slug, 새로고침/session 복원, 자식 카테고리 생성 및 ArrowUp 순서 PUT/GET·notice, inline rename·notice, 중복 거부·기존 목록 보존, 새 탭 재조회와 native screenshot의 단일 카드/들여쓰기/행/타이포/DEFAULT disabled/미분류 안내. 이는 QA가 독립 조작한 결과가 아닌 parent 실행 보고로 기록한다.
+- 잔여 실패/미실행: CUA mouse drag가 핸들 focus만 만들고 HTML5 dragstart/dragover/drop lifecycle을 완료하지 않아 실제 마우스 DnD PUT/notice는 미검증이다. LOCKED 경고는 AX에서 확인됐으나 confirm 수락은 timeout/`No dialog is showing`으로 저장되지 않았다. 코드·회귀 테스트 통과를 이 두 브라우저 실측으로 대체하지 않는다.
+- 판정/다음 gate: 정적 FE 패치와 parent 자동/API/부분 브라우저 경로에서 신규 critical/high finding은 없지만 M3 독립 최종 acceptance는 보류한다. 수동 DnD와 LOCKED confirm 수락, 독립 1440px computed layout/copy/loading/error 대조 뒤에만 최종 판단하며, M3 마감 후 M4는 착수하지 않는다.
+
+## 2026-09-07 — 브라우저 evidence 상태 정정
+
+- frontend 작성자와 별도 컨텍스트인 root의 직접 실행·관측으로 signup/setup/self-blog/full-refresh/session, keyboard reorder, rename, duplicate rejection, new-tab persistence 및 1440px native screenshot(단일 카드·들여쓰기·행·타이포·DEFAULT disabled·미분류 안내)을 완료 근거로 반영한다. 이를 QA 직접 실행으로 표기하지 않으며, root 독립 검토 evidence로 대조했다.
+- 남은 게이트는 CUA mouse-DnD가 HTML5 lifecycle을 완료하지 못한 실제 마우스 순서 PUT/notice와 LOCKED confirm 수락 후 불변 상태뿐이다. confirm은 timeout/`No dialog is showing`으로 저장되지 않았다. 사용자 확인/도구 제약을 해소하기 전 M3 최종 acceptance와 dev 머지는 보류한다.
+
+## 2026-09-08 09:39 KST — M3 종료 재개·완료 주장 및 설치 상태 감사
+
+- 한 일: 헌법·root/QA 지침·STATE를 순서대로 읽고, ADR-0005 Q1~Q4, REQUIREMENTS FR-CAT-01~05/FR-SETTINGS-04·NFR-04·08·09, PRD §5.4·§7·§9.5·§10~§12, M3 worklog와 `qa/M3-review.md`를 현재 HEAD와 교차 대조했다. 제품 source/test와 타 역할 파일은 변경하지 않았다.
+- 검증: HEAD `08239e0514b6a1a78f090c3b0961e8fd4a60403e`, working tree clean, `4fc9ae2..HEAD`의 `src`·`frontend` diff 없음. 기존 `build/m3-root-full-build.log`/XML은 `BUILD SUCCESSFUL in 10m 24s`, 56 files/370 tests/failures·errors·skips 0/0/0이며, FE log는 23 files/273 tests PASS다. FE/BE 실행 자체는 이번 턴에 재실행하지 않았다. 검증 JAR SHA-256 `422F7216E6B70A8BC533C9F84605C9E3368B961C0F0AC1F58A6B9113819FE369`도 기존 기록과 일치한다.
+- 설치 상태: `package.json`·`package-lock.json`·직접 `node_modules` manifest를 읽기 전용 비교해 17개 직접 의존성 lock/설치 version exact match를 확인했다. Vite는 선언 `^8.1.1`, lock/설치/실행 로그 `8.1.5`로 mismatch가 아니다. `npm ls --depth=0` exit 0, @emnapi 계열·`tslib` 6개 extraneous만 보고했으며 install/update/정리는 하지 않았다.
+- delivery metadata: local PR body의 “project-lead 스킬 이전 변경은 이 PR에서 제외” 문구는 HEAD `08239e0`가 `.agents/skills/project-lead/**`와 운영 문서를 포함한 실제 파일 목록과 모순된다. PR/Git는 root 소유이므로 수정하지 않고 root 교정 대상으로 보고한다. 제품 acceptance에는 영향이 없다.
+- 미해결: root의 이전 독립 브라우저 evidence(가입/setup·reload/session·keyboard·rename·duplicate·new-tab·1440px screenshot)는 유지하되, HTML5 mouse-DnD drop→순서 PUT→성공 notice 및 LOCKED confirm 수락→불변 상태 재조회는 새 증거 전까지 pending이다. 이 gate 전 M3 최종 PASS/APPROVE·dev merge를 주장하지 않으며 M4는 시작하지 않는다.
+
+## 2026-09-08 09:53 KST — native DnD 실측 PASS·LOCKED confirm 잔여 gate
+
+- 한 일: root가 frontend 구현자와 분리된 Chrome 컨텍스트에서 `/blog/m3-close-20260908`의 실제 CUA pointer drag `[515,281] → [515,223]`를 수행해 `프론트엔드`를 `백엔드` 위로 이동했다는 증거를 검토했다. 직후 AX에서 `미분류/프론트엔드/백엔드/회고`와 정확한 `카테고리 순서를 저장했습니다.` notice가 보였고, DB read-only 재조회에서 active IDs/orders `19 DEFAULT=0`, `21 GENERAL=1`, `20 GENERAL=2`, `22 GENERAL=3`이 확인됐다.
+- 판정: `SettingsPostsPage.tsx:193–224`의 `persistOrder`가 reorder await→GET 재조회 성공→notice 순서인 현재 source와 root의 UI/DB 결과가 일치한다. QA가 직접 브라우저를 조작한 결과는 아니므로 root 독립 evidence로 native mouse-DnD 저장 gate를 PASS로 승격했으며 새 critical/high finding은 없다.
+ - 범위 경계: 오전 Chrome native DnD 시 viewport override 요청 후 브라우저 zoom 90%로 `innerWidth=1600`, `dpr=0.9`가 관측되어 해당 동작을 1440 CSS px 실측으로 주장하지 않는다. 이후 임시 viewport는 reset됐다. 기존 1440 screenshot의 단일 카드·들여쓰기·행·타이포·disabled·미분류 안내 evidence는 유지한다.
+- 미해결: `회고` type을 LOCKED로 선택한 뒤 경고 `잠금 카테고리로 저장하면 이름·타입·순서를 되돌릴 수 없습니다. 저장할까요?`와 AX confirm/OK focus는 확인했으나 `getJsDialog.accept` timeout/세션 reset으로 저장이 완료되지 않았다. DB에서 id 22는 여전히 GENERAL이므로 LOCKED 저장·GET 재조회·불변 disabled 상태는 미검증이며 현재 유일한 UI gate다. 사용자 직접 OK 클릭 또는 지원 대체 evidence 전 최종 M3 APPROVE/dev merge는 보류한다.
+- 전달: root가 remote PR body의 project-lead 공개 범위를 `제외`에서 `포함`으로 정정해 gh 성공했다고 보고했다. GitHub API 인증 실패로 QA는 직접 확인하지 않았고, PR/Git·마일스톤 기록은 root 소유로 유지한다. M4는 시작하지 않는다.
+
+## 2026-09-08 10:05 KST — M3 최종 LOCKED 실측·QA APPROVE
+
+- 한 일: root가 frontend 구현자와 분리된 IAB tab 1에서 `http://localhost:5173/settings/posts`를 열고 합성 slug `m3-iab-close-20260908`로 가입→초기 설정→자기 블로그 이동 후 `회고` 타입을 native click→Down→Return으로 `LOCKED`로 변경했다. confirm 경고 `잠금 카테고리로 저장하면 이름·타입·순서를 되돌릴 수 없습니다. 저장할까요?`에 `getJsDialog.accept`가 성공했다.
+- 검증: 저장 후 AX에서 `회고 0 개의 글 LOCKED`, 순서 이동·이름 변경·삭제·타입 4개 조작 disabled, notice `카테고리를 잠금 상태로 저장했습니다. 잠금은 되돌릴 수 없습니다.`를 확인했다. reload 후 session 복원과 fresh AX에서도 동일 LOCKED/disabled 상태가 유지됐다. 10:05 KST DB read-only exit 0에서 blog 7/category 23 `미분류 DEFAULT order=0`, 24 `백엔드 GENERAL order=1`, 25 `프론트엔드 GENERAL order=2`, 26 `회고 LOCKED order=3`을 확인했다.
+ - 경계: 이 브라우저 조작은 QA가 직접 수행한 것이 아니라 root 독립 evidence다. 이전 Chrome fixture blog 6/category 22가 GENERAL인 상태는 별도 fixture이며 성공 결과에 혼합하지 않았다. 오전 Chrome native DnD 시점의 zoom 90%(`innerWidth=1600`, `dpr=0.9`) 관측은 IAB 동작에 해당하지 않는다. IAB에는 viewport override를 설정하지 않았고 치수도 측정하지 않았으므로 1440 CSS 수치로 주장하지 않으며, 기존 native 1440 screenshot evidence만 유지한다.
+- 종합: 기존 BE 370 tests/XML 0 failure·error·skip, FE 273 tests/lint/build, JAR SHA-256, loopback smoke, V1→V2/SQL count·move/권한/OpenAPI, signup/setup/reload/session·keyboard/rename/duplicate/new-tab·1440px·native DnD 저장/notice/DB 재조회 근거와 이번 LOCKED confirm 저장/재조회 근거를 승인 정본 ADR-0005 Q1~Q4 및 FR-CAT-01~05/FR-SETTINGS-04에 대조했다. 새 critical/high finding은 없다.
+- 판정: **QA 최종 APPROVE.** M3 acceptance의 마지막 UI gate가 해소됐으며 root가 PR `OPEN/Draft/head=08239e0`의 remote scope 문장 `포함` 정정도 완료했다고 보고했다. root의 dev merge와 M3 `[머지]` 마감은 별도 후속이며, merge 완료로 기록하지 않는다. M4는 시작하지 않는다.

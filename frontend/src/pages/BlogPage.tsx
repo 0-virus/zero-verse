@@ -10,7 +10,7 @@ import type { PublicBlogResponse } from '../features/settings/types';
  * `/blog/:blogSlug` 블로그 화면.
  *
  * 히어로(`AppShell`)가 실시간 title/description/owner를 표시한다.
- * 좌측 패널은 `ScreenPanel`이 카테고리·통계를 표시한다(M3/M4 미구현).
+ * 좌측 패널은 `ScreenPanel`이 이 페이지가 채운 공개 블로그 context의 카테고리·통계를 표시한다(M3).
  * 본문은 글 목록 또는 빈 상태를 표시한다(M4 미구현).
  */
 export function BlogPage() {

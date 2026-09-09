@@ -67,6 +67,11 @@ public class Category extends BaseSoftDeleteEntity {
         return new Category(blog, null, DEFAULT_NAME, CategoryType.DEFAULT, 0);
     }
 
+    public static Category create(
+            Blog blog, Category parent, String name, CategoryType type, Integer displayOrder) {
+        return new Category(blog, parent, name, type, displayOrder);
+    }
+
     public Long getId() {
         return id;
     }
@@ -94,5 +99,19 @@ public class Category extends BaseSoftDeleteEntity {
     /** 이름·삭제를 바꿀 수 없는 카테고리인지(PRD §9-H). */
     public boolean isImmutable() {
         return type == CategoryType.DEFAULT || type == CategoryType.LOCKED;
+    }
+
+    public boolean isRoot() {
+        return parent == null;
+    }
+
+    public void update(String name, CategoryType type, Integer displayOrder) {
+        this.name = name;
+        this.type = type;
+        this.displayOrder = displayOrder;
+    }
+
+    public void updateDisplayOrder(Integer displayOrder) {
+        this.displayOrder = displayOrder;
     }
 }

@@ -72,9 +72,27 @@ export function SetupGuard({ children }: { children: ReactNode }) {
 
   const isSetupPage = location.pathname === '/blog/setup';
   const isSetupCompleted = user.defaultBlog.isSetupCompleted;
+  const state = location.state;
+  const completionTarget =
+    isSetupPage &&
+    typeof state === 'object' &&
+    state !== null &&
+    'setupCompletionTo' in state &&
+    state.setupCompletionTo === 'blog' &&
+    user.defaultBlog.urlSlug
+      ? `/blog/${user.defaultBlog.urlSlug}`
+      : null;
+  const recoveryTarget =
+    isSetupPage &&
+    typeof state === 'object' &&
+    state !== null &&
+    'setupRecoveryTo' in state &&
+    state.setupRecoveryTo === '/settings/posts'
+      ? '/settings/posts'
+      : null;
 
   if (isSetupPage && isSetupCompleted) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={completionTarget ?? recoveryTarget ?? '/'} replace />;
   }
   if (!isSetupPage && !isSetupCompleted) {
     return <Navigate to="/blog/setup" replace />;

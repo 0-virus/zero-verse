@@ -101,6 +101,52 @@ function callsTo(pattern: RegExp) {
   return fetchMock.mock.calls.filter((c) => pattern.test(String(c[0])));
 }
 
+/** M3 초기 설정의 GET → 누락 루트 순차 POST를 검증하기 위한 실제 응답 모형. */
+function setupCategoryRoutes(): Array<[RegExp, Handler]> {
+  const categories: Array<{
+    id: number;
+    parentId: null;
+    name: string;
+    type: 'GENERAL';
+    displayOrder: number;
+    postCount: number;
+    children: [];
+  }> = [];
+  return [
+    [
+      /\/blogs\/1\/categories(?:\?|$)/,
+      (_url, init) => {
+        if (init?.method === 'POST') {
+          const request = JSON.parse(String(init.body)) as {
+            name: string;
+            displayOrder: number;
+          };
+          const category = {
+            id: categories.length + 10,
+            parentId: null,
+            name: request.name,
+            type: 'GENERAL' as const,
+            displayOrder: request.displayOrder,
+            postCount: 0,
+            children: [] as [],
+          };
+          categories.push(category);
+          return envelope(category);
+        }
+        return envelope({
+          items: categories,
+          page: 0,
+          size: 100,
+          totalElements: categories.length,
+          totalPages: 1,
+          hasNext: false,
+          hasPrevious: false,
+        });
+      },
+    ],
+  ];
+}
+
 function PathProbe() {
   const { pathname } = useLocation();
   return <div data-testid="pathname">{pathname}</div>;
@@ -121,6 +167,7 @@ describe('/blog/setup — 초기 설정 행동', () => {
             isSetupCompleted: true,
           }),
       ],
+      ...setupCategoryRoutes(),
     ]);
 
     render(
@@ -160,6 +207,7 @@ describe('/blog/setup — 초기 설정 행동', () => {
     install([
       [/\/blogs\/me\/initial-setup/, () => failure(409, 'BLOG_004')],
       [/\/blogs\/me$/, () => envelope({ ...BLOG, urlSlug: 'already-done' })],
+      ...setupCategoryRoutes(),
     ]);
 
     render(

@@ -14,6 +14,8 @@
 
 둘 이상의 역할 소유 영역에 걸친 팀 작업은 역할별 에이전트에 분할하고, 독립 작업만 병렬화한다. 한 파일을 둘 이상에게 동시에 맡기지 않는다. 주 에이전트는 모든 결과를 기다린 뒤 실제 파일과 검증 출력을 직접 확인한다. 세션 시작·재개·다음 작업 선정에는 `$brief`를 사용한다.
 
+연속 지휘의 시작·재개에는 프로젝트 스킬 `$project-lead`(`.agents/skills/project-lead/SKILL.md`)를 사용한다. 이 범용 스킬은 이 저장소의 정본·역할·승인·마일스톤 규칙을 읽고 적용하며, 사용자 정지까지 작업 배정·검증·다음 단계 또는 필요한 대기를 이어간다.
+
 ## Purpose
 
 ZeroVerse Blog MVP 저장소. 개인 블로그 플랫폼으로, 사용자는 자신의 블로그를 운영하고 "유니버스"라 부르는 단방향 신청-수락 관계로 서로의 글을 발견/공유한다. Spring Boot 백엔드와 React 프론트엔드가 구현 중이며, 현재 위치는 Git·`docs/worklog/`·역할별 `STATE.md`를 직접 대조해 판정한다.
@@ -24,6 +26,7 @@ ZeroVerse Blog MVP 저장소. 개인 블로그 플랫폼으로, 사용자는 자
 
 | Path | Description |
 |------|--------------|
+| `README.md` | 로컬 테스트 서버·프론트 실행, 자동 테스트, 종료·문제 해결 안내. 리더 소유이며 실제 설정과 대조해 유지한다. |
 | `docs/REQUIREMENTS.md` | MVP 전체 요구사항 명세(v2.1). 도메인 모델, API 규칙, FR-*/NFR-*, 프론트 라우트, 엔드포인트 목록, 에픽 초안. **요구사항 정본**(단, `docs/PRD.md` §9 사용자 결정이 override하는 부분 제외). |
 | `docs/PRD.md` | 요구사항 + 디자인 정본 + 사용자 결정을 통합한 **구현 실행 명세**(v2.0). 아키텍처/패키지 구조, 화면-API 매핑, 디자인 시스템 토큰(§6), 화면 명세(§7), 결정 로그(§9), 마일스톤 순서(§10), 테스트 전략, DoD. 실제 구현의 로드맵. |
 | `docs/design/` | **시각 디자인 정본**(2026-07-24 도입). Claude Design 프로젝트에서 가져온 `.dc.html` 원본 + `DESIGN-SYSTEM.md`(토큰·컴포넌트·13화면 스펙). `docs/design/AGENTS.md` 참고. |
@@ -46,7 +49,7 @@ ZeroVerse Blog MVP 저장소. 개인 블로그 플랫폼으로, 사용자는 자
 | `qa/` | 독립 QA 검토·재현 기록. `qa/AGENTS.md`를 따르며 제품 소스와 구현 테스트는 각 소유 역할에 요청한다. |
 | `.claude/` | 공통 팀 헌법, Claude 역할 정의·스킬, 역할별 상태·기록. 앱 코드 아님. |
 | `.codex/` | Codex custom agent 설정. 상태 파일은 두지 않고 `.claude/team/`을 공유. |
-| `.agents/` | Codex 저장소 스킬. `$brief` 포함. |
+| `.agents/` | Codex 프로젝트 스킬. 읽기 전용 `$brief`, 범용 연속 지휘 `$project-lead`. |
 | `.omc/` | oh-my-claudecode 런타임 상태. 무시 대상 운영 아티팩트. |
 
 ## Architecture
@@ -130,6 +133,7 @@ ZeroVerse Blog MVP 저장소. 개인 블로그 플랫폼으로, 사용자는 자
 - Spring Boot 프로젝트와 React 프로젝트는 구현 중이다. 현재 완료·진행 상태는 커밋 제목으로 추정하지 말고 Git, `docs/worklog/**`, 역할별 `STATE.md`를 대조한다. 구현 순서는 **PRD §10 마일스톤(M0 스캐폴딩 → M1 인증 → … → M10 마감)** 을 따른다.
 - 백엔드 패키지는 PRD §2.2(base `com.zeroverse`, 도메인 패키지 + 레이어드), 프론트는 §2.3. DB 컬럼 snake_case / Java 필드 camelCase(NFR-06), JPA 필드는 래퍼 타입.
 - **카테고리 타입은 `DEFAULT/GENERAL/LOCKED`** (SERIES 제거, §9-H). 미분류=DEFAULT(변경·삭제 불가), LOCKED=잠금(변경·삭제 불가). **공개범위 enum은 `UNIVERSE`이나 화면 표기는 "친구"**(§9-B).
+- M3 카테고리의 상세 예외·계약은 사용자 승인 [ADR-0005](docs/governance/decisions/ADR-0005-categories-contract.md)와 REQUIREMENTS §6.4를 따른다. DEFAULT 순서는 변경 가능하고 LOCKED 숫자 순서는 불변이다. 활성 unique, 공개 count, 초기 설정 후속 카테고리 저장 및 M4 blog lock 인계도 이 계약을 따른다.
 - **프론트엔드는 PRD §6 = `docs/design/DESIGN-SYSTEM.md` 토큰을 반드시 적용**(레트로 픽셀 × 크림 페이퍼 × 황혼의 우주):
   - 배경 `#f6ead8`(paper) · 잉크/보더 `#2b1b3d` · 강조 `#e85d75`(accent) · 하드 오프셋 그림자 `#d8c7b0`.
   - 표면 `#fff` / `#fff8ec` / `#ffe9c9` / `#fff3dd`, 텍스트 `#3d2f52`·`#5c4a72`·`#9b8aa8`, 잉크 위 텍스트 `#ffd9a0`.

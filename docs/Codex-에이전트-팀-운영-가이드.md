@@ -20,6 +20,11 @@ Codex 전용 STATE나 WORKLOG를 만들지 않는다.
 
     $brief를 사용해 backend, frontend, qa, pm의 상태와 최우선 다음 행동을 보고해.
 
+    $project-lead로 brief와 PRD 상세 명세에 따라 팀 작업을 계속 지휘해.
+    내가 정지할 때까지 작업 배정·검증·다음 마일스톤 진행을 이어가.
+
+`$project-lead`는 `.agents/skills/project-lead/`의 프로젝트 스킬이다. 특정 프로젝트명·역할명·PRD 절·브랜치를 고정하지 않고 이 저장소의 지침을 찾아 적용한다. `정지해`로 중단하고 `$project-lead 재개`로 이어간다.
+
     ZeroVerse 에이전트 팀으로 이 작업을 수행해. backend, frontend, qa에 소유 영역이
     겹치지 않게 배정하고 독립 작업만 병렬 실행해. 모든 결과를 기다린 뒤 실제 파일과
     검증 출력을 다시 확인해 종합해: <작업>
@@ -63,6 +68,8 @@ Codex에서는 주 에이전트가 역할 간 전달 허브다. 타 역할 파�
 | .codex/agents/zeroverse-*.toml | 네 역할 정의 |
 | .agents/skills/brief/SKILL.md | 읽기 전용 현재 상태 종합 |
 | .agents/skills/brief/agents/openai.yaml | $brief UI 정보 |
+| .agents/skills/project-lead/SKILL.md | 명세·진행 상황 기반 범용 연속 지휘 |
+| .agents/skills/project-lead/agents/openai.yaml | $project-lead UI 정보 |
 
 ## 7. 빠른 자체 점검
 
@@ -70,5 +77,6 @@ Codex에서는 주 에이전트가 역할 간 전달 허브다. 타 역할 파�
     Get-Content -Raw -Encoding UTF8 .codex/config.toml
     Get-ChildItem .codex/agents/*.toml | Select-Object Name
     Get-Content -Raw -Encoding UTF8 .agents/skills/brief/SKILL.md
+    Get-Content -Raw -Encoding UTF8 .agents/skills/project-lead/SKILL.md
 
-새 세션에서 $brief와 zeroverse-backend, zeroverse-frontend, zeroverse-qa, zeroverse-pm이 발견되면 구성이 완료된 것이다.
+새 세션에서 $brief, $project-lead와 zeroverse-backend, zeroverse-frontend, zeroverse-qa, zeroverse-pm이 발견되면 구성이 완료된 것이다.

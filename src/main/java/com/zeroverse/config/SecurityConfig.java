@@ -73,6 +73,7 @@ public class SecurityConfig {
                         // 공개 조회 — GET만 연다. 같은 경로의 쓰기 요청은 인증이 필요하다.
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/blogs/slug/**",
+                                "/api/v1/blogs/*/categories",
                                 "/api/v1/feed/public",
                                 "/api/v1/search").permitAll()
 

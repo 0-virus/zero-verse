@@ -155,3 +155,25 @@
 - 리더는 `SettingsPostsPage.changeType`의 실제 confirm→PUT→GET 성공→notice 경로와 UI·DB 결과의 일치를 확인했다. `git diff --name-status 4fc9ae2 -- src frontend`는 출력이 없어 검증 제품 tree가 유지되며 문서만 바뀌었다. `git diff --check` exit 0이다. 원격 fetch 후 feature HEAD와 origin은 ahead/behind 0/0이고 base dev는 `1690731`이다.
 - 리더 최종 승인 후 root에 현재 11개 변경 파일(네 역할 STATE/WORKLOG, QA review, M3 worklog, JOURNAL)의 명시 stage·commit·origin feature push와 PR #9 Ready/merge를 배정한다. 비밀값·실행 로그·ignored PM 준비 문서·임시 PR 본문은 stage하지 않는다. 실제 merge 결과와 종료 기록은 이후 별도로 남긴다.
 - Chrome 임시 viewport reset은 성공했다. 멈춘 기존 Chrome 검증 탭의 close는 timeout이라 닫힘을 주장하지 않으며, 정상 IAB 검증 결과 탭은 보존했다. 합성 DB·API·Vite를 삭제하거나 초기화하지 않았다.
+
+## [이슈·결정] — 2026-09-08 10:13 KST 공개 푸시 승인 대기
+
+- 리더가 검토한 문서 11개를 명시 stage하고 `822b4ce1d6c78695e87ac7883e8577b066e03aea`(`docs: record M3 browser acceptance and final QA approval`)로 로컬 커밋했다. staged diff check exit 0, 11 files/+233/-46, 커밋 직후 작업 트리는 깨끗했다. 제품 파일과 비밀값·실행 로그는 포함하지 않았다.
+- `git push origin HEAD:feature/M3-categories`는 실행 전 자동 승인 검토에서 거절됐다. 사유는 공개 저장소로 팀 STATE/WORKLOG·QA·JOURNAL 등 새 검증 기록 11개를 전송할 구체적인 사용자 공개 승인이 부족하다는 것이다. 원격 feature는 `08239e0` 그대로이고 로컬은 ahead/behind 1/0이다. 푸시·PR Ready·merge 완료가 아니며 다른 명령이나 경로로 우회하지 않는다.
+- 현재 제품 검증·독립 QA/리더 승인은 완료됐고, 남은 것은 해당 공개 게시에 대한 명시 승인→현재 기록 재검증/필요한 문서 커밋→같은 feature push→PR #9 dev merge→마감 기록이다. M4는 시작하지 않는다. 사용자에게 게시 범위와 공개성, 차단 사유를 설명하고 승인을 요청한다.
+
+## [이슈·결정] — 2026-09-08 10:43 KST 최신 M4 범위 요청
+
+- 이후 사용자 `$project-lead m4`로 이전의 M3 마감 후 종료 경계가 대체됐다. [M4 준비 기록](M4-posts.md)에서 문서 준비·독립 심의를 시작한다. 기존 M3 검증 및 미실행 push/merge 사실은 변하지 않았다.
+- 새 요청은 차단된 공개 게시 11개 파일/PR 본문에 대한 구체적 승인을 대체하지 않는다. M3 공개 승인→실제 dev merge 전에는 M4 분기·제품 구현을 하지 않는다. 최신 PR 직접 조회는 OPEN/Draft, MERGEABLE, mergedAt null이다.
+
+## [이슈·결정] — 2026-09-09 09:07 KST 공개 게시·머지 명시 승인
+
+- 사용자 `그렇게 해줘`로 공개 저장소 `0-virus/zero-verse`에 고정 커밋 `822b4ce`의 팀 상태·QA·작업 기록 11개와 검증 요약을 게시하고 PR #9를 `dev`에 머지하는 범위가 승인됐다. 앞선 승인 부족 거절 이후 새로 수령한 명시 승인이다.
+- root가 고정 11개 기록과 제품 불변, 독립 QA APPROVE, PR #9 OPEN/Draft/base dev/원격 `08239e0`을 대조했다. 미커밋 M4 준비 자료는 게시 범위에서 제외한다. BE370/FE273의 기존 통과 검증을 중복 실행하지 않는다.
+
+## [머지] — 2026-09-09 09:09 KST M3 완료
+
+- 리더 `/root`가 사용자 승인 범위의 고정 기록11개(`822b4ce`)와 최종 검증 요약만 공개하고 PR #9를 Ready 전환했다. push/edit/ready/merge 명령은 모두 exit0이다.
+- [PR #9](https://github.com/0-virus/zero-verse/pull/9) 실제 상태 `MERGED`, base `dev`, head `822b4ce1d6c78695e87ac7883e8577b066e03aea`, merge `59badfe42d539a33091a387b9ee6119d838190b8`, mergedAt `2026-09-09T00:08:47Z`(09:08:47 KST). fetch한 origin/dev와 고정 HEAD의 tree diff는 없다. 최종 QA APPROVE·리더 승인 및 기존 BE370/FE273·브라우저 인수 증거가 같은 제품 버전에 적용된다.
+- M3 제품·검증·게시·머지 완료. 최신 사용자 M4 요청에 따라 종료 대신 `feature/M4-posts`를 실제 dev에서 분기했다. 기존 혼합 미커밋 기록·M4 초안과 합성 DB/실행 환경은 보존했고 M4 준비 자료는 공개하지 않았다.

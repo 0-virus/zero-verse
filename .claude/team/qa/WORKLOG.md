@@ -206,3 +206,59 @@
  - 경계: 이 브라우저 조작은 QA가 직접 수행한 것이 아니라 root 독립 evidence다. 이전 Chrome fixture blog 6/category 22가 GENERAL인 상태는 별도 fixture이며 성공 결과에 혼합하지 않았다. 오전 Chrome native DnD 시점의 zoom 90%(`innerWidth=1600`, `dpr=0.9`) 관측은 IAB 동작에 해당하지 않는다. IAB에는 viewport override를 설정하지 않았고 치수도 측정하지 않았으므로 1440 CSS 수치로 주장하지 않으며, 기존 native 1440 screenshot evidence만 유지한다.
 - 종합: 기존 BE 370 tests/XML 0 failure·error·skip, FE 273 tests/lint/build, JAR SHA-256, loopback smoke, V1→V2/SQL count·move/권한/OpenAPI, signup/setup/reload/session·keyboard/rename/duplicate/new-tab·1440px·native DnD 저장/notice/DB 재조회 근거와 이번 LOCKED confirm 저장/재조회 근거를 승인 정본 ADR-0005 Q1~Q4 및 FR-CAT-01~05/FR-SETTINGS-04에 대조했다. 새 critical/high finding은 없다.
 - 판정: **QA 최종 APPROVE.** M3 acceptance의 마지막 UI gate가 해소됐으며 root가 PR `OPEN/Draft/head=08239e0`의 remote scope 문장 `포함` 정정도 완료했다고 보고했다. root의 dev merge와 M3 `[머지]` 마감은 별도 후속이며, merge 완료로 기록하지 않는다. M4는 시작하지 않는다.
+
+## 2026-09-08 10:14 KST — M3 QA 완료·공개 게시 승인 대기
+
+- 상태 갱신: QA 최종 **APPROVE**와 기존 LOCKED/native DnD acceptance 근거는 유지한다. root 보고에 따라 제품 불변의 로컬 문서 커밋 `822b4ce1d6c78695e87ac7883e8577b066e03aea`가 생성됐고, 제품 기준 feature 원격 HEAD는 `08239e0`이다(local `ahead 1/behind 0`).
+- 잔여 delivery gate: 11개 문서 공개 전송을 포함한 `git push`가 사용자 승인 부족으로 거절됐으며, 현재 PR은 `OPEN/Draft`이고 push·ready·merge는 수행되지 않았다. 공개 게시 승인 후 root가 push·PR 상태 갱신·dev merge 및 M3 `[머지]` 마감 기록을 이어간다.
+- 범위: QA는 새 UI 조작·테스트·서버 검증·Git 조작을 수행하지 않았고 타인 변경을 보존했다. M4는 시작하지 않는다.
+
+## 2026-09-09 09:20 KST — M3 공개 게시·dev merge 독립 마감 감사
+
+- 한 일: 헌법·QA 지침과 현재 STATE를 읽은 뒤 ADR-0005 `ACCEPTED`, REQUIREMENTS §6.4의 FR-CAT-01~05·FR-SETTINGS-04·M3 공통 계약, PRD §5.4·§10~§12, M3 worklog `[머지]`, `qa/M3-review.md` 최종 `APPROVE`를 직접 재대조했다. 사용자 `그렇게 해줘`로 승인된 M3 공개 게시·PR 병합 범위만 감사했으며 M4 제품 구현·새 계약 검토·테스트 재실행은 하지 않았다.
+- 검증: `git show --format=fuller --stat --summary 822b4ce1d6c78695e87ac7883e8577b066e03aea` exit 0, 11 files `+233/-46`; `git diff-tree --no-commit-id --name-status -r 822b4ce1d6c78695e87ac7883e8577b066e03aea` exit 0, 고정된 팀 상태/로그·QA review·M3 worklog 11개만 포함. `git diff --quiet 4fc9ae2 59badfe42d539a33091a387b9ee6119d838190b8 -- src frontend` exit 0, 출력 없음으로 승인 제품 tree 불변을 확인했다. merge tree에서 `M4|M4-posts|20260908-posts` 경로는 발견되지 않았다.
+- 원격 증거: `git ls-remote origin refs/heads/dev refs/heads/feature/M3-categories` exit 0에서 `dev=59badfe42d539a33091a387b9ee6119d838190b8`, feature=`822b4ce1d6c78695e87ac7883e8577b066e03aea`; `git ls-remote origin refs/pull/9/head refs/pull/9/merge` exit 0에서 PR head=`822b4ce1d6c78695e87ac7883e8577b066e03aea`; `git cat-file -t 59badfe42d539a33091a387b9ee6119d838190b8`는 `commit`을 반환했다. 현재 브랜치는 `feature/M4-posts`이고 기존 M4/운영 미커밋 변경은 보존되어 있다.
+- PR 증거: 공개 [PR #9](https://github.com/0-virus/zero-verse/pull/9) 페이지에서 `Merged`, `dev` ← `feature/M3-categories`, 2026-09-09 병합, Ready timeline과 merge commit `59badfe`를 확인했다. PR 본문도 11개 기록·검증 요약 게시와 M4 준비 문서 제외를 명시한다. `gh pr view` 직접 API는 인증 오류 `HTTP 401`(exit 1)이어서 API JSON을 읽었다고 주장하지 않고 공개 페이지·Git ref를 사용했다.
+- 산출물: `qa/M3-review.md`에 공개 payload/PR 상태/base-head/merge/tree 불변의 독립 마감 감사와 **PASS**를 append했다. `.claude/team/qa/STATE.md`를 `M3 MERGED / M4 계약 준비 중 / QA 제품 미배정`으로 갱신했다. 제품 코드·제품 테스트·타 역할 파일·Git ref는 변경하지 않았다.
+- 미해결: M3 차단 요인은 없다. M4 세부 계약 승인과 QA 명시 배정 전에는 제품 검증을 시작하지 않는다. loopback 합성 계정·브라우저 fixture는 정리하지 않았다.
+
+## 2026-09-09 12:37 KST — M4 U0 독립 QA 최종 검토
+
+- 한 일: 사용자 승인 §12.3·§14의 U0 범위만 대상으로 FR-UPLOAD-01~04, PRD §5.12·§13.1, 회의 §11.4·§11.5와 `gradle/u0/**`, `frontend/u0/**`, `compose.localstack.yml`을 읽기 전용 대조했다. 이번 U0 구현에는 참여하지 않았고 제품 API·DB·도메인·실제 AWS·구매는 다루지 않았다.
+- 검증 근거: root가 별도 실행한 fresh process/bucket과 CUA 브라우저의 결과를 대조했다. `compileJava`는 cache ACL 문제를 권한 승인 후 exit 0으로 통과했고, fixture 보정 후 **19 CASE 18 PASS/1 FAIL**, **28 VERIFY 27 PASS/1 FAIL**이었다. 정상 네 MIME·정확 5 MiB·경계·checksum/byte/type 변조·만료·replay 412·signed GET negative·bounded GET/HEAD/Tika·객체 부재·CORS negative는 통과했다.
+- 실패: `unsigned-private-get`가 실제 200(기대 403), `/verify`의 `unsigned-private-get-403`도 실패했다. `S3_SKIP_SIGNATURE_VALIDATION=0` 및 `S3_VALIDATE_SIGNATURES=1` 설정은 있으나 IAM authorization enforcement가 없어 signature validation과 private 권한이 분리되지 않았다. 브라우저 DOM도 `19/19 cases · 18 PASS · verify 27/28 PASS`를 재현했고 CORS TypeError는 없었다.
+- 정적 경계: MIME spoof는 raw PUT 거부가 아닌 Tika 탐지 경계이므로 제품 `complete`/UPLOAD validation 증거가 아니다. Java direct self-check의 `requestStatus`는 GET/PUT만 전송하고 CORS OPTIONS는 별도 helper로 검사하며 현재 manifest도 GET/PUT만 포함한다. 고유 `zeroverse-u0-` 자원, 기존 데이터 미삭제, signed URL/token 비출력은 root 보고와 최종 파일에서 확인했으며 QA는 재실행하지 않았다.
+- 판정/미해결: **BLOCKED (U0 PASS 아님), 확신도 99/100, 위험 HIGH/기밀성 CRITICAL.** 정식 지원·허가된 IAM authorization enforcement가 실제로 403을 증명하기 전까지 U0 완료·M4/U1 착수·보안 완화를 주장하지 않는다. 가입·구매·임의 구버전 pin·만료 우회·같은 key 재실행은 하지 않는다. 상세 근거와 필수 gate는 `qa/M4-u0-review.md`에 기록했다.
+
+## 2026-09-09 12:57 KST — U0 IAM 라이선스 진단 후속 독립 검토
+
+- 한 일: root가 제공한 12:55:48 read-only license 진단과 공식 [LocalStack Plans](https://docs.localstack.cloud/aws/licensing/), [IAM Policy Enforcement](https://docs.localstack.cloud/aws/developer-tools/security-testing/iam-policy-enforcement/)를 대조했다. 새 Docker/버킷/브라우저 실험, 설정·라이선스 파일 변경, 온라인 activate/request-new-license, 구매는 하지 않았다.
+- 사실: `GET /_aws/iam/config` 404만으로 미지원이라 단정하지 않는다. 설치된 `localstack_pro_core-2026.8.1.dist-info/entry_points.txt`의 `iam-enforcement` plugin entrypoint는 확인됐다. 메모리 오프라인 검증 exit 0 결과는 `cached_license_valid=true`, `iam_basic_allowed=true`, `iam_enforcement_allowed=false`였고 비밀·라이선스 원문·고객 식별자는 출력하지 않았다.
+- 판단: 공식 문서는 IAM Policy Enforcement가 기본 비활성이고 `ENFORCE_IAM=1`이 필요하며 Hobby에는 없고 Base/Ultimate 이상에 있다고 명시한다. 따라서 현재 차단은 플러그인 미설치가 아니라 **현재 cached license의 enforcement entitlement 미허용**으로 구체화된다. IAM 기본 API 허용은 enforcement 허용을 뜻하지 않는다. 계정 tier/license 원문은 독립 확정하지 않았다.
+- 범위/결론: 사용자 후속 승인에도 root는 U0 bucket 2개/객체 16개를 초기화·재생성하지 않고 보존했다. 기존 18/19·27/28 실측과 브라우저 결과 외 추가 시험은 없다. U0 판정은 **BLOCKED (PASS 아님), 확신도 99/100, HIGH/기밀성 CRITICAL** 유지다. IAM entitlement가 허가된 환경에서 fresh 자원 무서명 GET 403을 재현하기 전까지 U0/M4/U1 PASS·보안 완화·구매·우회 주장을 금지한다. 세부 후속은 `qa/M4-u0-review.md`에 append했다.
+
+## 2026-09-23 KST — SeaweedFS U0-ALT 최종 독립 QA
+
+- 한 일: 헌법·AGENTS·QA 지침·현재 STATE를 순서대로 다시 읽고, 사용자 명시 `$brief` 절차로 정본·회의 §17·M4 worklog·현재 U0 harness/page를 읽기 전용 대조했다. QA가 SeaweedFS 설치·서버/브라우저 실행·Git·제품 수정은 하지 않았고 root의 별도 실행/관측 산출물만 독립 검토했다.
+- 증거: 공식 native SeaweedFS 4.47 ZIP SHA-256 `8809359079e62fcd60574ff661449160899622c52072f3f569d346669079efe9`, Java `EA8D0D21161159638683D5CD7871F391578641F743AD9D12F45572DE98D75F6D`, HTML `B98C583B82C49F87EB08C30550624EADADF58DDE1F8F6CB86DF07EA014442EDE`를 파일 hash/관측 요약과 대조했다. `build/u0-seaweedfs-core-self-check.log`는 `19/19 CASE PASS`, `27/28 VERIFY PASS`, exit1이다.
+- SeaweedFS identity가 anonymous private GET `403`, signed GET `200/403/403`, OwnershipControls `BUCKET_OWNER_ENFORCED`, exact/wrong CORS `200/403`, checksum·HEAD/range/Tika·negative object absence를 통과시켜 LocalStack의 private GET 200 공백을 provider-local로 보완했다. broad `Admin/Read/Write/List/Tagging` synthetic identity이므로 least privilege 증거로 확대하지 않았다.
+- root browser evidence는 fresh bucket에서 `19/19 cases · 18 PASS · verify 27/28 PASS`다. unsigned private GET은 실제 `403`이나 `over-5mb-signed-at-max`는 `fetch TypeError/CORS`로 status 미노출이라 FAIL이다. `/verify` 유일 실패는 PAB `UNSUPPORTED HTTP501`이며, 객체 부재를 HTTP403 증거로 대체하지 않았다. TypeError 원인은 미확정이다.
+- 현재 harness는 SeaweedFS setup PAB/OwnershipControls의 `501`만 capability line으로 기록하고 VERIFY false/분모28/exit1을 유지한다. browser origin은 `14566`·`14568`만 허용하고 expected status/wildcard CORS는 완화하지 않았다. core log의 generic PAB detail은 최신 detail-only 소스 변경 전 출력이며 acceptance 변경이 아니다.
+- 잔여 위험: PAB 미지원으로 AWS Public Access Block을 증명하지 못하고, SeaweedFS emulator 결과를 IAM policy semantics·TLS·durability·lifecycle·STS/SSE/control-plane 또는 실제 AWS 보장으로 해석하지 않는다. server-v2 stderr의 STS signing-key/SSE/filer gRPC 경고도 운영 통과로 주장하지 않는다. U1은 실제 AWS가 아닌 제품 domain/FE vertical slice 별도 gate다.
+- 산출물: `qa/M4-u0-review.md`에 SeaweedFS acceptance matrix·필수 PASS/FAIL·AWS/U1 잔여 gate를 append하고, STATE를 최종 **U0 BLOCKED** 스냅샷으로 갱신했다. 최종 권고는 대체 provider를 더 늘리지 않고 SeaweedFS 4.47을 `U0-ALT/core` 부분 gate로 고정하는 것; PAB와 browser oversized status를 FAIL로 유지하며 실제 AWS/정식 지원 PAB·IAM 환경과 U1 검증을 별도 수행하는 것이다.
+
+## 2026-09-23 15:43 KST — 잔여 두 문제 후속 독립 QA
+
+- root의 `build/u0-seaweedfs-diagnostic-evidence.md`와 fresh harness/browser 결과를 읽기 전용으로 대조했다. 동일 manifest의 fresh Run U0는 다시 `18/19 CASE`, `27/28 VERIFY`였고, native XHR 비교는 `status 0 · event error · headers 미수신 · U0 판정 미변경`이었다. fetch를 XHR로 교체해도 readable reject status가 나오지 않으므로 API 교체 해결안은 기각한다.
+- 브라우저 증거 경계: raw HTTP의 `403 SignatureDoesNotMatch`·정확한 ACAO·`Connection: close`와 body 0 TCP 즉시 403은 서버 조기 서명 거절/연결 종료 가설을 강화한다. Go `net/http`의 큰 미소비 body close 규칙과도 부합하지만 browser TCP reset/error code는 확보되지 않아 exact root cause는 미확정이다. XHR의 ACAO/Connection 미관측은 CORS exposure 제한 때문에 헤더 부재를 뜻하지 않는다.
+- PAB 공식 소스를 동일 4.47 tag로 재확인했다. `s3api_server.go` L882–885에 route는 있으나 `s3api_bucket_policy_handlers.go` L424–435의 각 handler가 `ErrNotImplemented`를 반환한다. 이전 중간 보고의 route 부재 표현은 정정하며, 정확한 판정은 **route 존재·handler stub·HTTP501**이다. PAB VERIFY false/분모28/exit1은 유지한다.
+- 판정: 두 문제 모두 미해결, **U0 전체 BLOCKED**. raw 403·object absence·XHR status0은 browser PASS로 대체하지 않으며, expected status/manifest/negative 기준 완화·provider 합산·proxy/vendor patch/비용 전환을 하지 않는다. 전체 U0 재개 조건은 PAB 4 flag와 effective deny를 정식 지원하는 승인 환경 및 browser에서 readable `400/403`을 새로 확보하는 것이다. U1은 제품 도메인/FE gate, 실제 AWS는 별도 gate다.
+- 검증·보존: temporary XHR HTML hash `4E25BBC4E140F2F705899985896A0FDCE4D50825AE283CB879D7B58889AEB7C9`는 root 증거에 기록됐고, root가 진단 후 XHR 코드를 제거했다. Java harness hash `EA8D0D...`는 변하지 않았으며 서버/listener와 합성 data 보존 상태는 root가 확인했다. QA는 제품·타 역할 파일·runtime·Git을 변경하지 않았다.
+
+## 2026-10-03 13:43 KST — M3/M4 QA 산출물 commit-review 독립 대조
+
+- 범위: `qa/M3-review.md`, `qa/M4-u0-review.md`, QA `STATE/WORKLOG`, ADR-0005, `docs/worklog/M3-categories.md`, `docs/worklog/M4-posts.md`, M4 회의 §14~§19와 U0 core/browser/diagnostic evidence를 읽기 전용으로 대조했다. 제품 코드·타 역할 파일·Git ref는 변경하지 않았다.
+- M3 merge 증거는 `59badfe42d539a33091a387b9ee6119d838190b8`의 PR #9 merge commit/부모(`822b4ce`), 원격 `dev`, `feature/M3-categories`, PR head ref와 일치했고 `4fc9ae2..59badfe`의 `src`·`frontend` diff는 exit 0, merge tree의 M4 경로 match는 0이었다. ADR-0005 `ACCEPTED` 및 M3 `[머지]` 기록과 QA review의 PASS가 모순되지 않는다. M3 worklog 상단의 과거 `Draft PR #9` 문구는 append-only 역사 기록으로 보존한다.
+- M4 수치는 정본과 일치한다. LocalStack은 `18/19 CASE`, `27/28 VERIFY`; SeaweedFS Java core는 `19/19 CASE PASS`, `27/28 VERIFY PASS`, exit 1; fresh browser는 `18/19 CASE`, `27/28 VERIFY`; PAB는 `HTTP501`; native XHR은 `status 0/event error`; 최종 U0 판정은 모든 문서에서 `BLOCKED`다. 실제 core log는 19/19 CASE, 27/28 VERIFY·1 FAIL과 non-zero exit 1을 재확인했고 OwnershipControls는 PASS, PAB만 FAIL이다.
+- 정정 필요성이 명백한 STATE 사실은 발견하지 않아 판정·차단·잔여 위험은 유지했다. 다만 `qa/M4-u0-review.md:68`의 `PAB/OwnershipControls 결과를 false` 표현은 실제 log·STATE·worklog의 OwnershipControls PASS와 모호하게 충돌하므로 원문 수정은 담당자 판단으로 남긴다. `qa/M4-u0-review.md:3`의 Markdown hard-break trailing spaces 1건은 staged `diff --check`에서 확인할 항목이다.
+- 검증: M3 merge/tree/ref 확인 명령 exit 0, SeaweedFS core 집계 `19/19`, `27/28·1 FAIL`, exit marker 1, browser evidence `18/19·27/28`, diagnostic `XHR status 0`, tracked QA `git diff --check` exit 0. 제품 테스트·U0 재실행·browser 재조작·commit/push는 실행하지 않았다.

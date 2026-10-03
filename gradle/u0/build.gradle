@@ -1,0 +1,28 @@
+plugins {
+    id 'application'
+}
+
+group = 'com.zeroverse.u0'
+version = '0.0.1'
+
+// AWS official release 2.49.6; Apache Tika supported 3.x line 3.3.2.
+def awsSdkVersion = '2.49.6'
+def tikaVersion = '3.3.2'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+layout.buildDirectory.set(file('../../build/u0'))
+
+dependencies {
+    implementation platform("software.amazon.awssdk:bom:${awsSdkVersion}")
+    implementation 'software.amazon.awssdk:s3'
+    implementation "org.apache.tika:tika-core:${tikaVersion}"
+}
+
+application {
+    mainClass = 'com.zeroverse.u0.U0Harness'
+}

@@ -21,6 +21,96 @@ npm.cmd --version
 API만 확인한다면 Node/npm과 프론트 실행은 생략할 수 있습니다.
 현재 인증·블로그 설정·카테고리 확인에는 LocalStack/S3가 필요하지 않습니다.
 
+### LocalStack — M4 준비용, 제품 연결 전
+
+현재 PC는 Windows 예약 범위 `4474–4573` 때문에 `lstk 1.0.0`의 기본 서비스 포트와 `4566`을 열 수 없습니다.
+[compose.localstack.yml](compose.localstack.yml)은 사용자가 받은 LocalStack **2026.8.1** 이미지의 digest를 고정하고,
+**`127.0.0.1:14566 → 4566`만** 연결합니다. Windows 예약·방화벽·기존 MySQL은 변경하지 않습니다.
+S3만 활성화하며 Docker socket은 공유하지 않습니다. `lstk start`는 이 Compose 설정을 사용하지 않습니다.
+
+이미 생성된 컨테이너의 시작·확인·종료:
+
+```powershell
+docker start zeroverse-localstack
+(Invoke-RestMethod 'http://127.0.0.1:14566/_localstack/health').services.s3
+docker stop zeroverse-localstack
+```
+
+최초 생성이나 설정 적용을 위해 재생성할 때만 아래를 사용합니다. `lstk`의 시스템 저장소 로그인은 Compose에 자동 전달되지 않습니다.
+토큰은 LocalStack 계정의 Auth Tokens에서 확인하여 **아래 로컬 입력창에만** 넣으세요. 채팅·파일·Git에 남기지 마세요.
+이미지 자동 다운로드는 막아 두었으므로 다른 PC에서는 Compose에 고정된 이미지를 먼저 준비해야 합니다.
+
+```powershell
+$localstackPreviousToken = $env:LOCALSTACK_AUTH_TOKEN
+try {
+    $env:LOCALSTACK_AUTH_TOKEN = [System.Net.NetworkCredential]::new('', (Read-Host 'LocalStack Auth Token' -AsSecureString)).Password
+    docker compose -f compose.localstack.yml up --detach --wait
+} finally {
+    $env:LOCALSTACK_AUTH_TOKEN = $localstackPreviousToken
+    $localstackPreviousToken = $null
+}
+```
+
+Docker 컨테이너 환경에는 실행용 토큰이 들어 있으므로 전체 `docker inspect`/Compose 설정 출력을 공유하지 마세요.
+현재는 **기동 확인용 임시 환경**이며 데이터 영속성은 설정하지 않았습니다. 재시작·재생성 시 테스트 데이터 보존을 기대하지 마세요.
+health 성공은 이미지 업로드/권한 검증 U0 통과가 아닙니다. 제품 코드·DB·실제 AWS 연결은 아직 변경하지 않았습니다.
+
+### U0 업로드 검증 — 제품 서버와 별도
+
+LocalStack이 실행 중일 때 저장소 루트에서 실행합니다. 검증용 SDK/Tika는 `gradle/u0`에만 있으며,
+매 실행마다 고유 테스트 버킷과 합성 이미지가 생성됩니다. 기존 버킷은 삭제하지 않습니다.
+
+```powershell
+.\gradlew.bat --gradle-user-home .gradle-home2 --no-daemon --max-workers=1 -p gradle/u0 run
+```
+
+`http://127.0.0.1:14567`을 열어 **Run U0를 한 번만** 누릅니다. 다시 시험하려면 이 도구만 `Ctrl+C`로 종료하고 새로 실행하세요.
+같은 프로세스의 URL·객체를 재사용하면 덮어쓰기 거부·만료로 결과가 달라집니다.
+브라우저 없는 자체 검사는 위 명령 끝에 `--args=--self-check`를 붙이며, 실제 브라우저 시험을 대체하지 않습니다.
+
+2026-09-09 실측은 **U0 실패**입니다. 브라우저 요청 18/19·서버 검사 27/28이 통과했지만,
+무서명 private GET이 `403` 대신 `200`이었습니다. 현재 IAM enforcement는 비활성이며,
+기존 라이선스의 오프라인 검증에서도 이 기능은 허용되지 않았습니다. 재생성·재시험은 보류하고 테스트 데이터를 보존합니다.
+이 환경에 개인 이미지·실제 데이터를 올리지 마세요. 상세 결과와 재개 조건은 [M4 기록](docs/worklog/M4-posts.md)을 따릅니다.
+
+### SeaweedFS U0 대체 검증 — 2026-09-23 승인
+
+이 PC에는 공식 SeaweedFS native `4.47`을 `build/u0-seaweedfs-4.47/`에 준비했습니다(Git 제외).
+공식 `windows_amd64.zip` SHA-256은 `8809359079e62fcd60574ff661449160899622c52072f3f569d346669079efe9`입니다.
+이 폴더의 `s3.json`에는 U0 합성 identity만 있고 익명 identity는 없습니다. 계정 가입·결제·Docker가 필요하지 않습니다.
+
+검증용 저장소를 다시 시작할 때는 먼저 같은 프로세스가 실행 중인지 확인한 뒤 별도 터미널에서 실행합니다.
+
+```powershell
+Set-Location build/u0-seaweedfs-4.47
+.\weed.exe server -master -volume -filer -s3 -ip=127.0.0.1 -ip.bind=127.0.0.1 -s3.ip.bind=127.0.0.1 -dir=data -volume.port=9340 -s3.port=14568 -s3.config=s3.json -s3.allowedOrigins=http://127.0.0.1:14567 -s3.port.iceberg=0 -s3.port.lance=0 -master.telemetry=false -volume.max=24 -master.volumeSizeLimitMB=128 -s3.allowDeleteBucketNotEmpty=false -s3.autoCreateBucket=false
+```
+
+`mini -admin.ui=false`도 이 버전에서 관리 gRPC `::33646`을 열었으므로 `server`를 사용합니다.
+리더 실측에서는 `server`의 8개 listener가 모두 `127.0.0.1`이었습니다. S3 endpoint는 `14568`이며 기존 LocalStack `14566`과 분리됩니다.
+
+저장소 루트의 다른 터미널에서 검증기를 실행합니다. 두 명령은 동시에 실행하지 않습니다.
+
+```powershell
+# 실제 브라우저: http://127.0.0.1:14567 에서 Run U0를 한 번 실행
+.\gradlew.bat --gradle-user-home .gradle-home2 --no-daemon --max-workers=1 -p gradle/u0 run --args=--seaweedfs
+# 브라우저 없는 별도 새 프로세스 검사
+.\gradlew.bat --gradle-user-home .gradle-home2 --no-daemon --max-workers=1 -p gradle/u0 run --args="--seaweedfs --self-check"
+```
+
+실행마다 고유 합성 버킷을 생성하고 삭제하지 않습니다. 종료는 각 터미널의 `Ctrl+C`이며 데이터 폴더는 보존합니다.
+최신 결과는 [M4 기록](docs/worklog/M4-posts.md)을 따릅니다. 로컬 U0 통과도 제품 U1 완료나 AWS IAM 정책 동등성의 증거는 아닙니다.
+
+2026-09-23 실측: Java 요청19/19·서버검사27/28, 실제브라우저 요청18/19·서버검사27/28.
+Public Access Block은 HTTP501 미지원이고, 브라우저 초과크기 요청은 HTTP코드 대신 fetch TypeError/CORS였다.
+무서명GET403과 초과객체미생성은 확인했지만 전체U0는 BLOCKED다. 임시서버는 종료했고 합성데이터는 보존했다.
+
+후속 진단에서도 두 문제는 미해결입니다. PAB는 공식4.47 handler 자체가 미구현이며,
+초과 PUT은 원시 HTTP에서 조기403·정확한 CORS 헤더·Connection close가 확인됐지만 브라우저 fetch와 XHR 모두 응답을 읽지 못했습니다.
+합성 버킷은 총6개 보존했습니다. 마지막 진단에서 volume.max를16→24로 늘렸고 현재 data의 볼륨 파일은23개입니다.
+새 버킷 재시험 전 남은 볼륨 슬롯과 디스크 용량을 확인해야 하며, 데이터 삭제로 공간을 자동 확보하지 않습니다.
+위 명령은 마지막 진단 설정이며 두 실패를 해결하는 설정이 아닙니다. 변화 없는 동일 재시험은 하지 않습니다.
+
 ## 1. 테스트용 MySQL 준비
 
 이미 사용할 **로컬 테스트 DB**가 있다면 새로 만들지 말고 2단계에서 해당 주소·계정을 사용하세요.

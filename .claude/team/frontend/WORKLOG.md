@@ -160,3 +160,87 @@
 - 산출물: `.claude/team/frontend/STATE.md`의 현재 상태·다음 작업·차단을 LOCKED gate 해소 및 QA 최종 판정/PR #9 `dev` merge 대기로 최소 정정했다. 이 `WORKLOG.md`와 `STATE.md`만 수정했으며 제품 source/test/UI/deps/server/Git는 변경하지 않았다.
 - 검증 근거: root 독립 인앱 브라우저에서 새 합성 blog ID `7`/category ID `26`의 `회고`를 LOCKED로 저장하고 order `3`, `카테고리를 잠금 상태로 저장했습니다. 잠금은 되돌릴 수 없습니다.`, `회고 0개의 글 LOCKED`를 확인했다. full reload 후에도 LOCKED/order `3` 및 순서 이동·이름 변경·삭제·타입 선택 4개 조작의 disabled 상태를 확인했다. QA 직접 조작으로 표기하지 않는다.
 - 미해결: 남은 단계는 독립 QA 최종 acceptance와 리더의 PR #9 `dev` merge·M3 마감이다. 이번 IAB 관측은 1440 CSS px 실측으로 확대하지 않고 기존 1440px 시각 evidence를 유지한다. M4는 시작하지 않는다.
+
+## 2026-09-08 10:14:03 KST — M3 최종 승인·공개 게시 승인 대기 체크포인트
+
+- 한 일: 독립 QA 최종 `APPROVE`와 리더 승인이 완료된 상태를 frontend 역할 스냅샷에 반영했다. 로컬 문서 커밋 `822b4ce1d6c78695e87ac7883e8577b066e03aea` 및 제품 tree 불변 상태를 기록했다.
+- 산출물: `.claude/team/frontend/STATE.md`의 현재 HEAD·QA 완료·다음 작업·차단을 최소 정정했다. `origin/feature/M3-categories`는 `08239e0` 그대로(local ahead 1/behind 0)이며, 이 `WORKLOG.md`와 `STATE.md`만 수정했다. 제품 source/test/deps, 외부 시스템, Git push/PR Ready/merge는 변경하지 않았다.
+- 검증 근거: 제품 tree는 `4fc9ae2` 이후 불변이다. 자동 승인 검토가 팀 STATE/QA/JOURNAL 등 11개 문서의 공개 전송에 대한 구체적 사용자 승인 부족으로 push를 거절했으며, 따라서 현재 blocker는 검증이 아니라 공개 게시 승인이다.
+- 미해결: 사용자의 명시적 공개 게시 승인을 받은 뒤에만 리더가 push·PR #9 Ready 전환·`dev` merge·M3 마감 기록을 진행한다. M4는 시작하지 않는다.
+
+## 2026-09-09 09:18:34 KST — M4 비공개 S3 이미지 FE 소비 흐름 조사
+
+- 한 일: `CONSTITUTION.md` → 루트 `AGENTS.md` → frontend `CLAUDE.md`/`STATE.md` 순서로 읽고, REQUIREMENTS FR-POST-01~07·FR-UPLOAD-01~04·NFR-02/03/04/08, PRD §7.1~§7.2(블로그·상세·에디터)·§8.1~§8.3·§13.1, `docs/design/AGENTS.md`, `DESIGN-SYSTEM.md` §1~§8.4, `ZeroVerse Pages.dc.html` 원본과 실제 FE 이미지 소비처를 대조했다. 제품 source/package/design/Git는 수정하지 않았다.
+- 정본 사실: 기존 FR-UPLOAD-01은 `profileImageUrl`/`thumbnailUrl`/`images[].imageUrl`에 접근 URL을 저장하는 계약이고, FR-POST의 `content_json`은 TipTap 원본이며 `content_html`은 sanitizer 캐시다. PRD §13.1은 LocalStack과 S3 직접 URL을 확정하지만, 이번 사용자 결정은 글 권한에 맞춘 **비공개 S3 + 짧은 GET URL 방향의 세부 계약 보완**까지만 승인했다. TTL·DTO/API·세부 DB·제품 구현은 미승인이다.
+- 실제 소비처: `frontend/src/pages/SettingsProfilePage.tsx:147,258,332-340,415-417`가 프로필 URL을 폼에 보존·PUT하고 직접 `<img src>`로 미리보기한다. `frontend/src/features/settings/types.ts:12,22,67`과 `frontend/src/types/auth.ts:62`가 `profileImageUrl`을 DTO/Auth 상태로 운반한다. `frontend/src/features/blog/types`가 아니라 `features/settings/types.ts:58-70`의 `PublicBlogResponse.owner.profileImageUrl`을 `AppShell.tsx:83`이 `Hero.tsx:157-164`의 76px 히어로 `<img>`에 넘긴다. `Avatar.tsx`는 emoji만 렌더하며 `PostCard.tsx`·`BlogPage.tsx`·`PostDetailPage.tsx`·`WritePage.tsx`·`EditPage.tsx`에는 현재 thumbnail/body image 소비가 없다. `Prose.tsx`는 children wrapper만 있고 raw HTML sink도 없다.
+- 권고(미확정, 1건): 기존 저장/요청 필드 이름은 유지하되 그 값은 **무서명 canonical URL만** 읽고/쓴다. 리소스(`profile/user` 또는 `post/purpose`)를 서버가 매번 권한 확인하는 batch read API가 반환한 `canonicalUrl → displayUrl, expiresAt`만 각 화면의 메모리 map에 보관한다. `AuthUser`, 설정 form, Post DTO, TipTap JSON/HTML, POST/PUT payload, local/session storage에는 display URL을 절대 되돌려 쓰지 않고 별도 전역 이미지 플랫폼/cache도 만들지 않는다.
+- 최소 mapping: (1) 프로필 설정은 `profileImageUrl` canonical을 form 값으로 유지하고 read 결과의 display URL만 아바타 preview에 주입한다. 저장 성공 후 canonical이 바뀌면 이전 map을 폐기하고 새 ref만 resolve한다. (2) `/auth/me`와 `PublicBlogResponse.owner`는 canonical만 운반하며 `HeroAvatar`에는 현재 blog/resource 세대가 일치하는 display URL 또는 emoji fallback을 전달한다. (3) 향후 `thumbnailUrl`은 목록 응답 canonical을 모아 한 번에 resolve하되, 디자인 §8.2/§8.3에 목록 카드·상세 hero 대표 이미지가 없으므로 제품 승인 전 markup을 추가하지 않는다. (4) 본문은 JSON image node의 `attrs.src`에 canonical을 저장하고 TipTap renderer/NodeView가 display map을 읽어 DOM `src`만 대체한다. 저장은 항상 `editor.getJSON()` 원본으로 하며 signed URL을 JSON에 재저장하지 않는다. `content_html` fallback을 쓸 때는 승인된 안전 renderer/sanitizer 경로가 필요하며 FE에 현재 raw HTML 구현은 없다.
+- stale/재시도 검토안: route·post/profile ID·canonical 값·load generation이 모두 맞는 응답만 적용하고, 이전 slug/post의 늦은 read 응답은 버린다. `apiClient`의 credentials/401 single-flight를 재사용하며 S3 `<img>` 오류는 같은 generation/ref에 대해 read 재요청 1회만 허용하고 그 뒤에는 emoji/placeholder fallback으로 끝낸다. logout·profile update·관계 취소 시 view-local map과 pending 적용을 폐기한다. 오래 열린 draft 탭은 `expiresAt`을 확인해 재조회하고, 접근 거부면 signed URL을 재사용하지 않으며 editor 텍스트와 canonical state를 보존한다. 이미 발급된 GET URL은 권한 취소 뒤에도 TTL 동안 열릴 수 있으므로 서버 정책과 검증에 남긴다.
+- draft/upload 검토안: presigned PUT 성공 직후 canonical ref를 editor local state/JSON에만 넣고 display URL은 별도 map에서 resolve한다. `/posts`/`/posts/{id}`/`/posts/{id}/images`에는 canonical만 전송한다. 저장하지 않고 탭을 닫으면 orphan 객체 정리 정책은 backend 운영 계약으로 남긴다. draft를 다시 열 때 signed URL을 복원하지 말고 canonical ref로 새로 권한 확인한다. URL-only read 요청은 임의 object probe가 되므로 리소스 ID/purpose 등 서버 권한 경계를 포함해야 한다.
+- 미해결: `POST /uploads/read-urls`의 최종 path/요청·응답/부분 거부 shape와 canonical 공개 수준, 제안 TTL(60초)·clock skew·브라우저 캐시, relationship revoke/logout 후 기존 URL의 허용 TTL, 현재 외부 URL을 저장하는 profile 경로의 migration/거부, HTML fallback의 안전한 이미지 rewrite, upload 후 미저장 orphan 정리와 read 실패 UX. 정본 디자인의 에디터 10MB 문구와 REQUIREMENTS 5MB 제약 정합화도 별도 승인 대상이다.
+- 검증: 실제 branch `feature/M4-posts`, HEAD `59badfe42d539a33091a387b9ee6119d838190b8`(origin/dev와 동일), `git diff --name-only -- frontend` 출력 없음, `rg`로 `frontend/src`의 `profileImageUrl`/thumbnail/avatar/content/HTML sink를 확인했다. 조사 전후 제품 source/package/design/Git 변경 없음. 문서-only 상태라 M3 기준 `npm test` 273 tests·lint/build exit 0을 재실행하지 않았고, 이 조사 결과를 M4 테스트 통과로 표시하지 않는다.
+
+## 2026-09-09 12:23:55 KST — M4 U0 로컬 업로드 브라우저 검증 페이지 구현
+
+- 한 일: 사용자 승인 범위를 `docs/governance/meetings/M4-20260908-posts.md` §12.3 U0로 한정하고, BE가 제공하는 `{cases:[...]}`·`{checks:[...]}` 계약에 맞춘 독립 정적 페이지 `frontend/u0/index.html`을 추가했다. 제품 `frontend/src`, package/lock, 디자인 정본, 서버/API/DB/AWS는 수정하지 않았다.
+- 동작: `Run U0` 클릭으로 `/cases`를 메모리에만 읽고 case를 순차 실행하며, PUT은 base64 bytes → synthetic `File` → raw `fetch` body로 보낸다. `File.size`를 확인하고 `Content-Length`·`Host`는 설정하지 않는다. URL은 `http://127.0.0.1:14566` origin만 허용하며 GET/HEAD/PUT/OPTIONS 외 method·임의 목적지는 거절한다. `waitMs`는 0~10초로 검증하고 요청별 `AbortController` 30초 timeout, 중복 Run 잠금, 실패 후 다음 case 진행을 적용했다.
+- 결과·보안: 표의 `id/status/code/pass`에 `S3 HTTP`와 `fetch TypeError/CORS`를 구분해 기록하고, negative case는 기대 HTTP status 일치로만 PASS한다. case 후 `/verify`를 읽어 서버 checks summary를 표시하며, raw URL/header/body/credentials/detail은 DOM·console·storage·window 전역에 기록하지 않는다. `safeId` ASCII allowlist로 식별 라벨만 보존하고 나머지는 고정 fallback으로 대체한다. 실제 5MiB `File.size` 경계와 local-origin self-check를 포함했다.
+- 검증: inline JS `new Function` 문법 검사 `U0_INLINE_JS_SYNTAX=PASS`, `git diff --check -- frontend/u0/index.html` exit 0, `npm.cmd run lint` exit 0, `npm.cmd run build` exit 0(Vite 64 modules)을 확인했다. 저장소 전체 `npm.cmd test -- --run`은 273개 중 270 passed/3 failed로 종료됐다(`categoryBehavior` 1, `authForms` timeout 1, `settingsBehavior` 1); 이 실행만으로 U0 변경과의 인과 또는 기존 제품 결함을 판단하지 않으며 제품 테스트/소스는 수정하지 않았다.
+- 미해결/인계: 부모가 BE U0 harness를 `http://127.0.0.1:14567/`에서 기동하고 독립 실제 브라우저로 Run U0·1440px 동작/시각·서명정보 비노출을 확인한다. BE `/cases`·`/verify`가 same-origin GET에도 `Origin`을 강제하면 브라우저가 금지 헤더를 설정할 수 없으므로, 403 재현 시 BE 쪽 검토가 필요하다. 실제 브라우저 결과 전에는 U0 PASS를 주장하지 않는다.
+
+## 2026-09-09 — M4 U0 실제 브라우저 증거 반영
+
+- root가 Codex In-app 브라우저에서 `http://127.0.0.1:14567/`를 열어 self-check PASS 후 `Run U0`를 실행했다. 19/19 cases가 실행됐고 18 PASS, `/verify`는 27/28 PASS였다.
+- 모든 case는 HTTP 결과로 분류됐고 fetch TypeError/CORS는 없었다. 정상 4 MIME 업로드와 5MiB boundary는 200이었으며 length/checksum/header/expiry/replay 거부도 기대 HTTP 결과였다. 유일한 실패는 `unsigned-private-get`의 실제 200 대 expected 403 assertion이었다.
+- root가 같은 브라우저 bucket의 `/verify`를 별도로 확인해 exit 0과 동일한 27/28 결과를 재확인했다. 다만 IAM enforcement가 비활성이라 unsigned private GET 보안 gate가 해소되지 않았으므로 전체 U0는 BLOCKED다.
+- 1440px 시각 검증은 수행하지 않았고 이 결과로 제품 화면 인증을 주장하지 않는다. U1 및 제품 M4 FE 구현은 미승인이다.
+- 반복 Run은 기존 key/서명 TTL 영향을 받을 수 있으므로 README에 한 번만 Run하고 새 프로세스로 재검증하는 안내가 필요하다. 이번 항목에서는 README를 수정하지 않고 frontend `STATE.md`/`WORKLOG.md`만 갱신했다.
+
+## 2026-09-23 13:22:47 KST — SeaweedFS U0-ALT FE endpoint allowlist 준비
+
+- 한 일: 부모가 전달한 사용자의 SeaweedFS 4.47 native U0-ALT 설치·재시험 승인을 확인하고, `frontend/u0/index.html`의 S3 endpoint allowlist를 정확히 `http://127.0.0.1:14566` 또는 `http://127.0.0.1:14568` 두 origin으로 확장했다. `14567` harness origin, scheme/hostname/인접 port는 계속 거부한다.
+- 한 일: 화면 카피의 LocalStack 고정을 제거하고 `S3-compatible endpoint`로 중립화했다. 기존 raw `File` PUT, `Content-Length`·`Host` 제외, 서명 header/case 결과 표시, method·status 기대값·negative 정책은 변경하지 않았다. Content-Length 서명 제거·기대값 약화·provider 우회는 하지 않았다.
+- 산출물: `frontend/u0/index.html`, `.claude/team/frontend/STATE.md`, 이 `WORKLOG.md`. 제품 `frontend/src/**`, package/dependency, backend harness/profile, 서버/컨테이너, Git는 변경하지 않았다.
+- 검증: 변경 후 관련 inline JS syntax 및 두 허용 origin/거부 origin self-check만 실행 예정이며, 이 기록 시점에는 SeaweedFS runtime·14568 CORS/SigV4·backend `/cases`/`/verify`·실제 브라우저 결과를 아직 실행하지 않았다. 기존 LocalStack 14566의 19/19·18 PASS 및 `/verify` 27/28은 과거 별도 증거이며 SeaweedFS PASS로 승격하지 않는다.
+- 미해결: root가 SeaweedFS 4.47 native를 `127.0.0.1:14568`에 기동하고 backend `--seaweedfs` manifest를 준비한 뒤 fresh browser에서 U0 및 `/verify`를 실측해야 한다. 그 결과 전에는 U0-ALT 완료·전체 U0 PASS·제품 M4/U1 승인을 주장하지 않는다.
+
+## 2026-09-23 13:24:27 KST — SeaweedFS U0-ALT FE syntax/self-check 검증
+
+- 검증 명령: inline `<script>` 추출 후 `new Function(...)` syntax 검사 → `U0_INLINE_JS_SYNTAX=PASS`, exit 0; 최소 DOM shim에서 페이지 초기 self-check 실행 → `U0_SELF_CHECK_TWO_ORIGINS=PASS`, exit 0; provider-neutral 카피·두 origin·forbidden header·raw File/fetch·허용 method·14569 거부 정적 확인 → `U0_RELATED_STATIC_CHECK=PASS`, exit 0.
+- 검증 범위: `frontend/u0/index.html`의 두 origin allowlist와 self-check만 확인했다. 전체 FE test/lint/build, 서버 기동, SeaweedFS 4.47 protocol/CORS/SigV4, backend `/cases`·`/verify`, 실제 browser/1440px는 실행하지 않았다.
+- 판정: FE 준비 변경은 자체 검증을 통과했지만 SeaweedFS U0-ALT runtime은 미검증이다. root의 fresh browser 실측과 backend 결과 전에는 U0-ALT PASS·private GET 보안 gate 해소·전체 M4/U1 완료를 주장하지 않는다.
+
+## 2026-09-23 13:36:50 KST — SeaweedFS U0-ALT fresh-browser 실측 상태 동기화
+
+- 한 일: root가 수행한 SeaweedFS `14568` fresh-browser 직접 관측을 프론트 역할 상태에 반영했다. `frontend/u0/index.html`과 제품 FE는 변경하지 않았다. 기존 14566 LocalStack 결과와 이번 14568 결과를 별도 증거로 유지했다.
+- 실측: self-check PASS, 19 cases 중 18 PASS. 정상 5MiB PUT은 HTTP 200이며 type/checksum/expiry/replay/signed GET/무서명 GET403 negative도 HTTP PASS였다. over-size object 부재도 확인됐다.
+- 실패: `over-5mb-signed-at-max`는 `fetch TypeError/CORS`로 관측되어 HTTP code가 노출되지 않았다. 원인은 CORS 정책인지 연결 종료인지 미확정이며, 이를 403 또는 PASS로 추정하지 않는다. `/verify`는 27/28 PASS이고 유일한 실패는 `PAB UNSUPPORTED HTTP 501`이다. 미지원 PAB를 조용히 skip하거나 전체 PASS로 만들지 않는다.
+- 증거: root 브라우저 관측이 직접 실행 증거이며 서버 로그는 `build/u0-seaweedfs-browser-v2-server.log`다. 사용자의 설치·재시험 승인은 이 실행으로 소진됐으며 계정 설정·가입·추가 승인 요청은 필요하지 않다. 임시 프로세스 정리는 root 담당이다.
+- 판정: SeaweedFS runtime/browser는 실행됐지만 실패 1건과 PAB 501로 전체 U0는 계속 BLOCKED다. FE 자체 allowlist/self-check PASS는 런타임 보안 gate 통과가 아니다. 원인 분리·기능 경계 확인 전 제품 U1/M4 완료나 U0 PASS를 주장하지 않는다.
+
+## 2026-09-23 15:34:02 KST — SeaweedFS 초과 PUT native XHR 진단 경로
+
+- 조사 결론: root의 동일 live presigned URL 원시 HTTP 대조에서 초과 body를 보내기 전에도 HTTP 403 `SignatureDoesNotMatch`, 정확한 `Access-Control-Allow-Origin`, `Connection: close`가 관측됐다. 따라서 FE CORS allowlist 누락은 현재 주원인으로 보기 어렵고, SeaweedFS SigV4 조기 거절 뒤 unread body/연결 종료가 Chromium fetch TypeError로 이어지는 경로가 강한 후보이다. Go `net/http` 공식 소스의 `maxPostHandlerReadBytes=256KiB`·`closeWriteAndWait` 주석(큰 미소비 body는 close, 송신 중 클라이언트의 ECONNRESET/응답 절단 가능)과 일치하지만 Chromium이 실제 403을 수신했다는 증거는 아니다.
+- 한 일: `frontend/u0/index.html`에 `초과 PUT XHR 진단` 버튼과 독립 상태 문구를 추가했다. `/cases`를 fresh로 읽어 `over-5mb-signed-at-max`만 검증한 뒤 동일 body를 `new File([bytes], "u0-synthetic.bin", ...)`로 native `XMLHttpRequest.send()`한다. `withCredentials=false`, 기존 manifest header만 사용하며 `Host`·`Content-Length`는 제외한다. `HEADERS_RECEIVED`/status/onload/onerror/ontimeout/loadend만 내부적으로 수집하고 URL·headers·body·responseText는 출력하지 않는다.
+- 경계: 기존 19-case fetch 경로, 28 verify 분모/기대값, negative 정책, Content-Length 서명 계약은 변경하지 않았다. XHR status 0은 진단 FAIL이며, XHR 400/403 관측도 U0 PASS·fetch fallback·기대값 변경으로 승격하지 않는다. `/cases`의 만료된 URL은 재사용하지 않고 root가 fresh harness에서 다시 열어 버튼을 1회 실행한다.
+- freshness guard: 진단은 `X-Amz-Date`와 `X-Amz-Expires`를 파싱해 5초 안전 여유 뒤에도 유효할 때만 전송한다. 만료/형식 오류면 요청을 만들지 않고 fresh harness 필요 상태를 별도 표시한다.
+- 검증: inline script `node` `vm.Script` syntax → `U0 inline script syntax PASS`; origin/forbidden-header/raw File/fetch 보존 및 독립 XHR wiring 정적 invariant → `U0 diagnostic invariant self-check PASS`, 모두 exit 0. 서버·브라우저·SeaweedFS 재기동은 수행하지 않았다. root가 fresh runtime/CUA에서 XHR 결과를 기록해야 한다.
+- 소유권: 변경 파일은 `frontend/u0/index.html`, `.claude/team/frontend/STATE.md`, 이 `WORKLOG.md`뿐이다. 제품 `frontend/src/**`, package/dependency, backend harness/API/DB/AWS/Git는 변경하지 않았고 다른 작업자의 변경도 되돌리지 않았다.
+- 다음 판정: XHR에서 HTTP 400/403과 `HEADERS_RECEIVED`가 보이면 브라우저 fetch transport 차이를 확인하는 증거로만 기록한다. XHR도 status 0/error이면 CORS-readable response 이전의 연결 reset 가능성을 강화한다. 어느 경우도 PAB HTTP501 미지원과 별개의 전체 U0 BLOCKED 상태를 바꾸지 않는다.
+
+## 2026-09-23 15:45:02 KST — native XHR 비교 종료·일회성 진단 경로 제거
+
+- root가 fresh same-manifest에서 기존 `over-5mb-signed-at-max`와 동일한 raw `File`·signed header로 native XHR을 1회 실행했다. 결과는 `status 0 · event error · HEADERS_RECEIVED 미수신 · ACAO 미관측 · Connection 미관측`이었고, XHR 교체로 실제 HTTP status가 노출되거나 U0 판정이 개선되지 않았다. ACAO/Connection 미관측은 response header expose 여부와 구분한다.
+- 결과에 따라 `frontend/u0/index.html`에서 이번 진단에만 추가했던 버튼, 결과 문구, XHR 함수·freshness 상수·wiring, 임시 header wrapper/CSS를 `apply_patch`로 제거했다. 기존 19-case fetch, 28 verify, raw `File`, signed `Content-Length` 계약, negative 기대값은 건드리지 않았다.
+- 검증: 진단 제거 후 inline script `new Function` syntax 및 origin/forbidden-header/raw File/fetch 보존 정적 invariant가 `U0 restored syntax/invariant PASS`로 exit 0이며, 임시 XHR/diagnostic/header-wrapper 마커가 없다. 서버·브라우저·SeaweedFS 재기동은 수행하지 않았다.
+- 해시 경계: 현재 `frontend/u0/index.html` SHA-256은 `FEBE910EA47F526AF901C86502EE774E51874E417FC51D914EC8353E23691DDE`다. 기존 M4 기록의 기준 `B98C583B82C49F87EB08C30550624EADADF58DDE1F8F6CB86DF07EA014442EDE`와 불일치하며, LF/CRLF 후보도 일치하지 않았다. 이번 추가분 역패치 이후에도 남은 차이를 추정해 되돌리지 않고 부모에게 경계를 보고한다.
+- 판정: native XHR status 0은 보조 진단 FAIL로 유지한다. fetch fallback, expected 403 추정, PASS 승격, PAB 501 완화는 하지 않으며 전체 U0 BLOCKED 상태를 유지한다.
+
+## 2026-10-03 13:48:05 KST — frontend commit-review 검증
+
+- 검토 범위: frontend/u0/index.html과 frontend 역할 STATE/WORKLOG를 재독하고, XHR 임시 진단 제거·14566/14568 origin allowlist·실제 expected status 비교·fetch 실패 분류·비밀/외부 URL 비노출을 확인했다. 제품 frontend/src와 U0 페이지 코드는 수정하지 않았다.
+- 기록 변경: 제품/검증 코드 수정은 없으며, 헌법 제4조에 따라 STATE의 마지막 갱신 시각을 업데이트하고 이 항목만 WORKLOG 끝에 append했다. 기존 기록은 수정하지 않았다.
+- 검증: inline JavaScript syntax PASS, 관련 정적 self-check PASS, U0 브라우저 초기 self-check PASS, npm lint exit 0, npm build exit 0(64 modules), Vitest 23 files/273 tests 전부 통과를 확인했다.
+- 동작 확인: 임시 14567 정적 서버에서 브라우저 초기 화면과 self-check를 확인한 뒤 브라우저 탭과 서버 프로세스를 정리했으며 14567 listener가 닫힌 것을 확인했다.
+- git diff --check는 오류 없이 종료했고 line-ending 및 사용자 git ignore 접근 경고만 출력됐다. 최종 파일 재독도 PASS다.
+- 판정: SeaweedFS U0의 기존 18/19 case·27/28 verify, over-size fetch TypeError/CORS, PAB UNSUPPORTED HTTP 501 실패 증거를 유지하며 전체 U0 BLOCKED 상태를 변경하지 않는다.

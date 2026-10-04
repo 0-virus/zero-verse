@@ -81,7 +81,9 @@ public enum ErrorCode {
 
     // --- UPLOAD ---
     UPLOAD_001("UPLOAD_001", HttpStatus.BAD_REQUEST, "지원하지 않는 파일 형식입니다."),
-    UPLOAD_002("UPLOAD_002", HttpStatus.BAD_REQUEST, "파일 크기가 제한을 초과했습니다.");
+    UPLOAD_002("UPLOAD_002", HttpStatus.BAD_REQUEST, "파일 크기가 제한을 초과했습니다."),
+    UPLOAD_003("UPLOAD_003", HttpStatus.NOT_FOUND, "이미지를 찾을 수 없습니다."),
+    UPLOAD_004("UPLOAD_004", HttpStatus.BAD_REQUEST, "이미지 용도 또는 연결이 올바르지 않습니다.");
 
     private final String code;
     private final HttpStatus status;

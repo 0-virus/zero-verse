@@ -1,5 +1,6 @@
 import { Badge, type BadgeKind } from './Badge';
 import { TagChip } from './TagChip';
+import { ManagedImage } from '../../features/upload/ManagedImage';
 
 /** 디자인 정본 §7.6. 전달받은 값만 렌더한다 — 샘플 데이터를 내부에서 만들지 않는다. */
 export interface PostCardProps {
@@ -9,8 +10,10 @@ export interface PostCardProps {
   excerpt?: string;
   visibility?: BadgeKind;
   tags?: string[];
-  commentCount: number;
-  likeCount: number;
+  /** M6 댓글/좋아요 API가 연결되기 전에는 숫자 자체를 렌더하지 않는다. */
+  commentCount?: number;
+  likeCount?: number;
+  thumbnailUrl?: string | null;
   onClick?: () => void;
 }
 
@@ -22,6 +25,7 @@ export function PostCard({
   tags = [],
   commentCount,
   likeCount,
+  thumbnailUrl,
   onClick,
 }: PostCardProps) {
   return (
@@ -33,17 +37,28 @@ export function PostCard({
         {visibility && <Badge kind={visibility} />}
         <span className="text-xs text-text-muted">{meta}</span>
       </div>
-      <h2 className="text-[18px] font-bold">{title}</h2>
-      {excerpt && <p className="mt-2 text-[13.5px] leading-[1.65] text-text-body">{excerpt}</p>}
+      <div className={thumbnailUrl ? 'grid grid-cols-[1fr_132px] gap-4' : undefined}>
+        <div>
+          <h2 className="text-[18px] font-bold">{title}</h2>
+          {excerpt && <p className="mt-2 text-[13.5px] leading-[1.65] text-text-body">{excerpt}</p>}
+        </div>
+        {thumbnailUrl && (
+          <ManagedImage
+            src={thumbnailUrl}
+            alt={`${title} 대표 이미지`}
+            className="h-[88px] w-[132px] border-2 border-ink object-cover"
+          />
+        )}
+      </div>
       <div className="mt-3 flex items-center justify-between">
         <div className="flex gap-1.5">
           {tags.map((tag) => (
             <TagChip key={tag} name={tag} />
           ))}
         </div>
-        <span className="text-xs text-text-muted">
-          댓글 {commentCount} · 좋아요 {likeCount}
-        </span>
+        {commentCount !== undefined && likeCount !== undefined && (
+          <span className="text-xs text-text-muted">댓글 {commentCount} · 좋아요 {likeCount}</span>
+        )}
       </div>
     </article>
   );

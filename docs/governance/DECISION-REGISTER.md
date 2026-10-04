@@ -20,3 +20,6 @@
 | M4-20260909-iam-check | 2026-09-09 | 비용 없는 IAM 지원 확인 및 지원 시 식별된 U0 자원 초기화·재검증 | HIGH | APPROVED(기능 미지원으로 재생성 미실행) | 사용자 `응 진행해`; bucket 2개/16개 합성 객체만, 구매·대체 서비스·제품 제외 | [회의록 §16](meetings/M4-20260908-posts.md) |
 | M4-20260923-u0-alt | 2026-09-23 | SeaweedFS native 4.47을 U0 전용 무료 검증기로 설치·실측 | HIGH | APPROVED(실측 완료·전체 U0 BLOCKED) | 사용자 `승인. 내가 할 일을 알려줘.`; Java19/19·VERIFY27/28, browser18/19·VERIFY27/28, PAB501·브라우저 초과파일 TypeError 미해결 | [회의록 §17~18](meetings/M4-20260908-posts.md), [M4 기록](../worklog/M4-posts.md) |
 | M4-20260923-u0-remediation | 2026-09-23 | PAB501·브라우저 초과 파일 오류 원인 조사·최소 수정·재검증 | HIGH | APPROVED(진단 수행·두 문제 미해결) | 사용자 `두 문제 해결을 먼저 수행해줄래?`; PAB handler 미구현 확인, raw HTTP403·exactACAO·close, fetch 및 XHR 모두 응답 미가독. vendor 보안 구현·지원 환경 변경은 별도 결정 | [회의록 §19](meetings/M4-20260908-posts.md), [M4 기록](../worklog/M4-posts.md) |
+| M4-20261003-local | 2026-10-03 | 로컬 파일 업로드 기반 M4 완성·실행계획 | HIGH | APPROVED(구현 진행) | 사용자 `로컬 파일 저장으로 M4 완성` 및 Task1~7 실행 요청에 `yes`; 로컬 API·DB·콘텐츠·권한·5MB·화면·독립QA, S3후속/M5제외 | [회의록 §20.7~20.8](meetings/M4-20260908-posts.md), [실행계획](../worklog/M4-posts.md) |
+
+M4 현재 실행 판단에는 마지막 `M4-20261003-local`을 적용한다. 이전 준비/U0 BLOCKED 행은 당시 결정·실측의 이력이며 로컬 M4 제품 구현의 현재 차단 조건이 아니다.

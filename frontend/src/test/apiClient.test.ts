@@ -111,6 +111,25 @@ describe('apiClient', () => {
   });
 
   describe('401 자동 갱신', () => {
+    it('binary 이미지도 401이면 refresh 후 한 번만 재시도한다', async () => {
+      setAccessToken('old-token');
+      const binaryResponse = {
+        ok: true,
+        status: 200,
+        blob: async () => new Blob(['image'], { type: 'image/png' }),
+      } as unknown as Response;
+      fetchMock
+        .mockResolvedValueOnce(failure(401, 'AUTH_002'))
+        .mockResolvedValueOnce(envelope({ accessToken: 'new-token' }))
+        .mockResolvedValueOnce(binaryResponse);
+
+      await expect(apiClient.getBlob('/api/v1/uploads/image-1/content')).resolves.toBeInstanceOf(
+        Blob,
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(fetchMock.mock.calls[2][1].headers.Authorization).toBe('Bearer new-token');
+    });
+
     it('401이면 refresh 후 원래 요청을 1회 재시도한다', async () => {
       setAccessToken('old-token');
       fetchMock

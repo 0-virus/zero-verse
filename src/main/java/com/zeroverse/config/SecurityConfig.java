@@ -15,6 +15,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.util.matcher.RegexRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -74,8 +75,17 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/blogs/slug/**",
                                 "/api/v1/blogs/*/categories",
+                                "/api/v1/blogs/*/posts",
+                                "/api/v1/blogs/slug/*/posts",
+                                "/api/v1/tags/*/posts",
+                                "/api/v1/uploads/*/content",
                                 "/api/v1/feed/public",
                                 "/api/v1/search").permitAll()
+
+                        // 숫자 post id만 공개 상세로 연다. `/posts/drafts`는 보호 API다.
+                        .requestMatchers(RegexRequestMatcher.regexMatcher(
+                                HttpMethod.GET, "/api/v1/posts/[0-9]+"))
+                        .permitAll()
 
                         // API 문서.
                         .requestMatchers(HttpMethod.GET,

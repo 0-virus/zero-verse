@@ -7,6 +7,7 @@ import com.zeroverse.domain.user.dto.UserSettingsDtos.ChangePasswordRequest;
 import com.zeroverse.domain.user.dto.UserSettingsDtos.ChangePasswordResponse;
 import com.zeroverse.domain.user.dto.UserSettingsDtos.UpdateProfileRequest;
 import com.zeroverse.domain.user.dto.UserSettingsDtos.UserProfileResponse;
+import com.zeroverse.domain.upload.service.UploadService;
 import com.zeroverse.domain.user.entity.User;
 import com.zeroverse.domain.user.repository.UserRepository;
 import org.slf4j.Logger;
@@ -31,10 +32,15 @@ public class UserSettingsService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final UploadService uploadService;
 
-    public UserSettingsService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserSettingsService(
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder,
+            UploadService uploadService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.uploadService = uploadService;
     }
 
     /**
@@ -76,7 +82,9 @@ public class UserSettingsService {
      */
     @Transactional
     public UserProfileResponse updateProfile(Long userId, UpdateProfileRequest request) {
-        User user = userRepository.findByIdAndDeletedAtIsNull(userId)
+        // Profile image policy compares the request with the current row. Lock that row before
+        // reading it so a stale entity cannot detach or replace a binding after another update.
+        User user = userRepository.findByIdAndDeletedAtIsNullForUpdate(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_001));
 
         // 중복 검사는 self-exclusion 쿼리 하나로 끝낸다. "바뀌었을 때만 검사한다"는 앞단
@@ -87,6 +95,7 @@ public class UserSettingsService {
         }
 
         try {
+            synchronizeManagedProfileImage(userId, user, request.profileImageUrl());
             user.updateProfile(
                     request.name(),
                     request.nickname(),
@@ -109,6 +118,38 @@ public class UserSettingsService {
                 user.getBirthDate(),
                 user.getBio(),
                 user.getProfileImageUrl());
+    }
+
+    /**
+     * Connects a local managed image before the user row is updated.
+     *
+     * <p>Legacy external profile URLs remain display-compatible only when the exact current value
+     * is submitted again. New external, blob/data, malformed, or blank values are rejected;
+     * managed canonical URLs and an explicit {@code null} clear go through the upload binder.
+     */
+    private void synchronizeManagedProfileImage(Long userId, User user, String requestedUrl) {
+        String currentUrl = user.getProfileImageUrl();
+        if (requestedUrl == null) {
+            if (uploadService.isManagedImageUrl(currentUrl)) {
+                uploadService.bindProfileImage(userId, null);
+            }
+            return;
+        }
+
+        if (requestedUrl.isBlank()) {
+            throw new BusinessException(ErrorCode.UPLOAD_004);
+        }
+
+        if (uploadService.isManagedImageUrl(requestedUrl)) {
+            uploadService.bindProfileImage(userId, requestedUrl);
+            return;
+        }
+
+        // The only non-managed value accepted by a write is an unchanged legacy value already
+        // stored on this user. It is never newly bound or fetched by the server.
+        if (!requestedUrl.equals(currentUrl)) {
+            throw new BusinessException(ErrorCode.UPLOAD_004);
+        }
     }
 
     /**

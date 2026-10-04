@@ -2,7 +2,11 @@ package com.zeroverse.domain.user.repository;
 
 import com.zeroverse.domain.user.entity.User;
 import java.util.Optional;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /**
  * 사용자 조회(FR-AUTH-01·02, FR-SETTINGS-01).
@@ -14,6 +18,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmailAndDeletedAtIsNull(String email);
 
     Optional<User> findByIdAndDeletedAtIsNull(Long id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from User u where u.id = :id and u.deletedAt is null")
+    Optional<User> findByIdAndDeletedAtIsNullForUpdate(@Param("id") Long id);
 
     boolean existsByEmailAndDeletedAtIsNull(String email);
 

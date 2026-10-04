@@ -9,15 +9,28 @@ import type { PublicBlogResponse } from '../features/settings/types';
 export interface HeroBlogContextValue {
   blog: PublicBlogResponse | null;
   setBlog: (blog: PublicBlogResponse | null) => void;
+  actions: ReactNode | null;
+  setActions: (actions: ReactNode | null) => void;
 }
 
 const HeroBlogContext = createContext<HeroBlogContextValue | null>(null);
 
+// Public pages are also rendered in isolation by route tests and lightweight embeds. Keep the
+// fallback identity stable: returning fresh no-op callbacks on every render would retrigger any
+// effect that depends on `setBlog`/`setActions` indefinitely when no provider is mounted.
+const FALLBACK_HERO_BLOG_CONTEXT: HeroBlogContextValue = {
+  blog: null,
+  setBlog: () => {},
+  actions: null,
+  setActions: () => {},
+};
+
 export function HeroBlogProvider({ children }: { children: ReactNode }) {
   const [blog, setBlog] = useState<PublicBlogResponse | null>(null);
+  const [actions, setActions] = useState<ReactNode | null>(null);
 
   return (
-    <HeroBlogContext.Provider value={{ blog, setBlog }}>
+    <HeroBlogContext.Provider value={{ blog, setBlog, actions, setActions }}>
       {children}
     </HeroBlogContext.Provider>
   );
@@ -26,8 +39,8 @@ export function HeroBlogProvider({ children }: { children: ReactNode }) {
 export function useHeroBlog(): HeroBlogContextValue {
   const context = useContext(HeroBlogContext);
   if (!context) {
-    // Fallback: Provider 없을 때(테스트 등)는 null을 반환하는 더미 컨텍스트
-    return { blog: null, setBlog: () => {} };
+    // Fallback: Provider 없을 때(테스트 등)는 안정적인 더미 컨텍스트를 반환한다.
+    return FALLBACK_HERO_BLOG_CONTEXT;
   }
   return context;
 }

@@ -205,3 +205,52 @@
 - **승인 경계**: 이 Git 공개 승인은 M4 제품 endpoint·DB/migration·도메인/제품 FE 구현, U0 `PASS`, 세부 Q1~Q5 계약 확정, 실제 AWS·구매, PR Ready/merge를 승인하지 않는다. M4 전체와 U0는 PAB HTTP 501 및 브라우저 oversized status 미노출로 계속 `BLOCKED`다.
 - **XHR 정정**: PM STATE의 `임시 XHR 진단 코드는 제거 중` 현재형 문구를 제거 완료로 정정했다. `frontend/u0/index.html` 현재 SHA-256은 `FEBE910EA47F526AF901C86502EE774E51874E417FC51D914EC8353E23691DDE`, XHR 진단 마커는 없고, `build/u0-seaweedfs-diagnostic-evidence.md`·M4 worklog의 `U0_CLEAN_PAGE_SELF_CHECK=PASS`(jsdom, exit 0)와 일치한다. 기존 WORKLOG의 역사 항목은 append-only로 수정하지 않았다.
 - **검증**: backend/frontend/qa STATE·WORKLOG, M4 worklog·회의록·JOURNAL·진단 evidence와 실제 Git을 재대조했다. branch `feature/M4-posts`, HEAD `59badfe`, `docs/PRD.md` 변경 없음, PM 문서 `git diff --check` exit 0, PM STATE stale phrase 0건을 확인했다. PM은 stage/commit/push를 수행하지 않았고 타 경로는 수정하지 않았다.
+
+## 2026-10-03 14:24 KST — 로컬 M4 실행 지시·U0 선행 gate 분리 정합화
+
+- **한 일**: 헌법→`AGENTS.md`/`CLAUDE.md`→PM 지침→PM `STATE.md`를 순서대로 재독하고 `$brief` 절차에 따라 backend/frontend/qa/pm STATE·최근 WORKLOG, 실제 Git, PRD §9·§10, PM-M4 readiness, M4 회의록 §20.5~§20.6을 직접 대조했다. 실제 checkout은 `feature/M4-posts`, HEAD `97567d9`이며 PM 외 변경은 보존했다.
+- **사용자 지시 반영**: 최신 원문 **`$brief 로컬에서 검증할 수 있는 수준이면 되니까 localstack 등은 제쳐 두고 m4 완료까지 달려`**를 M4 로컬 구현·검증 실행 지시로 기록했다. LocalStack·SeaweedFS·AWS U0 호환성 검증을 M4 구현 선행 gate에서 제외하되 U0 과거 실패·미실측·SeaweedFS 잔여 문제와 `BLOCKED` 판정은 유지했다.
+- **승인 경계**: PRD §9.7·PM-M4 readiness·PM STATE에 기존 S3 presigned upload API/비공개 S3 접근 방향은 유지하고, 로컬 파일 저장·multipart/content API·새 endpoint/schema/migration/의존성은 이 지시로 확정하지 않는다고 기록했다. §20.6의 Product/Delivery `APPROVE_WITH_CHANGES/HIGH`, Architecture 전체 계약 `BLOCKED`, 리더 종합 `USER_DECISION_REQUIRED`와 새 저장 방식 사용자 선택 대기를 반영했다.
+- **수치·출처 재확인**: SeaweedFS Java `19/19 cases PASS`, `/verify 27/28`, process exit 1; fresh browser `18/19 cases PASS`, `/verify 27/28`; PAB `HTTP 501`, oversized signed-at-max `status 0/error/noheaders`를 backend/frontend/qa STATE와 evidence에서 재확인했다. 과거 LocalStack `18/19`, `/verify 27/28`, unsigned private GET `expected 403/actual 200`도 역사로 유지했다.
+- **산출물**: `docs/PRD.md` §9.7, `docs/PM-M4-readiness.md` 현재 판정·실행 gate·검증 경계·출처, `.claude/team/pm/STATE.md` 최신 스냅샷을 갱신했다. 회의록·root worklog·JOURNAL·제품 소스·테스트·Git stage/commit/push는 수행하지 않았다.
+- **검증**: 편집 파일 4개를 재독하고 SHA-256/내용 검색으로 PRD §9.7·PM-M4 최신 gate·§20.6 상태를 확인했다. `git diff --check -- docs/PRD.md docs/PM-M4-readiness.md .claude/team/pm/STATE.md .claude/team/pm/WORKLOG.md`는 `PM_DIFF_CHECK_EXIT=0`, `rg -n -P "[ \\t]+$" ...`는 일치 없음(`PM_TRAILING_WHITESPACE_EXIT=1`, rg no-match)으로 확인했다. 미해결은 새 저장 방식·multipart/content API 및 M4 세부 계약의 사용자 결정이다.
+
+## 2026-10-03 15:08 KST — 로컬 파일 저장 M4 결정 반영
+
+- **사용자 결정**: 사용자의 질문(“M4 이미지는 S3 연동을 후속으로 남기고, 서버의 로컬 폴더에 실제 저장하는 방식으로 완성해도 될까요? 글·이미지 접근권한과 5MB 제한은 유지하고, 로컬 업로드 API를 사용합니다.”)에 대한 최신 응답 **`로컬 파일 저장으로 M4 완성`**을 반영했다.
+- **정본 반영**: `docs/PRD.md` §9.7과 `docs/PM-M4-readiness.md`에 M4 이미지의 서버 로컬 폴더 실제 저장·로컬 업로드 API·글/이미지 접근권한·최대 5MB 제한을 확정된 사용자 결정으로 기록하고, S3 presigned/비공개 S3 연동은 후속 범위로 분리했다. 기존 LocalStack/SeaweedFS/AWS U0 선행 gate 제외와 과거 U0 `BLOCKED` 수치는 유지했다.
+- **승인 경계**: 회의록 §20.5~§20.6의 세부 endpoint/schema/migration/파일 lifecycle·실패 원자성·이미지 소비 계약은 root 작성 구현계획과 계획 검토 전 확정하지 않는다. 계획 검토 전 제품 코드 착수 없음도 PM STATE/readiness에 현재화했다. governance/worklog/JOURNAL은 편집하지 않았다.
+- **검증**: 변경 파일 4개를 재독하고 SHA-256/`rg` 내용 검색으로 로컬 폴더 저장·로컬 업로드 API·접근권한·5MB·S3 후속·계획 검토 전 코드 미착수 문구를 확인했다. `git diff --check -- docs/PRD.md docs/PM-M4-readiness.md .claude/team/pm/STATE.md .claude/team/pm/WORKLOG.md`는 `PM_DIFF_CHECK_EXIT=0`, trailing whitespace 검색은 일치 없음(`PM_TRAILING_WHITESPACE_EXIT=1`, rg no-match)이다. 미해결은 계획 검토 전 대기하는 §20 세부 구현계약이다.
+
+## 2026-10-03 15:20 KST — M4 실행계획·공유 계약 사용자 승인 동기화
+
+- **사용자 승인**: 최신 사용자 `yes`를 M4 worklog `Task1~7` 실행계획과 `§20.1~§20.5` 공유 HTTP/DB/콘텐츠/UI 계약의 구현·실행 승인으로 반영했다. 로컬 폴더 저장·로컬 업로드 API·글/이미지 접근권한·5MB 제한은 유지하고, S3 연동·U0 provider 검증은 후속 범위로 분리한다.
+- **실행 상태**: `m4_backend_impl`·`m4_frontend_impl`의 병렬 구현과 `m4_qa_acceptance`의 독립 QA가 실행 중임을 PRD §9.7·PM-M4 readiness·PM STATE에 반영했다. M4 완료는 실제 구현·테스트·독립 QA 증거 전까지 선언하지 않는다.
+- **예외 경계**: PRD §§4.6·5.5·5.12·7·10·13.1의 S3/LocalStack 전제는 §9.7 로컬 M4 예외에 따라 이 마일스톤 구현·검증에서 후속으로 분리했다. S3 후속·M5 이후 제외·기존 데이터 보존·§9.6 U0 실패 이력은 유지한다. 제품 소스·REQUIREMENTS·governance/worklog/JOURNAL은 편집하지 않았다.
+- **검증**: 변경 파일 4개를 재독하고 SHA-256/`rg` 내용 검색으로 Task1~7, §20.1~§20.5, BE/FE 병렬 구현, 독립 QA, S3 후속, M5 제외, 기존 데이터 보존 및 §9.6 U0 역사 보존을 확인했다. `git diff --check -- docs/PRD.md docs/PM-M4-readiness.md .claude/team/pm/STATE.md .claude/team/pm/WORKLOG.md`는 `PM_DIFF_CHECK_EXIT=0`, trailing whitespace 검색은 일치 없음(`PM_TRAILING_WHITESPACE_EXIT=1`, rg no-match)이다. 추가 제품 구현·테스트·Git 조작은 하지 않았다.
+
+## 2026-10-03 17:27 KST — 브라우저 파일 선택 검증 범위·최신 M4 인수 상태 동기화
+
+- **사용자 결정**: 최신 사용자 응답 **`브라우저 파일 업로드만 제외하고 API·자동 테스트로 검증해`**를 반영했다. Chrome 확장의 파일 URL 접근 권한은 확대하지 않으며, 제외는 실제 브라우저 파일 선택·전송 자동화뿐이다. multipart API·FE 파일 입력/업로드 자동 테스트, 실제 파일 저장, 5MiB 바이트 제한, 글·이미지 접근권한, 브라우저 이미지 표시, 재시작 보존은 M4 인수 조건으로 유지하고 미실행 파일 선택을 브라우저 PASS로 기록하지 않는다.
+- **정본 반영**: `docs/PRD.md` §9.7과 PM `STATE.md`에 위 범위와 최신 로컬 인수 상태를 기록했다. S3/LocalStack 후속, U0 과거 `BLOCKED`, M5 제외·기존 데이터 보존, M4 미완료·커밋/푸시 금지 경계는 유지했다.
+- **실제 진행 근거**: `docs/worklog/M4-posts.md` 2026-10-03 17:20 기록의 root runtime JAR `3890657091DDDD7927DC53CBB4E14891125F568F51739B69F32793053723B36A`에서 HTTP smoke exit 0, 실제 PNG의 비로그인 브라우저 managed Blob 표시(`complete=true`, `96×64`) 및 로컬 파일·응답 SHA-256 일치를 확인했다. 같은 시점 FE 스냅샷은 28 files/302 tests, lint/build exit 0이었다. 이 실측은 전체 리뷰 수정 전 스냅샷으로만 기록한다.
+- **현재 미해결**: 독립 전체 리뷰는 Critical 0·Important 7·Minor 1, `Ready to merge: No`로 R1~R8 수정을 요구했고, backend full tests·수정 후 전체 재검증·독립 재리뷰가 진행 중이다. 새 `PostV3MigrationTest`와 성공 로그는 reviewer 추가 확인으로 migration 증거 부족 지적을 철회했지만 M4 완료로 선언하지 않는다.
+- **범위·검증**: 이번 턴은 PM 소유 `docs/PRD.md`, `.claude/team/pm/STATE.md`, `.claude/team/pm/WORKLOG.md`만 수정했으며 제품 소스·타 역할 파일·M4 원 worklog·governance·Git은 수정하지 않았다. 세 파일 재독·SHA-256 확인과 내용 검색은 `PM_CONTENT_SEARCH_EXIT=0`, `git diff --check`는 `PM_DIFF_CHECK_EXIT=0`, trailing whitespace 검색은 일치 없음(`PM_TRAILING_WHITESPACE_EXIT=1`, rg no-match)이다.
+
+## 2026-10-03 18:16 KST — M4 로컬 제품 검증·최종 artifact 정본 동기화
+
+- **근거 대조**: backend STATE와 실제 로그를 재독했다. `build/m4-final-backend-full-20261003-1900.log`는 `BUILD SUCCESSFUL`(13m49s, exit 0)이고, `build/m4-final-junit-20261003-1915/test-results` 66개 XML을 직접 집계해 426 tests, failures/errors/skips `0/0/0`을 확인했다. `build/m4-final-bootjar-20261003-1920.log`도 `BUILD SUCCESSFUL`이며 artifact `build/libs/zeroverse-server-0.0.1-SNAPSHOT.jar`는 66,354,802 bytes, SHA-256 `D2B5FBB8A659D707F1A4039FB062D1768113D9AD53946F7A1D6AAA983783E2EF`로 재확인했다.
+- **FE·리뷰 대조**: frontend STATE 및 `build/m4-frontend-final-results.json`을 재독해 `success=true`, 28 files/311 passed/0 failed/0 pending을 확인했고 lint/build exit 0 기록과 일치시켰다. R1~R8 독립 소스 재검토는 추가 Critical/Important 회귀 없이 종료 가능으로 정리됐다. R7 후속 영향 범위도 2 suites/40 passed로 기록되어 있다.
+- **실제 인수 근거**: M4 worklog의 최종 artifact 7차 HTTP smoke, malformed content `400/VALIDATION_001`, ordered-list `start/type` 보존, `page=2147483647&size=20` 정상 empty 응답, 재시작 후 기존 PNG URL·메타데이터·395 bytes·Chrome 표시 및 SHA-256 `2F76F73080F7F5ACE1CA54507604FE80937718FB8A6E1757F9E71D125B243F67` 일치를 대조했다. 사용자가 제외한 브라우저 파일 선택·전송 자동화는 실행하지 않았고 PASS로 올리지 않았다.
+- **정본 변경**: `docs/PRD.md` §9.7에 최종 로컬 제품 검증 수치와 남은 closeout 경계를 append하고, §10 M4 설명을 승인된 로컬 multipart/파일 저장 범위와 S3 후속 범위에 맞췄다. PM `STATE.md`를 현재 단계/진행 중/다음 작업/차단 요인 구조로 갱신했다. LocalStack·SeaweedFS/U0 `BLOCKED`, S3 후속, M5 제외 및 기존 데이터 보존 경계는 유지했다.
+- **남은 사항**: 최종 QA 기록·`POST /uploads` OpenAPI 201 표기 확인 및 root의 명시 파일 stage/commit/push/PR/merge는 아직 완료로 기록하지 않는다. PM은 제품 코드·QA 산출물·M4 원 worklog·Git을 편집하지 않았다.
+- **검증**: 편집 파일을 재독하고, backend JUnit/FE JSON/bootJar hash를 위 명령으로 직접 확인했다. 후속으로 PM 소유 파일 `git diff --check`와 핵심 결정·수치 검색을 수행해 closeout 기록의 오탈자·trailing whitespace를 확인한다.
+
+## 2026-10-03 18:20 KST — 최종 runtime/OpenAPI·독립 리뷰 보완 동기화
+
+- **추가 근거**: `docs/worklog/M4-posts.md`의 18:15 최종 항목을 대조했다. 최종 `D2B5FBB8A659D707F1A4039FB062D1768113D9AD53946F7A1D6AAA983783E2EF` runtime에서 OpenAPI `POST /posts` 201, `POST /uploads` 201, content GET operation과 실제 HTTP 응답이 PASS였다.
+- **이미지 응답 근거**: 기존 PNG는 HTTP 200/image/png/395 bytes였고 로컬 파일·HTTP 응답·기존 fixture의 SHA-256 `2F76F73080F7F5ACE1CA54507604FE80937718FB8A6E1757F9E71D125B243F67`가 동일했다. `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`도 확인됐다.
+- **독립 리뷰 상태**: `/root/m4_whole_review` 최종 판정은 `Ready to merge: Yes`, 잔여 Critical/Important/Minor `0`으로 보완됐다. 이전의 OpenAPI 대기 문구를 현재 정본에서 해소하고, 최종 QA 인수 기록 문서화와 Git closeout만 잔여로 분리했다.
+- **정본 변경**: `docs/PRD.md` §9.7, `.claude/team/pm/STATE.md`의 OpenAPI 대기 문구를 제거하고 최종 runtime·헤더·독립 리뷰 수치를 반영했다. 브라우저 파일 선택/전송 자동화 제외, S3/U0 후속, M5 제외 경계는 유지했다.
+- **남은 사항**: 최종 QA 기록과 root의 명시 파일 stage/commit/push/PR/merge는 아직 완료로 기록하지 않는다. PM은 제품·테스트·M4 원 worklog·Git을 수정하지 않았다.
+- **검증**: 편집한 PRD/STATE/WORKLOG를 재독하고 `git diff --check -- docs/PRD.md .claude/team/pm/STATE.md .claude/team/pm/WORKLOG.md` 및 trailing whitespace 검색을 재실행한다.

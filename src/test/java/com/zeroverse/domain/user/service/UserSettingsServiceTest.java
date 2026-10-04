@@ -101,19 +101,22 @@ class UserSettingsServiceTest extends MySqlTestSupport {
         @DisplayName("모든 필드를 수정한다")
         void updateAllFields() {
             User user = createUser("update@test.com", "oldnick", "password123!@");
+            String legacyUrl = "http://example.com/image.jpg";
+            user.updateProfile("테스터", "oldnick", null, null, legacyUrl);
+            userRepository.saveAndFlush(user);
             UpdateProfileRequest request = new UpdateProfileRequest(
                     "새이름",
                     "newnick",
                     "새 소개",
                     LocalDate.of(1995, 5, 15),
-                    "http://example.com/image.jpg");
+                    legacyUrl);
 
             UserProfileResponse response = userSettingsService.updateProfile(user.getId(), request);
 
             assertThat(response)
                     .extracting("name", "nickname", "bio", "birthDate", "profileImageUrl")
                     .containsExactly("새이름", "newnick", "새 소개", LocalDate.of(1995, 5, 15),
-                            "http://example.com/image.jpg");
+                            legacyUrl);
         }
 
         /**

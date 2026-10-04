@@ -17,6 +17,11 @@ zeroverse:
   cors:
     allowed-origins: http://localhost:5173
 
+  upload:
+    # 최소 32 UTF-8 bytes. 실제 값은 파일에만 입력하고 커밋하지 않는다.
+    viewer-hmac-secret: ${VIEWER_HMAC_SECRET}
+    directory: .local-data/uploads
+
   # JWT 서명 키 — 최소 256-bit(32바이트) 랜덤을 Base64로 넣는다.
   # 생성 예: openssl rand -base64 32
   # 이 값은 절대 커밋하지 않는다.

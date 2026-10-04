@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { Link, NavLink, useSearchParams } from 'react-router-dom';
 import { Panel } from '../ui/Panel';
 import { getAllCategories, type Category } from '../../features/category/categoryApi';
 import { useOptionalAuth } from '../../lib/authContext';
@@ -64,6 +64,7 @@ export function ScreenPanel({ kind }: { kind: ScreenPanelKind }) {
 function BlogScreenPanel() {
   const { blog } = useHeroBlog();
   const auth = useOptionalAuth();
+  const [searchParams] = useSearchParams();
   const viewerId = auth?.user?.id ?? null;
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -109,6 +110,26 @@ function BlogScreenPanel() {
       category.children.reduce((childSum, child) => childSum + child.postCount, 0),
     0,
   );
+  const selectedCategoryId = searchParams.get('categoryId');
+
+  const categoryHref = (categoryId?: number) => {
+    if (!blog) return '#';
+    const next = new URLSearchParams(searchParams);
+    if (categoryId == null) next.delete('categoryId');
+    else next.set('categoryId', String(categoryId));
+    next.set('page', '0');
+    const query = next.toString();
+    return `/blog/${blog.urlSlug}${query ? `?${query}` : ''}`;
+  };
+
+  const categoryLinkClass = (categoryId?: number, child = false) => {
+    const active = categoryId == null
+      ? !selectedCategoryId
+      : selectedCategoryId === String(categoryId);
+    return `flex items-center justify-between gap-2 ${child ? 'border-l-2 border-shadow pl-7 pr-3.5 text-[11px]' : 'px-3.5'} py-2 text-text-body hover:bg-surface-soft ${
+      active ? 'border-l-[5px] border-l-accent bg-surface-raise font-bold text-ink' : ''
+    }`;
+  };
 
   return (
     <aside
@@ -141,21 +162,20 @@ function BlogScreenPanel() {
           <ul className="py-1" aria-label="카테고리 목록">
             {categories.map((category) => (
               <li key={category.id}>
-                <div className="flex items-center justify-between gap-2 px-3.5 py-2 text-[12px] font-bold text-text-body">
+                <Link to={categoryHref(category.id)} className={categoryLinkClass(category.id)}>
                   <span className="truncate">{category.name}</span>
                   <span className="shrink-0 text-[11px] font-normal text-text-muted">
                     {category.postCount}
                   </span>
-                </div>
+                </Link>
                 {category.children.length > 0 && (
                   <ul aria-label={`${category.name} 하위 카테고리`}>
                     {category.children.map((child) => (
-                      <li
-                        key={child.id}
-                        className="flex items-center justify-between gap-2 border-l-2 border-shadow px-3.5 py-1.5 pl-7 text-[11px] text-text-body"
-                      >
-                        <span className="truncate">{child.name}</span>
-                        <span className="shrink-0 text-text-muted">{child.postCount}</span>
+                      <li key={child.id}>
+                        <Link to={categoryHref(child.id)} className={categoryLinkClass(child.id, true)}>
+                          <span className="truncate">{child.name}</span>
+                          <span className="shrink-0 text-text-muted">{child.postCount}</span>
+                        </Link>
                       </li>
                     ))}
                   </ul>

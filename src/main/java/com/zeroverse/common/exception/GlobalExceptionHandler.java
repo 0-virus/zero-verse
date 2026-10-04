@@ -13,6 +13,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
@@ -53,6 +54,13 @@ public class GlobalExceptionHandler {
     })
     public ResponseEntity<ApiResponse<Void>> handleRequestBinding(Exception e) {
         ErrorCode errorCode = ErrorCode.VALIDATION_001;
+        return ResponseEntity.status(errorCode.getStatus())
+                .body(ApiResponse.error(ErrorResponse.of(errorCode.getCode(), errorCode.getMessage())));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMaxUploadSize(MaxUploadSizeExceededException e) {
+        ErrorCode errorCode = ErrorCode.UPLOAD_002;
         return ResponseEntity.status(errorCode.getStatus())
                 .body(ApiResponse.error(ErrorResponse.of(errorCode.getCode(), errorCode.getMessage())));
     }

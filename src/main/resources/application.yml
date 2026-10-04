@@ -24,6 +24,12 @@ spring:
   jackson:
     default-property-inclusion: always
 
+  servlet:
+    multipart:
+      # LocalImageStore enforces the exact 5 MiB file bound; request allowance includes multipart metadata.
+      max-file-size: 5MB
+      max-request-size: 6MB
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
@@ -33,6 +39,12 @@ springdoc:
 zeroverse:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+
+  # 조회수 anonymous fingerprint용 서버 비밀. 운영/합성 runtime은 SPRING_APPLICATION_JSON으로
+  # 직접 주입하며, 일반 기동은 VIEWER_HMAC_SECRET 환경변수 없이는 실패한다.
+  upload:
+    viewer-hmac-secret: ${VIEWER_HMAC_SECRET}
+    directory: ${UPLOAD_DIRECTORY:.local-data/uploads}
 
   # JWT (ADR-0003). secret은 fallback 기본값을 두지 않는다 —
   # 미설정 시 기동에 실패해야 개발용 키가 운영으로 새지 않는다.

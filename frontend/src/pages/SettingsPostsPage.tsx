@@ -19,8 +19,11 @@ import {
   type CategoryType,
   type EditableCategoryType,
 } from '../features/category/categoryApi';
+import { deletePost, listDrafts } from '../features/post/postApi';
+import type { PostSummary, PageResponse } from '../features/post/types';
 import { ApiRequestError } from '../lib/apiClient';
 import { useAuth } from '../lib/authContext';
+import { Link } from 'react-router-dom';
 
 function sortCategories(categories: Category[]): Category[] {
   return [...categories]
@@ -85,6 +88,7 @@ function replaceSiblingOrder(
 
 export function SettingsPostsPage() {
   const { user, isLoading: authLoading } = useAuth();
+  const userId = user?.id ?? null;
   const blogId = user?.defaultBlog.id;
   const currentBlogId = blogId ?? null;
   const [categories, setCategories] = useState<Category[]>([]);
@@ -94,6 +98,9 @@ export function SettingsPostsPage() {
   const [isMutating, setIsMutating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<PageResponse<PostSummary> | null>(null);
+  const [draftLoading, setDraftLoading] = useState(false);
+  const [draftError, setDraftError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
   const [newName, setNewName] = useState('');
@@ -103,6 +110,7 @@ export function SettingsPostsPage() {
   const loadGeneration = useRef(0);
   const operationGeneration = useRef(0);
   const currentBlogIdRef = useRef<number | null>(currentBlogId);
+  const draftUserIdRef = useRef<number | null>(userId);
 
   // blog 전환/null 전환은 진행 중인 API의 결과를 모두 폐기하는 경계다.
   // 렌더 시점에 ref를 먼저 갱신해 늦은 promise continuation도 새 화면을 덮지 못하게 한다.
@@ -112,12 +120,41 @@ export function SettingsPostsPage() {
     loadGeneration.current += 1;
   }
 
+  // 사용자 전환은 effect가 시작되기 전 한 번 렌더를 거칠 수 있다. 이 렌더에서 이전 계정의
+  // 임시저장을 그리지 않도록 identity를 동기적으로 경계 짓는다.
+  const draftStateUserId = draftUserIdRef.current;
+  if (draftStateUserId !== userId) draftUserIdRef.current = userId;
+  const hasCurrentDraftState = draftStateUserId === userId;
+
   const isCurrentOperation = (expectedBlogId: number | null, operation: number) =>
     currentBlogIdRef.current === expectedBlogId && operationGeneration.current === operation;
 
   // blog가 바뀌는 렌더와 effect 사이에도 이전 목록을 새 blog의 쓰기 대상으로
   // 취급하지 않는다. 실제로 성공한 GET의 blog ID가 현재 ID와 같아야만 조작을 허용한다.
   const isReadyForBlog = currentBlogId !== null && loadedBlogId === currentBlogId && isLoaded;
+
+  const loadDrafts = useCallback(async (pageNumber = 0) => {
+    const requestUserId = userId;
+    draftUserIdRef.current = requestUserId;
+    setDraftError(null);
+    if (requestUserId == null) {
+      setDrafts(null);
+      setDraftLoading(false);
+      return;
+    }
+    setDraftLoading(true);
+    try {
+      const loaded = await listDrafts({ page: pageNumber, size: 20 });
+      if (draftUserIdRef.current === requestUserId) setDrafts(loaded);
+    } catch {
+      if (draftUserIdRef.current === requestUserId) {
+        setDrafts(null);
+        setDraftError('임시저장 글을 불러오지 못했습니다.');
+      }
+    } finally {
+      if (draftUserIdRef.current === requestUserId) setDraftLoading(false);
+    }
+  }, [userId]);
 
   const loadCategories = useCallback(async (): Promise<boolean> => {
     const requestBlogId = blogId ?? null;
@@ -176,9 +213,20 @@ export function SettingsPostsPage() {
     setError(null);
     setNotice(null);
     void loadCategories();
-  }, [authLoading, loadCategories]);
+    void loadDrafts();
+  }, [authLoading, loadCategories, loadDrafts]);
 
   const reloadAfterFailure = () => loadCategories();
+
+  const handleDraftDelete = async (draft: PostSummary) => {
+    if (!window.confirm(`'${draft.title || '제목 없는 초안'}'을 삭제할까요?`)) return;
+    try {
+      await deletePost(draft.id);
+      await loadDrafts();
+    } catch {
+      setDraftError('임시저장 글을 삭제하지 못했습니다.');
+    }
+  };
 
   const showMutationError = async (
     mutationError: unknown,
@@ -600,19 +648,19 @@ export function SettingsPostsPage() {
             </Button>
           </div>
         )}
-        {!isLoading && isLoaded && categories.length === 0 && (
+        {!isLoading && isReadyForBlog && categories.length === 0 && (
           <p className="px-5 py-10 text-center text-[13px] text-text-muted">
             아직 카테고리가 없습니다. 아래에서 카테고리를 추가하세요.
           </p>
         )}
-        {!isLoading && isLoaded && categories.map((category) => renderCategory(category, 0))}
+        {!isLoading && isReadyForBlog && categories.map((category) => renderCategory(category, 0))}
 
-        {isLoaded && error && (
+        {isReadyForBlog && error && (
           <p role="alert" className="border-t-2 border-danger bg-danger-bg px-5 py-3 text-[12px] text-danger">
             {error}
           </p>
         )}
-        {isLoaded && notice && (
+        {isReadyForBlog && notice && (
           <p className="border-t-2 border-success bg-success-bg px-5 py-3 text-[12px] text-success">
             {notice}
           </p>
@@ -666,6 +714,58 @@ export function SettingsPostsPage() {
             {isMutating ? '저장 중...' : '＋ 추가'}
           </Button>
         </form>
+      </Panel>
+      <Panel title="임시저장 글" tone="primary">
+        {draftLoading && <p className="px-5 py-8 text-center text-[13px] text-text-muted">초안을 불러오는 중...</p>}
+        {!draftLoading && hasCurrentDraftState && draftError && (
+          <div className="space-y-3 px-5 py-8 text-center">
+            <p role="status" className="text-[13px] text-danger">{draftError}</p>
+            <Button variant="neutral" size="sm" onClick={() => void loadDrafts()}>초안 다시 불러오기</Button>
+          </div>
+        )}
+        {!draftLoading && hasCurrentDraftState && !draftError && drafts && drafts.items.length === 0 && (
+          <p className="px-5 py-8 text-center text-[13px] text-text-muted">저장된 초안이 없습니다.</p>
+        )}
+        {!draftLoading && hasCurrentDraftState && !draftError && drafts && drafts.items.length > 0 && (
+          <>
+            <ul aria-label="임시저장 글 목록" className="divide-y-2 divide-shadow">
+              {drafts.items.map((draft) => (
+                <li key={draft.id} className="flex items-center gap-3 px-5 py-3">
+                  <Link to={`/edit/${draft.id}`} className="min-w-0 flex-1">
+                    <strong className="block truncate text-sm text-ink">{draft.title || '제목 없는 초안'}</strong>
+                    <span className="text-xs text-text-muted">{draft.updatedAt ? new Date(draft.updatedAt).toLocaleString('ko-KR') : '저장 시간 미정'}</span>
+                  </Link>
+                  <Button variant="danger" size="sm" onClick={() => void handleDraftDelete(draft)}>
+                    삭제
+                  </Button>
+                </li>
+              ))}
+            </ul>
+            {drafts.totalPages > 1 && (
+              <div className="flex items-center justify-between border-t-2 border-ink bg-surface-warm px-5 py-3">
+                <Button
+                  variant="neutral"
+                  size="sm"
+                  disabled={draftLoading || !drafts.hasPrevious}
+                  onClick={() => void loadDrafts(drafts.page - 1)}
+                  aria-label="이전 초안 페이지"
+                >
+                  이전
+                </Button>
+                <span className="text-xs text-text-muted">{drafts.page + 1} / {drafts.totalPages}</span>
+                <Button
+                  variant="neutral"
+                  size="sm"
+                  disabled={draftLoading || !drafts.hasNext}
+                  onClick={() => void loadDrafts(drafts.page + 1)}
+                  aria-label="다음 초안 페이지"
+                >
+                  다음
+                </Button>
+              </div>
+            )}
+          </>
+        )}
       </Panel>
       <p className="mt-2 px-1 text-xs text-text-muted">
         카테고리를 삭제하면 글은 '미분류'로 이동합니다. 글이 있는 카테고리는 삭제 전 확인을

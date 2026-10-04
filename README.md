@@ -19,7 +19,19 @@ npm.cmd --version
 ```
 
 API만 확인한다면 Node/npm과 프론트 실행은 생략할 수 있습니다.
-현재 인증·블로그 설정·카테고리 확인에는 LocalStack/S3가 필요하지 않습니다.
+현재 로컬 인증·블로그·카테고리·글·이미지 기능에는 LocalStack/S3가 필요하지 않습니다.
+
+### M4 로컬 이미지 저장
+
+2026-10-03 승인된 M4는 LocalStack 없이 서버 로컬 파일 업로드를 사용합니다. 글·이미지 권한과 최대 5MB(5,242,880바이트)를 유지하며 S3 연동은 후속 범위입니다. 구현·인수 결과는 [M4 기록](docs/worklog/M4-posts.md)을 확인하세요. 아래 U0 설명은 과거 별도 검증 환경이며 현재 M4 실행에 필요하지 않습니다.
+
+로컬 이미지 기본 경로는 저장소 루트의 `.local-data/uploads`입니다. 이 경로는 Git과 Gradle `clean` 대상에서 제외됩니다. 서버를 항상 같은 작업 디렉터리에서 시작하거나 `zeroverse.upload.directory`에 고정된 절대 경로를 설정하세요. DB에는 이미지 참조·소유·연결 정보가 있으므로 백업/복원 시 DB와 파일 폴더를 함께 보존해야 합니다. 폴더만 이동·삭제하거나 DB만 되돌리지 마세요. 미연결 업로드의 자동 파일 삭제는 제공하지 않으며 운영 정리는 별도입니다.
+
+저장된 파일 폴더를 정적 웹 디렉터리로 공개하지 마세요. 이미지 내용은 권한을 검사하는 `/api/v1/uploads/{id}/content`를 통해서만 제공합니다. S3 이전은 별도 구현·검증이 필요하고 로컬 통과를 AWS 정책 검증으로 간주하지 않습니다.
+
+로컬 업로드/이미지 읽기 컨트롤러는 `local` 또는 `test` 프로필에서만 활성화됩니다. 아래 기동 명령의 `--spring.profiles.active=local`을 유지하세요. 이 프로필을 운영 배포용 이미지 제공 설정으로 사용하지 마세요.
+
+조회수 중복 방지는 `VIEWER_HMAC_SECRET`(최소 32 UTF-8 바이트)을 사용합니다. IP/User-Agent 원문을 저장하지 않고 HMAC으로 구분하며, 키가 없거나 짧으면 기동에 실패합니다. 같은 키를 유지하면 재시작 전후 24시간 중복 방지 기준이 이어집니다. 키를 교체하면 익명 방문자 식별 기준이 바뀌어 같은 방문도 다시 집계될 수 있습니다. 키를 Git·로그에 남기지 마세요.
 
 ### LocalStack — M4 준비용, 제품 연결 전
 
@@ -57,7 +69,7 @@ health 성공은 이미지 업로드/권한 검증 U0 통과가 아닙니다. �
 
 ### U0 업로드 검증 — 제품 서버와 별도
 
-LocalStack이 실행 중일 때 저장소 루트에서 실행합니다. 검증용 SDK/Tika는 `gradle/u0`에만 있으며,
+LocalStack이 실행 중일 때 저장소 루트에서 실행합니다. 검증용 SDK와 별도 실행 설정은 `gradle/u0`에 있으며(Tika는 승인된 M4 제품 MIME 검사에도 사용),
 매 실행마다 고유 테스트 버킷과 합성 이미지가 생성됩니다. 기존 버킷은 삭제하지 않습니다.
 
 ```powershell
@@ -165,6 +177,9 @@ spring:
 zeroverse:
   jwt:
     secret-base64: ${JWT_SECRET_BASE64}
+  upload:
+    viewer-hmac-secret: ${VIEWER_HMAC_SECRET}
+    directory: .local-data/uploads
   cors:
     allowed-origins: http://localhost:5173
   auth:
@@ -183,6 +198,7 @@ zeroverse:
 
 루트의 **같은 PowerShell 창**에서 비밀번호를 입력하고 서명 키를 생성한 뒤 실행합니다.
 DB 비밀번호는 1단계에서 정한 **zeroverse 계정 비밀번호**이며 root 비밀번호가 아닙니다.
+이 PC의 2026-10-03 검증에서는 Windows 예약 범위 `8010–8109`에 8080이 포함돼 API를 **18080**에서 실행합니다. OS 예약·방화벽을 변경하지 않으며 프론트 API 주소도 같은 포트로 맞춥니다.
 
 ```powershell
 $env:DB_PASSWORD = [System.Net.NetworkCredential]::new('', (Read-Host '로컬 zeroverse DB 비밀번호' -AsSecureString)).Password
@@ -194,11 +210,20 @@ $zeroverseRng.GetBytes($zeroverseKeyBytes)
 $zeroverseRng.Dispose()
 $env:JWT_SECRET_BASE64 = [Convert]::ToBase64String($zeroverseKeyBytes)
 
-.\gradlew.bat --no-daemon --max-workers=1 bootRun --args="--spring.profiles.active=local --server.address=127.0.0.1 --server.port=8080"
+# 같은 터미널에서 재시작할 때 조회수 식별 키를 유지합니다.
+if (-not $env:VIEWER_HMAC_SECRET) {
+    $zeroverseViewerBytes = New-Object byte[] 32
+    $zeroverseViewerRng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    $zeroverseViewerRng.GetBytes($zeroverseViewerBytes)
+    $zeroverseViewerRng.Dispose()
+    $env:VIEWER_HMAC_SECRET = [Convert]::ToBase64String($zeroverseViewerBytes)
+}
+
+.\gradlew.bat --no-daemon --max-workers=1 bootRun --args="--spring.profiles.active=local --server.address=127.0.0.1 --server.port=18080"
 ```
 
 `Started ZeroverseServerApplication`이 나오면 준비된 것입니다. 이 창은 실행 중 그대로 둡니다.
-Flyway가 필요한 migration을 적용하고 Hibernate가 스키마를 검증합니다. V1/V2 SQL을 수동으로 반복 실행하거나 기존 migration을 수정하지 마세요.
+Flyway가 필요한 migration을 적용하고 Hibernate가 스키마를 검증합니다. 적용한 V1/V2/V3 SQL을 수동으로 반복 실행하거나 기존 migration을 수정하지 마세요.
 
 위 환경변수는 현재 터미널과 그 자식 프로세스에만 적용됩니다. 새 창에서는 다시 설정해야 합니다.
 키를 새로 생성하면 이전 로그인 토큰은 유효하지 않으므로 브라우저에서 다시 로그인하세요.
@@ -210,7 +235,7 @@ Flyway가 필요한 migration을 적용하고 Hibernate가 스키마를 검증�
 ```powershell
 .\gradlew.bat --no-daemon --max-workers=1 bootJar
 if ($LASTEXITCODE -eq 0) {
-    java -jar build/libs/zeroverse-server-0.0.1-SNAPSHOT.jar --spring.profiles.active=local --server.address=127.0.0.1 --server.port=8080
+    java -jar build/libs/zeroverse-server-0.0.1-SNAPSHOT.jar --spring.profiles.active=local --server.address=127.0.0.1 --server.port=18080
 }
 ```
 
@@ -224,7 +249,7 @@ if ($LASTEXITCODE -eq 0) {
 ```powershell
 Set-Location frontend
 npm.cmd ci
-$env:VITE_API_BASE_URL = 'http://localhost:8080'
+$env:VITE_API_BASE_URL = 'http://localhost:18080'
 npm.cmd run dev -- --host localhost --port 5173 --strictPort
 ```
 
@@ -236,19 +261,19 @@ API 주소에는 `/api/v1`을 붙이지 않습니다. 클라이언트가 각 요
 | --- | --- |
 | 회원가입 / 로그인 | http://localhost:5173/signup / http://localhost:5173/signin |
 | 프로필·블로그 설정 / 카테고리 관리 | http://localhost:5173/settings / http://localhost:5173/settings/posts |
-| Swagger UI | http://localhost:8080/swagger-ui.html |
-| OpenAPI JSON | http://localhost:8080/v3/api-docs |
+| Swagger UI | http://localhost:18080/swagger-ui.html |
+| OpenAPI JSON | http://localhost:18080/v3/api-docs |
 
 기본 테스트 계정은 제공하지 않습니다. 회원가입 → 초기 블로그 설정 → 카테고리 관리 순서로 확인하세요.
 화면은 데스크톱 전용이며 브라우저 표시 영역 가로 **1440px 이상**에서 확인합니다.
-게시글 작성·이미지 업로드 등 후속 마일스톤 기능은 아직 동작하지 않을 수 있습니다.
+글 작성은 `/write`, 임시저장·글 관리는 `/settings/posts`에서 확인합니다. M4의 최신 검증 결과는 [M4 기록](docs/worklog/M4-posts.md)을 따르며 관계 관리·댓글·좋아요 등 M5 이후 기능은 이번 범위에 포함하지 않습니다.
 
 ## 5. 동작 확인과 자동 테스트
 
 실행 중인 API의 문서 응답을 별도 터미널에서 확인할 수 있습니다.
 
 ```powershell
-(Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:8080/v3/api-docs').StatusCode
+(Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:18080/v3/api-docs').StatusCode
 ```
 
 기대 결과는 `200`입니다. 루트 `/`나 인증 없이 `/api/v1/auth/me`에 접근했을 때의 `401`은 기동 실패가 아닙니다.
@@ -280,18 +305,24 @@ npm.cmd run build
 루트에서 실행하며, 실제 화면 검증이나 전체 통합 테스트를 대체하지 않습니다.
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\qa\m3-api-smoke.ps1 -BaseUri http://127.0.0.1:8080
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\qa\m3-api-smoke.ps1 -BaseUri http://127.0.0.1:18080
 ```
+
+### M4 글·로컬 이미지 인수
+
+[M4 API smoke](qa/m4-api-smoke.ps1)는 기존 합성 계정 4개(작성자·정방향 친구·역방향 친구·무관계 사용자)와 관계 fixture를 입력받아 실행합니다. 계정이나 관계를 자동 생성하지 않으며 개인 테스트 DB에서만 사용하세요. 비밀번호는 명령 기록에 직접 적지 말고 메모리 변수로 전달하고, `-BaseUri http://127.0.0.1:18080`을 명시합니다. 검증용 글·이미지를 생성하고 그중 private 글 1개를 soft delete하며 파일은 보존합니다.
+
+전체 인수 항목과 실행 결과는 [M4 QA](qa/M4-review.md) 및 [M4 worklog](docs/worklog/M4-posts.md)를 따릅니다. 2026-10-03 사용자 결정으로 브라우저 파일 선택·전송은 API·자동 테스트로 대체합니다. 이미지 실제 표시와 재시작 후 DB·파일 보존 검증은 별개로 유지합니다.
 
 ## 종료·문제 해결
 
 - 백엔드와 프론트는 각각 실행한 터미널에서 `Ctrl+C`로 종료합니다.
 - 위에서 만든 DB만 중지하려면 `docker stop zeroverse-local-test`를 사용합니다. 컨테이너·volume은 남아 다음 `docker start` 때 데이터를 재사용합니다. `docker rm -v`나 volume 삭제는 필요하지 않습니다.
-- `8080`, `5173`, `13307`이 이미 사용 중이면 기존 실행을 확인하세요. 다른 프로젝트 프로세스를 무작정 종료하지 마세요. `--strictPort`는 프론트가 다른 포트로 자동 이동해 Origin 설정과 어긋나는 것을 막습니다.
+- `18080`, `5173`, `13307`이 이미 사용 중이면 기존 실행을 확인하세요. 리스너가 없어도 Windows의 `netsh interface ipv4 show excludedportrange protocol=tcp`에 포함된 포트는 사용할 수 없습니다. 다른 프로젝트 프로세스를 무작정 종료하거나 예약 범위를 바꾸지 마세요. `--strictPort`는 프론트가 다른 포트로 자동 이동해 Origin 설정과 어긋나는 것을 막습니다.
 - DB 연결 실패: 컨테이너 준비 상태, URL의 포트·DB 이름, 계정 비밀번호를 확인합니다. `Public Key Retrieval is not allowed`는 위 loopback 전용 JDBC URL과 일치하는지 확인합니다.
 - JWT 초기화 실패: 같은 터미널의 `JWT_SECRET_BASE64` 설정과 로컬 YAML의 `${JWT_SECRET_BASE64}` 참조를 확인합니다. Base64 디코딩 후 32바이트 이상이어야 합니다.
 - 로그인 후 새로고침/로그아웃 실패: `local` 프로파일, `secure: false`, FE/API의 `localhost` 일치, CORS와 auth Origin의 `http://localhost:5173`을 확인합니다. SameSite를 임의로 완화하지 마세요.
 - PowerShell에서 npm 실행 정책 오류: `npm` 대신 이 문서처럼 `npm.cmd`를 사용합니다.
 - Gradle 캐시 권한/잠금 문제: 다른 실행을 먼저 확인하고, 필요하면 Gradle 명령에 `--gradle-user-home .gradle-home2`를 추가합니다. 캐시나 DB를 삭제하는 명령이 아닙니다.
 
-설정 정본은 [application.yml](src/main/resources/application.yml), [로컬 예제](src/main/resources/application-local.example.yml), 테스트 범위는 [QA 기록](qa/M3-review.md)을 참고하세요.
+설정 정본은 [application.yml](src/main/resources/application.yml), [로컬 예제](src/main/resources/application-local.example.yml), 테스트 범위는 [M3 QA](qa/M3-review.md)와 [M4 QA](qa/M4-review.md)를 참고하세요.

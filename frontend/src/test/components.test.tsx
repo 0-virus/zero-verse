@@ -7,7 +7,7 @@ import { Panel } from '../components/ui/Panel';
 import { FormField } from '../components/ui/FormField';
 import { ListRow } from '../components/ui/ListRow';
 import { Avatar } from '../components/ui/Avatar';
-import { Callout, CodeBlock, Prose } from '../components/ui/Prose';
+import { Callout, CodeBlock, PostContent, Prose } from '../components/ui/Prose';
 import { Table } from '../components/ui/Table';
 import { Modal } from '../components/ui/Modal';
 import { TagInput } from '../components/ui/TagInput';
@@ -165,6 +165,56 @@ describe('Prose', () => {
   it('콜아웃은 ★를 접두로 붙인다', () => {
     render(<Callout>주의</Callout>);
     expect(screen.getByText(/★/)).toBeInTheDocument();
+  });
+
+  it('비배열 content와 잘못된 자식 노드도 전체 본문 렌더를 중단하지 않는다', () => {
+    expect(() =>
+      render(
+        <PostContent
+          content={{
+            type: 'doc',
+            content: { malformed: true },
+          }}
+        />,
+      ),
+    ).not.toThrow();
+  });
+
+  it('orderedList와 table cell의 허용 attrs를 상세 렌더에 보존한다', () => {
+    render(
+      <PostContent
+        content={{
+          type: 'doc',
+          content: [
+            {
+              type: 'orderedList',
+              attrs: { start: 5, type: 'A' },
+              content: [
+                { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: '다섯째' }] }] },
+              ],
+            },
+            {
+              type: 'table',
+              content: [
+                {
+                  type: 'tableRow',
+                  content: [
+                    { type: 'tableCell', attrs: { colspan: 2 }, content: [{ type: 'paragraph', content: [{ type: 'text', text: '가로 병합' }] }] },
+                    { type: 'tableCell', attrs: { rowspan: 2 }, content: [{ type: 'paragraph', content: [{ type: 'text', text: '세로 병합' }] }] },
+                  ],
+                },
+              ],
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByRole('list')).toHaveAttribute('start', '5');
+    expect(screen.getByRole('list')).toHaveAttribute('type', 'A');
+    expect(screen.getByRole('list')).toHaveStyle({ listStyleType: 'upper-alpha' });
+    expect(screen.getByText('가로 병합').closest('td')).toHaveAttribute('colspan', '2');
+    expect(screen.getByText('세로 병합').closest('td')).toHaveAttribute('rowspan', '2');
   });
 });
 

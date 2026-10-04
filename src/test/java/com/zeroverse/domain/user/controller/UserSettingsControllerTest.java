@@ -6,14 +6,22 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zeroverse.domain.upload.UploadPurpose;
+import com.zeroverse.domain.upload.config.UploadProperties;
+import com.zeroverse.domain.upload.entity.ImageUpload;
+import com.zeroverse.domain.upload.repository.ImageUploadRepository;
 import com.zeroverse.domain.user.entity.User;
 import com.zeroverse.domain.user.entity.UserRole;
 import com.zeroverse.domain.user.repository.UserRepository;
 import com.zeroverse.security.jwt.JwtProvider;
 import com.zeroverse.support.MySqlTestSupport;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +31,8 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.mock.web.MockMultipartFile;
 
 /** 사용자 설정 컨트롤러 테스트(FR-SETTINGS-01·02). */
 @SpringBootTest
@@ -35,6 +45,8 @@ class UserSettingsControllerTest extends MySqlTestSupport {
     @Autowired private UserRepository userRepository;
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private JwtProvider jwtProvider;
+    @Autowired private ImageUploadRepository imageUploadRepository;
+    @Autowired private UploadProperties uploadProperties;
 
     // --- GET /api/v1/users/me (FR-SETTINGS-01) ---
 
@@ -93,6 +105,9 @@ class UserSettingsControllerTest extends MySqlTestSupport {
     @DisplayName("프로필을 수정할 수 있다")
     void updateProfileSuccess() throws Exception {
         User user = persistUser("update@test.com", "updater");
+        String legacyUrl = "https://legacy.example/image.png";
+        user.updateProfile("테스터", "updater", null, null, legacyUrl);
+        userRepository.saveAndFlush(user);
         String token = jwtProvider.issueAccessToken(user, Instant.now()).token();
 
         String body =
@@ -103,7 +118,7 @@ class UserSettingsControllerTest extends MySqlTestSupport {
                                 "newuser",
                                 "새 소개",
                                 LocalDate.of(2000, 1, 1),
-                                "https://example.com/image.png"));
+                                legacyUrl));
 
         mockMvc.perform(
                         put("/api/v1/users/me")
@@ -114,8 +129,77 @@ class UserSettingsControllerTest extends MySqlTestSupport {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.name").value("새이름"))
                 .andExpect(jsonPath("$.data.nickname").value("newuser"))
-                .andExpect(jsonPath("$.data.bio").value("새 소개"));
+                .andExpect(jsonPath("$.data.bio").value("새 소개"))
+                .andExpect(jsonPath("$.data.profileImageUrl").value(legacyUrl));
     }
+
+    @Test
+    @DisplayName("실제 업로드 canonical URL을 프로필 PUT으로 연결한다")
+    void uploadThenProfilePutBindsManagedImage() throws Exception {
+        User user = persistUser("profile-upload@test.com", "profileupload");
+        String token = jwtProvider.issueAccessToken(user, Instant.now()).token();
+        UUID uploadedId = null;
+
+        try {
+            MvcResult uploadResult = mockMvc.perform(
+                            org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                                    .multipart("/api/v1/uploads")
+                                    .file(new MockMultipartFile(
+                                            "file", "avatar.jpg", "image/jpeg", JPEG))
+                                    .param("purpose", UploadPurpose.PROFILE_IMAGE.name())
+                                    .header("Authorization", "Bearer " + token))
+                    .andExpect(status().isCreated())
+                    .andReturn();
+
+            JsonNode uploadData = objectMapper.readTree(
+                    uploadResult.getResponse().getContentAsString()).get("data");
+            uploadedId = UUID.fromString(uploadData.get("id").asText());
+            String imageUrl = uploadData.get("imageUrl").asText();
+
+            String body = objectMapper.writeValueAsString(
+                    new com.zeroverse.domain.user.dto.UserSettingsDtos.UpdateProfileRequest(
+                            "테스터", "profileupload", null, null, imageUrl));
+            mockMvc.perform(put("/api/v1/users/me")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.profileImageUrl").value(imageUrl));
+
+            ImageUpload metadata = imageUploadRepository.findById(uploadedId).orElseThrow();
+            assertThat(metadata.isCurrentlyBound()).isTrue();
+            assertThat(metadata.getBoundResourceType()).isEqualTo(ImageUpload.RESOURCE_PROFILE);
+            assertThat(metadata.getBoundResourceId()).isEqualTo(user.getId().toString());
+        } finally {
+            if (uploadedId != null) {
+                Files.deleteIfExists(uploadProperties.directoryPath().resolve(uploadedId.toString()));
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("새 외부 프로필 URL은 UPLOAD_004로 거부한다")
+    void rejectsNewExternalProfileUrl() throws Exception {
+        User user = persistUser("external-profile@test.com", "externalprofile");
+        String token = jwtProvider.issueAccessToken(user, Instant.now()).token();
+        String body = objectMapper.writeValueAsString(
+                new com.zeroverse.domain.user.dto.UserSettingsDtos.UpdateProfileRequest(
+                        "테스터", "externalprofile", null, null,
+                        "https://new.example/avatar.png"));
+
+        mockMvc.perform(put("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("UPLOAD_004"));
+    }
+
+    private static final byte[] JPEG = {
+        (byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0,
+        0, 16, 'J', 'F', 'I', 'F', 0, 1, 1, 0, 0, 1, 0, 1, 0, 0,
+        (byte) 0xFF, (byte) 0xD9
+    };
 
     @Test
     @DisplayName("닉네임이 필수다")

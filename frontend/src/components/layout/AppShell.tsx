@@ -29,7 +29,7 @@ export function AppShell({
   user?: AuthUser | null;
 }) {
   const { pathname } = useLocation();
-  const { blog } = useHeroBlog();
+  const { blog, actions: heroActions } = useHeroBlog();
   const layout = resolveLayout(pathname);
 
   if (layout.kind === 'onboarding') {
@@ -85,6 +85,7 @@ export function AppShell({
               />
             ) : undefined
           }
+          actions={layout.hero.variant === 'blog' ? heroActions : undefined}
         />
       )}
       <div

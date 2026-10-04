@@ -1,9 +1,10 @@
 # backend 현재 상태
 
-## 2026-10-03 18:16 KST — root final runtime gate 반영
+## 2026-10-04 — M4 로컬 인수·Git 통합 완료
 
 - root가 최종 D2B5 artifact로 runtime/OpenAPI를 독립 확인했다: `POST /api/v1/posts` 201, `POST /api/v1/uploads` 201, public `content` GET, 기존 image 200 재조회 및 동일 hash, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`가 모두 통과했다.
-- whole independent review는 Ready to merge `Yes`, 잔여 `0`을 전달했다. 제품 backend gate와 runtime smoke는 해소됐지만 Git stage/commit/push/merge는 아직 대기 중이며 완료로 표시하지 않는다.
+- whole independent review는 Ready to merge `Yes`, 잔여 `0`, 최종 QA는 로컬 M4 PASS다. 구현 커밋 `4404f1e`를 푸시했고 PR #10이 `dev`에 머지됐다(`c34ff4e979bd6efffc3a2aea28c2be307ccac3b5`).
+- 사용자 승인으로 리더가 상태 문구만 갱신했다. 제품 코드·요구사항·기존 역할 WORKLOG는 변경하지 않았다.
 
 ## 2026-10-03 18:13 KST — M4 Task1~3 최종 backend 증거
 
@@ -14,9 +15,9 @@
 - R3/R8 targeted 로그 `build/m4-post-r3-r8-targeted-20261003-1810.log` 및 혼합 ACL pagination `build/m4-post-pagination-acl-green-20261003-1820.log`가 `BUILD SUCCESSFUL`이다. upload/profile/V3 targeted는 `build/m4-upload-profile-v3-targeted-20261003-1840.log`로 통과했다.
 - 최종 full `build/m4-final-backend-full-20261003-1900.log`: `BUILD SUCCESSFUL`, 13m49s, exit 0. 보존 XML `build/m4-final-junit-20261003-1915/test-results`: 66 suites, 426 tests, failures/errors/skips `0/0/0`.
 - 최종 bootJar `build/m4-final-bootjar-20261003-1920.log`: `build/libs/zeroverse-server-0.0.1-SNAPSHOT.jar`, 66,354,802 bytes, SHA-256 `D2B5FBB8A659D707F1A4039FB062D1768113D9AD53946F7A1D6AAA983783E2EF`.
-- root의 최종 artifact OpenAPI 및 HTTP/image/browser smoke gate는 해소됐다. Windows 8080 예약 포트는 제품 변경 없이 root가 18080 runtime으로 우회했다. Git stage/commit/push/merge는 아직 대기 중이며 root가 수행한다.
+- root의 최종 artifact OpenAPI 및 HTTP/image/browser smoke gate는 해소됐다. Windows 8080 예약 포트는 제품 변경 없이 root가 18080 runtime으로 우회했다. Git 통합 결과는 위 최종 상태를 따른다.
 
-마지막 갱신: 2026-10-03 18:16 KST
+마지막 갱신: 2026-10-04 KST
 
 ## 현재 단계
 
@@ -41,11 +42,10 @@
 ## 현재 차단·위험
 
 - 과거 `LocalImageStoreTest` 누락 import 오류는 upload 담당자의 통합 변경으로 해소됐으며 최종 full에서 compile/test가 통과했다.
-- 제품 backend gate는 해소됐다. root의 최종 artifact HTTP/OpenAPI/image/browser smoke와 독립 QA closure만 외부 gate로 남아 있다.
-- root runtime의 8080은 Windows 예약 포트로 바인딩되지 않아 root가 18080에서 별도 검증 중이다. 제품 코드 변경이 아니다.
+- 제품 backend·runtime·독립 QA·Git 통합 gate는 모두 해소됐다. 로컬 M4 완료를 막는 미해결 항목은 없다.
+- 8080 예약 포트 문제는 검증용 18080 사용으로 대응했다. S3/U0·운영 배포는 별도 후속 범위다.
 
 ## 다음 작업
 
-1. root의 최종 artifact HTTP/OpenAPI/image/browser smoke 결과를 root worklog와 closure 기록에 반영한다.
-2. 독립 QA/root closure 후 root가 Git stage/commit/push/merge를 수행한다. 이 역할은 Git 조작을 하지 않는다.
-3. 이후 결함은 새 RED→GREEN 증거를 남긴 뒤에만 수정한다.
+1. M4 추가 구현 작업은 없다. 실제 머지·검증 근거는 `docs/worklog/M4-posts.md`의 최종 [리뷰]·[머지]를 따른다.
+2. M5/S3 후속은 별도 사용자 지시 전 착수하지 않는다. 이후 결함 수정은 새 RED→GREEN 증거와 함께 진행한다.

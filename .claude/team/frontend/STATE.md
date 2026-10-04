@@ -2,14 +2,14 @@
 
 > 덮어쓰기 스냅샷. 시간순 이력은 `WORKLOG.md`, 마일스톤 이력은 `docs/worklog/**`를 본다.
 
-마지막 갱신: 2026-10-03 (M4 최종 독립 리뷰·Git 통합 대기 인계)
+마지막 갱신: 2026-10-04 KST (사용자 승인에 따른 리더의 상태 문구 갱신)
 
 ## 현재 단계
 
 - 사용자 승인 로컬 파일 저장 범위의 M4 Task4~6 제품 FE 구현이 checkout에 반영되어 있다. 현재 checkout/HEAD와 다른 역할의 변경은 보존하며 Git stage/commit/push는 리더 소유다.
 - 소유 경계는 `frontend/**` 및 `.claude/team/frontend/**`다. backend/QA/root 정본·runtime·브라우저 최종 판정은 수정하지 않는다.
 - 독립 whole reviewer `m4_whole_review`는 최종 `Ready to merge: Yes`로 판정했고 R1~R8 및 R7 후속 잔여는 0이다. root의 API·Chrome R1/R4/R5·orderedList 표식 검증과 최종 PNG artifact도 보존되어 있다(`docs/worklog/M4-posts.md` 18:15 기록 참조).
-- frontend 범위의 리뷰·runtime 인계는 해소되었고, 현재 남은 상태는 root 소유 Git 통합/merge 대기다. 이 역할은 Git stage/commit/push를 수행하지 않았으며 통합 완료를 주장하지 않는다.
+- frontend 리뷰·runtime 인계 및 Git 통합이 완료됐다. root가 구현 커밋 `4404f1e`를 푸시하고 PR #10을 `dev`에 머지했다(`c34ff4e979bd6efffc3a2aea28c2be307ccac3b5`). 제품 코드는 추가 변경하지 않았다.
 
 ## 이번 wave 구현
 
@@ -34,8 +34,8 @@
 ## 최종 인계
 
 - 독립 whole reviewer 최종 판정은 `Ready to merge: Yes`이며 R1~R8 및 R7 후속 잔여는 0이다.
-- root가 API, Chrome R1/R4/R5, orderedList `start=5,type=A` 및 lower-alpha 표식, 최종 PNG artifact를 검증·보존했고 M4 worklog 18:15에 기록했다.
-- FE 범위의 독립 review/runtime pending은 해소되었다. 남은 것은 root 소유 Git 통합/merge뿐이며, 이 역할은 Git stage/commit/push를 하지 않았고 통합 완료·대기 완료를 주장하지 않는다.
+- root가 API, Chrome R1/R4/R5, orderedList `start=5,type=a`의 lower-alpha/marker `e.`, 최종 PNG artifact를 검증·보존했다. `type=A`와 표 span은 자동 회귀 증거로 구분한다.
+- FE 독립 review/runtime 및 Git 통합은 완료됐다. 실제 결과는 M4 worklog 최종 [리뷰]·[머지]를 따른다. Git 작업은 root가 수행했다.
 - 이 기록 이후 frontend 역할의 추가 문서 쓰기·제품 수정·테스트/빌드는 계획하지 않는다. logout UI는 이번 배정 범위가 아니다.
 
 ## 주요 산출물

@@ -27,6 +27,9 @@ ZeroVerse Blog MVP 저장소. 개인 블로그 플랫폼으로, 사용자는 자
 | Path | Description |
 |------|--------------|
 | `README.md` | 로컬 테스트 서버·프론트 실행, 자동 테스트, 종료·문제 해결 안내. 리더 소유이며 실제 설정과 대조해 유지한다. |
+| `compose.localstack.yml` | 리더 소유의 로컬 S3 기동 설정. Windows 예약 포트를 피해 `127.0.0.1:14566`만 공개한다. 제품 업로드 구현/U0 통과 또는 운영 배포 설정이 아니다. |
+| `gradle/u0/`, `frontend/u0/` | 승인된 U0 전용 검증 도구. 각각 backend/ frontend 소유이며 제품 빌드·API·DB와 분리한다. 실행·독립 판정은 M4 worklog에서 확인한다. |
+| `build/u0-seaweedfs-4.47/` | 2026-09-23 승인된 U0 대체 검증용 바이너리·로컬 설정·합성 데이터·로그. 리더 소유, Git 제외. 공식 tag `4.47`, S3 loopback `14568`, 실행법·판정은 README/M4 worklog를 따른다. |
 | `docs/REQUIREMENTS.md` | MVP 전체 요구사항 명세(v2.1). 도메인 모델, API 규칙, FR-*/NFR-*, 프론트 라우트, 엔드포인트 목록, 에픽 초안. **요구사항 정본**(단, `docs/PRD.md` §9 사용자 결정이 override하는 부분 제외). |
 | `docs/PRD.md` | 요구사항 + 디자인 정본 + 사용자 결정을 통합한 **구현 실행 명세**(v2.0). 아키텍처/패키지 구조, 화면-API 매핑, 디자인 시스템 토큰(§6), 화면 명세(§7), 결정 로그(§9), 마일스톤 순서(§10), 테스트 전략, DoD. 실제 구현의 로드맵. |
 | `docs/design/` | **시각 디자인 정본**(2026-07-24 도입). Claude Design 프로젝트에서 가져온 `.dc.html` 원본 + `DESIGN-SYSTEM.md`(토큰·컴포넌트·13화면 스펙). `docs/design/AGENTS.md` 참고. |
@@ -165,4 +168,12 @@ ZeroVerse Blog MVP 저장소. 개인 블로그 플랫폼으로, 사용자는 자
 
 `docs/REQUIREMENTS.md` §2 스택 외 추가 패키지 결정 시 이 문서와 PRD를 갱신. 프론트 TipTap 설치: `@tiptap/react @tiptap/pm @tiptap/starter-kit @tiptap/extension-link @tiptap/extension-image`(REQUIREMENTS §8.6).
 
+U0만 승인된 검증 의존성: `gradle/u0`의 AWS SDK Java2 S3/BOM `2.49.6`, Apache Tika core `3.3.2`. 제품 의존성으로 편입하지 않는다. 근거·검증 상태는 M4 회의 §14 및 worklog를 따른다.
+
 <!-- MANUAL: Any manually added notes below this line are preserved on regeneration -->
+
+### 2026-10-03 로컬 M4 실행 결정
+
+사용자는 로컬 파일 저장으로 M4 완성과 `docs/worklog/M4-posts.md`의 실행계획(Task1~7)을 승인했다. 현재 M4는 LocalStack/SeaweedFS/AWS 검증을 선행 조건으로 삼지 않는다. 인증된 로컬 multipart 업로드와 권한 있는 콘텐츠 GET, 실제 바이트 5MiB 제한을 사용하며 S3 연동은 후속이다. 위의 기존 S3/LocalStack 설명과 충돌하는 로컬 M4 범위는 이 결정과 PRD §9.7·회의 §20.8이 우선한다. `.local-data/`는 Git 제외 로컬 영속 데이터이며 Gradle clean과 분리하고 임의 삭제하지 않는다. 실제 구현·검증 완료 여부는 M4 worklog와 역할 STATE를 확인한다. 이번 실행은 M4까지이며 M5 이후 자동 확장하지 않는다.
+
+승인된 실행계획/회의 §20.1에 따라 제품 콘텐츠 정화에 OWASP Java HTML Sanitizer `20260102.1`, MIME 판별에 Tika core `3.3.2`를 사용한다. 따라서 위 U0 전용 Tika 제한은 이 로컬 제품 범위에 한해 대체되며 AWS SDK는 여전히 U0 전용이다. 2026-10-03 사용자 지시로 브라우저 파일 선택·업로드 검증만 제외하고 API·자동 테스트로 검증한다. 실제 파일 저장·권한·5MiB·브라우저 이미지 표시·재시작 보존 검증은 유지한다.

@@ -6,6 +6,7 @@ import {
   PixelRocket,
   PixelStars,
 } from './StarField';
+import { ManagedImage } from '../../features/upload/ManagedImage';
 
 /**
  * 우주(다크) 히어로 스트립.
@@ -156,7 +157,7 @@ export function HeroAvatar({
 
   if (profileImageUrl) {
     return (
-      <img
+      <ManagedImage
         src={profileImageUrl}
         alt={ownerNickname ? `${ownerNickname}의 프로필 이미지` : '블로그 아바타'}
         style={{ ...size, objectFit: 'cover' }}

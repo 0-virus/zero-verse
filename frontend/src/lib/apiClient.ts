@@ -14,6 +14,10 @@ import type { ApiEnvelope, ApiError } from '../types/auth';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
 
+export function getApiBaseUrl(): string {
+  return BASE_URL;
+}
+
 /** refresh를 재귀적으로 호출하면 안 되는 경로. 이들의 401은 그대로 던진다. */
 const NO_REFRESH_PATHS = [
   '/api/v1/auth/register',
@@ -99,10 +103,25 @@ interface RequestOptions {
   skipRefresh?: boolean;
 }
 
+function isRawBody(body: unknown): body is BodyInit {
+  if (typeof body === 'string') return true;
+  if (typeof FormData !== 'undefined' && body instanceof FormData) return true;
+  if (typeof Blob !== 'undefined' && body instanceof Blob) return true;
+  if (typeof ArrayBuffer !== 'undefined' && body instanceof ArrayBuffer) return true;
+  if (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams) return true;
+  return false;
+}
+
 async function rawRequest(path: string, options: RequestOptions): Promise<Response> {
   const headers: Record<string, string> = {};
+  let body: BodyInit | undefined;
   if (options.body !== undefined) {
-    headers['Content-Type'] = 'application/json';
+    if (isRawBody(options.body)) {
+      body = options.body;
+    } else {
+      headers['Content-Type'] = 'application/json';
+      body = JSON.stringify(options.body);
+    }
   }
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
@@ -113,7 +132,7 @@ async function rawRequest(path: string, options: RequestOptions): Promise<Respon
     headers,
     // Refresh 쿠키를 주고받으려면 필수다.
     credentials: 'include',
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    body,
   });
 }
 
@@ -177,7 +196,7 @@ function refreshOnce(): Promise<boolean> {
  * 바로 재시도한다. 이 확인이 없으면 느린 요청의 뒤늦은 401이 불필요한 두 번째 rotation을
  * 일으켜, 방금 발급된 토큰이 곧바로 폐기된다.
  */
-export async function request<T>(path: string, options: RequestOptions = {}): Promise<T | null> {
+async function requestResponse(path: string, options: RequestOptions = {}): Promise<Response> {
   const skipRefresh = options.skipRefresh || NO_REFRESH_PATHS.includes(path);
 
   const versionAtRequest = tokenVersion;
@@ -191,7 +210,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     if (!refreshed) {
       accessToken = null;
       onAuthExpired?.();
-      return parseEnvelope<T>(response);
+      return response;
     }
     response = await rawRequest(path, options);
     if (response.status === 401) {
@@ -200,13 +219,29 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     }
   }
 
-  return parseEnvelope<T>(response);
+  return response;
+}
+
+export async function request<T>(path: string, options: RequestOptions = {}): Promise<T | null> {
+  return parseEnvelope<T>(await requestResponse(path, options));
+}
+
+export async function requestBlob(path: string): Promise<Blob> {
+  const response = await requestResponse(path);
+  if (!response.ok) {
+    // Binary endpoints use the same error envelope as JSON endpoints.
+    await parseEnvelope<never>(response);
+    throw new ApiRequestError(response.status, null);
+  }
+  return response.blob();
 }
 
 export const apiClient = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body }),
+  upload: <T>(path: string, body: FormData) => request<T>(path, { method: 'POST', body }),
   put: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT', body }),
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  getBlob: (path: string) => requestBlob(path),
 };

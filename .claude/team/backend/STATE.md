@@ -1,55 +1,51 @@
 # backend 현재 상태
 
-> 덮어쓰기 스냅샷. 시간순 이력은 `WORKLOG.md`, 마일스톤 이력은 `docs/worklog/**`를 본다.
+## 2026-10-03 18:16 KST — root final runtime gate 반영
 
-마지막 갱신: 2026-09-08 10:05 KST
+- root가 최종 D2B5 artifact로 runtime/OpenAPI를 독립 확인했다: `POST /api/v1/posts` 201, `POST /api/v1/uploads` 201, public `content` GET, 기존 image 200 재조회 및 동일 hash, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`가 모두 통과했다.
+- whole independent review는 Ready to merge `Yes`, 잔여 `0`을 전달했다. 제품 backend gate와 runtime smoke는 해소됐지만 Git stage/commit/push/merge는 아직 대기 중이며 완료로 표시하지 않는다.
+
+## 2026-10-03 18:13 KST — M4 Task1~3 최종 backend 증거
+
+- `feature/M4-posts`의 Task1~3 구현·통합과 root/독립 QA source closure를 완료했다. upload 병렬 담당자의 변경도 통합된 현재 소스 기준으로 backend 기록을 갱신한다.
+- `PostRepository` 목록·인접글 SQL predicate는 soft-delete 부모, publish/visibility, owner/accepted Universe, category/tag를 먼저 필터하고 `Pageable`로 bounded 조회한다. JPA int offset을 넘는 범위는 DB total 확인 후 정상 empty page를 반환한다.
+- `PostService`는 CRUD/권한/태그/image snapshot/URL dedupe/24시간 view ledger/48시간 bounded cleanup/ACL 후 previous-next를 적용한다. `PostContentService`는 root `doc`, UTF-8 JSON·HTML 1MiB, depth32/node10000, TipTap node/attrs/mark allowlist, ordered-list/table span 보존, canonical local image URL, OWASP sanitizer를 적용한다.
+- `UserSettingsService`는 managed canonical profile URL의 최초 binding·clear·재연결을 binding service로 검증하고 unchanged legacy external URL만 호환한다. 신규 external/blob/data/malformed 변경은 `UPLOAD_004`다.
+- R3/R8 targeted 로그 `build/m4-post-r3-r8-targeted-20261003-1810.log` 및 혼합 ACL pagination `build/m4-post-pagination-acl-green-20261003-1820.log`가 `BUILD SUCCESSFUL`이다. upload/profile/V3 targeted는 `build/m4-upload-profile-v3-targeted-20261003-1840.log`로 통과했다.
+- 최종 full `build/m4-final-backend-full-20261003-1900.log`: `BUILD SUCCESSFUL`, 13m49s, exit 0. 보존 XML `build/m4-final-junit-20261003-1915/test-results`: 66 suites, 426 tests, failures/errors/skips `0/0/0`.
+- 최종 bootJar `build/m4-final-bootjar-20261003-1920.log`: `build/libs/zeroverse-server-0.0.1-SNAPSHOT.jar`, 66,354,802 bytes, SHA-256 `D2B5FBB8A659D707F1A4039FB062D1768113D9AD53946F7A1D6AAA983783E2EF`.
+- root의 최종 artifact OpenAPI 및 HTTP/image/browser smoke gate는 해소됐다. Windows 8080 예약 포트는 제품 변경 없이 root가 18080 runtime으로 우회했다. Git stage/commit/push/merge는 아직 대기 중이며 root가 수행한다.
+
+마지막 갱신: 2026-10-03 18:16 KST
 
 ## 현재 단계
 
-- 기준 브랜치: `feature/M3-categories`, 현재 HEAD `08239e0514b6a1a78f090c3b0961e8fd4a60403e`(`08239e0`). `1690731`은 M3 분기 기준선이므로 현재 기준으로 사용하지 않는다. Git 조작은 이 역할에서 수행하지 않는다.
-- M3 category 계약은 [ADR-0005](../../../docs/governance/decisions/ADR-0005-categories-contract.md) `ACCEPTED`, M3 회의록 `APPROVED`, 사용자 `시작` 승인에 근거한다. REQUIREMENTS FR-CAT01~05/NFR04~09와 PRD §5.4/§9.5/§10~12를 함께 따른다.
-- 구현 커밋은 `067cd1174aeec1452b6c74402e750fdad75c3c05`이며 구현 저자는 초안 `m3_backend`와 후속 `m3_backend_resume`이다. 독립 QA 최종 acceptance·root 최종 승인·`dev` merge는 아직 끝나지 않았다. M3 검증·PR #9 `dev` merge·마감 기록 완료가 이번 실행의 종료 경계이며, M4는 이번 실행 범위가 아니므로 착수하지 않는다.
+- 브랜치 `feature/M4-posts`에서 M4 Task1(글 CRUD/권한/목록/태그/조회수), Task2(JSON 원본·HTML sanitizer), Task3 로컬 업로드 연동을 구현했다.
+- 업로드 전용 구현 경로는 병렬 담당자의 변경을 통합했으며 현재 backend 통합·검증 기록과 root 인계를 이 역할이 관리한다.
+- 공유 경계는 `PostService.bindPostImages`, `UploadService.bindProfileImage`, `UploadService.read`와 `zeroverse.upload.viewer-hmac-secret`, `zeroverse.upload.directory`이다.
 
-## 진행 중
+## 구현 사실
 
-- backend `src/**`, `src/test/**`, Gradle 경로는 `067cd11..08239e0`에서 변경되지 않았다.
-- `src/main/java/com/zeroverse/domain/category/`에 entity·DTO·repository·service·controller와 실제 MySQL count/visibility/order/delete 규칙이 구현되어 있다.
-- `src/main/resources/db/migration/V2__category_active_unique.sql`은 V1을 수정하지 않고 active-key unique를 추가하는 forward migration이다. 활성 name/order 제약, soft-delete 후 재사용, parent 경로 및 blog owner 삭제 검증을 포함한다.
-- `BlogRepository`의 category 경로는 active blog와 active owner를 확인하고, 쓰기는 blog lock 후 재조회한다. `ErrorCode`의 CAT_004 고정 문구, `GlobalExceptionHandler`의 request binding 400 경계, `JacksonConfig`의 strict numeric/enum 입력 정책이 반영되어 있다.
-- category HTTP/OpenAPI 테스트에는 공개 root `parentId: null`, trim-before-size, CAT_004/AUTH 오류, malformed JSON/numeric/enum 입력, 삭제 owner 경계 및 GET `security: []` 구조 검증이 있다. controller 6번째 테스트와 LWW assertion 변경도 최신 full suite에 포함됐다.
+- `PostService`는 blog→user→post 잠금, ACTIVE 쓰기 재검증, PUBLIC/UNIVERSE/PRIVATE/draft ACL, publish 필터, tag 정규화, image snapshot 검증/중복 URL dedupe, 24시간 ledger와 48시간 bounded cleanup, HMAC anonymous key, ACL 후 previous/next 선택을 적용한다.
+- `PostContentService`는 JSON root `doc`, UTF-8 JSON/HTML 1MiB, depth32/node10000, TipTap toolbar attrs allowlist, canonical local image URL, deterministic HTML 및 OWASP sanitizer를 적용한다. client HTML은 저장 원본이 아니다.
+- `UserSettingsService`는 managed canonical profile URL을 `UploadService.bindProfileImage`로 최초 binding/재연결 검증하고, 기존 외부 profile URL은 호환 유지하며 managed URL detach/clear를 처리한다.
+- V3 migration은 post image active unique key, view ledger, local image metadata를 추가한다. V1/V2는 수정하지 않았다.
+- 공통 multipart 설정은 `max-file-size: 5MB`, `max-request-size: 6MB`이며 초과는 `UPLOAD_002` envelope으로 변환한다. `UPLOAD_003/004` 계약도 반영했다.
 
 ## 검증 사실
 
-- root가 남긴 기존 full 검증 산출물은 `build/m3-root-full-build.log`의 exit 0, `BUILD SUCCESSFUL in 10m 24s`, XML 56 suites/370 tests, failures 0/errors 0/skips 0이다. `CategoryServiceMySqlTest` 14, `CategoryControllerMySqlTest` 6, `CategoryMigrationTest` 1, `GlobalExceptionHandlerTest` 5를 포함한다.
-- 기존 산출 JAR는 `build/libs/zeroverse-server-0.0.1-SNAPSHOT.jar`이며 2026-09-06 17:13:54 KST 생성됐다. SHA-256은 `422F7216E6B70A8BC533C9F84605C9E3368B961C0F0AC1F58A6B9113819FE369`다. root가 이를 PID 8712로 `127.0.0.1:8080`에 기동했다.
-- root의 기존 실행 기록에서 M3 합성 DB(13306) 재기동 후 Flyway V1/V2 success=1/1, 기동 시 `users/blogs/categories/posts = 5/5/18/0` 보존을 확인했다. 이후 새 UI 합성 계정이 추가됐으며 fixture는 삭제하지 않는다. Swagger 실제 JSON의 category GET `security=[]`, POST `bearerAuth`와 QA HTTP script exit 0도 기존 evidence이며 오늘 이 상태 턴에 Swagger/full test를 재실행하지 않았다.
-- frontend 구현자와 분리된 root CUA 실행에서 `프론트엔드`를 `백엔드` 위로 native mouse DnD했다. UI 성공 notice `카테고리 순서를 저장했습니다.`와 DB active ID/order `19:0, 21:1, 20:2, 22:3`을 확인해 DnD gate는 root 독립 evidence로 PASS다. QA 직접 조작으로 표기하지 않는다.
-- 2026-09-08 기존 Chrome fixture(ID 22)의 LOCKED 시도는 경고·확인창·OK focus를 관측했으나 `accept`가 timeout 후 kernel reset으로 끝났고 이어진 `getTab`도 timeout됐다. DB에서 ID 22가 계속 GENERAL인 과거 실패로 보존하며 새 IAB 결과와 섞지 않는다.
-- 2026-09-07 과거 재시도에서는 확인창 도구가 `No dialog is showing`을 반환했고 새 탭의 타입이 GENERAL이었다. 이 과거 evidence도 LOCKED 저장 PASS로 승격하지 않는다.
-- 2026-09-08 새 IAB fixture(blog ID 7)에서 category ID 26 `LOCKED`, `displayOrder=3` 저장·재조회와 새로고침 후 복원을 확인했다. `회고`의 순서 이동·이름 변경·삭제·타입 선택이 disabled이고 `카테고리를 잠금 상태로 저장했습니다. 잠금은 되돌릴 수 없습니다.` notice가 표시됐다. 이는 root 독립 실제 UI·DB evidence로 LOCKED gate PASS이며 QA 직접 조작으로 표기하지 않는다.
-- 이전 25-test snapshot과 numeric enum 21-test 실패는 진행 중간의 역사 기록으로 `WORKLOG.md`에 보존한다. 최신 full 결과가 이를 대체한다.
+- `& .\gradlew.bat --no-daemon --max-workers=1 compileJava --gradle-user-home .gradle-home2`: `BUILD SUCCESSFUL in 47s` (UserSettingsController/OpenAPI 설정 포함).
+- 16:40 snapshot bootJar 기록은 과거 증거로 보존한다. 최종 artifact는 위 18:13 증거 항목의 `build/m4-final-bootjar-20261003-1920.log`와 SHA-256을 따른다.
+- 최종 full과 targeted 테스트의 현재 수치·로그·JUnit 보존 경로는 위 18:13 증거 항목을 따른다.
+
+## 현재 차단·위험
+
+- 과거 `LocalImageStoreTest` 누락 import 오류는 upload 담당자의 통합 변경으로 해소됐으며 최종 full에서 compile/test가 통과했다.
+- 제품 backend gate는 해소됐다. root의 최종 artifact HTTP/OpenAPI/image/browser smoke와 독립 QA closure만 외부 gate로 남아 있다.
+- root runtime의 8080은 Windows 예약 포트로 바인딩되지 않아 root가 18080에서 별도 검증 중이다. 제품 코드 변경이 아니다.
 
 ## 다음 작업
 
-1. 새 IAB LOCKED evidence를 독립 QA가 기존 BE/FE/API evidence와 최종 대조해 M3 acceptance를 판정한다.
-2. QA 최종 판정 후 PR #9 Ready 전환 및 `dev` merge·M3 마감 기록을 완료한다. 이 순서가 이번 실행의 종료 경계다.
-3. 미래에 별도 M4를 착수할 때 Post의 모든 `category_id` 쓰기가 동일 blog lock과 활성·동일 블로그 재검증을 공유하는지 인계 참고로 사용한다. M4는 이번 실행 범위가 아니다.
-
-## 차단 요인
-
-- LOCKED 저장·재조회·reload 후 불변 상태는 root 독립 evidence로 확인됐고, 독립 QA 최종 판정이 남아 있다. QA 판정 전에는 M3 PASS/APPROVE·`dev` merge를 주장하지 않는다.
-- PR #9는 Draft/OPEN 상태이며 LOCKED gate와 M3 마감 기록 전에는 `dev` merge를 할 수 없다. M4는 이번 실행 범위가 아니며 착수하지 않는다.
-- 이번 문서 전용 턴에는 Gradle/테스트/JAR/API/DB를 재실행하지 않았다. full test/XML·JAR·Swagger·HTTP 수치는 기존 산출물 및 root/QA 최신 기록을 재대조한 것이다.
-
-## 역사 요약
-
-- M0 스캐폴딩과 M1 인증은 `dev`에 머지됐다.
-- M2 backend 검증·OpenAPI 보완은 XML 53개/348 tests, failures/errors/skips 0과 JAR/API 문서 smoke를 root·QA가 독립 대조해 완료했고, M2 PR #8은 merge됐다. 상세 명령·SHA·시각은 기존 `WORKLOG.md` 항목을 보존한다.
-- M3 이전 상태의 Q1~Q4 결정 대기 기록과 중간 25/21-test 기록은 역사로만 남기며, 현재 구현 판단은 ACCEPTED ADR-0005와 최신 full 검증 증거를 따른다.
-
-## 주요 소유 경로
-
-- `src/main/java/com/zeroverse/**`
-- `src/test/java/com/zeroverse/**`
-- `src/main/resources/db/migration/**`
-- `build.gradle`, `settings.gradle`, Gradle wrapper
+1. root의 최종 artifact HTTP/OpenAPI/image/browser smoke 결과를 root worklog와 closure 기록에 반영한다.
+2. 독립 QA/root closure 후 root가 Git stage/commit/push/merge를 수행한다. 이 역할은 Git 조작을 하지 않는다.
+3. 이후 결함은 새 RED→GREEN 증거를 남긴 뒤에만 수정한다.

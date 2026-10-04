@@ -16,6 +16,7 @@ import com.zeroverse.support.MySqlTestSupport;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Arrays;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -55,7 +56,6 @@ class SecurityAccessControlTest extends MySqlTestSupport {
     @ValueSource(strings = {
         "/api/v1/anything",
         "/api/v1/blogs/1",
-        "/api/v1/posts/1",
         "/api/v1/some/deep/unmapped/path"
     })
     @DisplayName("allowlist에 없는 경로는 전부 401이다 — blanket permitAll이 아니다")
@@ -144,13 +144,25 @@ class SecurityAccessControlTest extends MySqlTestSupport {
     // --- 종료 조건 4·5: 공개 allowlist의 method 제한, 공개 경로 쓰기 401 ---
 
     @ParameterizedTest
-    @ValueSource(strings = {"/api/v1/blogs/slug/zerostar", "/api/v1/blogs/slug/another-blog", "/api/v1/feed/public", "/api/v1/search"})
+    @ValueSource(strings = {"/api/v1/blogs/slug/zerostar", "/api/v1/blogs/slug/another-blog", "/api/v1/posts/1", "/api/v1/feed/public", "/api/v1/search"})
     @DisplayName("공개 경로의 GET은 인증을 요구하지 않는다 (401이 아니다) (M2: /blogs/slug/** 포함)")
     void publicGetIsNotUnauthorized(String path) throws Exception {
         int status = mockMvc.perform(get(path)).andReturn().getResponse().getStatus();
 
         // 아직 구현되지 않아 404일 수 있으나 401이면 allowlist가 깨진 것이다.
         assertThat(status).as("%s 의 GET", path).isNotEqualTo(401);
+    }
+
+    @Test
+    @DisplayName("이미지 content GET은 공개 allowlist에서 DB 권한 평가까지 도달하고 upload 404를 반환한다")
+    void imageContentReadIsPublicButUploadRemainsProtected() throws Exception {
+        mockMvc.perform(get("/api/v1/uploads/{id}/content", UUID.randomUUID()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("UPLOAD_003"));
+
+        mockMvc.perform(post("/api/v1/uploads"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("AUTH_004"));
     }
 
     @ParameterizedTest

@@ -195,3 +195,190 @@
 
 - 독립 `/root/m3_final_qa` 최종 APPROVE와 실제 기록을 리더가 확인했다. 현재 역할 상태·이력 및 M3 검증 문서 11개만 변경됐고 제품 tree는 `4fc9ae2` 이후 불변, diff check exit 0이다. 모든 역할 쓰기 작업이 끝났으며 원격 feature와 HEAD는 0/0, base dev는 `1690731`로 재확인했다.
 - 리더 최종 승인 및 명시 배정: root가 위 11개 파일만 stage/commit하고 origin `feature/M3-categories`로 push한 뒤, PR #9의 동일 HEAD/base dev·checks·mergeability를 확인해 Ready/merge한다. 실제 결과 확인 전 merge 완료로 기록하지 않는다. 이후 마감 기록·예약 재개 취소 후 이번 실행을 종료하며 M4는 시작하지 않는다.
+
+## 2026-09-08 10:13 KST — 로컬 커밋 완료·공개 게시 승인 대기
+
+- 실행 상태: **대기**. 검증·역할 기록 11개를 로컬 `822b4ce1d6c78695e87ac7883e8577b066e03aea`로 커밋했다. 제품 tree는 불변이며 QA 최종 APPROVE·리더 승인도 완료됐다. 이어서 시도한 기존 공개 origin feature push는 새 검증 기록의 구체적 공개 전송 승인 부족으로 자동 승인 검토에서 거절됐다. 원격 `08239e0`, 로컬 ahead/behind 1/0이며 실제 푸시·Ready·merge는 없다.
+- 이 거절을 우회하지 않고 사용자에게 팀 STATE/WORKLOG·QA·M3/JOURNAL 11개 파일의 공개 게시 승인을 요청한다. 아직 공개하지 않은 최종 PR 본문도 보류한다. 재개 시 현재 문서 변경·로컬/원격 SHA를 다시 확인한 뒤 승인된 범위만 이어간다. M3 마감이 종료점이며 M4는 시작하지 않는다.
+- `zeroverse-m3` heartbeat를 실제 도구로 갱신해 UI 확인 대기 대신 공개 게시 승인 대기로 바꿨다. ACTIVE 상태를 확인했고 명시 승인 전 푸시·PR 신규 공개·merge 재시도/우회 금지, 변화 없을 때 무알림을 유지한다. 역할 소유자가 최종 STATE/WORKLOG를 같은 상태로 맞춘 뒤 사용자 입력 대기로 전환한다.
+
+## 2026-09-08 10:43 KST — 사용자 m4 요청·독립 기획 심의 시작
+
+- 실행 상태: **진행(준비·심의)**. 사용자 `$project-lead m4`가 이전 M3 마감 후 종료 경계를 대체했다. 과거 기록은 보존하고 현재 M4 준비를 시작한다. 이번 요청을 미승인 공개 게시나 신규 M4 세부 계약의 승인으로 해석하지 않는다.
+- brief 결과: `feature/M3-categories` 로컬 `822b4ce`, 원격/PR `08239e0`; 실제 PR #9 OPEN/Draft, base dev, MERGEABLE, mergedAt null. M3 QA APPROVE는 유지하며 전체 통과 테스트를 반복하지 않았다. 11개 공개 기록 push 차단은 여전히 미해소다.
+- 리더가 REQUIREMENTS FR-POST/UPLOAD·NFR, PRD 상세/DoD, 디자인 post/write 원본, V1/카테고리 lock/FE scaffold를 직접 대조해 `docs/worklog/M4-posts.md`와 `docs/governance/meetings/M4-20260908-posts.md` v1을 작성했다. 파일 작성자는 리더 단독이다. 제품 코드·의존성·DB·브랜치는 변경하지 않았다.
+- `/root/m4_product_review`, `/root/m4_architecture_review`, `/root/m4_delivery_review`에 동일 §1~4 v1/근거 목록을 배포해 읽기 전용 독립 1회 심의를 배정했다. 상호 연락·중간 결론 공유·파일 편집 금지. `/root/m3_state_pm`은 PM STATE/WORKLOG/PM-M4-readiness의 최신 요청 정합화만 담당한다.
+- Q1 글 저장/조회, Q2 이미지 unique·24h ledger, Q3 에디터/정화, Q4 이미지 크기/공개성, Q5 화면 단계 구분은 권고(미확정). 공개 S3 이미지와 비공개 글 접근제어의 차이, PUT 크기 보장 미검증은 별도 위험으로 드러냈다. ponytail 원칙으로 기존 blog lock·UI·TagInput·TipTap3 내장 Link/Underline을 재사용하는 안이며 자체 sanitizer/parser/signer를 제안하지 않았다.
+- 기존 heartbeat `zeroverse-m3`를 중복 생성 없이 `ZeroVerse M4 이어가기`로 실제 갱신, ACTIVE 확인. M3 공개 승인 금지 경계를 유지하고 새 M4 준비 범위·미확정 계약 보류·변화 없으면 무알림을 저장했다. 다음 행동은 독립 결과 검증·종합과 필요한 사용자 결정 요청이다.
+
+## 2026-09-08 10:53 KST — M4 심의 완료·정책 결정 대기
+
+- 실행 상태: **대기(권한·계약)**. 세 독립 reviewer 보고를 모두 받은 뒤 리더가 중요 근거를 직접 확인했다. Product/Delivery는 A 진행 방식에 조건부 찬성·HIGH(확신도88/91), Architecture는 동일 조건부 권고이나 현재 계약 전체 BLOCKED(92). 다수결·확신도로 승인하지 않고 실제 정본 충돌·DB/보안 미결 근거로 회의 최종 BLOCKED를 기록했다.
+- 직접 정정: FR-BLOG-02의 slug 목록과 FR-POST-04의 id 목록은 모두 필수다. v1의 slug-list 생략 권고는 철회하고 기존 두 경로/공통 로직 방향을 §6에 기록했다. JWT filter가 claims만 사용함도 확인해 M4 쓰기 ACTIVE/soft-delete 검증을 인수 조건으로 추가했다. 기존 사용자 정본·제품 소스는 수정하지 않았다.
+- 사용자 입력: 비공개 S3+권한 확인 후 만료 이미지 URL(권고)과 기존 공개 URL 위험 수용 중 선택 요청을 남겼다. 선택은 후속 정확한 계약의 입력이지 M4 일괄 구현 승인이 아니다. ledger 보유/cleanup/rotation, 콘텐츠 JSON/HTML 한도·일치, 실제 PUT 크기·MIME·재사용 보장도 승인 전 미결로 남겼다.
+- 산출물: M4 회의 §5~6에 세 독립 결과·가장 강한 반론·실패 경로·필수 조건, 결정 레지스터 BLOCKED, RISK-0010(이미지 권한)·0011(조회 ledger), M4 worklog에 검토 결과를 기록했다. PM은 자신의 STATE/WORKLOG/readiness를 같은 최종 상태로 맞춘다. BE/FE/QA는 구현 배정이 없으며 기존 역할 스냅샷의 과거 M3 종료 경계는 이 최신 사용자 요청/리더 기록으로 대체된다.
+- Git/검증: M3 검증 버전 `822b4ce` 유지. 신규 M4 문서는 로컬 준비 자료로만 두며 기존 11개 공개 게시 승인에 자동 포함하지 않는다. 제품 diff 없음, 문서 링크 검사/공백 검사 exit0. commit/push/merge·새 의존성·DB 변경·M4 branch는 하지 않았다. 새로운 사용자 선택·구체 승인 전 영향받는 작업을 진행하지 않으며, 변화 없는 대기를 로그/테스트로 채우지 않는다.
+- 리더 후속 검증: PM 최종 STATE/readiness의 BLOCKED·두 정본 경로·미승인 계약, WORKLOG append와 링크 정정 기록을 실제 파일로 확인했다. 최종 `git diff --check` exit0, 제품 diff 없음. 준비 배정 4개(독립 검토3/PM1)의 결과를 모두 수령했고 남은 구현 배정은 없다. heartbeat는 최종 BLOCKED·이미지 선택·M3 공개 승인 대기로 갱신해 ACTIVE 확인했다.
+
+## 2026-09-09 09:07 KST — 명시 승인 수령·M3 게시와 M4 계약 보완 배정
+
+- 사용자 원문 `그렇게 해줘`는 직전 요청한 두 범위, 즉 공개 저장소 `0-virus/zero-verse`에 M3 기록 11개와 검증 요약을 게시하고 PR #9를 dev에 머지하는 일, M4 비공개 S3에서 글 열람권한에 맞춰 이미지를 제공하는 방향의 세부 계약 보완을 승인했다. 이전 공개 전송 차단은 이 새 명시 승인으로 해소됐다.
+- 리더 배정: 고정 커밋 `822b4ce1d6c78695e87ac7883e8577b066e03aea`만 기존 feature에 push하고 검증 요약을 공개한 뒤 정확한 HEAD/base dev를 확인해 Ready/merge한다. 미커밋 M4 초안과 이후 혼합 기록은 이 공개 payload에 포함하지 않는다. 실제 merge 확인 전 완료를 기록하지 않는다.
+- M4 방향 선택은 세부 API/DB/보안/의존성·제품 구현 일괄 승인이 아니다. 새 상세 계약과 필요한 독립 심의/승인 후 구현한다. 실제 dev merge 뒤 M4 분기하며, 공유 checkout의 모든 기존 변경을 보존한다. 기존 heartbeat도 새 승인 경계로 실제 갱신해 ACTIVE 확인했다.
+
+## 2026-09-09 09:09 KST — M3 실제 dev 머지·M4 브랜치 전환
+
+- 승인된 `822b4ce`를 공개 origin의 기존 feature에 push하고 PR #9 검증 요약을 게시/Ready 전환했다(각 exit0). HEAD/base dev/CLEAN/MERGEABLE 확인 후 `gh pr merge --merge --match-head-commit 822b4ce…` exit0. 실제 PR 조회는 MERGED, mergedAt `2026-09-09T00:08:47Z`(09:08:47 KST), merge SHA `59badfe42d539a33091a387b9ee6119d838190b8`다. 원격 브랜치를 삭제하지 않았다.
+- fetch한 origin/dev의 제품·문서 트리는 고정 `822b4ce`와 동일했다. 기존 쓰기 에이전트가 완료 상태임을 확인하고 `git switch -c feature/M4-posts origin/dev` exit0으로 새 마일스톤 브랜치를 만들었다. 모든 기존 미커밋/신규/ignored 문서를 그대로 보존했으며 stash/reset/삭제 없이 전환했다. M4 초안은 공개하지 않았다.
+- 다음 배정은 승인된 비공개 이미지 방향의 상세 계약 작성과 독립 심의다. ponytail에 따라 기존 URL 필드·권한 predicate·S3 SDK를 우선 사용하고 별도 미디어 플랫폼/자체 서명기를 만들지 않는 최소안을 검토한다. 제품 구현·의존성 설치·DB 적용은 미착수다.
+
+## 2026-09-09 09:16 KST — M4 이미지 계약 역할 배정·정본 방향 반영
+
+- `/root/m3_state_pm`은 PRD §9/5.12/13.1과 PM 문서/상태에 승인된 방향 및 실제 M3 머지만 반영한다. `/root/m4_image_contract_backend`는 업로드·기존 URL 저장·소유권/동시성 기술 입력, `/root/m4_image_contract_frontend`는 실제 URL 소비처·canonical/display 분리·만료/실패 UX 입력을 조사한다. BE/FE는 자기 STATE/WORKLOG 외 편집 금지이며 초안 기여자라 최종 심의자가 아니다. 제품·Git 변경은 배정하지 않았다.
+- root는 REQUIREMENTS FR-UPLOAD-01 앞에 사용자 방향 결정을 명시하고 기존 영구 public_url/cdn_url 문구가 충돌하는 범위는 적용하지 않음을 추가했다. 과거 본문은 보존했다. 결정 레지스터에는 방향 승인만 별도 표시했고 RISK-0010은 상세/실측 미완료 때문에 OPEN 유지한다.
+- 외부 1차 자료에서 S3 서명 URL의 bearer/reuse/만료 경계, 조건부 PUT, 체크섬, 브라우저 Content-Length 자동 관리 사실을 확인했다. 외부 버킷 조작·실측·라이브러리 설치는 하지 않았다. 새로운 상세 계약만 같은 근거와 함께 3인 독립 심의할 예정이다.
+
+## 2026-09-09 09:29 KST — 이미지 v2 독립 심의 배정·M3 QA 마감 확인
+
+- PM/BE/FE 기술 입력과 `/root/m3_merge_audit_qa` 결과를 모두 받았다. root가 PM PRD §5.12/9.6/13.1의 방향 승인·상세 미확정·canonical/bearer 경계, 역할 기록과 QA 공개 payload/remote ref/tree 대조를 직접 확인했다. QA M3 delivery PASS이며 API 인증 실패를 공개 PR+Git remote 교차 검증으로 구분한 기록도 유지한다.
+- root가 새 이미지 v2를 회의 §11에 작성했다. FE의 canonical/display 분리와 기존 소비처 검증, BE의 thumbnail 교체 후 과거 binding 유실 반례를 반영했다. 현재 URL 검색만으로 영구 no-rebind를 보장한다는 초기안은 채택하지 않고 image_uploads 표1개·최초 연결 불변·asset 행 기반 정리로 보완했다. 이 선택은 HIGH 권고일 뿐 사용자 승인/제품 구현이 아니다.
+- `/root/m4_image_v2_product_review`, `/root/m4_image_v2_architecture_review`, `/root/m4_image_v2_delivery_review`에 같은 §11 v2 및 근거 목록을 배포했다. 모두 별도 신규 컨텍스트에서 1회 읽기 전용, 상호 연락/의견 공유/파일 편집 금지이며 과거 타 reviewer의 §5 의견도 읽지 않도록 했다. U0 실제 signed PUT/LocalStack 검증부터 진행할 정확한 범위와 잔여 위험을 심의한다.
+- 기존 제품 tree 불변, 문서 diff check exit0. 새 M4 문서는 로컬 준비 자료이며 외부 게시/새 PR/추가 commit은 아직 하지 않았다. 심의 결과와 필수 보완을 받은 뒤 필요한 상세 승인을 한 번 요청한다.
+
+## 2026-09-09 09:34 KST — U0 LocalStack 환경 조건 추가 확인
+
+- 공식 2026.03.0 발표/현재 설치 문서를 직접 조회해 2026-03-23 이후 통합 AWS 이미지에 auth token이 필요함을 확인했다. 단순 `latest` 무계정/무조건 무료 실행은 전제하지 않는다. 같은 사실과 출처를 진행 중 세 독립 reviewer에게 모두 전달했으며 다른 reviewer 의견을 공유하지 않았다.
+- 비밀값 출력 없이 LOCALSTACK_AUTH_TOKEN의 Process/User/Machine 존재만 확인해 모두 False였다. Docker 이미지/컨테이너 기본 조회는 sandbox 접근 거절이라 미확인으로 구분하고, 별도 허용된 읽기 전용 조회 exit0에서 `localstack/*` 이미지 및 해당 localstack/localstack 컨테이너 출력이 없음을 확인했다. 자격증명 저장소를 탐색하거나 기존 credentials를 읽지 않았다.
+- RISK-0012에 환경 gate를 추가했다. 현재 token 부재는 계정이 없다는 증거가 아니며 사용자가 다른 저장소에 보유했는지는 모른다. U0 상세 승인 외에 허가된 계정/토큰·사용 조건 또는 별도 승인된 환경 선택이 필요하다. 계정 생성/구매/임의 구버전·만료 우회/컨테이너 설치·기동은 하지 않았다.
+
+## 2026-09-09 09:52 KST — 이미지 v2 심의 종합·신규 권한/환경 입력 대기
+
+- 새 독립 Product/Architecture/Delivery 세 결과를 모두 수령했다. 각각 APPROVE_WITH_CHANGES·HIGH, 확신도88/88/90이며 A를 조건부 권고한다. root가 주요 현재 소스·SQL 근거를 직접 확인하고 회의 §12에 판정·가장 강한 반론·실패 경로·후속 조건을 기록했다. Delivery의 실제 파일 경로 두 오기는 확인한 경로로 정정했고 LocalStack 조회의 후속 실측을 구분했다.
+- 보완 권고는 익명/불량 토큰 구분, 실패 PENDING 유지와 complete 상태 역행 금지, HEAD checksum·멱등 삭제, legacy 전체 교체 DTO, PostImage active unique/참조 cardinality, 모든 renderer 및 5MB/10MB 충돌이다. 이것은 문서 초안이며 reviewer가 수정안까지 최종 승인한 것으로 기록하지 않는다. 역할별 기존 기술 입력은 당시 이력으로 보존한다.
+- 현재 실행 상태는 **대기(신규 승인·환경 입력)**. M3는 공개·dev 머지/독립 QA까지 완료했다. M4 전체 제품 계약은 BLOCKED이고, U0 로컬 검증만 USER_DECISION_REQUIRED로 별도 등록했다. SDK/Tika 검증 harness·허가된 LocalStack만 요청 범위이며 제품 API/DB/FE·AWS 운영/비용·M4 공개 게시는 포함하지 않는다. 계정 여부와 U0 승인이 필요하고 token은 채팅에 받지 않는다.
+- 모든 배정 완료, 제품 tree 불변, 신규 M4 commit/push/PR·설치·실측 없음. 같은 심의/통과 테스트를 반복하거나 무응답을 승인으로 취급하지 않는다. 기존 heartbeat는 최신 M3 완료·U0/LocalStack 대기로 갱신하고 변화 없으면 조용히 유지한다.
+
+## 2026-09-09 11:39 KST — 승인된 LocalStack 포트 오류 해결
+
+- 사용자의 `응 그렇게 해줘`는 직전 제안한 LocalStack S3 loopback 14566 기동·확인만 승인했다. root가 Windows 예약 범위 4474–4573 충돌을 확인하고 기존 다운로드 이미지 digest를 고정한 Compose 및 README/AGENTS를 작성했다. 사용자에게 알린 뒤 `lstk` 전용 자격증명 한 항목만 메모리에서 재사용했고 비밀값은 출력·파일 저장하지 않았다.
+- 기동 exit0/healthy, S3 running·라이선스 활성화, 버킷 수 read-only 조회 0/exit0, 실제 publish는 `127.0.0.1:14566 → 4566` 하나다. 기존 MySQL·Windows 예약/방화벽·제품·DB·실제 AWS는 그대로다. 상세 증거는 M4 회의 §13과 worklog에 기록했다.
+- `/root/localstack_startup_review`를 독립 읽기 전용 QA로 배정했다. U0 harness/SDK/Tika/bucket 쓰기·보안 실측·전체 M4 구현·새 공개 게시는 미승인·미실행이다. 로컬 로그인/기동만 해소했으므로 계정 질문을 반복하지 않는다. heartbeat는 이 승인 경계와 최신 증거로 갱신하며 변화 없는 대기는 조용히 유지한다.
+- 독립 QA 결과를 수령했다: 좁은 기동 설정 PASS, helper parser 오류 0, 비차단 운영 주의만 존재한다. root의 실제 health·포트·S3 조회 및 README/Compose 확인과 일치한다. 기존 heartbeat 실제 update 결과 ACTIVE이며 최신 로컬 gate 해소·U0 별도 승인 대기를 반영했다.
+
+## 2026-09-09 12:00 KST — U0 사용자 승인·진행 재개
+
+- 최신 `승인`은 직전 안내한 U0 안전성 검증만 승인했다. root가 brief로 기존 M3 완료/HEAD `59badfe`·제품 불변·LocalStack 기동 완료와 역할 준비 상태를 대조했다. 과거 PM/역할의 환경 미확보 문구는 최신 회의 §13~14를 적용한다.
+- `/root/m4_u0_backend`에 `gradle/u0/**` standalone SDK/Tika·private S3 harness, `/root/m4_u0_frontend`에 `frontend/u0/**` 실제 브라우저 File PUT, `/root/m4_u0_pm`에 PM 정본/승인 상태 동기화를 각각 단일 소유로 배정했다. 루트 제품 build·src·frontend/src·DB·실제 AWS·Git 전송은 배정하지 않았다. 새 검증 경로 소유권은 AGENTS에 명시했다.
+- root는 환경/출력·실제 브라우저 및 독립 최종 QA를 담당한다. 기존 Docker·wrapper 재사용, endpoint/자격증명 로컬 고정, 비밀값 비기록, 고유 테스트 자원 보존을 적용한다. 실행 상태 진행, U0 미통과이며 전체 M4/U1 계약은 여전히 BLOCKED다.
+
+## 2026-09-09 12:40 KST — U0 실제 브라우저 검증 후 IAM 보안 gate 대기
+
+- backend의 `gradle/u0`와 frontend의 `frontend/u0/index.html`을 root가 직접 빌드·실행·검증했다. 제품 경로/의존성/DB/실제 AWS는 불변이며 HEAD `59badfe`와 기존 dirty tree를 보존했다. 공식 SDK2.49.6·Tika3.3.2를 독립 검증에만 사용했다.
+- cache 권한 실패는 동일 명령 승인 실행으로 해소됐고, 테스트 WebP fixture 오류는 원 소유자가 고쳤다. root 자체 검사와 fresh bucket 실제 CUA File PUT 모두 19개 중18 PASS/서버28개 중27 PASS. unsigned private GET만200(expected403)으로 실패했다. 원시 signed URL/비밀값 출력·security 완화·구매·재생성·삭제는 없었다.
+- 구현과 분리된 `/root/m4_image_v2_product_review`를 재사용한 QA도 BLOCKED다. root는 실제 코드/보고의 FE method 오기 1건을 찾아 정정받았으며, MIME 위장 탐지와 제품 complete 검증은 구분했다. 상세 근거는 M4 회의§15·워크로그·qa/M4-u0-review.md에 남겼다. PM/BE/FE는 자신의 최신 상태에 실측을 반영한다.
+- 실행 상태 **대기(로컬 IAM enforcement 지원·재생성 방식 선택)**. U0 승인 자체는 유지하지만 보안 gate 미통과, 전체 M4/U1 계약은 여전히 별도 미승인이다. 현재 라이선스의 지원을 비용 없이 확인하고 합성 테스트 데이터 초기화를 허용받아 재검증하는 안을 권고한다. 다른 emulator/실제 AWS/구매로 자동 확장하지 않는다.
+- 임시 Java harness는 종료·14567 listener0 확인. LocalStack S3는 running, 이번 고유 bucket2개/각8객체 보존. heartbeat는 기존 항목을 이 결과와 재개 조건으로 갱신하고, 변화 없으면 조용히 대기하도록 한다. 신규 Git commit/push/PR·통과한 전체 M3 재시험은 수행하지 않는다.
+
+## 2026-09-09 13:02 KST — 승인된 IAM 확인 완료·기능 미지원 대기
+
+- 최신 `응 진행해`는 비용 없는 IAM 지원 확인과 지원 시 식별된 U0 두 버킷/16객체 초기화·재검증을 승인했다. root는 brief·실제 Git/역할 상태를 대조하고 기존 라이선스를 정상 오프라인 검증했다. 12:55:48 KST exit0에서 cached license valid/basic IAM true, `localstack.platform.plugin/iam-enforcement` false였다. 설치 플러그인 ID·공식 기능표와 대조했으며 라이선스 원문·비밀값 비출력, 온라인 활성화/구매/우회 없음이다.
+- `/root/m4_image_v2_product_review`에는 기존 QA 보고·자기 STATE/WORKLOG 후속 검토만, `/root/m4_u0_pm`에는 PRD·PM 준비/상태 동기화만 단일 소유로 배정했다. 두 결과를 모두 받고 실제 파일을 확인했으며 QA는 BLOCKED 유지다. root는 회의§16·위험/결정·README·마일스톤 기록에 반영했다.
+- 재생성만으로 entitlement 제한을 해소할 수 없어 컨테이너·Compose·합성 자원을 그대로 보존하고 재시험하지 않았다. 실행 상태 **대기(무료 대체 검증 전략 또는 정식 기능 확보 방향 필요)**. U0 미통과, 전체 M4/U1·실제 AWS·대체 emulator·구매·공개 게시 미승인 유지. 기존 heartbeat는 지원 확인/초기화 승인을 재요청하지 않도록 갱신하고 변화 없으면 조용히 유지한다.
+
+## 2026-09-09 13:55 KST — 사용자 정지
+
+- 사용자 `일단 중지`에 따라 연속 지휘·새 배정·재시도·Git 작업을 중지했다. 기존 heartbeat `zeroverse-m3`의 실제 update 결과는 **PAUSED**이며, 하위 에이전트 4명은 모두 completed로 실행 중인 배정이 없다.
+- 기존 파일·컨테이너·합성 데이터는 변경/삭제하지 않았다. U0는 IAM enforcement 라이선스 gate로 BLOCKED 유지한다. SeaweedFS·지원 플랜·실제 AWS는 대안 설명만 했으며 실행 승인/전환은 없다. 사용자 명시 재개 전 자동 재개하지 않는다.
+
+## 2026-09-23 KST — 재개·비용 없는 U0 대체안 조사 완료
+
+- 사용자 명시 재개에 따라 heartbeat를 ACTIVE로 되돌리고, backend/frontend/qa/pm 네 역할에 무료 대체 검증기를 읽기 전용으로 독립 조사시켰다. root는 공식 프로젝트 문서·보안/호환 자료와 현재 U0 실패를 대조했다. 파일 설치, 컨테이너 전환, bucket/object 변경, 제품 구현, Git 게시 없이 조사만 완료했다.
+- 리더 단일 권고는 **SeaweedFS 4.47.0 `weed mini`를 U0 전용으로 고정하고 기존 AWS SDK/Tika와 브라우저 페이지를 재사용**하는 안이다. 인증 identity를 명시해야 하며, provider-neutral 19-case 보안/전송 검증을 실측한다. AWS 전용 Public Access Block/Ownership Controls는 동등성으로 포장하지 않고 별도 항목으로 남기며 실제 AWS U1도 유지한다.
+- RustFS 1.0.1은 2순위 fallback, MinIO/Garage/AWS Free Tier/자체 프록시는 유지보수·호환·비용 보장·시험 대상 오류 때문에 제외했다. U0/M4/U1 BLOCKED는 변함없고 SeaweedFS 전환·재시험은 새 사용자 승인 전 수행하지 않는다.
+
+## 2026-09-23 KST — U0-ALT 명시 승인·실행 배정
+
+- 사용자 `승인. 내가 할 일을 알려줘.`로 SeaweedFS U0 전용 설치·재시험을 승인했다. 사용자가 지금 할 일은 없다고 안내했다. `/root/u0_alt_backend`는 `gradle/u0/**` 고정 SeaweedFS profile, `/root/u0_alt_frontend`는 `frontend/u0/index.html`의 두 정확한 origin과 카피, `/root/u0_alt_pm`은 승인 정본을 담당한다. 각자 자기 상태/기록만 함께 갱신하며 root는 환경/최종 실측/통합 기록을 맡는다.
+- native 공식 `4.47` ZIP 해시 검증 완료. 기존 LocalStack 보존을 위해 SeaweedFS는 loopback `14568`로 실행하며 인증 identity를 명시하고 telemetry/WebDAV/Admin UI/추가 catalog는 비활성화한다. U0 기대값·제품 계약은 그대로다. 현재 상태 진행, 최종 QA/통과 여부 미확정이다.
+
+## 2026-09-23 KST — U0-ALT 실측·후속 대기
+
+- root 실측은 Java19/19CASE·27/28VERIFY/exit1, fresh CUA browser18/19CASE·27/28VERIFY다. PAB501 미지원, 브라우저over-max fetchTypeError/CORS가 남아 전체U0 BLOCKED다. 무서명GET403 개선은 확인했으나 무료완전대체통과로보고하지않는다. 제품U1과실제AWS는서로다른미실행범위다.
+- mini관리gRPC wildcard노출발견즉시종료→server모드8listener loopback확인,볼륨수4소진→16확대후fresh브라우저를사용했다. 실패이력과정확한최종소스해시/증거는M4worklog·회의§18에기록했다. backend/frontend/pm은자기정본·상태,별도QA는검토문서를동기화한다.
+- 임시harness/SeaweedFS모두종료,14567/14568listener0·data존재True.새합성bucket4개/객체0·8·0·8보존,삭제없음.실행상태는대기(현재대체검증결과확인·후속방향),사용자에게요구할가입/키/결제/설정없음.같은실패시험을반복하거나검증완화/유료전환/제품구현으로범위를넓히지않는다.
+- 네 역할의 최종 보고를 수령한 뒤 실제 상태·QA 문서·출력을 직접 확인했다. QA도 전체 U0 BLOCKED다. 최종 문서 공백 검사 exit0, 제품 경로 diff 없음. 기존 heartbeat는 이 결과와 조용한 후속 대기 상태로 실제 갱신했다.
+
+## 2026-09-23 KST — U0 잔여 두 문제 해결 재개
+
+- 사용자 원문 `두 문제 해결을 먼저 수행해줄래?`에 따라 PAB HTTP501과 브라우저 초과 파일 TypeError의 원인 조사·최소 수정·재검증을 재개했다. 제품 U1/실제 AWS/비용/계정/기준 완화/공개 Git 게시로 확장하지 않는다. 신규 provider 또는 vendor patch가 필요하면 구체적인 근거와 별도 결정 범위를 먼저 제시한다.
+- root가 기존 공식 SeaweedFS4.47 동일 설정/보존 data로 PID26068을 기동했으며 8개 수신 포트 모두 127.0.0.1을 확인했다. backend는 PAB 공식 소스와 지원 경로, frontend는 전송 실패 원인을 병렬 조사한다. runtime/CUA는 root 단독 관리하며 소유 파일 외 변경과 기존 데이터 삭제는 금지한다.
+- 새 브라우저 재현은 CASE18/19·VERIFY27/28이다. 같은 manifest의 초과 파일을 Origin 포함 HTTP 요청으로 진단하면 403 SignatureDoesNotMatch, 정확한 Access-Control-Allow-Origin, Connection:close를 받는다. 브라우저 응답 실패를 단순 CORS 설정 누락이라고 확정하지 않으며, raw HTTP403을 브라우저 PASS로 대신하지 않는다. 현재 진행 중, U0 BLOCKED 유지.
+
+## 2026-09-23 KST — U0 두 문제 진단 종료·범위 결정 대기
+
+- PAB official4.47의 route는 존재하지만 세 handler가 무조건 ErrNotImplemented다. latest지원 구현도 찾지 못했다. 올바른 수정에는4flag영속화와ACL/policy쓰기·읽기enforcement가필요하며단순metadata응답/skip은해결이아니다.
+- root가 fresh manifest의기존fetch18/19·VERIFY27/28뒤동일File/signedheaders의독립XHR진단을실행했다. XHR도status0/error/headers미수신이었다. API교체해결안은입증되지않았고,serverearly403/Connectionclose와Go미소비body종료경로가강한후보이나browserTCPreset직접증거는없다. 두문제모두미해결/U0BLOCKED를유지한다.
+- 임시XHR코드는실험후frontend가자기추가분만제거한다. runtime은root가종료(harness81971,weed25292;앞선26068도없음),14567/14568LISTENING0,dataTrue,C UA임시탭닫음. 기존4bucket+새2bucket(각8객체)총6개보존,삭제없음. 상세증거build/u0-seaweedfs-diagnostic-evidence.md·M4worklog·회의§19.1.
+- 현재범위에서완료할수있는해결책을확보하지못해후속결정대기다. 신규provider/vendor보안기능개발·proxy/실제AWS/비용/계정/검증완화/제품U1로자동확대하지않는다. 같은실패재시험·조사·승인요청을변화없이반복하지않는다. QA최종검토및역할문서동기화진행.
+
+- 후속 정리 완료: 네 역할 최종 보고와 독립 QA BLOCKED를 실제 파일로 확인했다. 임시XHR추가분 제거 후 HTML은FEBE910E…이며 과거B98C와byte동일확인은못했다. root jsdom 실제페이지self-check/버튼복원assert PASS(exit0),최종diffcheck0·제품경로diff없음·14567/14568LISTENING0. 현재clean해시와과거browser입력해시를구분해M4worklog/진단evidence에명시했다. 기존heartbeat갱신성공,후속범위결정전반복작업없이대기한다.
+
+## 2026-10-03 14:22 KST — 로컬 M4 완료 지시·계약 검토 재개
+
+- 사용자 `$brief 로컬에서 검증할 수 있는 수준이면 되니까 localstack 등은 제쳐 두고 m4 완료까지 달려`에 따라 root가 읽기 전용 brief를 수행했다. 기준 `feature/M4-posts`/`97567d9`, M3 dev 병합 완료, 시작 시 clean. 글 엔티티/API·Write/Edit/PostDetail 제품 기능은 아직 없으며 U0 실패가 제품 구현의 선행 차단 조건인 기존 상태를 최신 지시로 갱신한다. M5 이후는 이번 범위 밖이다.
+- 실행 상태 진행: 회의 §20 로컬 계약 초안을 작성하고 독립 `/root/m4_local_product_review`, `/root/m4_local_architecture_review`, `/root/m4_local_delivery_review`에 동일 안건을 읽기 전용 배정했다. `/root/m4_local_pm_sync`는 명시된 사용자 결정만 PM 정본에 반영한다. 기존 U0 실패 이력은 보존한다.
+- S3 계약 대체는 로컬 검증 기준 변경과 구분한다. 실제 multipart 로컬 파일 저장 방식과 S3 API 유지 중 선택을 사용자에게 요청했다. 초안 전체의 신규 API·DB·보안·의존성은 아직 승인으로 기록하지 않으며 제품 구현은 시작하지 않았다.
+- JDK21/Node22 확인. Docker 엔진 미기동을 확인해 설치된 Docker Desktop을 hidden으로 시작했으며 준비 상태 확인 중이다. 기존 데이터 삭제/LocalStack 재시험/외부 자원 생성은 하지 않았다. GitHub 읽기 API의 401은 로컬 준비와 분리한다.
+
+- 후속: 독립3인 모두 보고 완료, 회의 §20.5~20.6 보완·종합 기록. Product/Delivery HIGH 조건부, Architecture 새 전체계약 BLOCKED. 로컬 파일 업로드 안을 권고하며 사용자 선택을 기다린다. Docker 엔진 응답 exit0·실행 컨테이너 없음 확인. 제품 코드/DB/의존성 변경 없이 문서·환경 준비까지 보존하며 결정 후 구현 계획·역할 배정·독립 QA로 재개한다.
+
+## 2026-10-03 — 로컬 저장 방식 승인·구현 계획 작성
+
+- 사용자가 로컬 저장/업로드 API·권한과5MB유지·S3후속 질문에 `로컬 파일 저장으로 M4 완성`을 선택했다. 회의 §20.7에 정확한 승인 범위를 기록했다. 저장 방식 선택 대기는 해소됐으며 기존 U0 실패는 유지한다.
+- root는 기존 M4 worklog에 역할별 파일·API·테스트를 포함한 실행 계획을 작성한다. PM 기존 에이전트에 최신 결정만 정본에 동기화하도록 후속 배정했다. 제품 구현 전 계획 검토 단계이며 별도 계획 파일/작업트리/외부 서비스를 생성하지 않는다.
+
+## 2026-10-03 — 실행계획 yes 승인·역할 병렬 구현 시작
+
+- 사용자 `yes`로 기존 M4 worklog Task1~7과 backend/frontend 병렬·독립QA가 승인됐다. `/root/m4_backend_impl`에 src/Gradle Task1~3, `/root/m4_frontend_impl`에 frontend Task4~6, `/root/m4_qa_acceptance`에 qa Task7 인수준비를 배정했다. `/root/m4_local_pm_sync`는 승인 정본 동기화. root는 REQUIREMENTS/지침/README/.gitignore/governance/runtime과 최종 검증 담당이다. 공유파일별 단일작성자이며 Git은 root 최종 검증 후 수행한다.
+- root는 로컬M4요구·UPLOAD003/004·JSON원본 정책, `.local-data/` Git제외·운영경계와 결정/위험 레지스터를 동기화했다. GitHub 읽기조회는 sandbox 밖 정상인증으로 성공했고 M4 open PR은 없다. 기존의401은 현재 차단이 아니다.
+- 별도합성DB `zeroverse-m4-smoke-20261003-v2`를 mysql8.4/loopback13308로 생성했다. 최초 `zeroverse-m4-smoke-20261003` 시도는 PowerShell .NET 정적RNG API 미지원→credential미생성→MySQL init exit1이었고 원인을 확인해 instanceRNG·중단오류처리로 수정했다. 최초 빈컨테이너와 기존DB는 보존했다. 비밀값은 메모리/컨테이너 환경에만 전달하고 출력/파일/Git에 남기지 않았다. 실제 제품 인수는 아직 미실행이다.
+
+## 2026-10-03 16:07 KST — 구현 병렬 분할·조기 QA 수정 루프
+
+- root는 기존 backend를 잠시 중단해 아직 미착수 upload 경로를 확인한 뒤 `/root/m4_backend_upload`에 `domain/upload/**`와 upload 전용 테스트를 독점 배정했다. `/root/m4_backend_impl`은 즉시 재개해 post/content/tag/universe·공통 설정/오류·서비스 통합 및 backend STATE/WORKLOG 단일 작성을 유지한다. frontend·QA도 기존 배정을 이어간다. 기능 범위·사용자 승인 경계는 바꾸지 않았다.
+- `qa/M4-review.md` 조기 Task1/2 리뷰의 ACL/order/ledger/인접글/HMAC/동시성 증거 발견을 읽고 원 구현자에 전달했다. 콘텐츠 초기 보완은 정적 확인했으며 runtime/full test PASS는 아직 아니다. POST 생성은 기존 프로젝트 API 패턴에 따라 201 envelope로 조율했다.
+- root의 합성 DB와 Vite(`127.0.0.1:5173`, API target `127.0.0.1:8080`)가 실행 중이고 Chrome 첫 화면 로딩을 확인했다. API는 아직 시작하지 않았다. Git 제외 build 보조 스크립트의 구문 검사 및 합성 PNG 생성만 완료했으며 기존 사용자 데이터·파일은 보존했다.
+- 다음은 구현자 테스트/통합 인계 → root 실제 HTTP·브라우저·재시작 → 독립 최종 QA → 기록·명시 파일 커밋/푸시/PR이다. M4 완료나 S3 완료를 아직 주장하지 않는다.
+
+## 2026-10-03 — 로컬 기동·브라우저 작성 검증 진행
+
+- 실행 상태 `진행`. root는 예약 포트 충돌을 피한 API18080와 Vite5173에서 실제 작성/임시저장/재개/발행을 확인했다. 상세·근거는 M4 worklog 중간 검증에 기록했다. 현재 runtime snapshot `0E90FCBF...`은 최신 소스 전이므로 최종 재빌드/재시작 인수가 필요하다.
+- backend 원 작성자는 프로필 바인딩·UTC 응답 및 전체 테스트, upload 작성자는 컴파일·스토리지 검증, frontend는 전체 테스트 OOM 원인, QA는 smoke fixture 빈 배열을 각각 수정 중이다. 파일 소유권은 기존 배정을 유지한다.
+- 브라우저 파일 업로드 확장 권한은 사용자 선택 대기이며 임의 변경하지 않는다. HTTP·단위/통합 검증은 독립 진행한다. 전체 PASS·M4 완료·커밋/푸시는 아직 미실행이다.
+
+## 2026-10-03 17:20 KST — HTTP 첫 통과·전체 리뷰 수정 준비
+
+- 실행 `진행`. runtime389065.../API18080에서 QA HTTP script 전체 범위 exit0, 실제 PNG 익명 browser 렌더·바이트/파일 hash 일치를 root가 확인했다. FE28files/302tests 및 upload20tests/symlink 검사 통과 증거는 M4 worklog에 연결했다. 전체 BE suite는 원 작성자가 실행 중이다.
+- QA harness의 반복 fixture 오류는 fresh QA 컨텍스트 `/root/m4_qa_harness_fix`가 단일 파일을 보정했고 현재 인계 완료다. `/root/m4_whole_review`는 별도 읽기 전용 전체 리뷰를 수행하며 markdown 본문 유실 등 발견을 최종 목록으로 취합한다. 구현자 자기승인으로 대체하지 않는다.
+- 다음은 리뷰 발견을 backend/frontend 소유자별 수정 → 영향 회귀/전체 BE → 최신 snapshot HTTP/재시작/브라우저 → 독립 재리뷰 → 정본/기록 → 명시 파일 commit/push/PR이다. M5는 착수하지 않는다. 브라우저 파일 선택창 권한만 사용자 선택 대기이며 다른 검증을 계속한다.
+
+## 2026-10-03 — 브라우저 파일 업로드 검증 예외 승인
+
+- 사용자가 `브라우저 파일 업로드만 제외하고 API·자동 테스트로 검증해`라고 결정했다. Chrome 파일 URL 권한 대기를 해소하고 해당 설정은 변경하지 않는다. API·자동 업로드 테스트 및 실제 저장된 이미지의 브라우저 읽기/재시작 보존 검증을 유지한다. 전체 리뷰 R1~R8 수정은 계속 진행한다.
+
+## 2026-10-03 17:53 KST — 최종 회귀·재리뷰 진행
+
+- 실행 `진행`, 범위 M4 한정. root가 FE 보존 JSON28files/311tests/0failure·pending과 실제 브라우저 R1 본문보존/R4 초안전환/R5 DEFAULT 선택을 확인했다. 독립 검토자는 FE R1/R2방어/R4/R5/R6 해소, R7 ol CSS Minor 잔여를 반환했고 frontend가 소유 파일을 보완 중이다.
+- backend는 첫 전체419tests/1failure의 구 allowlist fixture를 보정하고 R3 SQL페이징/R8 부모삭제 및 content R2/R7을 통합했다. root가 관련 targeted 성공 로그와 SQL/page 소스를 직접 확인했으며 최종 전체/산출물은 대기다. QA `/root/m4_qa_closeout`이 과거 조기기록에 최신 증거 addendum을 작성했다.
+- 다음은 최신 JAR 재시작 → API/기존 이미지보존·콘텐츠 GREEN → 최종BE전체 및 독립 scoped 재리뷰 → 역할/리더 기록·명시파일 commit/push/dev PR이다. Git branch는 feature/M4-posts, HEAD97567d9, origin/dev59badfe 유지, 기존 M4 PR은 없다. 완료·머지 주장은 보류한다.
+
+## 2026-10-03 — 로컬 M4 최종 인수·Git 통합 준비
+
+- 실행 `진행`, 제품 인수 완료. BE426 tests/0failure·error·skip, FE311 및 후속영향40 PASS, 최종 D2B5 artifact의 Swagger201·기존 이미지해시 보존을 root가 확인했다. `/root/m4_whole_review` Ready to merge Yes/잔여0, `/root/m4_qa_closeout` 로컬M4 PASS다. 실제 증거는 M4 worklog 최종 리뷰와 qa/M4-review.md18:18을 따른다.
+- 역할별 문서를 최종 결과로 맞춘 뒤 명시112파일만 commit/push하고 feature/M4-posts→dev PR을 처리한다. 제품소스 변경은 종료했으며 기존 local데이터/개인설정/검증로그는 Git에서 제외한다. S3후속·브라우저파일선택예외·M5제외는 유지한다.
+
+## 2026-10-04 14:58 KST — M4 Git closeout 재개
+
+- 사용자 `계속`, 실행 `진행`. brief 재대조: feature/M4-posts HEAD97567d9/원격 동일, dev59badfe, M4 PR없음. 최종 제품소스 추가 변경 없음, JAR D2B5와 보존 BE426/FE311+후속40 PASS 일치. 최신 독립 QA는 로컬M4 PASS다.
+- PM 마지막 상태 문구 후속은 역할 모델 사용량 제한으로 종료됐다. 현재 쓰기 중인 역할은 없고 제한을 우회하지 않는다. 일부 역할STATE의 QA/runtime 대기 문구는 이전 시점이며 최신 M4worklog/QA가 이를 해소한다. 역할STATE·PRD 상태 문구에 한한 리더 갱신 권한을 별도로 요청했고 제품 인수와 분리한다.
+- 리더는 승인된 명시 파일 commit/push와 dev PR 통합을 계속한다. M5 및 S3/U0 확장, 데이터 삭제는 하지 않는다.

@@ -206,3 +206,201 @@
  - 경계: 이 브라우저 조작은 QA가 직접 수행한 것이 아니라 root 독립 evidence다. 이전 Chrome fixture blog 6/category 22가 GENERAL인 상태는 별도 fixture이며 성공 결과에 혼합하지 않았다. 오전 Chrome native DnD 시점의 zoom 90%(`innerWidth=1600`, `dpr=0.9`) 관측은 IAB 동작에 해당하지 않는다. IAB에는 viewport override를 설정하지 않았고 치수도 측정하지 않았으므로 1440 CSS 수치로 주장하지 않으며, 기존 native 1440 screenshot evidence만 유지한다.
 - 종합: 기존 BE 370 tests/XML 0 failure·error·skip, FE 273 tests/lint/build, JAR SHA-256, loopback smoke, V1→V2/SQL count·move/권한/OpenAPI, signup/setup/reload/session·keyboard/rename/duplicate/new-tab·1440px·native DnD 저장/notice/DB 재조회 근거와 이번 LOCKED confirm 저장/재조회 근거를 승인 정본 ADR-0005 Q1~Q4 및 FR-CAT-01~05/FR-SETTINGS-04에 대조했다. 새 critical/high finding은 없다.
 - 판정: **QA 최종 APPROVE.** M3 acceptance의 마지막 UI gate가 해소됐으며 root가 PR `OPEN/Draft/head=08239e0`의 remote scope 문장 `포함` 정정도 완료했다고 보고했다. root의 dev merge와 M3 `[머지]` 마감은 별도 후속이며, merge 완료로 기록하지 않는다. M4는 시작하지 않는다.
+
+## 2026-09-08 10:14 KST — M3 QA 완료·공개 게시 승인 대기
+
+- 상태 갱신: QA 최종 **APPROVE**와 기존 LOCKED/native DnD acceptance 근거는 유지한다. root 보고에 따라 제품 불변의 로컬 문서 커밋 `822b4ce1d6c78695e87ac7883e8577b066e03aea`가 생성됐고, 제품 기준 feature 원격 HEAD는 `08239e0`이다(local `ahead 1/behind 0`).
+- 잔여 delivery gate: 11개 문서 공개 전송을 포함한 `git push`가 사용자 승인 부족으로 거절됐으며, 현재 PR은 `OPEN/Draft`이고 push·ready·merge는 수행되지 않았다. 공개 게시 승인 후 root가 push·PR 상태 갱신·dev merge 및 M3 `[머지]` 마감 기록을 이어간다.
+- 범위: QA는 새 UI 조작·테스트·서버 검증·Git 조작을 수행하지 않았고 타인 변경을 보존했다. M4는 시작하지 않는다.
+
+## 2026-09-09 09:20 KST — M3 공개 게시·dev merge 독립 마감 감사
+
+- 한 일: 헌법·QA 지침과 현재 STATE를 읽은 뒤 ADR-0005 `ACCEPTED`, REQUIREMENTS §6.4의 FR-CAT-01~05·FR-SETTINGS-04·M3 공통 계약, PRD §5.4·§10~§12, M3 worklog `[머지]`, `qa/M3-review.md` 최종 `APPROVE`를 직접 재대조했다. 사용자 `그렇게 해줘`로 승인된 M3 공개 게시·PR 병합 범위만 감사했으며 M4 제품 구현·새 계약 검토·테스트 재실행은 하지 않았다.
+- 검증: `git show --format=fuller --stat --summary 822b4ce1d6c78695e87ac7883e8577b066e03aea` exit 0, 11 files `+233/-46`; `git diff-tree --no-commit-id --name-status -r 822b4ce1d6c78695e87ac7883e8577b066e03aea` exit 0, 고정된 팀 상태/로그·QA review·M3 worklog 11개만 포함. `git diff --quiet 4fc9ae2 59badfe42d539a33091a387b9ee6119d838190b8 -- src frontend` exit 0, 출력 없음으로 승인 제품 tree 불변을 확인했다. merge tree에서 `M4|M4-posts|20260908-posts` 경로는 발견되지 않았다.
+- 원격 증거: `git ls-remote origin refs/heads/dev refs/heads/feature/M3-categories` exit 0에서 `dev=59badfe42d539a33091a387b9ee6119d838190b8`, feature=`822b4ce1d6c78695e87ac7883e8577b066e03aea`; `git ls-remote origin refs/pull/9/head refs/pull/9/merge` exit 0에서 PR head=`822b4ce1d6c78695e87ac7883e8577b066e03aea`; `git cat-file -t 59badfe42d539a33091a387b9ee6119d838190b8`는 `commit`을 반환했다. 현재 브랜치는 `feature/M4-posts`이고 기존 M4/운영 미커밋 변경은 보존되어 있다.
+- PR 증거: 공개 [PR #9](https://github.com/0-virus/zero-verse/pull/9) 페이지에서 `Merged`, `dev` ← `feature/M3-categories`, 2026-09-09 병합, Ready timeline과 merge commit `59badfe`를 확인했다. PR 본문도 11개 기록·검증 요약 게시와 M4 준비 문서 제외를 명시한다. `gh pr view` 직접 API는 인증 오류 `HTTP 401`(exit 1)이어서 API JSON을 읽었다고 주장하지 않고 공개 페이지·Git ref를 사용했다.
+- 산출물: `qa/M3-review.md`에 공개 payload/PR 상태/base-head/merge/tree 불변의 독립 마감 감사와 **PASS**를 append했다. `.claude/team/qa/STATE.md`를 `M3 MERGED / M4 계약 준비 중 / QA 제품 미배정`으로 갱신했다. 제품 코드·제품 테스트·타 역할 파일·Git ref는 변경하지 않았다.
+- 미해결: M3 차단 요인은 없다. M4 세부 계약 승인과 QA 명시 배정 전에는 제품 검증을 시작하지 않는다. loopback 합성 계정·브라우저 fixture는 정리하지 않았다.
+
+## 2026-09-09 12:37 KST — M4 U0 독립 QA 최종 검토
+
+- 한 일: 사용자 승인 §12.3·§14의 U0 범위만 대상으로 FR-UPLOAD-01~04, PRD §5.12·§13.1, 회의 §11.4·§11.5와 `gradle/u0/**`, `frontend/u0/**`, `compose.localstack.yml`을 읽기 전용 대조했다. 이번 U0 구현에는 참여하지 않았고 제품 API·DB·도메인·실제 AWS·구매는 다루지 않았다.
+- 검증 근거: root가 별도 실행한 fresh process/bucket과 CUA 브라우저의 결과를 대조했다. `compileJava`는 cache ACL 문제를 권한 승인 후 exit 0으로 통과했고, fixture 보정 후 **19 CASE 18 PASS/1 FAIL**, **28 VERIFY 27 PASS/1 FAIL**이었다. 정상 네 MIME·정확 5 MiB·경계·checksum/byte/type 변조·만료·replay 412·signed GET negative·bounded GET/HEAD/Tika·객체 부재·CORS negative는 통과했다.
+- 실패: `unsigned-private-get`가 실제 200(기대 403), `/verify`의 `unsigned-private-get-403`도 실패했다. `S3_SKIP_SIGNATURE_VALIDATION=0` 및 `S3_VALIDATE_SIGNATURES=1` 설정은 있으나 IAM authorization enforcement가 없어 signature validation과 private 권한이 분리되지 않았다. 브라우저 DOM도 `19/19 cases · 18 PASS · verify 27/28 PASS`를 재현했고 CORS TypeError는 없었다.
+- 정적 경계: MIME spoof는 raw PUT 거부가 아닌 Tika 탐지 경계이므로 제품 `complete`/UPLOAD validation 증거가 아니다. Java direct self-check의 `requestStatus`는 GET/PUT만 전송하고 CORS OPTIONS는 별도 helper로 검사하며 현재 manifest도 GET/PUT만 포함한다. 고유 `zeroverse-u0-` 자원, 기존 데이터 미삭제, signed URL/token 비출력은 root 보고와 최종 파일에서 확인했으며 QA는 재실행하지 않았다.
+- 판정/미해결: **BLOCKED (U0 PASS 아님), 확신도 99/100, 위험 HIGH/기밀성 CRITICAL.** 정식 지원·허가된 IAM authorization enforcement가 실제로 403을 증명하기 전까지 U0 완료·M4/U1 착수·보안 완화를 주장하지 않는다. 가입·구매·임의 구버전 pin·만료 우회·같은 key 재실행은 하지 않는다. 상세 근거와 필수 gate는 `qa/M4-u0-review.md`에 기록했다.
+
+## 2026-09-09 12:57 KST — U0 IAM 라이선스 진단 후속 독립 검토
+
+- 한 일: root가 제공한 12:55:48 read-only license 진단과 공식 [LocalStack Plans](https://docs.localstack.cloud/aws/licensing/), [IAM Policy Enforcement](https://docs.localstack.cloud/aws/developer-tools/security-testing/iam-policy-enforcement/)를 대조했다. 새 Docker/버킷/브라우저 실험, 설정·라이선스 파일 변경, 온라인 activate/request-new-license, 구매는 하지 않았다.
+- 사실: `GET /_aws/iam/config` 404만으로 미지원이라 단정하지 않는다. 설치된 `localstack_pro_core-2026.8.1.dist-info/entry_points.txt`의 `iam-enforcement` plugin entrypoint는 확인됐다. 메모리 오프라인 검증 exit 0 결과는 `cached_license_valid=true`, `iam_basic_allowed=true`, `iam_enforcement_allowed=false`였고 비밀·라이선스 원문·고객 식별자는 출력하지 않았다.
+- 판단: 공식 문서는 IAM Policy Enforcement가 기본 비활성이고 `ENFORCE_IAM=1`이 필요하며 Hobby에는 없고 Base/Ultimate 이상에 있다고 명시한다. 따라서 현재 차단은 플러그인 미설치가 아니라 **현재 cached license의 enforcement entitlement 미허용**으로 구체화된다. IAM 기본 API 허용은 enforcement 허용을 뜻하지 않는다. 계정 tier/license 원문은 독립 확정하지 않았다.
+- 범위/결론: 사용자 후속 승인에도 root는 U0 bucket 2개/객체 16개를 초기화·재생성하지 않고 보존했다. 기존 18/19·27/28 실측과 브라우저 결과 외 추가 시험은 없다. U0 판정은 **BLOCKED (PASS 아님), 확신도 99/100, HIGH/기밀성 CRITICAL** 유지다. IAM entitlement가 허가된 환경에서 fresh 자원 무서명 GET 403을 재현하기 전까지 U0/M4/U1 PASS·보안 완화·구매·우회 주장을 금지한다. 세부 후속은 `qa/M4-u0-review.md`에 append했다.
+
+## 2026-09-23 KST — SeaweedFS U0-ALT 최종 독립 QA
+
+- 한 일: 헌법·AGENTS·QA 지침·현재 STATE를 순서대로 다시 읽고, 사용자 명시 `$brief` 절차로 정본·회의 §17·M4 worklog·현재 U0 harness/page를 읽기 전용 대조했다. QA가 SeaweedFS 설치·서버/브라우저 실행·Git·제품 수정은 하지 않았고 root의 별도 실행/관측 산출물만 독립 검토했다.
+- 증거: 공식 native SeaweedFS 4.47 ZIP SHA-256 `8809359079e62fcd60574ff661449160899622c52072f3f569d346669079efe9`, Java `EA8D0D21161159638683D5CD7871F391578641F743AD9D12F45572DE98D75F6D`, HTML `B98C583B82C49F87EB08C30550624EADADF58DDE1F8F6CB86DF07EA014442EDE`를 파일 hash/관측 요약과 대조했다. `build/u0-seaweedfs-core-self-check.log`는 `19/19 CASE PASS`, `27/28 VERIFY PASS`, exit1이다.
+- SeaweedFS identity가 anonymous private GET `403`, signed GET `200/403/403`, OwnershipControls `BUCKET_OWNER_ENFORCED`, exact/wrong CORS `200/403`, checksum·HEAD/range/Tika·negative object absence를 통과시켜 LocalStack의 private GET 200 공백을 provider-local로 보완했다. broad `Admin/Read/Write/List/Tagging` synthetic identity이므로 least privilege 증거로 확대하지 않았다.
+- root browser evidence는 fresh bucket에서 `19/19 cases · 18 PASS · verify 27/28 PASS`다. unsigned private GET은 실제 `403`이나 `over-5mb-signed-at-max`는 `fetch TypeError/CORS`로 status 미노출이라 FAIL이다. `/verify` 유일 실패는 PAB `UNSUPPORTED HTTP501`이며, 객체 부재를 HTTP403 증거로 대체하지 않았다. TypeError 원인은 미확정이다.
+- 현재 harness는 SeaweedFS setup PAB/OwnershipControls의 `501`만 capability line으로 기록하고 VERIFY false/분모28/exit1을 유지한다. browser origin은 `14566`·`14568`만 허용하고 expected status/wildcard CORS는 완화하지 않았다. core log의 generic PAB detail은 최신 detail-only 소스 변경 전 출력이며 acceptance 변경이 아니다.
+- 잔여 위험: PAB 미지원으로 AWS Public Access Block을 증명하지 못하고, SeaweedFS emulator 결과를 IAM policy semantics·TLS·durability·lifecycle·STS/SSE/control-plane 또는 실제 AWS 보장으로 해석하지 않는다. server-v2 stderr의 STS signing-key/SSE/filer gRPC 경고도 운영 통과로 주장하지 않는다. U1은 실제 AWS가 아닌 제품 domain/FE vertical slice 별도 gate다.
+- 산출물: `qa/M4-u0-review.md`에 SeaweedFS acceptance matrix·필수 PASS/FAIL·AWS/U1 잔여 gate를 append하고, STATE를 최종 **U0 BLOCKED** 스냅샷으로 갱신했다. 최종 권고는 대체 provider를 더 늘리지 않고 SeaweedFS 4.47을 `U0-ALT/core` 부분 gate로 고정하는 것; PAB와 browser oversized status를 FAIL로 유지하며 실제 AWS/정식 지원 PAB·IAM 환경과 U1 검증을 별도 수행하는 것이다.
+
+## 2026-09-23 15:43 KST — 잔여 두 문제 후속 독립 QA
+
+- root의 `build/u0-seaweedfs-diagnostic-evidence.md`와 fresh harness/browser 결과를 읽기 전용으로 대조했다. 동일 manifest의 fresh Run U0는 다시 `18/19 CASE`, `27/28 VERIFY`였고, native XHR 비교는 `status 0 · event error · headers 미수신 · U0 판정 미변경`이었다. fetch를 XHR로 교체해도 readable reject status가 나오지 않으므로 API 교체 해결안은 기각한다.
+- 브라우저 증거 경계: raw HTTP의 `403 SignatureDoesNotMatch`·정확한 ACAO·`Connection: close`와 body 0 TCP 즉시 403은 서버 조기 서명 거절/연결 종료 가설을 강화한다. Go `net/http`의 큰 미소비 body close 규칙과도 부합하지만 browser TCP reset/error code는 확보되지 않아 exact root cause는 미확정이다. XHR의 ACAO/Connection 미관측은 CORS exposure 제한 때문에 헤더 부재를 뜻하지 않는다.
+- PAB 공식 소스를 동일 4.47 tag로 재확인했다. `s3api_server.go` L882–885에 route는 있으나 `s3api_bucket_policy_handlers.go` L424–435의 각 handler가 `ErrNotImplemented`를 반환한다. 이전 중간 보고의 route 부재 표현은 정정하며, 정확한 판정은 **route 존재·handler stub·HTTP501**이다. PAB VERIFY false/분모28/exit1은 유지한다.
+- 판정: 두 문제 모두 미해결, **U0 전체 BLOCKED**. raw 403·object absence·XHR status0은 browser PASS로 대체하지 않으며, expected status/manifest/negative 기준 완화·provider 합산·proxy/vendor patch/비용 전환을 하지 않는다. 전체 U0 재개 조건은 PAB 4 flag와 effective deny를 정식 지원하는 승인 환경 및 browser에서 readable `400/403`을 새로 확보하는 것이다. U1은 제품 도메인/FE gate, 실제 AWS는 별도 gate다.
+- 검증·보존: temporary XHR HTML hash `4E25BBC4E140F2F705899985896A0FDCE4D50825AE283CB879D7B58889AEB7C9`는 root 증거에 기록됐고, root가 진단 후 XHR 코드를 제거했다. Java harness hash `EA8D0D...`는 변하지 않았으며 서버/listener와 합성 data 보존 상태는 root가 확인했다. QA는 제품·타 역할 파일·runtime·Git을 변경하지 않았다.
+
+## 2026-10-03 13:43 KST — M3/M4 QA 산출물 commit-review 독립 대조
+
+- 범위: `qa/M3-review.md`, `qa/M4-u0-review.md`, QA `STATE/WORKLOG`, ADR-0005, `docs/worklog/M3-categories.md`, `docs/worklog/M4-posts.md`, M4 회의 §14~§19와 U0 core/browser/diagnostic evidence를 읽기 전용으로 대조했다. 제품 코드·타 역할 파일·Git ref는 변경하지 않았다.
+- M3 merge 증거는 `59badfe42d539a33091a387b9ee6119d838190b8`의 PR #9 merge commit/부모(`822b4ce`), 원격 `dev`, `feature/M3-categories`, PR head ref와 일치했고 `4fc9ae2..59badfe`의 `src`·`frontend` diff는 exit 0, merge tree의 M4 경로 match는 0이었다. ADR-0005 `ACCEPTED` 및 M3 `[머지]` 기록과 QA review의 PASS가 모순되지 않는다. M3 worklog 상단의 과거 `Draft PR #9` 문구는 append-only 역사 기록으로 보존한다.
+- M4 수치는 정본과 일치한다. LocalStack은 `18/19 CASE`, `27/28 VERIFY`; SeaweedFS Java core는 `19/19 CASE PASS`, `27/28 VERIFY PASS`, exit 1; fresh browser는 `18/19 CASE`, `27/28 VERIFY`; PAB는 `HTTP501`; native XHR은 `status 0/event error`; 최종 U0 판정은 모든 문서에서 `BLOCKED`다. 실제 core log는 19/19 CASE, 27/28 VERIFY·1 FAIL과 non-zero exit 1을 재확인했고 OwnershipControls는 PASS, PAB만 FAIL이다.
+- 정정 필요성이 명백한 STATE 사실은 발견하지 않아 판정·차단·잔여 위험은 유지했다. 다만 `qa/M4-u0-review.md:68`의 `PAB/OwnershipControls 결과를 false` 표현은 실제 log·STATE·worklog의 OwnershipControls PASS와 모호하게 충돌하므로 원문 수정은 담당자 판단으로 남긴다. `qa/M4-u0-review.md:3`의 Markdown hard-break trailing spaces 1건은 staged `diff --check`에서 확인할 항목이다.
+- 검증: M3 merge/tree/ref 확인 명령 exit 0, SeaweedFS core 집계 `19/19`, `27/28·1 FAIL`, exit marker 1, browser evidence `18/19·27/28`, diagnostic `XHR status 0`, tracked QA `git diff --check` exit 0. 제품 테스트·U0 재실행·browser 재조작·commit/push는 실행하지 않았다.
+
+## 2026-10-03 15:30 KST — M4 로컬 독립 인수계획·HTTP smoke 준비
+
+- 작업 전 `.claude/CONSTITUTION.md` → `AGENTS.md` → `.claude/team/qa/CLAUDE.md` → `.claude/team/qa/STATE.md` → `qa/AGENTS.md`를 순서대로 읽었다. `$brief` 절차로 branch/status/log, 네 역할 STATE·최근 WORKLOG, M4 worklog·회의 §20.1~§20.8, REQUIREMENTS FR-BLOG-02/FR-POST-01~08/FR-UPLOAD-01~04/NFR-02/04/06~09, PRD §4~7·§9.7·§10~§12, ADR-0005를 직접 대조했다.
+- 사용자 `로컬 파일 저장으로 M4 완성`과 worklog Implementation Plan에 대한 `yes`가 로컬 글/콘텐츠/DB/업로드/화면/QA 실행 기준임을 확인했다. S3/presigned/U0·실제 AWS/M5 이후는 별도 gate이고, M4 제품 구현·최종 PASS는 아직 미완료다. 기존 dirty `JOURNAL.md`, PM STATE/WORKLOG, M4 worklog/회의록은 변경하지 않았다.
+- `qa/M4-review.md`를 생성해 공유 HTTP DTO/envelope, owner·정방향 ACCEPTED·역방향 ACCEPTED·unrelated·anonymous 권한 매트릭스, draft/publish/soft delete/previous-next/tag/view ledger, XSS/JSON-image equality, local multipart/5MiB/MIME/purpose/rebind/detach/restart, FE/Swagger/build/design/README gate를 FR/NFR/회의/Task와 실제 증거 유형에 매핑했다. 24h 경계·동시성·재시작·늦은 Blob 응답은 API smoke가 대체하지 않는 미검증 항목으로 명시했다.
+- `qa/m4-api-smoke.ps1`를 생성했다. 기존 fixture 계정 credential만 메모리로 사용하고 M5 관계 mutation·SQL·runtime 기동/종료·cleanup을 하지 않는다. 실제 multipart PNG/JPEG/WebP/GIF, 정확 5MiB/초과/빈/위장, shared post DTO, XSS, 권한별 detail/list/tag/draft, image binary headers, purpose/rebind/external/detach/delete, 동일 anonymous view dedup을 검증하도록 작성했다.
+- 검증: PowerShell parser `PS_PARSE_ERRORS=0`, `git diff --check -- qa/M4-review.md qa/m4-api-smoke.ps1` exit 0, 산출물 파일 존재/핵심 marker 확인 exit 0. 제품 runtime/DB/API/FE 테스트는 제품 미완성 및 root 소유 경계에 따라 실행하지 않았다. 따라서 smoke PASS·M4 완료를 주장하지 않으며 다음은 구현 완료 스냅샷·fixture·실측 출력 수령 후 독립 실행이다.
+
+## 2026-10-03 15:36 KST — 공유 계약 대조 보정
+
+- root의 독립 대조에서 M4 회의 §20.1의 익명 비허용 상세 오류(`AUTH_004`)와 초기 fixture 표의 `POST_002`가 충돌함을 확인했다. `qa/M4-review.md`와 smoke의 익명 UNIVERSE 상세 기대값을 HTTP 401 `AUTH_004`로 수정했다. 잘못/만료 Bearer를 익명 강등하지 않는 보완 계약도 유지한다.
+- 이미지 snapshot의 중복·비연속 `displayOrder`는 입력 형식 검증 `VALIDATION_001`, owner/purpose/최초 binding/참조 불일치는 `UPLOAD_004`로 분리했다. smoke에 두 관리 이미지의 동일 order를 실제 400 `VALIDATION_001` gate로 추가했다.
+- 보정 후 PowerShell parser `PS_PARSE_ERRORS=0`, QA 소유 파일 `git diff --check` exit 0을 재확인했다. 제품 HTTP smoke는 아직 실행하지 않았고 M4 PASS를 주장하지 않는다.
+
+## 2026-10-03 15:40 KST — 생성 post soft-delete negative 경계 명시
+
+- root fixture 계획과 대조해 smoke의 삭제 범위를 명확히 했다. 기존 계정·기존 post·기존 파일·fixture에는 삭제를 수행하지 않는다. smoke가 스스로 만든 private post 1건만 승인된 `DELETE` soft-delete negative로 사용하고, detail 404 및 연결 image 제3자/owner 404를 확인한다. 물리 파일 삭제나 전체 cleanup은 수행하지 않는다.
+- 스크립트 주석과 `M4-review.md` 실행 경계를 위 내용으로 보정했다. 최신 parser `PS_PARSE_ERRORS=0`과 QA diff check exit 0은 다음 독립 실행 전 다시 확인 대상이며, 현재 제품 runtime/DB/API는 실행하지 않았다.
+- 최종 보정 후 fresh PowerShell parser `PS_PARSE_ERRORS=0`, `git diff --check` exit 0, 계약 marker(`AUTH_004`, `VALIDATION_001`, `UPLOAD_004`, `no-store`) 확인 exit 0을 기록했다. 이는 도구 정적 준비 증거일 뿐 제품 API smoke 실행이나 M4 완료 증거가 아니다.
+
+## 2026-10-03 15:54 KST — M4 Task1/2 조기 독립 코드리뷰
+
+- 한 일: 제품 소유권을 지켜 `src/main/java/com/zeroverse/domain/post/**`, `tag/**`, `universe/**`, `V3__posts_local_uploads.sql`, 대응 post/migration test만 읽었다. 기준은 `feature/M4-posts` HEAD `97567d9cae51869b1ad1f896bce3dc5be4f2c42c`였고, backend 생성 파일은 untracked 상태였다. 주요 파일 읽기 시각/mtime은 `qa/M4-review.md` 조기 리뷰 절에 고정했다. 제품 코드·타 역할 test·runtime·DB·Git은 수정/기동/조작하지 않았다.
+- 산출물: `qa/M4-review.md`에 Task1/2 조기 검토와 file:line/영향/수정방향/재판정 조건을 append했다. 정본 §20.1/§20.2·worklog Task1/2와 직접 대조해 (1) 익명 비공개 상세 `AUTH_004` 분기 부재, (2) 익명 `publish=false` 목록의 200 빈 결과, (3) 입력 `displayOrder` 중복/음수/비연속의 위치값 덮어쓰기, (4) 48h view cleanup 부재, (5) 접근 filter 전에 previous/next 20건 한정, (6) HMAC secret 고정 fallback을 Important 조기 FAIL/미구현으로 기록했다.
+- 알려진 backend 초안인 ContentService HTML 1MiB/root doc/attrs allowlist/table span/external image code는 리뷰 중 `PostContentService.java`가 재갱신된 최신 source readback에서도 반영을 확인했다. `PostContentServiceTest.java`가 의도를 담고 있으나 제품 테스트/HTTP는 실행하지 않았다. `PostConcurrencyTest.java` 부재와 `PostMigrationTest.java`의 schema 존재성 위주 검증은 독립 증거 부족으로 기록했다.
+- 검증: source 정적 readback과 `rg` 전체 검색만 수행했다. backend test/Gradle/API smoke/DB/browser는 제품 미완성 및 root 소유 경계로 실행하지 않았다. QA 산출물 변경 후 PowerShell parser 및 `git diff --check`는 다음 fresh 검증에서 재실행한다. 따라서 조기 FAIL/미검증 혼합이며 M4 PASS를 주장하지 않는다.
+- 미해결: backend 수정 후 fresh snapshot 재리뷰, root의 random runtime HMAC 주입 및 4계정 fixture, 실제 MySQL/HTTP/FE evidence가 필요하다. root 조율로 POST `/posts`·`/uploads` 생성은 201, PUT/DELETE는 200으로 확정했지만 현재 PostController/OpenAPI의 POST 200은 backend 수정 후 fresh JAR에서 확인해야 한다. 최종 acceptance는 별도 배정 전까지 보류한다.
+
+## 2026-10-03 16:01 KST — M4 Task1/2 최신 source 재확인
+
+- 최신 읽기 범위: backend가 계속 수정 중인 `PostService.java`(UTC mtime 06:57:56), `PostContentService.java`(06:56:13), `PostController.java`(06:38:39), 대응 post/migration test를 다시 읽었다. 원래 조기 보고한 ACL 익명 오류·draft owner filter·image order 검증·48h cleanup·previous/next 접근 탐색·HMAC fallback 7건은 현재 source에 정적으로 반영된 것을 확인했으며, 제품 test/Gradle/API/DB는 실행하지 않았다.
+- 잔여 Important: `PostService.java:389-400`은 동일 image URL을 `VALIDATION_001`로 거부하지만 회의 §20.1은 URL 중복 제거 후 최종 order를 연속 재번호하는 계약이다(`M4-EARLY-IMG-02`). 서로 다른 URL의 중복/음수/비연속 order를 `VALIDATION_001`로 구분하는 현재 방향은 유지하되, 동일 URL dedupe와 HTTP fixture가 필요하다.
+- 계약·증거 공백: root 조율상 POST `/posts`·`/uploads`는 201, PUT/DELETE는 200이어야 하나 현재 `PostController` POST 반환/OpenAPI는 200이다. 익명 private stale controller test, `PostConcurrencyTest` 부재, `PostMigrationTest`의 table/index 존재성 한정 검증이 남았다. 원래 `PostServiceIntegrationTest` 2 fail은 backend 조사 중이라는 root 보고 이후 QA가 재실행하지 않았다.
+- ContentService의 root doc/HTML 1MiB/attrs allowlist/table span/외부 image `UPLOAD_004`는 최신 source와 의도 test에서 정적 반영됐으나 실행 미검증이다. 조기 판정은 **정적 수정 확인 + residual FAIL + runtime 미검증 혼합**, M4 PASS 주장이 아니다.
+- 산출물 검증: QA 소유 문서·smoke만 수정했고 제품·runtime·DB·Git은 건드리지 않았다. 다음 fresh parser/diff/marker 확인 후 root에 최신 상태를 전달한다.
+
+## 2026-10-03 16:05 KST — M4 최신 변경 재독 정정
+
+- backend가 조기 리뷰 후 추가 생성·수정한 `PostConcurrencyTest.java`를 확인했다. concurrent 10→1, 24h boundary, 48h batch cleanup, adjacent access fixture가 있어 기존 “파일 부재” 판정을 철회하고, 실제 실행·DB 결과 미검증 및 `PostMigrationTest` 보존 검증 부족으로 `M4-EARLY-TEST-01`을 부분 보완 상태로 정정했다.
+- `PostController.java:51-63` 실제 POST `/posts` response는 201로 수정됐다. 다만 OpenAPI annotation은 `responseCode = "200"`으로 남아 있어 root 조율 계약(POST `/posts`·`/uploads` 201, PUT/DELETE 200)과 문서 정합성은 아직 미완료다. `PostControllerTest.java` 익명 private 기대값은 최신 source에서 `AUTH_004`로 맞음을 확인했다.
+- 제품 test/Gradle/API/DB는 실행하지 않았다. QA 소유 산출물만 갱신했고 M4 판정은 여전히 **정적 수정 확인 + URL dedupe residual FAIL + 실행 미검증**, PASS 아님이다.
+
+## 2026-10-03 16:08 KST — QA 산출물 최신 정적 검증
+
+- `qa/m4-api-smoke.ps1` PowerShell parser 결과 `PS_PARSE_ERRORS=0`이다. 생성·업로드 기본 기대 201, PUT/DELETE 200, 익명 비공개 `401/AUTH_004`, 서로 다른 URL의 동일 `displayOrder` `400/VALIDATION_001`, binding/purpose/external `400/UPLOAD_004`, 동일 URL dedupe 201·image 1개·order 0 기대가 문서·스크립트에 함께 존재하는지 marker 검사 `MISSING_MARKERS=0`으로 확인했다.
+- QA 소유 파일 `qa/M4-review.md`, `qa/m4-api-smoke.ps1`, `.claude/team/qa/STATE.md`, `.claude/team/qa/WORKLOG.md`에 대해 `git diff --check` exit 0을 확인했다(줄바꿈 경고만 출력). 제품 test/Gradle/API/DB/browser/runtime은 실행하지 않았다.
+- 최신 제품 source mtime은 `PostService.java 07:03:37.960Z`, `PostController.java 06:58:41.504Z`, 새 `PostConcurrencyTest.java 07:00:04.421Z`, `PostMigrationTest.java 06:45:12.474Z`이다. source는 계속 변할 수 있으므로 이 결과는 조기 재확인 스냅샷이며 M4 PASS가 아니다.
+
+## 2026-10-03 16:22 KST — M4 Task4 프론트 API·인증 이미지 조기 독립 코드리뷰
+
+- 범위: frontend 구현자가 계속 수정 중인 기준 HEAD `97567d9` + untracked snapshot에서 `lib/apiClient.ts`, post DTO/API/tests, `features/upload/**`, `apiClient.test.ts`, Avatar/PostCard/Prose와 auth identity·프로필·본문·thumbnail 소비처를 읽기 전용 대조했다. Task5 editor 전체 UI/디자인, backend 재리뷰, 제품 test/runtime/browser, Git 조작은 하지 않았다. 주요 UTC mtime과 범위는 `qa/M4-review.md` Task4 절에 고정했다.
+- 정본: worklog Task4, 회의 §20.3·§20.5, REQUIREMENTS 인증/업로드 canonical 계약을 적용했다. `apiClient.ts:106-236`의 FormData no-JSON-header·Bearer/credentials·401 single-flight·binary error, `ManagedImage.tsx:28-78`의 `src/userId` identity/늦은 Blob 무효화/revoke를 정적으로 확인했다. 전체 frontend `rg`에서 실제 `<img>`는 ManagedImage 한 곳이고 Prose/PostCard/설정/상세/Hero/PostEditor 소비처가 공통 경로를 사용한다. 최신 `uploadApi.ts:34-53`에서 기존 prefix resolver 문제도 해소됐다.
+- Important `M4-FE-EARLY-CANON-01`: `uploadApi.ts:24-31`이 upload response `imageUrl`을 canonical 검증 없이 반환하고 PostEditor(`:186-207`)·Settings(`:222-228`)가 저장한다. Settings 자유 `profileImageUrl` input(`SettingsProfilePage.tsx:479-485`)도 update payload(`:310-316`)로 임의 external/blob/data/비정상 URL 쓰기를 막지 않아 §20.3의 canonical-only·legacy external read-only 경계가 FE에서 강제되지 않는다. 응답 malformed negative 및 자유 입력 테스트도 없다. canonical validator, 자유 입력 제거/읽기 전용·managed upload-only, negative tests와 실제 HTTP가 필요하다. 실제 서버 거부 여부는 미실행이다.
+- 판정: Critical 발견 없음. ManagedImage stale Blob/userId guard·revoke, external URL no-Bearer, FormData/401 계약은 정적 수정 확인이지만 실행 증거가 아니다. 제품 FE test/lint/build·backend/API/DB/browser는 실행하지 않았고 M4 PASS를 주장하지 않는다. `STATE.md`와 `qa/M4-review.md`에 동일 판정과 다음 재검증 조건을 반영했다.
+
+## 2026-10-03 16:34 KST — HTTP smoke New-ImageBytes primitive-array harness 수정
+
+- root `build/m4-run-http-acceptance.ps1` 첫 HTTP acceptance가 합성 4계정·관계·signin/default category 뒤 `New-ImageBytes`의 `[Buffer]::BlockCopy`에서 제품 HTTP 단계 전에 중단됐다. QA는 동일 `switch` 자료 흐름을 Windows PowerShell 5.1에서 재현해 `byte[]`가 `System.Object[]`로 열거되고 primitive-array 예외가 나는 원인을 확정했다.
+- QA 소유 `qa/m4-api-smoke.ps1:316-329`만 수정했다: 빈 byte[] 단일 반환, `[byte[]]$seed` 명시 캐스팅, 큰 결과 `return ,$bytes` 단일 반환. 제품 소스·runtime·DB·root harness·기존 합성 데이터는 변경하지 않았다.
+- AST로 해당 순수 함수만 추출해 4 MIME/128 bytes·0·정확 5MiB·5MiB+1을 검증했다. `PURE_IMAGE_CASES=7`, `PURE_IMAGE_BAD=0`, 모두 `System.Byte[]`·기대 길이였고 parser `PS_PARSE_ERRORS=0`, smoke diff check exit 0이었다. HTTP/API PASS는 아니다.
+
+## 2026-10-03 16:36 KST — HTTP smoke 빈 byte[] parameter binding harness 수정
+
+- root 2회차가 4종 정상 업로드·익명 거부 후 빈 파일 검증에서 `Upload-Image`의 `[Parameter(Mandatory)][byte[]]$Bytes` binding 오류로 중단됐다. `[AllowEmptyCollection()]`이 없는 mandatory byte[]가 길이 0 배열을 거부하는 최소 재현을 확인했다. 하위 `Invoke-Request`의 기존 `[AllowNull()][byte[]]$FileBytes`는 별도 binding 재현에서 통과했다.
+- QA 소유 `qa/m4-api-smoke.ps1:396`의 `Upload-Image.Bytes`에 `[AllowEmptyCollection()]`만 추가했다. 실제 `Upload-Image` AST를 HTTP stub과 함께 호출해 `UPLOAD_EMPTY_BINDING=PASS`를 확인했고, 앞선 7개 primitive/size 경계도 `PURE_IMAGE_BAD=0`으로 재검증했다. 전체 parser `PS_PARSE_ERRORS=0`, smoke diff check exit 0이다.
+- 제품 HTTP/DB/runtime은 재실행하지 않았다. root가 다음 단일 HTTP smoke에서 제품 빈 파일 `400/UPLOAD_002`까지 도달하고 이후 전체 결과를 새로 제공해야 하며, 현재 M4 PASS가 아니다.
+
+## 2026-10-03 16:52 KST — HTTP smoke duplicate URL fixture order 분리
+
+- root 3회차는 5MiB 정확/초과·4 MIME·서로 다른 URL의 duplicate order `400/VALIDATION_001`까지 실제 HTTP로 통과했지만, dedupe fixture가 동일 URL의 raw `displayOrder=7,12`를 보내 정본의 연속 raw-order 입력을 위반해 `400/VALIDATION_001`을 받았다. 이는 제품 dedupe 실패가 아니라 QA fixture 순서 오류다.
+- `qa/m4-api-smoke.ps1:651-652`를 동일 URL의 유효 `displayOrder=0,1`로 수정하고 `:659-664`에 서로 다른 URL raw `7,12 → 400/VALIDATION_001` negative를 별도 추가했다. URL first-occurrence dedupe와 raw-order 검증을 분리했으며 backend acceptance를 완화하지 않았다.
+- PowerShell 5.1 pure test에서 `New-Post` body image 배열 count/index가 `2/0,1`로 유지되고, 단일 JSON image의 `Get-PostImages`도 `System.Object[]`, count 1, index0 order0이 되도록 `:533-535`를 단일 배열 반환으로 보정했다. 제품 HTTP/DB/runtime는 수정 후 실행하지 않았다.
+- 전체 parser와 QA diff check는 다음 fresh check에서 재확인해야 하며, root가 수정 보고 후 `127.0.0.1:18080` 단일 smoke를 재실행해 dedupe `201/1개/order0` 및 raw `7,12 → 400`을 확보해야 한다. 현재 M4 PASS가 아니다.
+
+## 2026-10-03 16:58 KST — HTTP smoke helper 빈 배열 binding 일괄 보정
+
+- root 4회차가 제품 HTTP 이전 이미지 없는 글의 `@()` 입력에서 `Images` empty-array binding 오류로 중단됐다. 최소 재현에서 `New-ContentJsonWithImages.ImageUrls @()`도 동일 오류를 냈다. 이미지 없는 글/본문/스냅샷의 빈 배열은 승인된 제품 계약이다.
+- QA smoke AST의 배열 parameter 8개를 전수 audit하고 `[AllowEmptyCollection()]`을 적용했다: `Invoke-Request.FileBytes`, `New-ContentJsonWithImages.ImageUrls`, `New-Post.TagNames/Images`, `Assert-ContainsId/Assert-ExcludesId.Items`, `Update-PostSnapshot.Images`. `Upload-Image.Bytes`는 이전 회차 수정으로 이미 포함돼 있다.
+- PowerShell 5.1 pure 검증에서 New-Post body tags/images 0·1·2, content image nodes 0·1·2, update images 0·1·2가 통과했다. `ARRAY_PARAMETER_COUNT=8`, `ARRAY_PARAMETER_MISSING_ALLOW_EMPTY=0`, `PURE_EMPTY_ARRAY_CASES=PASS`. 제품 HTTP/runtime/DB는 실행하지 않았다.
+- parser/diff fresh check 후 root가 다음 단일 smoke를 실행해야 한다. 이미지 없는 글 API 결과, dedupe `201/1개/order0`, raw non-contiguous `7,12 → 400`은 아직 미실측이며 M4 PASS가 아니다.
+
+## 2026-10-03 17:49 KST — M4 중간 인수 증거 재대조·최종 게이트 보류
+
+- 한 일: `.claude/CONSTITUTION.md` → `AGENTS.md` → `.claude/team/qa/CLAUDE.md` → `STATE.md`를 순서대로 읽고, `qa/AGENTS.md`, PRD §9.7, 회의 §20.8, `docs/worklog/M4-posts.md`, REQUIREMENTS의 M4 FR/NFR, ADR-0005와 기존 `qa/M4-review.md`를 직접 대조했다. 기존 기록은 삭제·덮어쓰지 않고 최신 addendum만 append했다. 제품 코드·타 역할 테스트·runtime/DB/browser fixture·Git은 변경하지 않았다.
+- 사용자 결정 **“브라우저 파일 업로드만 제외하고 API·자동 테스트로 검증해”**를 인수 범위에 반영했다. Chrome 파일 URL 권한을 확대하지 않으며 실제 파일 선택·전송 자동화만 제외한다. multipart API/FE 자동 업로드, 로컬 파일 저장, 이미지 접근권한·5MiB, 브라우저 이미지 표시·재시작 보존은 유지하고, 실행하지 않은 파일 선택을 PASS로 기록하지 않는다.
+- `build/m4-frontend-final-results.json`을 직접 `ConvertFrom-Json`으로 집계했다: `success=true`, 89 suites/311 tests, passed 89/311, failed 0, pending 0. root가 전달한 frontend WORKLOG의 최종 lint/build exit 0과 함께 기록했으나 backend 통합·독립 재리뷰 전 FE 전체 M4 PASS로 확대하지 않았다.
+- root가 제공한 이전 runtime `3890657091DDDD7927DC53CBB4E14891125F568F51739B69F32793053723B36A`의 6차 `qa/m4-api-smoke.ps1` exit0, API 생성 PNG의 비로그인 Chrome 표시와 로컬/HTTP 응답 SHA 동일, `LocalImageStoreSymlinkCheck` target/root/ancestor 차단 결과를 root 관측으로 `qa/M4-review.md`에 기록했다. 브라우저 파일 선택창 증거와 혼동하지 않았고, 최종 수정 JAR 재실행·재시작 보존 대체로 취급하지 않았다.
+- `build/m4-security-time-green-20261003-1720.log`와 `build/m4-post-v3-migration-20261003-1730.log`의 BUILD SUCCESSFUL을 직접 읽었다. 후자는 root가 보고한 target2→legacy active/deleted fixture→target3 보존 테스트와 연결했으나 최종 full suite/최종 artifact 재검증은 남겼다.
+- `build/m4-backend-full-test-20261003-1750.log`를 직접 읽어 `419 tests completed, 1 failed`, `SecurityAccessControlTest`의 `path=/api/v1/posts/1` fixture 기대 불일치와 BUILD FAILED를 확인했다. 따라서 현재 독립 QA 판정은 **중간 증거 통과 + 최종 게이트 보류 / M4 PASS 아님**이다.
+- `qa/M4-review.md`에 R1~R8 수정 추적을 갱신했다. R1/R4/R5/R6/R7 FE 자동 증거와 R1/R4 root UI 관측, R5 fresh `/write`의 실제 `미분류` selected는 중간 GREEN으로 기록했으며, R2 최종 malformed/ordered-list HTTP, R3 SQL ACL/page overflow, R8 deleted-parent `POST_001/404`, backend full green, 최신 HTTP/bootJar/restart/image preservation/final independent rereview는 pending으로 남겼다.
+
+### 검증 명령·출력
+
+- `Get-Content build/m4-frontend-final-results.json | ConvertFrom-Json` — `89/89 suites`, `311/311 tests`, failed/pending `0`, `success=True`.
+- `Get-Content build/m4-backend-full-test-20261003-1750.log` — `419 tests completed, 1 failed`, `BUILD FAILED`.
+- `Get-Content build/m4-security-time-green-20261003-1720.log`, `build/m4-post-v3-migration-20261003-1730.log` — 각각 `BUILD SUCCESSFUL`(2m18s/1m10s).
+- `Get-Content`로 `docs/PRD.md` §9.7, M4 worklog 최신 root 기록, governance §20.8 및 QA 산출물을 재대조했다. QA는 API/DB/browser를 새로 실행하지 않았다.
+
+### 미해결
+
+- backend full suite failure 수정 및 fresh JUnit archive/bootJar hash 필요.
+- 최종 JAR에서 API smoke와 malformed content/ordered-list attrs, HMAC/24h·동시성, 최신 PNG URL/metadata/bytes 재시작 전후 보존 필요.
+- OpenAPI 실제 response code, README, R1~R8 독립 재리뷰 및 최종 root 판정 필요.
+- S3/LocalStack/U0와 M5 이후 기능은 PRD §9.7에 따라 별도 후속이며, 기존 U0 `BLOCKED`를 로컬 M4 PASS로 변경하지 않는다.
+
+## 2026-10-03 18:18 KST — 최종 로컬 M4 독립 QA PASS
+
+- 최종 판정 범위를 PRD §9.7·회의 §20.8의 로컬 파일 저장, 인증 multipart/content API, 글·이미지 권한, 5MiB, API/자동 테스트로 고정했다. 사용자 결정 **“브라우저 파일 업로드만 제외하고 API·자동 테스트로 검증해”**에 따라 파일 선택창·브라우저 파일 전송 자동화는 실행하지 않았고, multipart API/FE 자동 업로드·실제 저장·권한·이미지 표시·재시작 보존은 유지했다.
+- backend 최종 로그 `build/m4-final-backend-full-20261003-1900.log`를 직접 읽어 `BUILD SUCCESSFUL in 13m 49s`, exit 0을 확인했다. 보존 archive `build/m4-final-junit-20261003-1915`의 `TEST-*.xml` 66개를 PowerShell `[xml]`로 직접 집계한 결과 `426 tests / 0 failures / 0 errors / 0 skipped`였다. `PostConcurrencyTest=3`, `PostContentServiceTest=10`, `PostServiceIntegrationTest=8`, `UploadServiceTest=8`, `PostV3MigrationTest=1`, `SecurityAccessControlTest=24`를 포함한다.
+- 최종 bootJar 로그 `build/m4-final-bootjar-20261003-1920.log`는 `BUILD SUCCESSFUL in 18s`다. `Get-FileHash build/m4-runtime-20261003-181423.jar -Algorithm SHA256` 결과는 `D2B5FBB8A659D707F1A4039FB062D1768113D9AD53946F7A1D6AAA983783E2EF`다. preflight F11E와 최종 JAR zip class hash를 직접 비교해 `UploadController.class` 1개만 변경되고 `LocalImageStore.class`는 동일함을 확인했다.
+- FE report를 직접 집계했다. `build/m4-frontend-final-results.json`: `28 testResults / 311 tests / 311 passed / 0 failed / 0 pending / success=true`; `build/m4-frontend-r7-results.json`: `2 files / 40 tests / 40 passed / 0 failed / 0 pending / success=true`. frontend WORKLOG 최종 lint/build exit 0도 직접 읽었다. 이전 기록의 `89 suites`는 nested suite 수이므로 최종 기준은 **28 files/311 tests**로 정정했다.
+- root가 최종 runtime F11E에서 7차 HTTP smoke exit0, malformed leaf `400/VALIDATION_001`, ordered-list start/type `True/True`, `page=2147483647&size=20`의 정상 empty page를 관측했다. 공개/친구 방향성/PRIVATE/draft, MIME/1~5MiB, purpose/rebind/detach/delete/view dedup/snapshot/order를 포함한다.
+- root가 최종 D2B5 runtime에서 실제 OpenAPI posts `201`, uploads `201`, content GET operation과 오류 response를 확인했다. 이전 uploads 200 annotation 잔여는 `UploadController.class` 변경으로 해소됐다. 같은 최종 artifact에서 post23 image `200/395 bytes/image/png/no-store/nosniff`와 원본·파일·HTTP SHA-256 `2F76F73080F7F5ACE1CA54507604FE80937718FB8A6E1757F9E71D125B243F67` 일치, 비로그인 Chrome `complete=true/natural96×64`를 재확인했다.
+- root의 Chrome 1440px ordered-list/image 표시, R1 Markdown 삽입, R4 draft 전환, R5 DEFAULT 선택과 root whole-review의 FE R1/R2방어/R4/R5/R6/R7·BE R2/R3/R7/R8 source closure를 대조했다. 추가 Critical/Important 회귀 없음으로 독립 reviewer 결과를 기록했다. symlink proof의 target/root/ancestor read `UPLOAD_003`, write `COMMON_500`, marker `UNCHANGED`도 root 실행 증거로 유지했다.
+- README를 직접 읽어 `.local-data/uploads`, DB+파일 동시 백업/재시작, local/test profile, static exposure 금지, 5MB와 S3 후속 범위를 확인했다. 로컬 M4 판정과 S3/U0/M5 범위를 섞지 않았다.
+
+### 최종 QA 판정
+
+**로컬 M4 PASS.** backend/FE full evidence, HTTP 권한·업로드·콘텐츠·페이징·OpenAPI, migration/동시성/HMAC/조회수, 파일 경계, 재시작 보존, 브라우저 표시와 독립 R1~R8 재리뷰를 확인했다. 이 판정은 commit/push/merge/release 완료가 아니다.
+
+### 비차단 잔여 범위
+
+- S3 presigned/실제 AWS/LocalStack/SeaweedFS U0는 PRD §9.7 후속 범위이며 기존 U0 `BLOCKED`를 변경하지 않는다.
+- 브라우저 파일 선택·전송 자동화는 사용자 결정으로 제외했다. API/FE 자동 업로드 및 실제 이미지 표시로 검증했다.
+- M5 관계 CRUD·댓글·좋아요 및 운영 배포 hardening은 이번 M4 판정 범위가 아니다.
+- QA는 제품 코드·타 역할 테스트·runtime/DB/browser fixture·Git을 변경하지 않았으며, root가 후속 stage/commit/push/merge를 진행한다.
+
+### 검증 명령·출력
+
+- `Get-Content build/m4-final-backend-full-20261003-1900.log` → `BUILD SUCCESSFUL in 13m 49s`.
+- `Get-ChildItem build/m4-final-junit-20261003-1915 -Recurse -Filter TEST-*.xml` + XML 합산 → `66 / 426 / 0 / 0 / 0`(files/tests/failures/errors/skipped).
+- `Get-Content build/m4-final-bootjar-20261003-1920.log` → `BUILD SUCCESSFUL in 18s`; `Get-FileHash` → D2B5 hash.
+- `ConvertFrom-Json build/m4-frontend-final-results.json` 및 `m4-frontend-r7-results.json` → 각각 `28/311/0/0`, `2/40/0/0`.
+- ZIP class hash comparison → final/preflight 차이 `UploadController.class` 1개, `LocalImageStore.class` 동일.
+- README/PRD §9.7/M4 worklog/whole-review 결과를 직접 대조했다. QA는 최종 runtime/API를 재기동하지 않았다.
+
+## 2026-10-03 18:20 KST — R7 브라우저·자동 테스트 증거 귀속 정정
+
+- 앞선 최종 QA 기록의 `R7 ordered-list/table 의미 보존` 표현을 정정했다. root Chrome 직접 검증은 ordered-list `start=5/type=a`의 marker `e.` 및 computed `lower-alpha`, 이미지 표시와 일반 2×2 표 작성·발행 흐름이다.
+- `rowspan/colspan` 보존은 Chrome 직접 증거로 주장하지 않고, backend `PostContentServiceTest` 및 FE R7 추가 회귀 JSON `2 files/40 tests`, 실패·pending 0의 자동 테스트 증거로 귀속한다.
+- 귀속 정정이며 R7 PASS, 로컬 M4 PASS, 테스트 결과와 범위는 변경하지 않는다. QA는 제품 코드·타 역할 테스트·runtime/DB/browser fixture·Git을 변경하지 않았다.

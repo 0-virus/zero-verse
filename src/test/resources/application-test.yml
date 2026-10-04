@@ -12,6 +12,9 @@ spring:
     locations: classpath:db/migration
 
 zeroverse:
+  upload:
+    # 테스트 전용 HMAC fixture. 제품 런타임에서는 SPRING_APPLICATION_JSON으로 주입한다.
+    viewer-hmac-secret: m4-test-viewer-hmac-secret-20261003-long-enough
   cors:
     allowed-origins: http://localhost:5173
 

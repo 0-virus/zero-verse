@@ -2,38 +2,39 @@
 
 > 덮어쓰기 스냅샷. 시간순 이력은 `WORKLOG.md`, 프로젝트 이력은 `docs/worklog/**`와 `docs/governance/**`를 본다.
 
-마지막 갱신: 2026-09-08 KST (M3 구현·검증 산출물 및 잔여 gate 정합화)
+마지막 갱신: 2026-10-03 18:20 KST (M4 최종 runtime/OpenAPI·독립 리뷰 보완, Git closeout 대기)
 
 ## 현재 단계
 
-- PRD §10 기준 M0·M1은 완료·`dev` 머지 기록이 있다.
-- M2 설정은 `dev`에 merge commit `4c129e20f58a6ccb9c61246d103934702516c295`로 머지됐고, PR #8은 GitHub에서 `MERGED`(`mergedAt=2026-09-05T20:41:12Z`, 2026-09-06 05:41:12 KST)다. M2 worklog의 최종 `[머지]` 기록과 QA 확인도 완료됐다.
-- M3 카테고리는 회의록 §4 Q1~Q4가 사용자 원문 `시작`으로 승인됐고 회의록은 `APPROVED`, ADR-0005는 `ACCEPTED`다. 현재 checkout과 `origin/feature/M3-categories`는 `feature/M3-categories` HEAD `08239e0514b6`이며, 제품 `src`·`frontend`는 `4fc9ae2` 이후 변경이 없다. PR #9는 worklog의 마지막 GitHub 확인 기준 `OPEN`/Draft다.
-- M3 구현·자동/DB/API 검증은 완료 근거가 있다. BE는 기존 산출물 XML 56 files/370 tests, failures/errors/skips 0/0/0 및 build exit 0이고, FE는 `build/m3-final-frontend-tests.log` 23 files/273 tests PASS, lint/build exit 0이다. QA HTTP smoke도 exit 0이다. 이는 독립 최종 acceptance가 아니다.
-- root가 확인한 가입·setup·reload/session·keyboard·rename·duplicate·new-tab·1440px 화면 증거와 mouse DnD drop→order PUT→`카테고리 순서를 저장했습니다.` notice를 유지한다. SQL에서 active category id `19/21/20/22`의 `display_order=0/1/2/3`도 확인됐다. 새 IAB의 root 독립 evidence에서 blog ID `7`의 active category ID `26`이 `LOCKED`·`display_order=3`으로 저장·재조회됐고, full reload 후에도 같은 상태와 순서 이동·이름 변경·삭제·타입 선택 disabled 및 `카테고리를 잠금 상태로 저장했습니다. 잠금은 되돌릴 수 없습니다.` notice가 확인됐다. 기존 Chrome fixture의 ID `22` `GENERAL`은 과거 실패 사실로 별도 보존한다. LOCKED 실측 gate는 해소됐고, `/root/m3_final_qa`의 독립 최종 acceptance와 root의 PR #9 `dev` merge·M3 `[머지]` 기록 전에는 M3를 마감하지 않는다.
-- 사용자 종료 경계는 M3 검증 → PR #9 `dev` merge → M3 마감 기록 후 이번 실행 종료다. 이번 실행에서 M4는 착수하지 않는다. `docs/PM-M4-readiness.md`는 기존 준비 산출물로 유지하며, S3 bucket/region/IAM 등 기존 미확정 입력은 M3 승인 범위에 포함하지 않는다.
+- PRD §10 기준 M0·M1은 완료·`dev` 머지 기록이 있다. M2 설정은 merge commit `4c129e20f58a6ccb9c61246d103934702516c295`로 `dev`에 머지됐고, M3 카테고리는 승인 계약·독립 QA·PR #9 `dev` merge(`59badfe42d539a33091a387b9ee6119d838190b8`)까지 완료됐다.
+- 실제 checkout은 `feature/M4-posts`, HEAD는 `97567d9cae51`이다. PM은 제품 소스·QA 산출물·root worklog/governance·Git을 편집하거나 stage/commit/push하지 않는다. 타 역할과 리더의 변경은 보존한다.
+- 최신 사용자 결정은 로컬 파일 저장 기반 M4 완성이다. 서버 로컬 폴더에 실제 파일을 저장하는 multipart API를 사용하고, 글·이미지 접근권한과 최대 5MiB 제한을 유지한다. S3 presigned/비공개 S3 연동, 실제 AWS, LocalStack·SeaweedFS 호환성 검증은 후속 범위이며 M4 로컬 구현의 선행 gate가 아니다.
+- 최신 사용자 결정 **`브라우저 파일 업로드만 제외하고 API·자동 테스트로 검증해`**에 따라 Chrome 확장의 파일 URL 접근 권한을 확대하지 않는다. 실제 브라우저 파일 선택·전송 자동화만 제외하고, API/FE 자동 업로드, 실제 로컬 저장, 접근제어, 5MiB 경계, 브라우저 이미지 표시, 재시작 후 보존은 인수 범위에 포함한다.
+- 현재는 승인된 로컬 범위의 M4 구현·제품 검증이 통과된 closeout 단계다. R1~R8 독립 whole-review 최종 판정은 `Ready to merge: Yes`, 잔여 Critical/Important/Minor `0`이며, 최종 QA 기록 문서화와 Git closeout 전에는 M4의 최종 merge 완료로 표기하지 않는다.
 
 ## 진행 중
 
-- M2 merge로 M3의 선행 gate는 해소됐고, Q1~Q4 승인 범위는 `active_key`, root page+children/CategoryResponse, 조회자별 count와 `includeDrafts`, `CAT_004~007`, 생성 시 parent 선택·DEFAULT/LOCKED 정책, setup 부분 복구, `last-write-wins`, M4 동일 `blog_id` lock이다.
-- 위 계약은 `docs/PRD.md` §3.5·§4.2·§4.4·§5.2·§5.4·§7·§9.5·§10~12, REQUIREMENTS FR-CAT/FR-SETTINGS/NFR, ADR-0005 및 실제 category source/test에 대조됐다. 승인 전 권고·반론·착수 전 상태는 기존 문맥으로 보존했다.
-- 실제 source/test와 로그는 최신 제품 tree 기준으로 대조했다. BE JAR SHA-256은 `422F7216E6B70A8BC533C9F84605C9E3368B961C0F0AC1F58A6B9113819FE369`로 기존 검증 기록과 일치한다. PM은 제품 코드·QA 산출물·governance·Git을 편집하지 않았다.
-- 현재 작업 트리에는 PM 소유 외의 기존 변경 `.claude/team/JOURNAL.md`, `.claude/team/qa/STATE.md`, `qa/M3-review.md`가 있어 보존한다. `gh pr view` 재조회는 이 턴에 local auth 401로 확인하지 못했으므로 PR 상태는 M3 worklog의 마지막 GitHub 조회와 origin head로만 표기한다.
+- backend 최종 full 로그 `build/m4-final-backend-full-20261003-1900.log`는 `BUILD SUCCESSFUL`(13m49s, exit 0)이다. 보존 JUnit `build/m4-final-junit-20261003-1915/test-results`를 직접 집계한 결과 66 files/426 tests/failures-errors-skips `0/0/0`이다.
+- 최종 bootJar 로그 `build/m4-final-bootjar-20261003-1920.log`는 성공했으며 `build/libs/zeroverse-server-0.0.1-SNAPSHOT.jar`는 66,354,802 bytes, SHA-256 `D2B5FBB8A659D707F1A4039FB062D1768113D9AD53946F7A1D6AAA983783E2EF`이다. backend STATE의 R3 SQL ACL/page overflow, R8 deleted parent, profile/upload/V3 targeted 증거와 일치한다.
+- frontend 최종 JSON `build/m4-frontend-final-results.json`은 28 files/311 passed/0 failed/0 pending(`success=true`)이며 frontend STATE의 lint/build exit 0 및 R7 후속 2 suites/40 passed 증거와 일치한다.
+- 최종 artifact runtime에 대한 7차 HTTP smoke, malformed content `400/VALIDATION_001`, ordered-list `start/type` 보존, `page=2147483647&size=20` 정상 empty 응답, 재시작 전후 기존 PNG URL·메타데이터·395 bytes·SHA-256·비로그인 Chrome 표시 동일성이 M4 worklog에 기록됐다. 실제 PNG SHA-256은 `2F76F73080F7F5ACE1CA54507604FE80937718FB8A6E1757F9E71D125B243F67`이다.
+- 최종 D2B5 runtime에서 OpenAPI `POST /posts` 201·`POST /uploads` 201·content GET operation 및 실제 HTTP 응답이 PASS다. 기존 PNG도 HTTP 200/image/png/395 bytes, 로컬 파일과 SHA-256 `2F76F73080F7F5ACE1CA54507604FE80937718FB8A6E1757F9E71D125B243F67` 일치, `no-store`/`nosniff`를 확인했다. 최종 QA 문서화는 위 독립 evidence를 대조해 진행 중이며, 파일 선택창 자동화는 사용자 결정상 미실행으로 남긴다. U0 LocalStack/SeaweedFS의 과거 `BLOCKED` 수치는 M4 로컬 판정과 분리해 보존한다.
 
 ## 다음 작업
 
-1. `/root/m3_final_qa`가 root 독립 IAB LOCKED 저장·reload·불변 상태 evidence와 기존 BE/FE/API/DnD 증거를 독립 대조해 `qa/M3-review.md` 최종 acceptance를 기록한다.
-2. root가 QA 최종 확인 후 PR #9를 `dev`에 merge하고 M3 worklog `[머지]`를 기록한다. 이 기록 후 이번 실행을 종료하며, 이번 실행에서 M4는 착수하지 않는다.
+1. root가 최종 독립 QA 인수 기록과 M4 worklog closeout 기록을 완료한다. OpenAPI 201 및 content GET/runtime 검증은 완료 상태로 유지한다.
+2. root가 실제 변경 파일·`origin/dev` 기준 diff·문서 정합성을 최종 확인한 뒤 명시 파일만 stage/commit/push하고, `dev` base PR/review/merge 절차를 결과와 함께 기록한다. PM은 Git 작업을 하지 않는다.
+3. Git closeout 결과를 반영할 PM 최종 상태 동기화가 필요하면 root 요청 후 이 스냅샷과 WORKLOG에 append한다. M5 착수나 S3/U0 범위 확장은 이번 실행에 포함하지 않는다.
 
 ## 차단 요인
 
-- LOCKED UI gate는 root 독립 IAB evidence로 해소됐다: blog ID `7`의 active category ID `26`이 `LOCKED`·`display_order=3`으로 저장·재조회됐고, full reload 후에도 불변 상태와 저장 완료 notice가 확인됐다. 기존 Chrome fixture의 ID `22` `GENERAL`은 과거 실패 사실로 현재 결과와 구분한다.
-- 남은 차단은 `/root/m3_final_qa`의 독립 최종 acceptance와 root의 PR #9 `dev` merge·M3 `[머지]` 기록이다. PR body의 project-lead 제외 문구는 root의 `gh pr edit`로 실제 포함 범위에 맞춰 정정됐으며 delivery metadata gate는 닫혔다.
-- M4의 `UNIVERSE` 접근 경계, nullable `category_id`/빈 draft, TipTap toolbar/sanitizer, PostImage unique, blogId/slug 경로·thumbnail 위치는 기존 `docs/PM-M4-readiness.md`의 `권고(미확정)`으로 유지한다. M3 마감 기록 후 이번 실행을 종료하며, 이번 실행에서 M4는 착수하지 않는다. S3 bucket name·region·IAM은 기존 착수 입력으로만 남긴다.
+- 제품 구현·로컬 자동/HTTP/브라우저 이미지·재시작 검증과 OpenAPI runtime 확인은 통과 상태다. 최종 QA 기록·Git stage/commit/push/PR/merge가 아직 끝나지 않아 M4 릴리스 closeout은 미완료다.
+- 사용자 결정으로 브라우저 파일 선택·전송 자동화는 의도적으로 제외한다. 이를 누락된 PASS로 보정하지 않는다.
+- U0 LocalStack/SeaweedFS는 IAM/PAB capability·browser transport 이슈로 별도 `BLOCKED`이며, §9.7의 사용자 결정에 따라 로컬 M4 완료를 막지 않는다. S3 연동과 M5 이후 기능도 후속 범위다.
 
 ## 주요 산출물
 
+- `docs/PRD.md`
 - `docs/PM-M3-readiness.md`
 - `docs/PM-M4-readiness.md`
 - `.claude/team/pm/WORKLOG.md`
-- `docs/PRD.md`

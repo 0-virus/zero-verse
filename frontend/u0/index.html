@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ZeroVerse U0 · S3-compatible local upload safety</title>
+    <style>
+      :root { color-scheme: light; --paper:#f6ead8; --ink:#2b1b3d; --accent:#e85d75; --shadow:#d8c7b0; --surface:#fff; --warm:#fff8ec; --raise:#ffe9c9; --body:#5c4a72; --muted:#9b8aa8; --success:#2e7d4f; --success-bg:#d7f5dd; --danger:#c73a55; --danger-bg:#ffe3ea; font-family:"IBM Plex Sans KR","Malgun Gothic",sans-serif; }
+      * { box-sizing:border-box; }
+      html { min-width:1000px; }
+      body { margin:0; min-height:100vh; background:var(--paper); color:var(--ink); }
+      header, main { width:min(1240px,calc(100% - 80px)); margin:0 auto; }
+      header { display:flex; align-items:end; justify-content:space-between; gap:32px; padding:44px 0 30px; }
+      h1, h2, p { margin-top:0; }
+      h1 { margin-bottom:10px; font-size:28px; line-height:1.35; }
+      h2 { margin-bottom:0; font-size:15px; letter-spacing:1px; }
+      .eyebrow { margin:0 0 12px; color:#c86bb1; font:10px/1.4 "Press Start 2P",monospace; letter-spacing:2px; }
+      .intro, .protocol-note { color:var(--body); line-height:1.7; }
+      .intro { max-width:800px; margin-bottom:0; font-size:14px; }
+      code { padding:2px 5px; background:var(--raise); color:var(--ink); font:12px/1.3 ui-monospace,Menlo,monospace; }
+      button { border:3px solid var(--ink); border-radius:0; background:var(--accent); color:#fff; cursor:pointer; font:700 14px/1.2 "IBM Plex Sans KR","Malgun Gothic",sans-serif; padding:11px 18px; box-shadow:6px 6px 0 var(--shadow); }
+      button:hover:not(:disabled) { filter:brightness(1.08); }
+      button:focus-visible { outline:3px solid var(--ink); outline-offset:3px; }
+      button:disabled { cursor:wait; opacity:.65; }
+      main { padding-bottom:64px; }
+      .summary, .results-panel { border:3px solid var(--ink); background:var(--surface); box-shadow:8px 8px 0 var(--shadow); }
+      .summary { display:grid; grid-template-columns:220px 1fr; gap:20px; align-items:center; padding:18px 22px; margin-bottom:30px; }
+      .phase { padding:12px 14px; background:var(--raise); border:2px solid var(--ink); font-weight:700; }
+      .phase[data-state="running"] { background:#ddedf5; }
+      .phase[data-state="pass"] { background:var(--success-bg); color:var(--success); }
+      .phase[data-state="fail"] { background:var(--danger-bg); color:var(--danger); }
+      .progress { margin-bottom:5px; font-weight:700; }
+      .completion { margin-bottom:0; color:var(--body); font-size:13px; }
+      .self-check { color:var(--muted); font-size:12px; }
+      .results-panel { margin-bottom:30px; overflow:hidden; }
+      .panel-header { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:13px 18px; background:var(--raise); border-bottom:3px solid var(--ink); }
+      .panel-count { color:var(--muted); font-size:12px; }
+      .table-wrap { overflow-x:auto; }
+      table { width:100%; border-collapse:collapse; table-layout:fixed; font-size:13px; }
+      th, td { padding:11px 18px; border-bottom:1px solid #eadbc4; text-align:left; vertical-align:middle; }
+      th { background:var(--warm); color:var(--body); font-size:11px; letter-spacing:1px; text-transform:lowercase; }
+      th:nth-child(1), td:nth-child(1) { width:38%; } th:nth-child(2), td:nth-child(2) { width:28%; } th:nth-child(3), td:nth-child(3) { width:14%; } th:nth-child(4), td:nth-child(4) { width:20%; }
+      tbody tr:last-child td { border-bottom:0; }
+      tbody tr[data-pass="true"] td:last-child { color:var(--success); } tbody tr[data-pass="false"] td:last-child { color:var(--danger); }
+      .empty-row td { color:var(--muted); text-align:center; }
+      .result-id, .result-code, .verify-id { overflow-wrap:anywhere; font:12px/1.4 ui-monospace,Menlo,monospace; }
+      .result-status, .verify-detail { color:var(--body); } .result-pass, .verify-pass { font-weight:700; letter-spacing:1px; }
+      .verify-panel[hidden] { display:none; }
+      .verify-list { margin:0; padding:0; list-style:none; }
+      .verify-list li { display:grid; grid-template-columns:240px 92px 1fr; gap:14px; padding:12px 18px; border-bottom:1px solid #eadbc4; font-size:13px; }
+      .verify-list li:last-child { border-bottom:0; } .verify-pass[data-pass="true"] { color:var(--success); } .verify-pass[data-pass="false"] { color:var(--danger); }
+      .protocol-note { margin:0; font-size:12px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <p class="eyebrow">U0 / LOCAL UPLOAD SAFETY</p>
+        <h1>브라우저 File PUT 검증</h1>
+        <p class="intro">
+          <code>127.0.0.1:14567</code>의 검증 manifest를 읽고
+          허용된 로컬 S3-compatible endpoint
+          (<code>127.0.0.1:14566</code> 또는 <code>127.0.0.1:14568</code>)에 실제 브라우저 파일을 전송합니다.
+          제품 API·DB·AWS 운영은 이 페이지의 범위가 아닙니다.
+        </p>
+      </div>
+      <button id="run-button" type="button">Run U0</button>
+    </header>
+
+    <main>
+      <section class="summary" aria-labelledby="summary-title">
+        <div id="phase" class="phase" data-state="ready">
+          <span id="summary-title">준비됨</span>
+        </div>
+        <div class="summary-copy">
+          <p id="progress" class="progress" aria-live="polite">실행 전</p>
+          <p id="completion" class="completion">Run U0를 눌러 로컬 검증을 시작하세요.</p>
+          <span id="self-check" class="self-check">브라우저 self-check 실행 중…</span>
+        </div>
+      </section>
+
+      <section class="results-panel" aria-labelledby="case-title">
+        <div class="panel-header">
+          <h2 id="case-title">case results</h2>
+          <span id="case-count" class="panel-count">0 cases</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">id</th>
+                <th scope="col">status</th>
+                <th scope="col">code</th>
+                <th scope="col">pass</th>
+              </tr>
+            </thead>
+            <tbody id="case-results">
+              <tr class="empty-row">
+                <td colspan="4">아직 실행한 case가 없습니다.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="verify-panel" class="results-panel verify-panel" aria-labelledby="verify-title" hidden>
+        <div class="panel-header">
+          <h2 id="verify-title">server verification</h2>
+          <span id="verify-count" class="panel-count">0 checks</span>
+        </div>
+        <ul id="verify-results" class="verify-list"></ul>
+      </section>
+
+      <p class="protocol-note">
+        PUT body는 base64 bytes를 synthetic <code>File</code>로 만들어 전송합니다.
+        <code>File.size</code>와 브라우저 자동 길이를 사용하며 <code>Content-Length</code>와
+        <code>Host</code>는 JavaScript에서 설정하지 않습니다. 서명 URL·header·body·자격증명은
+        DOM, console, storage에 기록하지 않습니다.
+      </p>
+    </main>
+
+    <script>
+      (() => {
+        "use strict";
+
+        const S3_ORIGINS = new Set([
+          "http://127.0.0.1:14566",
+          "http://127.0.0.1:14568"
+        ]);
+        const MAX_CASES = 100;
+        const MAX_BODY_BYTES = 8 * 1024 * 1024;
+        const MAX_WAIT_MS = 10_000;
+        const FETCH_TIMEOUT_MS = 30_000;
+        const FORBIDDEN_HEADERS = new Set(["content-length", "host"]);
+        const SAFE_ID = /^[A-Za-z0-9._-]{1,80}$/;
+
+        const elements = {
+          runButton: document.getElementById("run-button"),
+          phase: document.getElementById("phase"),
+          phaseText: document.getElementById("summary-title"),
+          progress: document.getElementById("progress"),
+          completion: document.getElementById("completion"),
+          selfCheck: document.getElementById("self-check"),
+          caseCount: document.getElementById("case-count"),
+          caseResults: document.getElementById("case-results"),
+          verifyPanel: document.getElementById("verify-panel"),
+          verifyCount: document.getElementById("verify-count"),
+          verifyResults: document.getElementById("verify-results")
+        };
+
+        let running = false;
+
+        function setPhase(state, text) {
+          elements.phase.dataset.state = state;
+          elements.phaseText.textContent = text;
+        }
+
+        function setEmptyCases(text) {
+          elements.caseResults.replaceChildren();
+          const row = document.createElement("tr");
+          row.className = "empty-row";
+          const cell = document.createElement("td");
+          cell.colSpan = 4;
+          cell.textContent = text;
+          row.append(cell);
+          elements.caseResults.append(row);
+        }
+
+        function appendCaseResult(id, status, code, passed) {
+          const row = document.createElement("tr");
+          row.dataset.pass = String(passed);
+          const idCell = document.createElement("td");
+          idCell.className = "result-id";
+          idCell.textContent = id;
+          const statusCell = document.createElement("td");
+          statusCell.className = "result-status";
+          statusCell.textContent = status;
+          const codeCell = document.createElement("td");
+          codeCell.className = "result-code";
+          codeCell.textContent = code;
+          const passCell = document.createElement("td");
+          passCell.className = "result-pass";
+          passCell.textContent = passed ? "PASS" : "FAIL";
+          row.append(idCell, statusCell, codeCell, passCell);
+          elements.caseResults.append(row);
+        }
+
+        function clearResults() {
+          setEmptyCases("manifest를 읽는 중…");
+          elements.caseCount.textContent = "0 cases";
+          elements.verifyPanel.hidden = true;
+          elements.verifyCount.textContent = "0 checks";
+          elements.verifyResults.replaceChildren();
+        }
+
+        function decodeBase64(value) {
+          if (typeof value !== "string") throw new Error("invalid body");
+          const compact = value.replace(/\s/g, "");
+          if (compact.length > Math.ceil(MAX_BODY_BYTES / 3) * 4) throw new Error("body too large");
+          const binary = atob(compact);
+          if (binary.length > MAX_BODY_BYTES) throw new Error("body too large");
+          const bytes = new Uint8Array(binary.length);
+          for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+          return bytes;
+        }
+
+        function allowedS3Url(value) {
+          try {
+            const url = new URL(value);
+            return S3_ORIGINS.has(url.origin) && !url.username && !url.password;
+          } catch {
+            return false;
+          }
+        }
+
+        function validateCase(raw, index) {
+          if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { id: `case-${index + 1}`, error: "invalid case" };
+          const id = safeId(raw.id, `case-${index + 1}`);
+          const method = typeof raw.method === "string" ? raw.method.toUpperCase() : "";
+          const expectedStatuses = Array.isArray(raw.expectedStatuses) ? raw.expectedStatuses : [];
+          const waitMs = raw.waitMs === undefined ? 0 : raw.waitMs;
+          if (!["GET", "HEAD", "PUT", "OPTIONS"].includes(method)) return { id, error: "invalid method" };
+          if (!allowedS3Url(raw.url)) return { id, error: "endpoint rejected" };
+          if (!expectedStatuses.length || expectedStatuses.some((status) => !Number.isInteger(status) || status < 100 || status > 599)) return { id, error: "invalid expected status" };
+          if (!Number.isInteger(waitMs) || waitMs < 0 || waitMs > MAX_WAIT_MS) return { id, error: "waitMs out of range" };
+          if (raw.headers !== undefined && (!raw.headers || typeof raw.headers !== "object" || Array.isArray(raw.headers))) return { id, error: "invalid headers" };
+          if (method === "PUT" && typeof raw.bodyBase64 !== "string") return { id, error: "missing body" };
+          if (raw.contentType !== undefined && typeof raw.contentType !== "string") return { id, error: "invalid content type" };
+          return { id, raw, method, expectedStatuses, waitMs };
+        }
+
+        function buildHeaders(rawHeaders) {
+          const headers = new Headers();
+          if (!rawHeaders) return headers;
+          for (const [name, value] of Object.entries(rawHeaders)) {
+            if (FORBIDDEN_HEADERS.has(name.toLowerCase())) continue;
+            if (typeof value !== "string") throw new Error("invalid header");
+            headers.set(name, value);
+          }
+          return headers;
+        }
+
+        function abortError() {
+          return new DOMException("aborted", "AbortError");
+        }
+
+        function waitFor(ms, signal) {
+          if (!ms) return Promise.resolve();
+          return new Promise((resolve, reject) => {
+            const timer = setTimeout(done, ms);
+            function cleanup() {
+              clearTimeout(timer);
+              signal.removeEventListener("abort", abort);
+            }
+            function done() {
+              cleanup();
+              resolve();
+            }
+            function abort() {
+              cleanup();
+              reject(abortError());
+            }
+            if (signal.aborted) abort();
+            else signal.addEventListener("abort", abort, { once: true });
+          });
+        }
+
+        async function fetchWithTimeout(url, options, runSignal) {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+          const relayAbort = () => controller.abort();
+          runSignal.addEventListener("abort", relayAbort, { once: true });
+          try {
+            return await fetch(url, { ...options, signal: controller.signal });
+          } finally {
+            clearTimeout(timer);
+            runSignal.removeEventListener("abort", relayAbort);
+          }
+        }
+
+        function classifyFetchError(error) {
+          if (error && error.name === "AbortError") return { status: "timeout/aborted", code: "—", passed: false };
+          if (error instanceof TypeError || (error && error.name === "TypeError")) return { status: "fetch TypeError/CORS", code: "—", passed: false };
+          return { status: "fetch error", code: "—", passed: false };
+        }
+
+        async function runCase(entry, runSignal) {
+          const { raw, id, method, expectedStatuses, waitMs } = entry;
+          let body;
+          let headers;
+          try {
+            const bodyBytes = method === "PUT" ? decodeBase64(raw.bodyBase64) : null;
+            if (bodyBytes) {
+              const contentType = typeof raw.contentType === "string" ? raw.contentType : "application/octet-stream";
+              body = new File([bodyBytes], "u0-synthetic.bin", { type: contentType });
+              if (body.size !== bodyBytes.byteLength) return { id, status: "client validation", code: "—", passed: false };
+            }
+            headers = buildHeaders(raw.headers);
+          } catch {
+            return { id, status: "client validation", code: "—", passed: false };
+          }
+          try {
+            await waitFor(waitMs, runSignal);
+            const response = await fetchWithTimeout(raw.url, {
+              method,
+              headers,
+              body,
+              credentials: "omit",
+              redirect: "error"
+            }, runSignal);
+            const passed = expectedStatuses.includes(response.status);
+            return { id, status: "S3 HTTP", code: String(response.status), passed };
+          } catch (error) {
+            const result = classifyFetchError(error);
+            return { id, ...result };
+          }
+        }
+
+        async function readJson(url, signal) {
+          const response = await fetchWithTimeout(url, { headers: { Accept: "application/json" }, credentials: "same-origin" }, signal);
+          if (!response.ok) throw new Error("harness HTTP failure");
+          return response.json();
+        }
+
+        function safeId(value, fallback) {
+          if (typeof value !== "string" || !SAFE_ID.test(value)) return fallback;
+          return value;
+        }
+
+        function renderVerify(checks) {
+          elements.verifyPanel.hidden = false;
+          elements.verifyResults.replaceChildren();
+          let passed = 0;
+          checks.forEach((check, index) => {
+            const valid = check && typeof check === "object" && typeof check.id === "string" && typeof check.passed === "boolean";
+            const id = valid ? safeId(check.id, `check-${index + 1}`) : `check-${index + 1}`;
+            const isPassed = valid && check.passed;
+            if (isPassed) passed += 1;
+            const item = document.createElement("li");
+            const idNode = document.createElement("span");
+            idNode.className = "verify-id";
+            idNode.textContent = id;
+            const passNode = document.createElement("span");
+            passNode.className = "verify-pass";
+            passNode.dataset.pass = String(isPassed);
+            passNode.textContent = isPassed ? "PASS" : "FAIL";
+            const detailNode = document.createElement("span");
+            detailNode.className = "verify-detail";
+            detailNode.textContent = valid ? "서버 검증 결과 수신" : "검증 결과 형식이 올바르지 않습니다.";
+            item.append(idNode, passNode, detailNode);
+            elements.verifyResults.append(item);
+          });
+          elements.verifyCount.textContent = `${checks.length} checks · ${passed} PASS`;
+          return { total: checks.length, passed };
+        }
+
+        function validateManifest(value) {
+          if (!value || !Array.isArray(value.cases) || value.cases.length === 0 || value.cases.length > MAX_CASES) throw new Error("invalid manifest");
+          return value.cases;
+        }
+
+        function selfCheck() {
+          const bytes = decodeBase64("AAE=");
+          const file = new File([bytes], "u0-self-check.bin", { type: "application/octet-stream" });
+          const boundary = new File([new Uint8Array(5 * 1024 * 1024)], "u0-5mb.bin", { type: "application/octet-stream" });
+          const allowedOriginsPass = [...S3_ORIGINS].every((origin) => allowedS3Url(origin + "/u0"));
+          const rejectedOrigins = [
+            "https://127.0.0.1:14566/u0",
+            "http://localhost:14566/u0",
+            "http://127.0.0.1:14567/u0",
+            "http://127.0.0.1:14569/u0"
+          ];
+          const rejectedOriginsPass = rejectedOrigins.every((url) => !allowedS3Url(url));
+          if (file.size !== 2 || boundary.size !== 5 * 1024 * 1024 || !allowedOriginsPass || !rejectedOriginsPass) throw new Error("self-check failed");
+        }
+
+        async function run() {
+          if (running) return;
+          running = true;
+          elements.runButton.disabled = true;
+          clearResults();
+          setPhase("running", "실행 중");
+          elements.progress.textContent = "manifest를 읽는 중…";
+          elements.completion.textContent = "case를 순서대로 실행하고 있습니다.";
+          const runController = new AbortController();
+          try {
+            const cases = validateManifest(await readJson(new URL("/cases", location.href), runController.signal));
+            elements.caseCount.textContent = `${cases.length} cases`;
+            setEmptyCases("실행 준비 완료…");
+            const results = [];
+            for (let index = 0; index < cases.length; index += 1) {
+              const entry = validateCase(cases[index], index);
+              elements.progress.textContent = `${index}/${cases.length} cases 완료 · ${entry.id}`;
+              const result = entry.error
+                ? { id: entry.id, status: entry.error, code: "—", passed: false }
+                : await runCase(entry, runController.signal);
+              results.push(result);
+              appendCaseResult(result.id, result.status, result.code, result.passed);
+              elements.progress.textContent = `${index + 1}/${cases.length} cases 완료`;
+            }
+
+            elements.progress.textContent = `${results.length}/${cases.length} cases 완료 · verify 대기`;
+            let verifySummary = { total: 0, passed: 0 };
+            try {
+              const verify = await readJson(new URL("/verify", location.href), runController.signal);
+              const checks = Array.isArray(verify && verify.checks) ? verify.checks : [];
+              verifySummary = renderVerify(checks);
+            } catch (error) {
+              elements.verifyPanel.hidden = false;
+              elements.verifyResults.replaceChildren();
+              const item = document.createElement("li");
+              item.textContent = error && error.name === "TypeError" ? "verify fetch TypeError/CORS · FAIL" : "verify 결과를 읽지 못했습니다 · FAIL";
+              elements.verifyResults.append(item);
+              elements.verifyCount.textContent = "verify FAIL";
+            }
+
+            const casePassed = results.filter((result) => result.passed).length;
+            const allPassed = results.length > 0 && casePassed === results.length && verifySummary.total > 0 && verifySummary.total === verifySummary.passed;
+            setPhase(allPassed ? "pass" : "fail", allPassed ? "통과" : "실패");
+            elements.progress.textContent = `${results.length}/${cases.length} cases · ${casePassed} PASS · verify ${verifySummary.passed}/${verifySummary.total} PASS`;
+            elements.completion.textContent = allPassed
+              ? "모든 case와 서버 검증이 통과했습니다."
+              : "실패한 case가 있습니다. HTTP 실패와 fetch TypeError/CORS를 구분해 확인하세요.";
+          } catch (error) {
+            setPhase("fail", "실행 실패");
+            elements.progress.textContent = error && error.name === "TypeError" ? "manifest fetch TypeError/CORS" : "manifest를 읽지 못했습니다";
+            elements.completion.textContent = "Run U0를 다시 눌러 재시도하세요. 세부 오류는 보안상 표시하지 않습니다.";
+            setEmptyCases("manifest를 읽지 못했습니다.");
+          } finally {
+            running = false;
+            elements.runButton.disabled = false;
+          }
+        }
+
+        try {
+          selfCheck();
+          elements.selfCheck.textContent = "브라우저 self-check PASS";
+        } catch {
+          elements.selfCheck.textContent = "브라우저 self-check FAIL";
+          elements.runButton.disabled = true;
+          setPhase("fail", "브라우저 확인 실패");
+        }
+
+        elements.runButton.addEventListener("click", run);
+      })();
+    </script>
+  </body>
+</html>

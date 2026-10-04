@@ -1,0 +1,21 @@
+name: zeroverse-localstack
+services:
+  localstack:
+    image: localstack/localstack-pro@sha256:4aef81c531684570d7b3cfd2805afa02194c929d52bbeedabb7d4874798b1572
+    pull_policy: never
+    container_name: zeroverse-localstack
+    ports:
+      - "127.0.0.1:14566:4566"
+    environment:
+      LOCALSTACK_AUTH_TOKEN: "${LOCALSTACK_AUTH_TOKEN:?Set the LocalStack auth token locally; never commit it}"
+      SERVICES: s3
+      EAGER_SERVICE_LOADING: "1"
+      GATEWAY_LISTEN: "0.0.0.0:4566"
+      LOCALSTACK_HOST: "localhost.localstack.cloud:14566"
+      S3_SKIP_SIGNATURE_VALIDATION: "0"
+      S3_VALIDATE_SIGNATURES: "1"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12

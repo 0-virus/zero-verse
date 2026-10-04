@@ -402,3 +402,12 @@
 - 사용자 `계속`에 따라 brief로 Git·네 역할 STATE·최종 QA·PRD/결정 기록을 재대조했다. HEAD97567d9와 원격feature97567d9/dev59badfe는 그대로이며 M4 PR은 아직 없다. 최종 제품 검증 이후 src/frontend/build.gradle 파일의 추가 수정은 없고 JAR hashD2B5, 보존 BE426/0failure·error·skip, FE311 및 후속40 PASS를 다시 읽어 확인했다. 소스 변경 없이 동일 전체 테스트를 반복하지 않는다.
 - QA18:18 로컬M4 PASS는 완료되어 있다. PM STATE의 QA 문서화 대기, backend STATE 하단의 이미 해소된 runtime/QA 대기, frontend 기록의 Chrome orderedList `type=A` 표기는 오래되거나 부정확한 상태 문구다. 실제 Chrome fixture는 `type=a`/lower-alpha/marker e.이고 type=A는 자동 회귀다. 최신 판정은 이 worklog와 QA 최종 항목을 따른다.
 - PM 마지막 후속 실행이 역할 모델 사용량 제한으로 종료됐다. 제한 우회/추가 제품 수정은 하지 않으며 리더 소유 Git·검증 기록을 계속한다. 역할별 STATE/PRD의 상태 문구만 리더가 직접 동기화하는 권한은 사용자에게 별도로 요청했다. 제품 인수 PASS 및 기존 독립 리뷰 승인은 변하지 않는다.
+
+## [머지] — 2026-10-04 로컬 M4 완료
+
+- 리더가 검토된112파일만 명시 목록으로 stage하고 staged diff/check 및 일반 비밀 패턴 검사를 수행했다(금지 데이터/개인설정0, 비밀 패턴0). 구현 커밋은 `4404f1e1fd518602d2c777bdeec11cde7ec2ca27` (`feat(M4): complete posts and local image uploads`)이다.
+- 최초 push/PR 요청은 원격 목적지 명시 확인을 요구한 자동 승인 검사에서 실행 전 거부됐다. 리더는 우회하지 않고 공개 저장소 `0-virus/zero-verse` 전송·PR·머지를 질문했고, 사용자 **`해당 저장소 푸시·PR·머지 승인`** 이후 실행했다. 로컬 이미지·개인설정·build 검증 로그는 전송하지 않았다.
+- 구현 커밋 push 성공 후 [PR #10](https://github.com/0-virus/zero-verse/pull/10)을 `feature/M4-posts → dev`로 생성했다. head4404f1e/base59badfe, MERGEABLE/CLEAN 및 대기 체크 없음(원격 CI 등록 없음)을 확인하고 정확한 head hash 조건으로 merge했다. 독립 검토·로컬 전체 테스트를 원격 CI 실행으로 오인하지 않는다.
+- GitHub `MERGED`, merge commit **`c34ff4e979bd6efffc3a2aea28c2be307ccac3b5`**, 시각 **2026-10-04 15:07:52 KST**를 실제 조회했다. merge tree와 검증된 feature tree의 `git diff --quiet`가 exit0이다. 깨끗한 로컬 dev도 ancestor 확인 후 fast-forward했다. 브랜치 삭제/force push/데이터 삭제는 하지 않았다.
+- 사용자 **`리더가 상태 문구만 갱신`** 승인에 따라 네 역할 STATE와 로컬 PRD의 완료 상태를 리더가 직접 동기화했다. 기존 역할 WORKLOG는 편집하지 않고 이 리더 기록으로 변경 주체·사유를 남긴다. backend의 stale runtime 대기, PM의 stale QA 대기, frontend의 Chrome type=A 오표기를 상태 문구에서 바로잡았다(type=A는 자동 회귀, Chrome은 type=a).
+- **최종 판정: 승인된 로컬 M4 구현·인수·PR 통합 완료.** BE426/0failure·error·skip, FE311 및 R7영향40, lint/build, API·실제 이미지·재시작 보존·독립QA/리뷰 근거는 위 최종 [리뷰]를 따른다. 이후 변경은 상태 문서뿐이며 제품 재수정/중복 전체 테스트는 없다. S3/U0·브라우저 파일 선택 예외·운영 배포·M5 이후는 별도 경계를 유지한다.

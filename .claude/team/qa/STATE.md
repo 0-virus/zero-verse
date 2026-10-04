@@ -2,13 +2,13 @@
 
 > 덮어쓰기 스냅샷. 시간순 이력은 `WORKLOG.md`, 심의·마일스톤 이력은 `docs/governance/**`와 `docs/worklog/**`를 본다.
 
-마지막 갱신: 2026-10-03 18:18 KST
+마지막 갱신: 2026-10-04 KST (사용자 승인에 따른 리더의 상태 문구 갱신)
 
 ## 현재 단계
 
 - **로컬 M4 최종 QA PASS**다. PRD §9.7·회의 §20.8의 승인 범위인 로컬 파일 저장, 인증 multipart/content API, 글·이미지 접근권한, 5MiB 제한, 자동 테스트와 root 독립 runtime/browser 증거를 닫았다.
 - 사용자가 **“브라우저 파일 업로드만 제외하고 API·자동 테스트로 검증해”**라고 결정했으므로 Chrome 파일 선택·전송 자동화는 실행하지 않았다. multipart API·FE 자동 업로드, 실제 파일 저장·권한·이미지 표시·재시작 보존은 검증했다.
-- 이 PASS는 제품 로컬 M4 인수 판정이며 commit/push/merge/release 완료를 의미하지 않는다. QA는 Git을 조작하지 않는다.
+- 제품 로컬 M4 PASS와 별도로 root의 Git 통합도 확인됐다. 구현 커밋 `4404f1e` 푸시, PR #10 `dev` 머지(`c34ff4e979bd6efffc3a2aea28c2be307ccac3b5`) 완료다. 운영 배포 완료를 뜻하지 않으며 QA는 Git을 조작하지 않았다.
 
 ## 최종 검증 결과
 
@@ -21,8 +21,8 @@
 
 ## 다음 작업
 
-1. root가 QA 판정을 반영한 명시 파일만 stage하여 diff/commit/PR 절차를 진행한다. QA는 stage/commit/push/merge하지 않는다.
-2. 이후 원격 PR/review/merge 결과가 오면 로컬 M4 PASS와 원격 통합 상태를 분리해 기록한다.
+1. M4 인수와 원격 통합은 완료됐다. 최종 결과는 `docs/worklog/M4-posts.md` [머지]와 PR #10을 따른다.
+2. 후속 제품 변경이 있으면 해당 범위에 새 독립 검증을 적용한다. 기존 테스트를 새 실행으로 재기록하지 않는다.
 3. S3/presigned/AWS/LocalStack/U0 후속과 M5 이후 기능은 새 승인·별도 마일스톤으로 다룬다.
 
 ## 비차단 잔여 범위

@@ -85,7 +85,7 @@ public class UserSettingsController {
                 responseCode = "200", description = "성공", useReturnTypeSchema = true),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "400",
-                description = "VALIDATION_001 — 요청 값 검증 실패.",
+                description = "VALIDATION_001 — 요청 값 검증 실패; UPLOAD_004 — 이미지 용도/연결 위반.",
                 content = @Content(
                         mediaType = "application/json",
                         schema = @Schema(implementation = ApiResponse.class))),

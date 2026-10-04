@@ -244,3 +244,78 @@
 - 동작 확인: 임시 14567 정적 서버에서 브라우저 초기 화면과 self-check를 확인한 뒤 브라우저 탭과 서버 프로세스를 정리했으며 14567 listener가 닫힌 것을 확인했다.
 - git diff --check는 오류 없이 종료했고 line-ending 및 사용자 git ignore 접근 경고만 출력됐다. 최종 파일 재독도 PASS다.
 - 판정: SeaweedFS U0의 기존 18/19 case·27/28 verify, over-size fetch TypeError/CORS, PAB UNSUPPORTED HTTP 501 실패 증거를 유지하며 전체 U0 BLOCKED 상태를 변경하지 않는다.
+
+## 2026-10-03 16:33:46 KST — M4 Task4~6 FE 개발 기록
+
+- 담당: frontend 역할 단일 작성자. 사용자 승인된 M4 로컬 파일 저장 실행계획에 따라 Task4~6 제품 FE를 `frontend/**`에서 구현했다. `.claude/team/frontend/STATE.md`도 같은 시각에 갱신했으며 backend/qa/root 소유 파일과 Git 조작은 건드리지 않았다.
+- Task4/API: `apiClient` raw FormData/Blob·401 single-flight refresh·binary read를 정리하고, `postApi`의 create/update/list/detail/drafts/images 계약을 추가했다. `uploadImage`는 1..5,242,880 bytes·허용 MIME을 먼저 검사한 뒤 응답 `id` UUID, `imageUrl` 정확 canonical 상대경로, `purpose`, `contentType`, `size`를 모두 요청과 대조한다. 외부/blob/data/query/mismatched/non-UUID 응답 negative test를 추가했다.
+- Task4/image: `ManagedImage`는 blob URL에 `{src,userId,url}` identity를 묶어 계정 전환·로그아웃 직후 이전 blob이 동기 렌더되지 않게 하고, 모든 revoke/cancel generation을 관리한다. API origin canonical read에만 Bearer를 사용하며 외부 legacy URL은 일반 `<img>`로 표시한다. profile file input은 validated canonical URL만 form에 반영하고 pending upload의 mounted/user/generation 경계를 지킨다.
+- Task5/editor: TipTap 패키지를 `3.31.3`으로 동 버전 고정했다. StarterKit/link/image/TableKit/Markdown NodeView 기반 editor, toolbar(B/I/U/S/H1~3/quote/code/hr/list/link/image/table/markdown), markdown paste, draft picker, POST_IMAGE·POST_THUMBNAIL upload, publish/draft save, duplicate guard, server `updatedAt` 표시, thumbnail preview/remove, normalized/deduplicated tags를 구현했다. 실제 schema fixture를 backend 역할에 전달했다.
+- Task6/screens: 실제 blog list/detail/write/edit/draft management를 연결하고 stale route/account response guard, category query/filter, permission/error/404/403 처리, safe Prose JSON renderer, ManagedImage thumbnail/hero를 구현했다. 댓글·좋아요 등 M6 fake controls/count는 노출하지 않았다. settings profile의 URL 직접 입력은 제거하고 legacy URL read-only + 파일 선택/제거로 바꿨다.
+- RED/GREEN:
+  - `npm.cmd test -- src/features/post/postApi.test.ts src/features/upload/uploadApi.test.ts src/features/upload/ManagedImage.test.tsx` (초기 RED: 3 files/0 tests, 신규 import resolution 실패).
+  - Task4 후속 GREEN: 4 files/21 tests; 최종 upload/settings: 3 files/46 tests.
+  - Task5 초기 JSX parse RED 후 `npm.cmd test -- src/features/post/PostEditor.test.tsx` GREEN: 1 file/5 tests.
+  - Task6 초기 `src/test/postBehavior.test.tsx` RED: 2 failures 후 GREEN: 1 file/2 tests.
+  - Task4~6 결합 `npm.cmd test -- src/test/apiClient.test.ts src/features/post/postApi.test.ts src/features/post/PostEditor.test.tsx src/test/postBehavior.test.tsx src/features/upload`: 6 files/37 tests passed.
+  - 최종 관련 회귀 `npm.cmd test -- src/features/upload src/features/post/PostEditor.test.tsx src/features/post/postApi.test.ts src/test/apiClient.test.ts src/test/postBehavior.test.tsx src/test/settingsBehavior.test.tsx src/test/categoryBehavior.test.tsx`: 8 files/81 tests passed.
+- 최종 명령/출력:
+  - `npm.cmd run lint` → exit 0.
+  - `npm.cmd run build` → exit 0; `tsc -b`, Vite 132 modules, `index-...js 855.37 kB / gzip 264.14 kB`; chunk >500 kB warning만 출력.
+  - `git diff --check -- frontend .claude/team/frontend` → `DIFF_CHECK_EXIT=0`; LF→CRLF 경고만 출력.
+  - 제품 FE 변경 파일 재독: upload/editor/post/screen/settings/api/test 28개 파일 read/count 확인.
+- 전체 suite 한계: `npm.cmd test -- --maxWorkers=1`는 693.44초 후 Node heap 4,055MB에서 OOM, `Test Files 27 passed (28)`, `Tests 277 passed (293)`, `Errors 1`로 종료했다. 병렬 전체 실행도 동일한 heap OOM 계열이어서 전체 PASS로 기록하지 않는다. 원인 해결은 root 환경에서 memory 상향/분할 실행으로 판단한다.
+- 인계/미해결: root가 API `http://127.0.0.1:18080`와 Vite를 사용해 1440px browser smoke 및 backend 실제 response compatibility를 확인한다. FE 자체 targeted/lint/build는 통과했으나 full Vitest heap 제한과 실제 runtime 시각 검증은 남았다.
+
+## 2026-10-03 17:11:16 KST — M4 전체 suite OOM 원인 수정·검증 기록
+
+- 조사 명령: `npm.cmd test -- --no-fileParallelism --maxWorkers=1`는 약 5분간 출력/CPU 변화 없이 대기하여 중단했다. 파일별 독립 `npm.cmd test -- <file> --maxWorkers=1`를 순차 실행해 22개 파일까지 정상 종료한 뒤 `src/test/router.test.tsx`에서 node worker CPU·메모리가 약 1.3GB로 증가하며 정체되는 것을 재현했다.
+- 원인 근거: router `/blog/my-blog`는 `HeroBlogProvider`를 마운트하지 않은 테스트였고, `useHeroBlog` fallback이 매번 새 callback을 반환했다. BlogPage effect가 `setHeroBlog`/`setHeroActions` identity 변화로 재실행되어 fetch/error state loop를 만들었다. module-level stable fallback으로 수정 후 동일 `/blog` 테스트는 1/1, 약 1.0s에 종료했다.
+- 보강 수정: BlogPage `useSearchParams` wrapper 자체가 바뀌어도 effect가 반복되지 않도록 `searchParams.toString()`을 memo dependency로 사용했다. Router fixture에 `/posts/42`·`/blogs/1/categories` 실제 shape를 넣어 새 PostDetail/Edit/Write 화면을 검증하고, write/edit는 화면 계약인 제목 textbox를 확인한다.
+- 브라우저 피드백 반영: PostEditor의 category select에서 실제 `DEFAULT` category가 있으면 null fallback `미분류` option을 렌더하지 않도록 했다. `PostEditor.test.tsx`에 duplicate option이 1개인지 회귀를 추가했다.
+- fresh 전체 검증: `npm.cmd test -- --maxWorkers=1` → `Test Files 28 passed (28)`, `Tests 302 passed (302)`, exit 0, `Duration 217.27s (transform 2.87s, setup 11.21s, import 18.86s, tests 43.09s, environment 122.17s)`. skipped/failure/error 출력 없음.
+- 관련 검증: `npm.cmd test -- src/test/router.test.tsx --maxWorkers=1 --reporter=verbose` → 1 file/16 tests passed; `npm.cmd test -- src/features/post/PostEditor.test.tsx --maxWorkers=1 --reporter=verbose` → 1 file/6 tests passed. `npm.cmd run lint` exit 0. `npm.cmd run build` exit 0(Vite 132 modules, JS 855.43 kB/gzip 264.16 kB; chunk warning만).
+- 구조 검증: 변경 파일 재독(`heroBlogContext`, `BlogPage`, `PostEditor`, 관련 tests), `git diff --check -- frontend .claude/team/frontend` → `DIFF_CHECK_EXIT=0`(line-ending warning만).
+- 남은 범위: logout UI 추가는 요청 범위가 아니며 구현하지 않았다. root가 API `127.0.0.1:18080` 실제 브라우저 upload 권한/1440px smoke를 계속 확인한다.
+
+## 2026-10-03 17:36:49 KST — M4 whole-review IMPORTANT 수정 wave·fresh 전체 검증
+
+- 담당/경계: frontend 역할 단일 작성자로 부모가 전달한 whole-review 기준 hash `59badfe` 이후 FE 소유 범위만 수정했다. `frontend/**`와 이 역할 STATE/WORKLOG만 변경했고 backend/QA/root 문서, Git stage/commit/push, 하위 agent는 건드리지 않았다.
+- RED: `npm.cmd test -- --maxWorkers=1 src/features/post/PostEditor.test.tsx src/test/components.test.tsx src/test/router.test.tsx src/test/categoryBehavior.test.tsx`는 frontend cwd에서 경로를 잘못 준 첫 시도 `No test files found` exit 1 후, 상대 경로 재실행에서 `4 files`, `8 failed`, `61 passed`, exit 1을 확인했다. 기존 문서 전체 교체, malformed Prose crash, EditPage draft callback, DEFAULT 앞 GENERAL category, 두 draft 목록 page1, list/table attrs가 각각 의도대로 실패했다.
+- 구현: `PostEditor` Markdown paste/toolbar를 TipTap `insertContent`로 전환해 선택 문맥을 보존하고 bold/link Markdown을 감지했다. DEFAULT가 있는 category에는 중복 없는 `카테고리 없음` 빈 option을 유지했다. `DraftPicker`와 `SettingsPostsPage`에 `page/size=20` next/previous UI를 연결했다. `EditPage` draft 선택은 `/edit/{id}`로 이동한다. `Prose`는 비배열 content/marks를 안전하게 건너뛰고 orderedList `start/type`, table `colspan/rowspan`을 상세 렌더에 반영했다.
+- 관련 GREEN: PostEditor `11/11`; components/router/category `3 files / 59 tests`; 편집 snapshot fixture의 orderedList `start=5,type=A`, table `colspan=2,rowspan=2` round-trip 포함.
+- 최종 검증 명령/출력:
+  - `npm.cmd test -- --maxWorkers=1` → `Test Files 28 passed (28)`, `Tests 311 passed (311)`, failure/error/skip 0, exit 0, Duration 151.75s. OOM 회피는 `maxWorkers=1` 자원 제한만 사용했으며 test skip/제외·힙 상향은 하지 않았다.
+  - `npm.cmd run lint` → exit 0.
+  - `npm.cmd run build` → exit 0; `tsc -b`, Vite 132 modules, JS 857.80 kB / gzip 264.76 kB; 500 kB chunk warning만 출력.
+  - `git diff --check -- frontend .claude/team/frontend` → `DIFF_CHECK_EXIT=0`; LF→CRLF 경고만 출력.
+- 남은 인계: independent `m4_whole_review` 후속 diff 검토, root의 API `127.0.0.1:18080`/backend sanitizer 호환성 및 1440px browser/visual 검증은 미실행이다. 이 역할은 자체 검증을 최종 M4 승인으로 승격하지 않는다.
+
+## 2026-10-03 17:47:44 KST — 브라우저 category 계약 보정·최종 구조화 증거
+
+- root Chrome R5에서 실제 DEFAULT가 존재하는 `/write`의 `카테고리 없음` 선택과 서버의 `null → DEFAULT` 의미 불일치가 관측되어, `PostEditor`를 실제 DEFAULT category ID로 초기화하고 DEFAULT가 있으면 빈 fallback option을 숨기도록 보정했다. GENERAL이 먼저인 fixture도 화면 선택값과 `categoryId` payload가 실제 DEFAULT ID `1`로 일치한다.
+- root Chrome R1의 toolbar Markdown 및 일반 Ctrl+V는 기존 paragraph/H1/H2와 삽입 본문을 모두 보존했고, R4 draft picker는 `/edit/26`으로 이동해 B 제목과 full snapshot 본문을 복원했다. 이 역할은 해당 browser runtime을 직접 운영하지 않았으며 root의 독립 증거로 기록한다.
+- 보정 후 `npm.cmd test -- --maxWorkers=1 src/features/post/PostEditor.test.tsx` → 1 file/11 tests passed. 최종 구조화 `npm.cmd test -- --maxWorkers=1 --reporter=json --outputFile=../build/m4-frontend-final-results.json` → `build/m4-frontend-final-results.json` 파싱 결과 `testResults=28`, assertions=311, passed=311, failed=0, skipped/todo=0, exit 0.
+- 최종 보정 상태의 `npm.cmd run lint` → exit 0; `npm.cmd run build` → exit 0, Vite 132 modules, JS 857.92 kB/gzip 264.75 kB, 500 kB chunk warning만; `git diff --check -- frontend .claude/team/frontend` → `DIFF_CHECK_EXIT=0`(LF→CRLF 경고만).
+- 남은 인계: independent `m4_whole_review` 후속 diff, backend sanitizer/API `18080` 호환성, root의 1440px 최종 시각/권한 판정은 별도다. 이번 wave 제품 수정과 자체 증거는 완료했지만 역할 단독으로 M4 최종 승인하지 않는다.
+
+## 2026-10-03 17:53:13 KST — R7 orderedList 실제 표식 스타일 보정
+
+- 독립 scoped review에서 `Prose.tsx`의 `<ol className="list-decimal">`가 HTML `type="A"` 의미를 decimal CSS로 덮는 Minor를 확인했다. `type=1/a/A/i/I`를 각각 `decimal/lower-alpha/upper-alpha/lower-roman/upper-roman` inline `list-style-type`로 매핑하고 `list-decimal` class를 제거했다.
+- TDD RED: `npm.cmd test -- --maxWorkers=1 src/test/components.test.tsx` → 1 failed/28 passed; DOM `type="A"`는 있었지만 `listStyleType: upper-alpha`가 없어 실패했다.
+- 영향 GREEN: `npm.cmd test -- --maxWorkers=1 src/test/components.test.tsx src/features/post/PostEditor.test.tsx` → 2 files/40 tests passed. 구조화 `build/m4-frontend-r7-results.json` 파싱 결과 suites=2, total=40, passed=40, failed/pending/todo=0, success=true.
+- `npm.cmd run lint` exit 0; `npm.cmd run build` exit 0, Vite 132 modules, JS 858.06 kB/gzip 264.80 kB, 500 kB chunk warning만. `git diff --check -- frontend .claude/team/frontend` → `DIFF_CHECK_EXIT=0`(LF→CRLF 경고만).
+- 기존 `build/m4-frontend-final-results.json`의 28 files/311 tests 증거는 R7 추가 전 결과로 구분하며, R7 영향범위 리포트가 추가되었다. 전체 suite는 요청대로 재실행하지 않았다.
+
+## 2026-10-03 18:00:23 KST — 구현 하위 경로 AGENTS 지침 동기화
+
+- 최종 Git 인벤토리에서 누락된 두 소유 하위 경로에 짧은 지침을 추가했다: `frontend/src/features/post/AGENTS.md`, `frontend/src/features/upload/AGENTS.md`.
+- post 지침은 contentJson 원본·PageResponse 초안 페이징·canonical 이미지·인접/행동 테스트 위치를, upload 지침은 UUID canonical URL·ManagedImage identity/revoke·1..5MiB·multipart 경계를 기록한다. 상위 지침을 반복 전재하지 않았다.
+- 제품 source/test/dependency는 변경하지 않았고 부모 지시대로 재테스트하지 않는다. R7 actual Chrome에서 orderedList `start=5,type=A`와 lower-alpha 표식이 확인된 결과는 기존 독립 인계 근거로 유지한다.
+
+## 2026-10-03 18:16:53 KST — M4 최종 독립 리뷰·Git 통합 대기 인계
+
+- 독립 whole reviewer 최종 판정은 `Ready to merge: Yes`이며 R1~R8 및 R7 후속 잔여는 0이다.
+- root가 API, Chrome R1/R4/R5, orderedList `start=5,type=A` 및 lower-alpha 표식, 최종 PNG artifact를 검증·보존했고 `docs/worklog/M4-posts.md` 18:15 기록에 남겼다.
+- FE STATE의 독립 review/runtime pending을 해소했다. 남은 상태는 root 소유 Git 통합/merge 대기뿐이며, FE는 Git stage/commit/push를 수행하지 않았고 통합 완료·대기 완료라고 표현하지 않는다.
+- 제품 source/test/dependency는 수정하지 않았고 재테스트·빌드도 실행하지 않았다. 이 append가 frontend 역할의 마지막 문서 쓰기다.

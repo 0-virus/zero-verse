@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { FormField } from '../components/ui/FormField';
 import { Button } from '../components/ui/Button';
 import { Panel } from '../components/ui/Panel';
@@ -6,6 +6,8 @@ import { getProfile, updateProfile, changePassword } from '../features/settings/
 import { getBlog, updateBlog } from '../features/blog/blogApi';
 import { useAuth } from '../lib/authContext';
 import { ApiRequestError } from '../lib/apiClient';
+import { ManagedImage } from '../features/upload/ManagedImage';
+import { uploadImage } from '../features/upload/uploadApi';
 
 interface ProfileForm {
   name: string;
@@ -55,6 +57,7 @@ export function SettingsProfilePage() {
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileSuccess, setProfileSuccess] = useState(false);
+  const [profileImageUploading, setProfileImageUploading] = useState(false);
 
   // 블로그 폼 상태
   const [blogForm, setBlogForm] = useState<BlogForm>({
@@ -86,6 +89,8 @@ export function SettingsProfilePage() {
    */
   const profileDirty = useRef(false);
   const blogDirty = useRef(false);
+  const profileImageUploadGeneration = useRef(0);
+  const mountedRef = useRef(true);
 
   /**
    * 편집 횟수. 요청을 보낼 때 값을 캡처해 두고 응답이 왔을 때 그대로인지 본다.
@@ -125,6 +130,21 @@ export function SettingsProfilePage() {
   const [blogLoaded, setBlogLoaded] = useState(false);
 
   const userId = user?.id;
+  const currentUserIdRef = useRef(userId);
+  currentUserIdRef.current = userId;
+
+  useEffect(() => {
+    profileImageUploadGeneration.current += 1;
+    setProfileImageUploading(false);
+  }, [userId]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      profileImageUploadGeneration.current += 1;
+    };
+  }, []);
 
   /**
    * 카드별 조회. **재시도할 수 있어야 한다** — 실패했는데 다시 부를 방법이 없으면 잠긴 `fieldset`이
@@ -187,6 +207,43 @@ export function SettingsProfilePage() {
     profileRevision.current += 1;
     setProfileForm((prev) => ({ ...prev, [field]: value }));
     setProfileSuccess(false);
+  };
+
+  const handleProfileImageFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    const requestUserId = userId;
+    const requestGeneration = ++profileImageUploadGeneration.current;
+    setProfileError(null);
+    setProfileSuccess(false);
+    setProfileImageUploading(true);
+    try {
+      const uploaded = await uploadImage(file, 'PROFILE_IMAGE');
+      if (
+        !mountedRef.current ||
+        currentUserIdRef.current !== requestUserId ||
+        profileImageUploadGeneration.current !== requestGeneration
+      ) return;
+      handleProfileChange('profileImageUrl', uploaded.imageUrl);
+    } catch (err) {
+      if (
+        !mountedRef.current ||
+        currentUserIdRef.current !== requestUserId ||
+        profileImageUploadGeneration.current !== requestGeneration
+      ) return;
+      if (err instanceof ApiRequestError) {
+        setProfileError(err.message || '프로필 이미지 업로드에 실패했습니다.');
+      } else {
+        setProfileError(err instanceof Error ? err.message : '프로필 이미지 업로드에 실패했습니다.');
+      }
+    } finally {
+      if (
+        mountedRef.current &&
+        currentUserIdRef.current === requestUserId &&
+        profileImageUploadGeneration.current === requestGeneration
+      ) setProfileImageUploading(false);
+    }
   };
 
   const handleBlogChange = (field: keyof BlogForm, value: string) => {
@@ -255,7 +312,9 @@ export function SettingsProfilePage() {
         nickname: profileForm.nickname,
         bio: profileForm.bio || undefined,
         birthDate: profileForm.birthDate || undefined,
-        profileImageUrl: profileForm.profileImageUrl || undefined,
+        // 빈 값은 사용자가 제거를 눌렀다는 명시적 신호다. JSON에서 빠뜨리면
+        // legacy/managed 이미지가 서버에 남을 수 있으므로 null로 보낸다.
+        profileImageUrl: profileForm.profileImageUrl || null,
       });
 
       // 저장 이전 상태를 읽고 있던 **프로필** 조회는 이제 낡았다. 블로그 조회는 건드리지 않는다.
@@ -330,7 +389,7 @@ export function SettingsProfilePage() {
             <div className="flex flex-col items-center gap-2">
               <div className="flex h-[90px] w-[90px] items-center justify-center border-[3px] border-ink bg-surface-raise">
                 {profileForm.profileImageUrl ? (
-                  <img
+                  <ManagedImage
                     src={profileForm.profileImageUrl}
                     alt={
                       profileForm.nickname
@@ -358,6 +417,17 @@ export function SettingsProfilePage() {
               >
                 변경
               </button>
+              <label className="cursor-pointer border-2 border-ink bg-surface px-2.5 py-1 text-center text-[11px] font-semibold text-ink hover:bg-surface-raise">
+                {profileImageUploading ? '업로드 중...' : '파일 업로드'}
+                <input
+                  type="file"
+                  aria-label="프로필 이미지 파일 업로드"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="sr-only"
+                  onChange={handleProfileImageFile}
+                  disabled={profileImageUploading}
+                />
+              </label>
             </div>
 
             {/* 우: 프로필 필드 — 정본 §8.7의 `90px 1fr` 그리드(라벨이 입력 왼쪽). */}
@@ -411,18 +481,30 @@ export function SettingsProfilePage() {
               <FormField
                 label="프로필 이미지"
                 id="profile-image-url"
-                type="url"
+                type="text"
                 value={profileForm.profileImageUrl}
-                onChange={(e) => handleProfileChange('profileImageUrl', e.target.value)}
-                placeholder="https://example.com/avatar.png"
+                readOnly
                 orientation="inline"
                 surface="warm"
+                hint="기존 이미지는 유지할 수 있으며, 새 이미지는 파일 업로드로 변경합니다."
+                trailing={
+                  profileForm.profileImageUrl ? (
+                    <button
+                      type="button"
+                      aria-label="프로필 이미지 제거"
+                      className="shrink-0 border-2 border-ink bg-surface px-2.5 py-2 text-[11px] font-semibold text-ink hover:bg-surface-raise"
+                      onClick={() => handleProfileChange('profileImageUrl', '')}
+                    >
+                      제거
+                    </button>
+                  ) : null
+                }
               />
               <Button
                 variant="primary"
                 size="md"
                 type="submit"
-                disabled={profileLoading || !profileLoaded}
+                disabled={profileLoading || profileImageUploading || !profileLoaded}
                 className="self-start px-[22px]"
               >
                 {profileLoading ? '저장 중...' : '저장'}

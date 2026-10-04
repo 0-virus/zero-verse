@@ -2,39 +2,40 @@
 
 > 덮어쓰기 스냅샷. 시간순 이력은 `WORKLOG.md`, 심의·마일스톤 이력은 `docs/governance/**`와 `docs/worklog/**`를 본다.
 
-마지막 갱신: 2026-10-03 13:43 KST (M3/M4 QA 산출물 commit-review 독립 대조)
+마지막 갱신: 2026-10-03 18:18 KST
 
 ## 현재 단계
 
-- M3는 PR #9 merge commit `59badfe42d539a33091a387b9ee6119d838190b8`로 `dev`에 병합됐고 기존 QA acceptance는 APPROVE/PASS다.
-- M4 전체·제품 U1·실제 AWS는 별도 gate이며 현재 승인/완료로 보지 않는다.
-- 무료 대체 SeaweedFS 4.47 실측은 **U0-ALT 부분 통과, U0 전체 BLOCKED**다. 최종 QA 판정은 **BLOCKED (U0 PASS 아님)**, 확신도 99/100, 위험 HIGH/기밀성 CRITICAL이다.
+- **로컬 M4 최종 QA PASS**다. PRD §9.7·회의 §20.8의 승인 범위인 로컬 파일 저장, 인증 multipart/content API, 글·이미지 접근권한, 5MiB 제한, 자동 테스트와 root 독립 runtime/browser 증거를 닫았다.
+- 사용자가 **“브라우저 파일 업로드만 제외하고 API·자동 테스트로 검증해”**라고 결정했으므로 Chrome 파일 선택·전송 자동화는 실행하지 않았다. multipart API·FE 자동 업로드, 실제 파일 저장·권한·이미지 표시·재시작 보존은 검증했다.
+- 이 PASS는 제품 로컬 M4 인수 판정이며 commit/push/merge/release 완료를 의미하지 않는다. QA는 Git을 조작하지 않는다.
 
-## 진행 중
+## 최종 검증 결과
 
-- 회의 §17·§19와 현재 `gradle/u0/**`, `frontend/u0/**`를 읽기 전용 대조했다. SeaweedFS 4.47은 PAB route는 등록하지만 공식 handler가 `ErrNotImplemented`를 반환해 setup/read가 `HTTP501`이며, PAB VERIFY는 false/분모 28/exit 1로 유지된다. expected status·negative 기준은 낮아지지 않았다.
-- 공식 native SeaweedFS 4.47 ZIP SHA-256 `8809359079e62fcd60574ff661449160899622c52072f3f569d346669079efe9`, Java SHA-256 `EA8D0D21161159638683D5CD7871F391578641F743AD9D12F45572DE98D75F6D`, HTML SHA-256 `B98C583B82C49F87EB08C30550624EADADF58DDE1F8F6CB86DF07EA014442EDE`를 root 산출물과 대조했다.
-- 후속 XHR 비교에서 사용한 일회성 진단 HTML SHA-256은 `4E25BBC4E140F2F705899985896A0FDCE4D50825AE283CB879D7B58889AEB7C9`로 root 증거에 기록됐고, 진단 후 현재 `frontend/u0/index.html`에는 XHR/diagnostic 코드가 남아 있지 않다. browser 본시험 증거의 HTML hash와 일회성 진단 hash를 혼합하지 않는다.
-- Java core는 `19/19 CASE PASS`, `27/28 VERIFY PASS`, exit 1이다. SeaweedFS identity가 실제 anonymous private GET `403`, signed GET `200/403/403`, OwnershipControls, CORS, checksum/HEAD/range/Tika/object absence를 통과시켰다.
-- root fresh browser 관측은 `19/19 cases · 18 PASS · verify 27/28 PASS`다. unsigned private GET은 실제 `403`이지만 `over-5mb-signed-at-max`는 `fetch TypeError/CORS`로 HTTP status가 노출되지 않아 FAIL 유지다. `/verify` 유일 실패는 PAB `UNSUPPORTED HTTP501`이다.
-- fresh harness `81971`에서 동일 manifest/body를 native XHR로 한 번 대조했으며 `status 0 · event error · headers 미수신`이었다. fetch→XHR 교체로도 response status가 readable하지 않았고, 이는 진단 증거일 뿐 U0 PASS 승격이나 fetch fallback 근거가 아니다. JS의 ACAO/Connection 미관측은 CORS header exposure 제한 때문에 CORS failure를 뜻하지 않는다.
-- 서버·harness는 종료됐고 SeaweedFS data는 보존됐다. 모든 listener loopback 확인, synthetic identity는 anonymous 없이 broad `Admin/Read/Write/List/Tagging`이며 least-privilege 증거가 아니다. STS signing-key/SSE/filer gRPC 경고는 운영 범위 밖 잔여 위험으로 남겼다.
+- Backend full: `build/m4-final-backend-full-20261003-1900.log` BUILD SUCCESSFUL 13m49s, 보존 archive `build/m4-final-junit-20261003-1915` 직접 XML 집계 66 files/426 tests/0 failure/0 error/0 skipped.
+- Backend bootJar: `build/m4-final-bootjar-20261003-1920.log` BUILD SUCCESSFUL 18s. 최종 runtime `build/m4-runtime-20261003-181423.jar` SHA-256 `D2B5FBB8A659D707F1A4039FB062D1768113D9AD53946F7A1D6AAA983783E2EF`.
+- Frontend: `build/m4-frontend-final-results.json` 28 test files/311 passed/0 failed/0 pending; `build/m4-frontend-r7-results.json` 2 files/40 passed/0 failed/0 pending. frontend lint/build exit 0.
+- Root 7차 HTTP smoke exit 0. malformed leaf 400/VALIDATION_001, ordered-list attrs true/true, large page 2147483647 정상 empty page, 권한·MIME·5MiB·purpose/rebind/detach/delete/view/snapshot gates 통과.
+- 최종 D2B5 runtime에서 OpenAPI posts 201, uploads 201, content GET operation과 실제 오류 응답을 확인했다. 기존 image post23의 재시작 후 HTTP 200/395 bytes/image/png/no-store/nosniff와 원본·파일·HTTP SHA-256 `2F76F73080F7F5ACE1CA54507604FE80937718FB8A6E1757F9E71D125B243F67`가 일치한다.
+- 독립 whole review는 FE R1/R2 방어/R4/R5/R6/R7 및 BE R2/R3/R7/R8을 종료 가능으로 판정했고 추가 Critical/Important 회귀가 없다. root Chrome은 1440px과 ordered-list/image 표시를 확인했다. symlink proof도 read/write 차단과 marker 보존으로 통과했다.
 
 ## 다음 작업
 
-1. `qa/M4-u0-review.md`의 SeaweedFS acceptance matrix와 BLOCKED 판정을 유지하고, SeaweedFS 결과를 AWS acceptance 또는 U0 완료로 승격하지 않는다.
-2. browser oversized PUT은 fetch와 native XHR 모두 readable status가 아니므로 FAIL을 유지한다. raw HTTP403·object absence·XHR status0을 browser status의 대체 증거로 쓰지 않는다.
-3. PAB 4 flags·least-privilege/deny precedence·AWS CORS/SigV4/checksum/conditional/size semantics는 실제 AWS 또는 정식 지원 IAM/PAB 환경의 별도 gate로 남긴다. U1은 실제 AWS가 아닌 제품 도메인/FE vertical slice다.
+1. root가 QA 판정을 반영한 명시 파일만 stage하여 diff/commit/PR 절차를 진행한다. QA는 stage/commit/push/merge하지 않는다.
+2. 이후 원격 PR/review/merge 결과가 오면 로컬 M4 PASS와 원격 통합 상태를 분리해 기록한다.
+3. S3/presigned/AWS/LocalStack/U0 후속과 M5 이후 기능은 새 승인·별도 마일스톤으로 다룬다.
 
-## 차단 요인
+## 비차단 잔여 범위
 
-- SeaweedFS 4.47은 PAB route만 있고 handler가 stub이라 `HTTP501`; 회의 §17상 조용한 skip/full PASS가 금지돼 U0 전체를 승인할 수 없다.
-- browser `over-5mb-signed-at-max`가 fetch와 XHR 모두 response status를 읽지 못한다(`fetch TypeError/CORS`, `XHR status 0/error`). 조기 close/reset 가설은 강해졌지만 exact browser TCP 원인은 미확정이며 통과로 바꾸지 않는다.
-- SeaweedFS의 broad synthetic identity·loopback data-plane은 AWS IAM policy semantics, public-access block, TLS/내구성/수명주기/STS/SSE/control-plane hardening을 증명하지 않는다.
+- 브라우저 파일 선택·전송 자동화는 사용자 명시 결정으로 제외했다.
+- S3/실제 AWS/U0 및 운영 배포 hardening은 후속이며 기존 U0 `BLOCKED` 판정을 유지한다.
+- M5 관계 CRUD·댓글·좋아요는 이번 판정에 포함하지 않는다.
 
 ## 주요 산출물
 
-- `qa/M4-u0-review.md` — SeaweedFS U0-ALT 독립 판정·acceptance matrix·잔여 AWS/U1 gate
-- `build/u0-seaweedfs-diagnostic-evidence.md` — root의 raw HTTP·TCP·native XHR 후속 관측(실행 근거, QA 직접 실행 아님)
-- `.claude/team/qa/WORKLOG.md` — 2026-09-23 최종 독립 QA append
-- 제품·BE/FE 원본·governance/worklog 원본은 QA가 변경하지 않았다.
+- `qa/M4-review.md`: 승인 계약, 전체 gate, 최종 로컬 M4 PASS 및 잔여 범위.
+- `qa/m4-api-smoke.ps1`: HTTP acceptance helper.
+- `qa/M4-u0-review.md`: U0-ALT 독립 판정 및 BLOCKED 위험.
+- `.claude/team/qa/WORKLOG.md`: append-only QA 검증 이력.
+
+QA는 제품 코드, 타 역할 테스트, runtime/DB/browser fixture, Git을 변경하지 않았다.

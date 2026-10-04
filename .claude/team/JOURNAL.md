@@ -322,3 +322,63 @@
 - 현재범위에서완료할수있는해결책을확보하지못해후속결정대기다. 신규provider/vendor보안기능개발·proxy/실제AWS/비용/계정/검증완화/제품U1로자동확대하지않는다. 같은실패재시험·조사·승인요청을변화없이반복하지않는다. QA최종검토및역할문서동기화진행.
 
 - 후속 정리 완료: 네 역할 최종 보고와 독립 QA BLOCKED를 실제 파일로 확인했다. 임시XHR추가분 제거 후 HTML은FEBE910E…이며 과거B98C와byte동일확인은못했다. root jsdom 실제페이지self-check/버튼복원assert PASS(exit0),최종diffcheck0·제품경로diff없음·14567/14568LISTENING0. 현재clean해시와과거browser입력해시를구분해M4worklog/진단evidence에명시했다. 기존heartbeat갱신성공,후속범위결정전반복작업없이대기한다.
+
+## 2026-10-03 14:22 KST — 로컬 M4 완료 지시·계약 검토 재개
+
+- 사용자 `$brief 로컬에서 검증할 수 있는 수준이면 되니까 localstack 등은 제쳐 두고 m4 완료까지 달려`에 따라 root가 읽기 전용 brief를 수행했다. 기준 `feature/M4-posts`/`97567d9`, M3 dev 병합 완료, 시작 시 clean. 글 엔티티/API·Write/Edit/PostDetail 제품 기능은 아직 없으며 U0 실패가 제품 구현의 선행 차단 조건인 기존 상태를 최신 지시로 갱신한다. M5 이후는 이번 범위 밖이다.
+- 실행 상태 진행: 회의 §20 로컬 계약 초안을 작성하고 독립 `/root/m4_local_product_review`, `/root/m4_local_architecture_review`, `/root/m4_local_delivery_review`에 동일 안건을 읽기 전용 배정했다. `/root/m4_local_pm_sync`는 명시된 사용자 결정만 PM 정본에 반영한다. 기존 U0 실패 이력은 보존한다.
+- S3 계약 대체는 로컬 검증 기준 변경과 구분한다. 실제 multipart 로컬 파일 저장 방식과 S3 API 유지 중 선택을 사용자에게 요청했다. 초안 전체의 신규 API·DB·보안·의존성은 아직 승인으로 기록하지 않으며 제품 구현은 시작하지 않았다.
+- JDK21/Node22 확인. Docker 엔진 미기동을 확인해 설치된 Docker Desktop을 hidden으로 시작했으며 준비 상태 확인 중이다. 기존 데이터 삭제/LocalStack 재시험/외부 자원 생성은 하지 않았다. GitHub 읽기 API의 401은 로컬 준비와 분리한다.
+
+- 후속: 독립3인 모두 보고 완료, 회의 §20.5~20.6 보완·종합 기록. Product/Delivery HIGH 조건부, Architecture 새 전체계약 BLOCKED. 로컬 파일 업로드 안을 권고하며 사용자 선택을 기다린다. Docker 엔진 응답 exit0·실행 컨테이너 없음 확인. 제품 코드/DB/의존성 변경 없이 문서·환경 준비까지 보존하며 결정 후 구현 계획·역할 배정·독립 QA로 재개한다.
+
+## 2026-10-03 — 로컬 저장 방식 승인·구현 계획 작성
+
+- 사용자가 로컬 저장/업로드 API·권한과5MB유지·S3후속 질문에 `로컬 파일 저장으로 M4 완성`을 선택했다. 회의 §20.7에 정확한 승인 범위를 기록했다. 저장 방식 선택 대기는 해소됐으며 기존 U0 실패는 유지한다.
+- root는 기존 M4 worklog에 역할별 파일·API·테스트를 포함한 실행 계획을 작성한다. PM 기존 에이전트에 최신 결정만 정본에 동기화하도록 후속 배정했다. 제품 구현 전 계획 검토 단계이며 별도 계획 파일/작업트리/외부 서비스를 생성하지 않는다.
+
+## 2026-10-03 — 실행계획 yes 승인·역할 병렬 구현 시작
+
+- 사용자 `yes`로 기존 M4 worklog Task1~7과 backend/frontend 병렬·독립QA가 승인됐다. `/root/m4_backend_impl`에 src/Gradle Task1~3, `/root/m4_frontend_impl`에 frontend Task4~6, `/root/m4_qa_acceptance`에 qa Task7 인수준비를 배정했다. `/root/m4_local_pm_sync`는 승인 정본 동기화. root는 REQUIREMENTS/지침/README/.gitignore/governance/runtime과 최종 검증 담당이다. 공유파일별 단일작성자이며 Git은 root 최종 검증 후 수행한다.
+- root는 로컬M4요구·UPLOAD003/004·JSON원본 정책, `.local-data/` Git제외·운영경계와 결정/위험 레지스터를 동기화했다. GitHub 읽기조회는 sandbox 밖 정상인증으로 성공했고 M4 open PR은 없다. 기존의401은 현재 차단이 아니다.
+- 별도합성DB `zeroverse-m4-smoke-20261003-v2`를 mysql8.4/loopback13308로 생성했다. 최초 `zeroverse-m4-smoke-20261003` 시도는 PowerShell .NET 정적RNG API 미지원→credential미생성→MySQL init exit1이었고 원인을 확인해 instanceRNG·중단오류처리로 수정했다. 최초 빈컨테이너와 기존DB는 보존했다. 비밀값은 메모리/컨테이너 환경에만 전달하고 출력/파일/Git에 남기지 않았다. 실제 제품 인수는 아직 미실행이다.
+
+## 2026-10-03 16:07 KST — 구현 병렬 분할·조기 QA 수정 루프
+
+- root는 기존 backend를 잠시 중단해 아직 미착수 upload 경로를 확인한 뒤 `/root/m4_backend_upload`에 `domain/upload/**`와 upload 전용 테스트를 독점 배정했다. `/root/m4_backend_impl`은 즉시 재개해 post/content/tag/universe·공통 설정/오류·서비스 통합 및 backend STATE/WORKLOG 단일 작성을 유지한다. frontend·QA도 기존 배정을 이어간다. 기능 범위·사용자 승인 경계는 바꾸지 않았다.
+- `qa/M4-review.md` 조기 Task1/2 리뷰의 ACL/order/ledger/인접글/HMAC/동시성 증거 발견을 읽고 원 구현자에 전달했다. 콘텐츠 초기 보완은 정적 확인했으며 runtime/full test PASS는 아직 아니다. POST 생성은 기존 프로젝트 API 패턴에 따라 201 envelope로 조율했다.
+- root의 합성 DB와 Vite(`127.0.0.1:5173`, API target `127.0.0.1:8080`)가 실행 중이고 Chrome 첫 화면 로딩을 확인했다. API는 아직 시작하지 않았다. Git 제외 build 보조 스크립트의 구문 검사 및 합성 PNG 생성만 완료했으며 기존 사용자 데이터·파일은 보존했다.
+- 다음은 구현자 테스트/통합 인계 → root 실제 HTTP·브라우저·재시작 → 독립 최종 QA → 기록·명시 파일 커밋/푸시/PR이다. M4 완료나 S3 완료를 아직 주장하지 않는다.
+
+## 2026-10-03 — 로컬 기동·브라우저 작성 검증 진행
+
+- 실행 상태 `진행`. root는 예약 포트 충돌을 피한 API18080와 Vite5173에서 실제 작성/임시저장/재개/발행을 확인했다. 상세·근거는 M4 worklog 중간 검증에 기록했다. 현재 runtime snapshot `0E90FCBF...`은 최신 소스 전이므로 최종 재빌드/재시작 인수가 필요하다.
+- backend 원 작성자는 프로필 바인딩·UTC 응답 및 전체 테스트, upload 작성자는 컴파일·스토리지 검증, frontend는 전체 테스트 OOM 원인, QA는 smoke fixture 빈 배열을 각각 수정 중이다. 파일 소유권은 기존 배정을 유지한다.
+- 브라우저 파일 업로드 확장 권한은 사용자 선택 대기이며 임의 변경하지 않는다. HTTP·단위/통합 검증은 독립 진행한다. 전체 PASS·M4 완료·커밋/푸시는 아직 미실행이다.
+
+## 2026-10-03 17:20 KST — HTTP 첫 통과·전체 리뷰 수정 준비
+
+- 실행 `진행`. runtime389065.../API18080에서 QA HTTP script 전체 범위 exit0, 실제 PNG 익명 browser 렌더·바이트/파일 hash 일치를 root가 확인했다. FE28files/302tests 및 upload20tests/symlink 검사 통과 증거는 M4 worklog에 연결했다. 전체 BE suite는 원 작성자가 실행 중이다.
+- QA harness의 반복 fixture 오류는 fresh QA 컨텍스트 `/root/m4_qa_harness_fix`가 단일 파일을 보정했고 현재 인계 완료다. `/root/m4_whole_review`는 별도 읽기 전용 전체 리뷰를 수행하며 markdown 본문 유실 등 발견을 최종 목록으로 취합한다. 구현자 자기승인으로 대체하지 않는다.
+- 다음은 리뷰 발견을 backend/frontend 소유자별 수정 → 영향 회귀/전체 BE → 최신 snapshot HTTP/재시작/브라우저 → 독립 재리뷰 → 정본/기록 → 명시 파일 commit/push/PR이다. M5는 착수하지 않는다. 브라우저 파일 선택창 권한만 사용자 선택 대기이며 다른 검증을 계속한다.
+
+## 2026-10-03 — 브라우저 파일 업로드 검증 예외 승인
+
+- 사용자가 `브라우저 파일 업로드만 제외하고 API·자동 테스트로 검증해`라고 결정했다. Chrome 파일 URL 권한 대기를 해소하고 해당 설정은 변경하지 않는다. API·자동 업로드 테스트 및 실제 저장된 이미지의 브라우저 읽기/재시작 보존 검증을 유지한다. 전체 리뷰 R1~R8 수정은 계속 진행한다.
+
+## 2026-10-03 17:53 KST — 최종 회귀·재리뷰 진행
+
+- 실행 `진행`, 범위 M4 한정. root가 FE 보존 JSON28files/311tests/0failure·pending과 실제 브라우저 R1 본문보존/R4 초안전환/R5 DEFAULT 선택을 확인했다. 독립 검토자는 FE R1/R2방어/R4/R5/R6 해소, R7 ol CSS Minor 잔여를 반환했고 frontend가 소유 파일을 보완 중이다.
+- backend는 첫 전체419tests/1failure의 구 allowlist fixture를 보정하고 R3 SQL페이징/R8 부모삭제 및 content R2/R7을 통합했다. root가 관련 targeted 성공 로그와 SQL/page 소스를 직접 확인했으며 최종 전체/산출물은 대기다. QA `/root/m4_qa_closeout`이 과거 조기기록에 최신 증거 addendum을 작성했다.
+- 다음은 최신 JAR 재시작 → API/기존 이미지보존·콘텐츠 GREEN → 최종BE전체 및 독립 scoped 재리뷰 → 역할/리더 기록·명시파일 commit/push/dev PR이다. Git branch는 feature/M4-posts, HEAD97567d9, origin/dev59badfe 유지, 기존 M4 PR은 없다. 완료·머지 주장은 보류한다.
+
+## 2026-10-03 — 로컬 M4 최종 인수·Git 통합 준비
+
+- 실행 `진행`, 제품 인수 완료. BE426 tests/0failure·error·skip, FE311 및 후속영향40 PASS, 최종 D2B5 artifact의 Swagger201·기존 이미지해시 보존을 root가 확인했다. `/root/m4_whole_review` Ready to merge Yes/잔여0, `/root/m4_qa_closeout` 로컬M4 PASS다. 실제 증거는 M4 worklog 최종 리뷰와 qa/M4-review.md18:18을 따른다.
+- 역할별 문서를 최종 결과로 맞춘 뒤 명시112파일만 commit/push하고 feature/M4-posts→dev PR을 처리한다. 제품소스 변경은 종료했으며 기존 local데이터/개인설정/검증로그는 Git에서 제외한다. S3후속·브라우저파일선택예외·M5제외는 유지한다.
+
+## 2026-10-04 14:58 KST — M4 Git closeout 재개
+
+- 사용자 `계속`, 실행 `진행`. brief 재대조: feature/M4-posts HEAD97567d9/원격 동일, dev59badfe, M4 PR없음. 최종 제품소스 추가 변경 없음, JAR D2B5와 보존 BE426/FE311+후속40 PASS 일치. 최신 독립 QA는 로컬M4 PASS다.
+- PM 마지막 상태 문구 후속은 역할 모델 사용량 제한으로 종료됐다. 현재 쓰기 중인 역할은 없고 제한을 우회하지 않는다. 일부 역할STATE의 QA/runtime 대기 문구는 이전 시점이며 최신 M4worklog/QA가 이를 해소한다. 역할STATE·PRD 상태 문구에 한한 리더 갱신 권한을 별도로 요청했고 제품 인수와 분리한다.
+- 리더는 승인된 명시 파일 commit/push와 dev PR 통합을 계속한다. M5 및 S3/U0 확장, 데이터 삭제는 하지 않는다.

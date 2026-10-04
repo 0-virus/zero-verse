@@ -229,6 +229,52 @@ afterEach(() => {
 });
 
 describe('M3 카테고리 관리 행동', () => {
+  it('임시저장 목록은 다음 페이지로 21번째 초안까지 접근할 수 있다', async () => {
+    const firstPage = Array.from({ length: 20 }, (_, index) => ({
+      id: index + 1,
+      blogId: 1,
+      blogSlug: 'category',
+      blogTitle: '카테고리 별',
+      author: { id: 1, nickname: 'category-user', profileImageUrl: null },
+      category: { id: 1, name: '기본' },
+      title: `${index + 1}번째 초안`,
+      thumbnailUrl: null,
+      visibility: 'PRIVATE',
+      viewCount: 0,
+      publishedAt: null,
+      createdAt: '2026-10-03T00:00:00Z',
+      updatedAt: '2026-10-03T00:00:00Z',
+      tags: [],
+      excerpt: '초안',
+    }));
+    const twentyFirst = { ...firstPage[0], id: 21, title: '21번째 초안' };
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/auth/refresh')) return envelope({ accessToken: 'token' });
+      if (url.includes('/auth/me')) return envelope(USER);
+      if (url.includes('/api/v1/blogs/1/categories')) return envelope(page([category(1, '기본', 'DEFAULT', 0)]));
+      if (url.includes('/api/v1/posts/drafts')) {
+        const requestedPage = Number(new URL(url).searchParams.get('page') ?? '0');
+        return envelope({
+          items: requestedPage === 0 ? firstPage : [twentyFirst],
+          page: requestedPage,
+          size: 20,
+          totalElements: 21,
+          totalPages: 2,
+          hasNext: requestedPage === 0,
+          hasPrevious: requestedPage > 0,
+        });
+      }
+      throw new Error(`예상하지 못한 요청: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderSettings();
+
+    expect(await screen.findByText('1번째 초안')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '다음 초안 페이지' }));
+    expect(await screen.findByText('21번째 초안')).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/posts/drafts?page=1&size=20'))).toBe(true);
+  });
+
   it('mutation 성공 뒤 재조회가 실패하면 성공 notice를 남기지 않고 재시도한다', async () => {
     const initial = [category(1, '기본', 'DEFAULT', 0), category(2, '일반', 'GENERAL', 1)];
     let categoryReads = 0;

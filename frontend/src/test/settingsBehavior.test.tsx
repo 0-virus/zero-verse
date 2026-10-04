@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { BlogInitialSetupPage } from '../pages/BlogInitialSetupPage';
@@ -525,7 +525,7 @@ describe('/settings — 프로필·블로그·비밀번호 독립 상태', () =>
    * 표시만 확인하면 `onChange`나 PUT payload에서 두 필드를 빼도 통과한다.
    * FR-SETTINGS-01의 수정 경로를 실제로 잡으려면 요청 본문을 단정해야 한다.
    */
-  it('생년월일·프로필 이미지 수정이 PUT 본문에 실린다', async () => {
+  it('생년월일 수정은 legacy 프로필 이미지 URL을 읽기 전용으로 유지한다', async () => {
     install([
       [
         /\/users\/me$/,
@@ -542,11 +542,11 @@ describe('/settings — 프로필·블로그·비밀번호 독립 상태', () =>
     await user.type(birth, '2000-12-31');
 
     const image = screen.getByLabelText('프로필 이미지');
-    await user.clear(image);
-    await user.type(image, 'https://a.dev/new.png');
+    expect(image).toHaveAttribute('readonly');
+    expect(image).toHaveValue('https://a.dev/x.png');
     expect(screen.getByAltText('behaver의 프로필 이미지')).toHaveAttribute(
       'src',
-      'https://a.dev/new.png',
+      'https://a.dev/x.png',
     );
 
     const profileForm = await formOf(/닉네임/);
@@ -559,7 +559,81 @@ describe('/settings — 프로필·블로그·비밀번호 독립 상태', () =>
       expect(puts).toHaveLength(1);
       expect(JSON.parse(String((puts[0][1] as RequestInit).body))).toMatchObject({
         birthDate: '2000-12-31',
-        profileImageUrl: 'https://a.dev/new.png',
+        profileImageUrl: 'https://a.dev/x.png',
+      });
+    });
+  });
+
+  it('프로필 이미지 제거는 빈 이미지 값으로 저장한다', async () => {
+    install([
+      [
+        /\/users\/me$/,
+        () => envelope({ ...USER, profileImageUrl: 'https://a.dev/x.png' }),
+      ],
+      BLOG_GET,
+    ]);
+
+    renderSettings();
+
+    const user = userEvent.setup();
+    await awaitLoadedValue(/프로필 이미지$/, 'https://a.dev/x.png');
+    await user.click(screen.getByRole('button', { name: '프로필 이미지 제거' }));
+    expect(screen.getByLabelText('프로필 이미지')).toHaveValue('');
+
+    const profileForm = await formOf(/닉네임/);
+    await user.click(within(profileForm).getByRole('button', { name: '저장' }));
+
+    await waitFor(() => {
+      const puts = fetchMock.mock.calls.filter(
+        (c) => String(c[0]).endsWith('/users/me') && (c[1] as RequestInit)?.method === 'PUT',
+      );
+      expect(puts).toHaveLength(1);
+      expect(JSON.parse(String((puts[0][1] as RequestInit).body))).toMatchObject({
+        profileImageUrl: null,
+      });
+    });
+  });
+
+  it('프로필 이미지 파일은 multipart 업로드 후 canonical URL을 프로필 저장에 사용한다', async () => {
+    const canonical = '/api/v1/uploads/550e8400-e29b-41d4-a716-446655440000/content';
+    install([
+      [/\/users\/me$/, (_url, init) =>
+        init?.method === 'PUT'
+          ? envelope({ ...USER, profileImageUrl: canonical })
+          : envelope(USER)],
+      BLOG_GET,
+      [/\/uploads$/, (_url, init) => {
+        expect(init?.body).toBeInstanceOf(FormData);
+        expect((init?.headers as Record<string, string> | undefined)?.['Content-Type']).toBeUndefined();
+        return envelope({
+          id: '550e8400-e29b-41d4-a716-446655440000',
+          imageUrl: canonical,
+          contentType: 'image/png',
+          size: 3,
+          purpose: 'PROFILE_IMAGE',
+        });
+      }],
+    ]);
+
+    renderSettings();
+    const user = userEvent.setup();
+    await awaitLoadedValue(/닉네임/, 'behaver');
+    const fileInput = await screen.findByLabelText('프로필 이미지 파일 업로드');
+    const file = new File(['png'], 'avatar.png', { type: 'image/png' });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    const imageUrl = await awaitLoadedValue(/프로필 이미지$/, canonical);
+    await waitFor(() => expect(imageUrl).toHaveValue(canonical));
+    const profileForm = await formOf(/닉네임/);
+    await user.click(within(profileForm).getByRole('button', { name: '저장' }));
+
+    await waitFor(() => {
+      const puts = fetchMock.mock.calls.filter(
+        (c) => String(c[0]).endsWith('/users/me') && (c[1] as RequestInit)?.method === 'PUT',
+      );
+      expect(puts).toHaveLength(1);
+      expect(JSON.parse(String((puts[0][1] as RequestInit).body))).toMatchObject({
+        profileImageUrl: canonical,
       });
     });
   });

@@ -182,3 +182,38 @@
 - 검토 결과: `gradle/u0`의 `U0Harness`는 고정 `127.0.0.1:14566` LocalStack/`--seaweedfs` 전용 `127.0.0.1:14568`, harness `127.0.0.1:14567`, `us-east-1`, synthetic `test/test`, 고유 private bucket을 유지한다. 19 CASE/28 VERIFY, signed `Content-Length`·`Content-Type`·checksum·`If-None-Match`, Host/Content-Length 브라우저 header 제외, reject 기대와 unsigned private GET 403 기준을 완화하지 않았다.
 - 검증: `git diff --check -- .claude/team/backend/STATE.md .claude/team/backend/WORKLOG.md gradle/u0/settings.gradle gradle/u0/build.gradle gradle/u0/src/main/java/com/zeroverse/u0/U0Harness.java` exit 0. `& .\gradlew.bat --gradle-user-home .gradle-home2 -p gradle/u0 --no-daemon --max-workers=1 compileJava`는 `BUILD SUCCESSFUL in 26s`, `U0_REVIEW_COMPILE_EXIT=0`; 동일 `test`는 `BUILD SUCCESSFUL in 27s`, `NO-SOURCE`, `U0_REVIEW_TEST_EXIT=0`이다.
 - 미해결: AWS 실서비스는 여전히 미실측이다. SeaweedFS 대체 실측은 browser over-size TypeError/CORS와 PAB capability gap으로 전체 U0 BLOCKED이며, 제품 `src/**`, 실제 AWS, U1/M4 상세 계약 및 Git 조작은 수행하지 않았다.
+## 2026-10-03 16:31 KST — M4 Task1~3 backend 통합·검증 기록
+
+- 구현: `PostService`의 글 CRUD/권한/목록/태그/rolling 24h 조회 ledger/48h bounded cleanup/ACL 후 previous-next를 보완하고, `PostContentService`의 JSON root·UTF-8 1MiB·depth32·node10000·TipTap attrs allowlist·canonical image·OWASP sanitizer를 반영했다.
+- 구현: `V3__posts_local_uploads.sql`의 active PostImage unique/ledger/image metadata와 실제 MySQL migration 검증, `UPLOAD_003/004`, multipart 5MiB/6MiB 및 `UPLOAD_002` 예외 변환을 반영했다.
+- 통합: `PostService`가 `UploadService.bindPostImages`를 호출하고 `UserSettingsService`가 `UploadService.bindProfileImage`를 호출한다. managed profile URL은 binding 검증 후 저장하며 외부 legacy URL은 유지한다.
+- 검증 명령: `& .\gradlew.bat --no-daemon --max-workers=1 compileJava --gradle-user-home .gradle-home2` → `BUILD SUCCESSFUL in 57s` (exit 0).
+- 검증 명령: `& .\gradlew.bat --no-daemon --max-workers=1 bootJar --gradle-user-home .gradle-home2` → `BUILD SUCCESSFUL in 1m 03s`, exit 0. 로그: `build/m4-backend-bootjar-20261003-1622.log`. 이후 UserSettingsService 변경이 있어 최종 bootJar 재생성 필요.
+- root runtime가 fresh 합성 MySQL에서 Flyway V1/V2/V3와 Hibernate validate를 확인했다. Windows 8080 예약으로 root가 18080에서 HTTP smoke를 조율 중이다.
+- 미해결: `src/test/java/com/zeroverse/domain/upload/LocalImageStoreTest.java`에 `com.zeroverse.domain.upload.service.LocalImageStore` import가 없어 `compileTestJava`가 8개 symbol 오류로 실패한다. 업로드 소유권 경로이므로 직접 수정하지 않고 담당자에게 요청했다.
+- 미해결 검증: 위 import 반영 전에는 fresh test count, Post/Upload integration, UserSettings binding test, full test를 완료로 보고하지 않는다. git stage/commit/push는 하지 않았다.
+## 2026-10-03 16:40 KST — M4 최종 main artifact·profile binding 기록
+
+- `UserSettingsService`가 `UploadService.bindProfileImage`를 통해 canonical profile image의 최초 binding/clear/detach를 같은 transaction에서 처리하도록 통합했다. legacy 외부 URL은 계속 저장할 수 있다.
+- `UserSettingsController` OpenAPI 400 설명에 `UPLOAD_004`를 추가하고, `application.yml`/`application-local.example.yml`에 `zeroverse.upload.viewer-hmac-secret: ${VIEWER_HMAC_SECRET}` 및 `zeroverse.upload.directory` 계약을 명시했다.
+- `& .\gradlew.bat --no-daemon --max-workers=1 compileJava --gradle-user-home .gradle-home2` → `BUILD SUCCESSFUL in 47s`, exit 0.
+- `& .\gradlew.bat --no-daemon --max-workers=1 bootJar --gradle-user-home .gradle-home2` → `BUILD SUCCESSFUL in 16s`, exit 0. 로그 `build/m4-backend-bootjar-20261003-1640.log`; artifact SHA-256 `A72FAC7008C79021FA0D0E5AD8636514C6305545D20B5A5E9092432A98F768A2`.
+- fresh `compileTestJava`는 업로드 담당 테스트의 누락 import 때문에 exit 1이며 로그 `build/m4-backend-compileTestJava-20261003-1628.log`에 12개 `LocalImageStore` symbol 오류가 남아 있다. 해당 경로는 직접 수정하지 않았다.
+
+## 2026-10-03 18:13 KST — M4 최종 backend 검증·인계
+
+- 보완: `PostRepository` 목록·인접글을 SQL ACL predicate와 `Pageable`로 bounded 조회하도록 통합했다. soft-deleted post/blog/owner, publish/visibility, category/tag, owner·accepted Universe 관계를 DB에서 먼저 제한하며, 이전 Java 전체목록 pagination과 20개 선행 ACL 누락 문제를 제거했다.
+- 보완: JPA query binder의 int offset 한계를 확인하는 RED(`build/m4-post-paging-parent-red-20261003-1745.log`) 후 page-zero total 기반 empty-page 방어를 적용했다. targeted GREEN은 `build/m4-post-paging-parent-green-20261003-1800.log`, 혼합 PUBLIC/PRIVATE offset 회귀는 `build/m4-post-pagination-acl-green-20261003-1820.log`이며 모두 exit 0이다.
+- 보완: `findById...`/for-update 조회에 deleted blog/user 조건을 추가해 삭제 부모 상세가 ACL 전에 `POST_001`이 되도록 했다. 공개 post 상세 security fixture는 M4 공개 GET 계약에 맞춰 보호 경로 목록에서 분리하고 missing detail fixture를 유지했다.
+- 통합: ContentService leaf/container recursive schema, attrs/mark allowlist, ordered-list/table span 보존, TipTap link attrs와 canonical local image URL 회귀를 upload 담당 변경과 통합했다. R3/R8/Content/Security targeted는 `build/m4-post-r3-r8-targeted-20261003-1810.log`에서 `BUILD SUCCESSFUL`이다.
+- 검증: upload/profile/V3 targeted 명령은 `build/m4-upload-profile-v3-targeted-20261003-1840.log`에서 `BUILD SUCCESSFUL`이다. 최종 full 명령은 `& .\gradlew.bat --no-daemon --max-workers=2 --init-script build/m4-two-fork-test.init.gradle test --gradle-user-home .gradle-home2`; 로그 `build/m4-final-backend-full-20261003-1900.log`, `BUILD SUCCESSFUL in 13m 49s`, exit 0이다.
+- 보존: `build/m4-final-junit-20261003-1915/test-results`에 66 XML suite/426 tests를 복사했다. failures/errors/skipped는 `0/0/0`이다. 최종 bootJar `build/m4-final-bootjar-20261003-1920.log`, artifact `build/libs/zeroverse-server-0.0.1-SNAPSHOT.jar`, SHA-256 `D2B5FBB8A659D707F1A4039FB062D1768113D9AD53946F7A1D6AAA983783E2EF`이다.
+- OpenAPI: `UploadController` upload operation에 실제 `201 Created` response annotation을 추가하고 final bootJar에 포함했다. root가 해당 artifact로 최종 OpenAPI/HTTP/image/browser smoke를 독립 검증했다.
+- 정책 정정: 이 파일의 16:40 과거 항목 “legacy 외부 URL은 계속 저장”은 호환 범위를 넓게 읽을 수 있다. 현재 승인 계약은 `currentUrl == requestedUrl`인 기존 legacy 외부 URL만 unchanged로 유지하며, 신규 external/blob/data/malformed/blank 또는 managed→external 변경은 `UPLOAD_004`(400)다. null clear와 canonical 변경은 `UploadService` binding 경유이며 user row 선잠금을 사용한다. 과거 항목은 이력으로 보존한다.
+- 실행 경계: 제품 코드·테스트·backend 기록만 수정했다. Git stage/commit/push, root runtime/DB 직접 조작, 실제 AWS/U0 변경은 수행하지 않았다.
+
+## 2026-10-03 18:16 KST — root final runtime/OpenAPI gate 결과
+
+- root가 SHA-256 `D2B5FBB8A659D707F1A4039FB062D1768113D9AD53946F7A1D6AAA983783E2EF` artifact로 runtime을 재기동하고 독립 검증했다. `POST /api/v1/posts` 201, `POST /api/v1/uploads` 201, public image content GET, 기존 image 200 재조회와 동일 hash, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`가 통과했다.
+- whole independent review 결과는 Ready to merge `Yes`, 잔여 `0`이다. Git stage/commit/push/merge는 아직 대기 중이며 이 기록에서 완료로 표시하지 않는다.
+- 이 항목은 문서 기록만 갱신했다. 제품 소스·테스트·빌드·runtime·DB 및 Git은 변경하지 않았다.

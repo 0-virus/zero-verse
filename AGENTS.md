@@ -171,3 +171,9 @@ ZeroVerse Blog MVP 저장소. 개인 블로그 플랫폼으로, 사용자는 자
 U0만 승인된 검증 의존성: `gradle/u0`의 AWS SDK Java2 S3/BOM `2.49.6`, Apache Tika core `3.3.2`. 제품 의존성으로 편입하지 않는다. 근거·검증 상태는 M4 회의 §14 및 worklog를 따른다.
 
 <!-- MANUAL: Any manually added notes below this line are preserved on regeneration -->
+
+### 2026-10-03 로컬 M4 실행 결정
+
+사용자는 로컬 파일 저장으로 M4 완성과 `docs/worklog/M4-posts.md`의 실행계획(Task1~7)을 승인했다. 현재 M4는 LocalStack/SeaweedFS/AWS 검증을 선행 조건으로 삼지 않는다. 인증된 로컬 multipart 업로드와 권한 있는 콘텐츠 GET, 실제 바이트 5MiB 제한을 사용하며 S3 연동은 후속이다. 위의 기존 S3/LocalStack 설명과 충돌하는 로컬 M4 범위는 이 결정과 PRD §9.7·회의 §20.8이 우선한다. `.local-data/`는 Git 제외 로컬 영속 데이터이며 Gradle clean과 분리하고 임의 삭제하지 않는다. 실제 구현·검증 완료 여부는 M4 worklog와 역할 STATE를 확인한다. 이번 실행은 M4까지이며 M5 이후 자동 확장하지 않는다.
+
+승인된 실행계획/회의 §20.1에 따라 제품 콘텐츠 정화에 OWASP Java HTML Sanitizer `20260102.1`, MIME 판별에 Tika core `3.3.2`를 사용한다. 따라서 위 U0 전용 Tika 제한은 이 로컬 제품 범위에 한해 대체되며 AWS SDK는 여전히 U0 전용이다. 2026-10-03 사용자 지시로 브라우저 파일 선택·업로드 검증만 제외하고 API·자동 테스트로 검증한다. 실제 파일 저장·권한·5MiB·브라우저 이미지 표시·재시작 보존 검증은 유지한다.

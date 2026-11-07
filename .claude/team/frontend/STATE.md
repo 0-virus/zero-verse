@@ -2,11 +2,11 @@
 
 > 덮어쓰기 스냅샷. 시간순 이력은 `WORKLOG.md`, 마일스톤 이력은 `docs/worklog/**`를 본다.
 
-마지막 갱신: 2026-11-07 최종 QA 인수 시점 KST
+마지막 갱신: 2026-11-07 16:53:41 KST
 
 ## 현재 단계
 
-- M5 A-v2 FE 구현·디자인 대조·독립 QA를 PASS로 인수했고 root의 Git 통합을 기다리는 단계다.
+- M5 A-v2 FE 구현·디자인 대조·독립 QA를 PASS로 인수했고 PR #11의 `dev` merge까지 반영된 단계다.
 - 소유 경계는 `frontend/**` 및 `.claude/team/frontend/**`이며, backend·QA·root 문서·Git은 수정하지 않았다.
 - `docs/design/DESIGN-SYSTEM.md`와 `ZeroVerse Pages.dc.html` 원본을 직접 대조했으며, QA final(`qa/M5-review.md`)의 1440px 실제 API·시각·키보드 PASS와 V001/V002 CLOSED를 접수했다.
 
@@ -36,5 +36,5 @@
 ## 다음 작업 / 차단 요인
 
 - QA가 1440px 실제 API 6개 카드·hero 7상태·refresh·계정 전환·guest·keyboard를 PASS했고 V001/V002를 닫았다. root가 같은 338/lint/build 결과와 screenshot 대조를 직접 확인했다.
-- 남은 단계는 root의 Git 통합·M5 최종 기록뿐이다. 실제 Git merge 전이므로 frontend 역할이 마일스톤 완료를 단정하지 않는다.
+- PR #11(`https://github.com/0-virus/zero-verse/pull/11`)이 2026-11-07 16:53:41 KST `30a863000a918075e9e1530ec6627e2f9167989a`로 `dev`에 merge됐다. root 확인상 `origin/dev` tree `ae40db51c5de9f9d262347802962579775ee7c77`와 검증 HEAD가 일치하고 local `dev` fast-forward도 완료됐다. M5 FE 범위는 통합 완료 상태이며, 이후 closeout 기록은 root 소유다.
 - npm lockfile 기준 기존 audit 2 moderate/6 high는 임의 fix/upgrade하지 않았다.

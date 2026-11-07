@@ -286,3 +286,9 @@
 - root/독립 QA의 최종 `qa/M5-review.md` 판정에서 V-001/V-002가 CLOSED되고 M5 전체 인수 PASS로 확정됐다.
 - backend 소스·테스트·runtime 제품 변경은 없으며 BE full `70 files / 457 tests`와 failures-errors-skips `0/0/0` 증거를 유지한다.
 - 현재 backend 역할의 잔여 작업은 없다. Git 마감 및 runtime(`session 48765`/Colima) 정상 정리는 root가 마감 절차에서 수행한다.
+
+## 2026-11-07 KST — M5 PR #11 dev 통합 완료
+
+- root가 PR #11(`https://github.com/0-virus/zero-verse/pull/11`)을 2026-11-07 16:53:41 KST `dev`에 머지했다. merge SHA는 `30a863000a918075e9e1530ec6627e2f9167989a`, 구현 SHA는 `060bbcf`다.
+- root는 검증 HEAD와 동일한 `origin/dev` tree `ae40db51c5de9f9d262347802962579775ee7c77`를 확인하고 local `dev`를 fast-forward했다. M5 인수·backend 자동검증·브라우저 QA 결과를 이 통합 상태로 확정한다.
+- 이번 역할 범위는 M5에서 종료하며 M6은 착수하지 않았다. runtime 종료 여부는 root가 별도 확인 후 처리한다.

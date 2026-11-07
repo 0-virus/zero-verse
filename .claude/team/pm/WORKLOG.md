@@ -304,3 +304,12 @@
 - **STATE 반영**: PM `STATE.md`를 `APPROVED / M5 인수 PASS, Git 마감 진행`으로 갱신했다. 제품 acceptance와 실제 Git closeout을 분리해 기록했다.
 - **Git·소유권**: 현재 branch에는 아직 M5 commit/push/PR/merge가 없다. 이번 턴은 PM 소유 `docs/PRD.md`, `.claude/team/pm/STATE.md`, `.claude/team/pm/WORKLOG.md`만 수정했고 제품 소스·QA·governance·M5 worklog·Git은 수정하지 않았다.
 - **다음 단계**: root가 명시 파일 commit/push, `dev` 대상 PR·독립 리뷰·merge를 수행한 뒤 실제 근거를 PM 기록에 append한다.
+
+## 2026-11-07 16:55 KST — M5 완료·PR #11 dev 통합 동기화
+
+- **근거 대조**: root가 전달한 PR #11 및 실제 Git을 read-only로 재확인했다. `git branch --show-current`=`dev`, `HEAD`=`30a863000a918075e9e1530ec6627e2f9167989a`, `origin/dev`도 동일하며, `HEAD^{tree}`와 `origin/dev^{tree}`는 모두 `ae40db51c5de9f9d262347802962579775ee7c77`다. 구현 commit은 `060bbcf15d54025a8e098627be279143e4e3094a`다.
+- **통합 사실**: PR #11(`https://github.com/0-virus/zero-verse/pull/11`)이 2026-11-07 16:53:41 KST `dev`에 merge됐다. M5 QA final acceptance PASS/merge-ready YES와 제품·1440px 시각 gate closure를 실제 Git 통합까지 연결했다.
+- **정본 반영**: PRD §9.8·§10 M5·§12 DoD·§13 확정 결정의 현재 상태 문구를 M5 완료·`dev` 통합으로 갱신하고, A-v2 계약 원문·사용자 승인 이력·M8/M6 이후 범위 제외를 보존했다.
+- **STATE 반영**: PM `STATE.md`를 `APPROVED / M5 완료·dev 통합`으로 갱신했다. 제품·QA·시각·Git 통합 blocker 없음과 M6 이후 자동 착수 금지를 명시했다.
+- **범위·소유권**: 이번 턴은 PM 소유 `docs/PRD.md`, `.claude/team/pm/STATE.md`, `.claude/team/pm/WORKLOG.md`만 수정했다. 제품 소스·테스트·QA·governance·Git 조작은 수행하지 않았다.
+- **다음 단계**: root의 문서 closeout 정합성 대조 후 M5를 마감 상태로 유지한다. M6 이후는 사용자의 명시 지시 전 착수하지 않는다.

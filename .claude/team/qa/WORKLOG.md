@@ -479,3 +479,10 @@
 ### 산출물 경계
 
 - QA가 수정한 것은 `qa/**`, `.claude/team/qa/**`뿐이다. PNG/JSON은 Git 무시 `build/m5-visual-qa/`에 있고 비밀값을 포함하지 않는다. 제품 코드·backend/frontend 역할 기록·governance·마일스톤 worklog·Git은 수정하지 않았다.
+
+## 2026-11-07 16:53:41 KST — M5 PR #11 dev 통합 closeout
+
+- root가 M5 PR #11의 실제 통합을 확인했다. 구현 커밋은 `060bbcf15d54025a8e098627be279143e4e3094a`, merge SHA는 `30a863000a918075e9e1530ec6627e2f9167989a`, 대상은 `dev`다.
+- root 확인 origin/dev tree `ae40db51c5de9f9d262347802962579775ee7c77`가 QA가 최종 검증한 커밋 트리와 동일하다. QA는 read-only로 HEAD/base 및 clean tree를 확인했으며 추가 테스트를 반복하지 않았다.
+- M5 독립 QA 최종 판정(PASS / merge-ready YES)과 BE-001/BE-002/QA-001/QA-002/DOC-001/V-001/V-002 CLOSED 상태는 dev 통합 후에도 유지된다.
+- QA 소유 STATE만 closeout/dev 통합 상태로 갱신했다. `qa/M5-review.md`는 최종 PASS 기록을 유지하며, 제품/테스트/Git은 변경하지 않았다.

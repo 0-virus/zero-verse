@@ -371,3 +371,9 @@
 - 독립 QA final(`qa/M5-review.md`) 결과를 접수했다. 1440px 실제 API 기준 SettingsUniverse 6 cards, Blog hero 7 states, refresh, account switch, guest, keyboard 동작과 screenshot 대조가 PASS였고 V001/V002가 CLOSED됐다.
 - root가 최종 frontend 자동 검증 `31 files/338 tests passed`, `npm run lint` exit 0, `npm run build` exit 0 및 screenshot 대조를 직접 확인했다. 기존 >500KB chunk warning과 npm audit 2 moderate/6 high는 변경하지 않았다.
 - 상태: frontend 역할 산출물은 QA 인수 PASS로 기록했지만 실제 Git merge는 아직 root 소유 단계다. merge 전 M5 전체 완료를 단정하지 않는다. 제품 소스는 추가 변경하지 않았다.
+
+## 2026-11-07 16:53:41 KST — M5 FE dev 통합 확인
+
+- root 전달 결과를 반영했다. PR #11(`https://github.com/0-virus/zero-verse/pull/11`)이 merge SHA `30a863000a918075e9e1530ec6627e2f9167989a`로 `dev`에 통합됐고, 구현 기준 `impl060bbcf`가 반영됐다.
+- root 확인상 `origin/dev` tree `ae40db51c5de9f9d262347802962579775ee7c77`가 검증 HEAD와 일치하며 local `dev` fast-forward도 완료됐다.
+- frontend 제품·테스트·Git은 추가 변경하지 않았다. M5 FE 범위는 QA PASS 및 dev 통합까지 닫혔고, 후속 closeout 문서 기록은 root 소유다.

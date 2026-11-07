@@ -389,3 +389,26 @@
 - 구현 커밋4404f1e push, PR #10 dev merge 완료: `c34ff4e979bd6efffc3a2aea28c2be307ccac3b5`, 15:07:52 KST. 원격 상태 MERGED, 검증 feature와 merge tree 동일, 로컬 dev fast-forward/기존 데이터 보존을 확인했다.
 - 로컬 M4 완료. 독립QA PASS·리뷰잔여0, BE426/FE311+R7영향40 및 runtime 증거는 M4worklog 최종 [리뷰]·[머지]가 정본이다. 네 역할 STATE와 로컬 PRD는 승인된 상태 문구만 리더가 갱신했으며 원 역할 WORKLOG/제품 코드/요구사항은 변경하지 않았다. 마감 문서는 별도 docs 커밋으로 남긴다.
 - 이번 사용자 범위인 M4까지 마감한다. M5 착수, S3/U0 재시험, 운영 배포와 데이터 삭제는 하지 않는다.
+- 2026-11-07 KST — 사용자 `m5 완료를 목표로 작업 착수해줘`로 M5 연속 지휘를 시작했다. 시작은 `feature/M5-universe`/`7b03de5`, `dev`와 동일, 제품 변경 0이다. `docs/worklog/M5-universe.md`와 `docs/governance/meetings/M5-20261107-universe.md`를 만들어 계획·심의를 시작했다.
+- M5는 backend+frontend·접근제어·공개 API 변경으로 필수 HIGH 심의 대상이다. 독립 Product/Architecture/Delivery 결과는 모두 `APPROVE_WITH_CHANGES/HIGH`(확신도 88/93/90)다. 진행자 권고 A-v2는 V1 유지, 모든 mutation의 오름차순 pair lock, 방향별 snapshot+PENDING requestId, `UNI_004` 404/`UNI_005` 409, 개인정보 최소 DTO, M8 알림 제외다.
+- 현재 상태 `USER_DECISION_REQUIRED`. A-v2 승인 전 제품 구현은 보류한다. gitignore 대상 디자인 원본 `DESIGN-SYSTEM.md`/두 `.dc.html`/`support.js`가 새 clone에 없어 최종 FE 시각 PASS도 복구 전 보류한다. 승인·원본 입력 후 정본 반영→backend/frontend TDD→독립 QA→Git 마감을 이어간다.
+- 2026-11-07 KST — 사용자 `승인`으로 M5 회의 §6 A-v2를 확정했다. 회의/결정 레지스터를 `APPROVED`, RISK-0014를 `OPEN(APPROVED_MITIGATION_PENDING)`으로 전환하고 REQUIREMENTS에 FR-UNI-12·UNI_004/005·pair lock/목록/DTO 계약을 반영했다. PM은 PRD/역할 상태를 동기화한다. 제품 구현은 정본·상세 plan 재독 뒤 backend/frontend TDD로 시작하며, 디자인 원본 복구 전 최종 시각 PASS는 금지한다.
+
+## 2026-11-07 — M5 A-v2 구현·독립 QA 기능 gate 완료, 시각 gate 대기
+
+- 사용자 `승인`으로 HIGH A-v2를 확정한 뒤 backend/frontend 역할이 분리 구현했고 QA가 독립 검토했다. backend는 pair lock·양방향 reread·FR-UNI-01~12·UNI_004/005·목록 batch·OpenAPI를, frontend는 여섯 관계 카드·Blog hero 우선순위·canonical reload·stale guard를 소유했다.
+- QA 1차 Important BE-001(일부 mutation 단방향 reread), BE-002(request 목록 N+1), QA-001(M4 UNIVERSE 연결 증거)은 원 구현자에게 되돌려 RED→GREEN으로 닫았다. snapshot 401과 14개 operation OpenAPI 문서도 보강했다.
+- 리더·QA fresh 증거는 backend 70 files/457 tests `0/0/0`, bootJar 성공, frontend 31 files/336 tests·lint·build 성공이다. 실제 MySQL/HTTP에서 request→accept→UNIVERSE 글 200, delete/block 후 POST_002/403, notification 0을 확인했다.
+- 자동/기능/API 범위는 PASS이며 RISK-0014를 CLOSED했다. 다만 gitignore 대상 디자인 원본 4개가 clone에 없어 1440px 원본 대조가 불가능하다. V-001/RISK-0015를 OPEN/BLOCKER로 유지하고 전체 M5 완료·commit/PR/merge는 디자인 복구와 독립 시각 QA 뒤로 보류한다.
+
+## 2026-11-07 — 디자인 원본 복구·M5 시각 인수 재개
+
+- 사용자 `파일들 옮겨뒀다`에 따라 디자인 원본 4개의 실제 존재를 확인했다. 실행 상태 `진행`, checkout `feature/M5-universe`/`7b03de5`, 원격 `dev` 동일, M5 PR 없음이다. 기존 기능 검증 결과는 유지하고 새로 가능한 1440px 시각 인수를 재개한다.
+- 배정: `/root/m5_frontend_impl`은 원본과 FE 스타일 대조·필요 수정, `/root/m5_independent_qa`는 독립 브라우저 대조와 V-001 판정, `/root/m5_backend_impl`은 합성 로컬 API runtime 준비를 맡는다. 리더는 frontend 서버·실측 확인·마일스톤 기록과 검증 이후 Git 마감을 소유한다.
+- 디자인 2카드·RSS 예시와 승인 M5 여섯 카드·RSS 제외의 차이는 PRD §9.8 결정을 따른다. 원본 복구 사실만으로 V-001을 닫지 않고 실제 화면·상태·새로고침·계정 전환 검증을 기다린다. M6 이후와 S3/U0는 이번 범위에 추가하지 않는다.
+
+## 2026-11-07 — M5 최종 독립 인수 PASS·Git 마감
+
+- 실행 `진행`. 복구 원본에 맞춰 frontend가 단일열 카드·배지·아바타·인라인 버튼·hero 카피를 보정했다. 최종 리더 검증 FE31files/338tests 및 lint/build PASS, BE70suites/457tests/0·0·0과 기존 JAR 유지다.
+- `/root/m5_independent_qa`는 실제 API와 Chrome 1440×1000에서 6개 목록·hero7상태·refresh·계정전환·guest·Tab을 확인하고 전체 M5 final acceptance PASS/merge-ready YES를 판정했다. 리더가 원본/제품 screenshot과 JSON43checks/14screenshots/failures[]를 직접 대조했다. V-001/V-002 및 RISK-0015를 닫았다.
+- 리더가 M5 변경 파일을 명시해 commit/push하고 `feature/M5-universe`→`dev` PR·merge를 수행한다. Git 결과는 실제 성공 후 기록하며 원본·개인설정·합성 데이터는 보존한다. 이번 사용자 목표 M5까지만 마감한다.

@@ -404,3 +404,78 @@
 - 앞선 최종 QA 기록의 `R7 ordered-list/table 의미 보존` 표현을 정정했다. root Chrome 직접 검증은 ordered-list `start=5/type=a`의 marker `e.` 및 computed `lower-alpha`, 이미지 표시와 일반 2×2 표 작성·발행 흐름이다.
 - `rowspan/colspan` 보존은 Chrome 직접 증거로 주장하지 않고, backend `PostContentServiceTest` 및 FE R7 추가 회귀 JSON `2 files/40 tests`, 실패·pending 0의 자동 테스트 증거로 귀속한다.
 - 귀속 정정이며 R7 PASS, 로컬 M4 PASS, 테스트 결과와 범위는 변경하지 않는다. QA는 제품 코드·타 역할 테스트·runtime/DB/browser fixture·Git을 변경하지 않았다.
+
+## 2026-11-07 KST — M5 독립 QA 1차 최종 판정
+
+### 한 일
+
+- `.claude/CONSTITUTION.md` → `AGENTS.md` → `.claude/team/qa/CLAUDE.md` → `STATE.md`와 `qa/AGENTS.md`를 다시 읽고, REQUIREMENTS §6.6 FR-UNI-01~12/NFR-04/09, PRD §4/§5.6/§7.1/§7.6/§9.8/§10~12, M5 worklog와 승인 회의록을 실제 소스와 대조했다.
+- `qa/M5-review.md`에 검증 매트릭스, severity별 finding, positive evidence, 잔여 gate를 작성했다. QA 소유 파일 외에는 수정하지 않았고 commit/push/PR/merge를 하지 않았다.
+
+### 검증
+
+- Fresh frontend `npm test -- --run --maxWorkers=1` → `31 files / 336 tests passed`; `npm run lint` exit 0; `npm run build` exit 0(Vite chunk warning만 존재).
+- 승인된 임시 Temurin21/Colima MySQL8.4 환경에서 backend M5 대상 test를 직접 실행 → `BUILD SUCCESSFUL in 14s`, `6 files / 28 tests / 0 failures / 0 errors / 0 skipped`.
+- source inspection으로 `lockPair` ID 오름차순, block 양방향 정리/반대 BLOCKED 보존, 목록 DB filter/search/sort/PageResponse, snapshot direction/requestId/availability/no-store, FE stale guard/action mapping을 확인했다.
+- 테스트 source에서 `@Disabled`, `it.skip`, `describe.skip`, `test.skip`, `xit`을 찾지 못했다. QA 문서 작성 전후 `git diff --check -- qa .claude/team/qa` exit 0.
+
+### 산출물·판정
+
+- `qa/M5-review.md`: **조건부 통과이나 최종 인수 차단**. Important는 BE-001(모든 mutation의 lock 후 양방향 Universe reread 누락), BE-002(received/sent per-row blog slug N+1), QA-001(M4 신청→수락→UNIVERSE GET 직접 통합/HTTP 증거 부재)다. Minor는 snapshot 직접 무토큰 테스트와 endpoint별 OpenAPI error 문서 증거다.
+- 디자인 원본 `DESIGN-SYSTEM.md`, `ZeroVerse Pages.dc.html`, `ZeroVerse Main Feed v2.dc.html`, `support.js`가 없고 `docs/design/AGENTS.md`만 있으므로 1440px 시각 DoD는 BLOCKED다. 따라서 M5 완료·merge-ready를 주장하지 않는다.
+
+### 미해결
+
+- root가 BE-001/BE-002 수정 루프, 실제 MySQL/HTTP M4 positive/revocation, snapshot 401/OpenAPI 보강, 디자인 원본 복구 후 1440px 검증을 수행해야 한다.
+
+## 2026-11-07 KST — M5 수정 루프 독립 재검토
+
+### 한 일
+
+- 수정된 실제 diff와 정본(REQUIREMENTS §6.6/NFR-04/09, PRD §5.6/§10~12, 승인 회의 A-v2, M5 worklog)을 다시 대조했다. 제품 코드·타 역할 파일은 수정하지 않았다.
+- BE-001은 `UniverseService.pairRelation()`의 `findPair()` 양방향 reread가 accept/reject/cancel/deleteFollowing/unblock 모두의 pair lock 후 경로에 적용된 것을 확인했다.
+- BE-002는 received/sent가 `requestPage→blogSlugs→findByUserIdInAndDeletedAtIsNullOrdered` batch map으로 전환됐고 빈 page early return이 있는 것을 확인했다.
+- QA-001은 실제 MySQL 테스트에서 post 생성→request/accept→service 및 MockMvc UNIVERSE GET 200, delete/block 후 service `POST_002`와 HTTP 403, notification count 0을 확인하도록 보강된 것을 대조했다.
+- QA-002 snapshot 직접 무토큰 경로와 DOC-001 14개 Universe operation bearer/status/schema 순회 검사를 대조했다.
+
+### 검증
+
+- Fresh backend 전체 `GradleWrapperMain test` → `BUILD SUCCESSFUL in 1m 27s`; XML 직접 집계 `70 files / 457 tests / 0 failures / 0 errors / 0 skipped`.
+- Fresh backend targeted Universe/PostConcurrency/OpenAPI/Security → `BUILD SUCCESSFUL in 15s`; `7 files / 61 tests / 0 failures / 0 errors / 0 skipped`.
+- Fresh backend `bootJar` → `BUILD SUCCESSFUL in 958ms`(UP-TO-DATE).
+- Fresh frontend `npm test -- --run --maxWorkers=1` → `31 files / 336 tests passed`; `npm run lint` exit 0; `npm run build` exit 0(Vite chunk warning만 존재).
+- `@Disabled|it.skip|describe.skip|test.skip|xit` 검색 결과 없음. `git diff --check -- qa .claude/team/qa` exit 0.
+- `find docs/design -maxdepth 1 -type f -print` → `docs/design/AGENTS.md`만 존재.
+
+### 최종 closure와 판정
+
+- **CLOSED:** BE-001 pair reread, BE-002 request-list N+1, QA-001 M4 UNIVERSE 접근 회귀/철회·알림 불변, QA-002 snapshot 401, DOC-001 14개 OpenAPI operation 문서화.
+- **OPEN/BLOCKER:** V-001 디자인 원본 부재. 기능/API/자동검증 범위는 **PASS·merge-ready YES**로 올렸지만, 1440px 시각 DoD가 닫히지 않아 전체 M5 final acceptance는 **BLOCKED·merge-ready NO**다.
+- `qa/M5-review.md`에 1차 판정과 수정 루프 closure matrix를 기록하고, `STATE.md`를 현재 상태로 갱신했다. 디자인 원본 복구 후 브라우저 시각 검증만 남겼다.
+
+## 2026-11-07 KST — M5 V-001 최종 실제 브라우저 인수
+
+### 한 일
+
+- 복구된 `docs/design/` 원본을 실제 Playwright + 시스템 Chrome에서 1440×1000 CSS viewport로 렌더하고 Blog/Settings Universe 화면의 visible assertion 후 기준 PNG를 만들었다. 빈 switcher/placeholder는 통과시키지 않았다.
+- root runtime `http://localhost:5173`/API `http://localhost:18080`과 backend-owned `build/m5-visual-fixture-runner.mjs`의 새 합성 A~H 계정을 사용했다. runner는 기존 데이터를 삭제하지 않고, 비밀값을 출력하지 않았다.
+- QA harness `qa/m5-visual-qa.mjs`를 추가·보완했다. 실제 API 계정 로그인, Settings 6개 카드, refresh, Blog owner/7 hero 상태, 두 번째 계정 전환, fresh guest context, RSS 제외 및 CTA href를 기록한다. `FAIL` 또는 final required matrix/account-switch 누락은 exit 1이 된다. `node --check`와 `git diff --check`를 통과했다.
+- 첫 브라우저 캡처에서 `유니버스 신청 ✦`와 원본 `✦ 유니버스 신청`의 순서 차이를 V-002로 보고했다. frontend 수정 후 현재 소스·FE 테스트·최종 matrix가 prefix 카피로 일치한다. 중간 guest 실패는 동일 page의 in-memory auth 상태를 사용한 harness 결함으로 분리했고 fresh BrowserContext로 수정했다.
+
+### 검증
+
+- 최종 명령: `M5_PLAYWRIGHT_MODULE=/Users/zerovirus/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright M5_HEADLESS=1 node build/m5-visual-fixture-runner.mjs` → fixture setup 성공, QA child exit `0`.
+- 최종 `build/m5-visual-qa/evidence.json`: viewport `1440×1000`, 14 screenshots, `failures=[]`; 실제 API 기준 Settings 6 cards/refresh, owner blog hero, incoming/outgoing/friend/follower/NONE/BLOCKED_BY_ME/UNAVAILABLE 7상태, second account, guest `✦ 유니버스 신청` + `/signin` href, no RSS 모두 PASS.
+- 실제 API 계정 A의 Settings main rect `x=404,width=896`, root `min-width=1440px`, body `rgb(246,234,216)`, Blog hero `190px`를 확인했다. 원본 기준 PNG와 제품 PNG를 root가 직접 view_image로 대조했다.
+- 보조 Tab 검증: guest Blog에서 Tab 28회 중 검색 input(`aria-label=검색`)과 hero `/signin` link에 포커스 도달. 반복 순환은 보조 증거로만 기록했다.
+- root 최신 회귀 교차확인: backend `70 XML suites/457 tests/0/0/0`, bootJar 성공; frontend `31 files/338 tests`, lint/build exit 0. 전체 회귀는 제품 코드 변경 후 root가 재실행했으므로 QA가 중복 실행하지 않았다.
+
+### 최종 판정
+
+- **V-001 CLOSED.** 실제 디자인 원본 복구 및 1440px 브라우저 대조가 완료됐다.
+- **V-002 CLOSED.** Blog guest/follower/NONE CTA prefix 카피와 `/signin` 유도 href가 승인 정본·현재 소스·브라우저 증거에 일치한다.
+- **M5 전체 final acceptance PASS / merge-ready YES.** 기능/API/자동검증/시각 gate와 잔여 QA finding이 없다. QA는 commit/push/PR/merge를 수행하지 않으며 root의 Git 마감만 남는다.
+
+### 산출물 경계
+
+- QA가 수정한 것은 `qa/**`, `.claude/team/qa/**`뿐이다. PNG/JSON은 Git 무시 `build/m5-visual-qa/`에 있고 비밀값을 포함하지 않는다. 제품 코드·backend/frontend 역할 기록·governance·마일스톤 worklog·Git은 수정하지 않았다.

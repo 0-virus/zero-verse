@@ -412,3 +412,9 @@
 - 실행 `진행`. 복구 원본에 맞춰 frontend가 단일열 카드·배지·아바타·인라인 버튼·hero 카피를 보정했다. 최종 리더 검증 FE31files/338tests 및 lint/build PASS, BE70suites/457tests/0·0·0과 기존 JAR 유지다.
 - `/root/m5_independent_qa`는 실제 API와 Chrome 1440×1000에서 6개 목록·hero7상태·refresh·계정전환·guest·Tab을 확인하고 전체 M5 final acceptance PASS/merge-ready YES를 판정했다. 리더가 원본/제품 screenshot과 JSON43checks/14screenshots/failures[]를 직접 대조했다. V-001/V-002 및 RISK-0015를 닫았다.
 - 리더가 M5 변경 파일을 명시해 commit/push하고 `feature/M5-universe`→`dev` PR·merge를 수행한다. Git 결과는 실제 성공 후 기록하며 원본·개인설정·합성 데이터는 보존한다. 이번 사용자 목표 M5까지만 마감한다.
+
+## 2026-11-07 16:53:41 KST — M5 dev 통합 완료
+
+- 구현 `060bbcf15d54025a8e098627be279143e4e3094a`를 push하고 PR #11을 `dev`에 merge했다. 실제 merge SHA는 `30a863000a918075e9e1530ec6627e2f9167989a`이며 GitHub merged=true를 확인했다. 독립 QA가 커밋된 44개 파일도 검증본과 동일하고 merge-ready YES라고 재확인했다.
+- 리더가 검증 HEAD와 origin/dev tree `ae40db51c5de9f9d262347802962579775ee7c77` 동일, diff exit 0을 확인한 뒤 local dev를 fast-forward했다. BE457/FE338·브라우저14screenshots/43checks/failures[]·전체 독립 인수 PASS의 제품 버전이 그대로 통합됐다.
+- M5 목표 완료, 제품 작업 종료. 역할 소유자가 실제 머지 상태를 각각 갱신하고 리더가 문서 closeout 커밋을 남긴다. 검증용 FE/API/MySQL/Colima는 정상 종료하며 합성 데이터와 사용자 원본은 보존했다. M6 이후 및 S3/U0는 별도 착수 범위다.

@@ -194,6 +194,15 @@
 
 ## [머지]
 
+### 2026-11-07 16:53:41 KST — PR #11 dev 통합 완료
+
+- 구현 커밋: `060bbcf15d54025a8e098627be279143e4e3094a` — `feat(M5): complete universe relationships and visual acceptance`, 명시 44개 파일.
+- PR: [#11](https://github.com/0-virus/zero-verse/pull/11), `feature/M5-universe` → `dev`. GitHub 응답 `merged=true`, merge SHA `30a863000a918075e9e1530ec6627e2f9167989a`, merged_at `2026-11-07T07:53:41Z`를 확인했다.
+- 독립 QA가 커밋된 `dev...HEAD` 44개 파일과 핵심 소스·harness가 검증본과 동일함을 재확인하고 `merge-ready YES`를 반환했다. GitHub 별도 workflow/status는 없으며 로컬 BE457/FE338·실제 브라우저·독립 QA 증거를 적용했다.
+- 리더가 fetch 후 `git diff --exit-code 060bbcf origin/dev` exit 0과 양쪽 tree `ae40db51c5de9f9d262347802962579775ee7c77` 동일을 확인했다. 로컬 `dev`를 fast-forward했다.
+- **M5 완료.** 기능/API/자동검증/시각 인수와 저장소 통합이 모두 완료됐고 열린 M5 finding은 없다. M6 이후·S3/U0는 이번 작업 범위에 추가하지 않는다.
+- 실행 정리: 이번 FE localhost:5173, API PID30056/18080, `zeroverse-m5-mysql84`, 임시 Colima VM을 정상 종료했다. 합성 DB·이미지·디자인 원본·스크린샷·기존 `.local-data/`는 삭제하지 않았다. 역할·머지 기록은 별도 closeout 문서 커밋으로 남긴다.
+
 ## 2026-11-07 — 시각 정본 복구 후 인수 재개
 
 - 사용자 `파일들 옮겨뒀다` 이후 `docs/design/`에서 네 파일의 실제 존재를 확인했다. 원본은 Git 제외 상태로 보존한다.

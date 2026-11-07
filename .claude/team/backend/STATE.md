@@ -2,7 +2,7 @@
 
 ## 2026-11-07 — M5 Universe 구현 진행
 
-- 현재 단계: M5 A-v2 backend 기능/API/자동검증 및 최종 브라우저 QA PASS. V-001/V-002는 CLOSED되어 M5 전체 인수 PASS이며, Git 마감은 root가 진행 예정이다. 소유 경로는 `src/main/**`, `src/test/**`, backend 역할 기록이다.
+- 현재 단계: M5 A-v2 backend 기능/API/자동검증 및 최종 브라우저 QA PASS. V-001/V-002는 CLOSED되어 M5 전체 인수 PASS이며, PR #11이 `dev`에 머지되어 역할 작업을 마감했다. 소유 경로는 `src/main/**`, `src/test/**`, backend 역할 기록이다.
 - 구현 사실: `Universe` 상태 전이 factory/accept, ID 오름차순 pair lock과 lock 후 양방향 재조회, 신청·수락·거절·취소·관계 삭제·차단·해제, 6개 목록 API, FR-UNI-12 snapshot/no-store Controller/DTO/Repository를 구현했다.
 - root 최종 검증: MySQL 8.4 Colima에서 backend full `70 files / 457 tests / failures-errors-skips 0/0/0`, `BUILD SUCCESSFUL in 1m31s`; `bootJar`도 성공했다.
 - 독립 QA 검증: targeted `7 files / 61 tests`, failures-errors-skips `0/0/0`. BE-001/BE-002/QA-001/QA-002/DOC-001은 CLOSED다.
@@ -10,7 +10,8 @@
 - 브라우저 QA runtime: 기존 `COLIMA_HOME=/private/tmp/zeroverse-colima` default VM을 재기동하고 M5 전용 `zeroverse-m5-mysql84`(MySQL 8.4, `127.0.0.1:13307`)를 준비했다. jar는 PID `30056`, 지속 세션 `48765`, `http://127.0.0.1:18080`에서 실행 중이며 `/v3/api-docs`가 HTTP 200이다. FE `5173`과 연결할 수 있도록 CORS/auth origin을 `http://localhost:5173`으로 주입했다.
 - QA fixture runner: ignored `build/m5-visual-fixture-runner.mjs`를 준비했다. 매 실행 공개 seed와 독립된 random password로 fresh synthetic A~H 계정을 register→signin→initial-setup하고 A 기준 6개 Universe 목록을 각각 1행 이상 채운다. B~H hero 대상 slug/ID·availability·방향 상태·request ID·expectedLabel은 비밀 없는 `M5_HERO_FIXTURES` JSON으로, A/B credentials는 메모리 환경으로만 `qa/m5-visual-qa.mjs`에 전달한다. QA 요청 전에는 실행하지 않는다.
 - 현재 시각 검증: 최종 QA에서 V-001/V-002가 CLOSED되었고 M5 전체 인수 PASS다. 제품 변경 없이 backend BE457 자동검증·API와 브라우저 검증이 유지된다.
-- 다음 작업: root가 Git 마감/정리 절차를 진행한다. runtime은 root가 마감 후 정상 종료할 예정이다.
+- Git 통합: PR #11(`https://github.com/0-virus/zero-verse/pull/11`)이 2026-11-07 16:53:41 KST `dev`에 머지되었고 merge SHA는 `30a863000a918075e9e1530ec6627e2f9167989a`다. 구현 SHA `060bbcf`, 검증 HEAD와 동일한 `origin/dev` tree `ae40db51c5de9f9d262347802962579775ee7c77`를 root가 확인했으며 local `dev`도 fast-forward했다.
+- 다음 작업: 이번 역할 범위는 M5에서 종료한다. M6은 착수하지 않았다. runtime 종료는 root 확인 전까지 미확정이다.
 - 갱신 시각: 2026-11-07 KST
 
 ## 2026-10-04 — M4 로컬 인수·Git 통합 완료

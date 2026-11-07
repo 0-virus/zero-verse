@@ -7,7 +7,8 @@
 - **M5 독립 최종 인수 완료 — 기능/API/자동검증/1440px 브라우저 시각 gate PASS, 전체 final acceptance PASS**다.
 - BE-001/BE-002/QA-001/QA-002/DOC-001과 V-001, 초기 CTA 카피 순서 V-002는 모두 CLOSED다.
 - 기능/API/자동검증 범위는 merge-ready YES이며, 실제 API fixture와 Playwright 브라우저에서 Settings Universe 6개 카드·Blog hero 7상태·refresh·계정 전환·guest를 확인했다.
-- QA는 commit/push/PR/merge를 수행하지 않는다. root의 명시된 Git 마감만 남는다.
+- M5 PR #11은 `060bbcf15d54025a8e098627be279143e4e3094a` 구현 커밋으로 `dev`에 2026-11-07 16:53:41 KST 머지되었고 merge SHA는 `30a863000a918075e9e1530ec6627e2f9167989a`다. QA 최종 판정은 dev 통합 후에도 PASS다.
+- QA는 commit/push/PR/merge를 수행하지 않았으며, 이후 추가 QA 요청 전까지 M5 closeout 상태다.
 
 ## 최종 실측
 
@@ -25,8 +26,8 @@
 
 ## 다음 작업
 
-1. root가 최신 제품 파일과 테스트 출력, QA 기록을 직접 확인한다.
-2. root가 승인된 파일만 commit/push/PR/merge하고 M5 `[머지]`를 기록한다.
+1. M5 PR #11의 `dev` 통합 및 origin/dev 기준(`ae40db51c5de9f9d262347802962579775ee7c77`)이 완료됐다.
+2. root가 docs closeout을 마감한다.
 3. QA는 root가 추가로 요청할 때만 재검토한다.
 
 ## 차단 요인
@@ -35,7 +36,7 @@
 
 ## 갱신 시각
 
-- 2026-11-07 KST — 실제 API fixture/Playwright 최종 run 및 keyboard 보조 검증 후.
+- 2026-11-07 16:53:41 KST — PR #11 dev 통합 확인 및 M5 QA closeout.
 
 ## 소유권 준수
 

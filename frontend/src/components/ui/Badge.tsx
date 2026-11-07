@@ -47,7 +47,7 @@ export function Badge({ kind }: BadgeProps) {
 export function CountBadge({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
-    <span className="inline-block border-2 border-ink bg-accent px-1.5 text-[10px] font-bold text-white">
+    <span className="inline-block border-2 border-ink bg-accent px-2 py-px text-[11px] font-bold text-white">
       {count}
     </span>
   );

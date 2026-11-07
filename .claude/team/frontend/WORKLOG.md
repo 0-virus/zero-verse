@@ -319,3 +319,55 @@
 - root가 API, Chrome R1/R4/R5, orderedList `start=5,type=A` 및 lower-alpha 표식, 최종 PNG artifact를 검증·보존했고 `docs/worklog/M4-posts.md` 18:15 기록에 남겼다.
 - FE STATE의 독립 review/runtime pending을 해소했다. 남은 상태는 root 소유 Git 통합/merge 대기뿐이며, FE는 Git stage/commit/push를 수행하지 않았고 통합 완료·대기 완료라고 표현하지 않는다.
 - 제품 source/test/dependency는 수정하지 않았고 재테스트·빌드도 실행하지 않았다. 이 append가 frontend 역할의 마지막 문서 쓰기다.
+
+## 2026-11-07 KST — M5 Universe FE 구현·검증·인계
+
+- 담당/경계: frontend 역할 단일 작성자로 부모가 승인한 M5 A-v2 실행계획의 `frontend/**`와 이 역할 상태/로그만 수정했다. backend·QA·root 문서와 Git 조작은 건드리지 않았다.
+- RED: `universeApi.test.ts`와 `UniverseListCard.test.tsx`를 먼저 추가하고 구현 전 import resolution 실패(2 suites/0 tests)를 확인했다.
+- 구현: `features/universe/types.ts`·`universeApi.ts`에 FR-UNI-01~12 API와 최소 개인정보 DTO, `UniverseListCard`에 카드/검색/로딩/오류/빈 상태/페이지/액션을 추가했다. `SettingsUniversePage`를 여섯 canonical 목록과 계정·요청 generation guard, mutation 후 목록 재조회로 교체했다.
+- 구현: `BlogPage` 공개 글 조회와 관계 snapshot 조회를 분리하고 guest signin 유도, owner 관리 액션, A-v2 우선순위 액션과 409 재조회·stale cleanup을 연결했다. 알림 row·RSS·신고·댓글/좋아요·feed/search는 만들지 않았다.
+- 검증: targeted 4 files/27 tests, M5 behavior 2/2 tests, 전체 `npm test -- --run --maxWorkers=1` 31 files/321 tests passed(실패/오류/skip 0), `npm run lint` exit 0, `npm run build` exit 0(Vite 137 modules), `git diff --check -- frontend .claude/team/frontend` 오류 없음.
+- 미해결: backend agent의 실제 DTO/OpenAPI/HTTP와의 호환성, 독립 QA, MySQL 경쟁, 디자인 원본 복구 후 1440px 브라우저 시각 검증은 부모/QA 게이트다. npm audit의 기존 2 moderate/6 high는 범위 밖이라 수정하지 않았다.
+
+## 2026-11-07 KST — M5 행동 계약 테스트 보강·최종 재검증
+
+- 보강 테스트: `universeBehavior.test.tsx`에 Blog hero의 BLOCKED_BY_ME·양방향 BLOCKED 정규화·UNAVAILABLE disabled·incoming/outgoing PENDING requestId·ACCEPTED/friend·NONE/incoming ACCEPTED only 우선순위를 전부 추가했다.
+- stale 경계: 블로그 owner 전환과 로그인 계정 전환 뒤 늦은 이전 snapshot이 현재 hero 액션을 덮지 않는지 deferred response로 고정했다.
+- Settings 계약: 받은 accept/reject, 보낸 cancel, followers block, following/friends delete+block, blocks unblock endpoint mapping과 UNI_005 canonical reload를 행동 테스트로 추가했다. 카드별 search/page 독립성도 검증했다.
+- RED 증거: `universeApi.ts`의 `Math.min(...,100)`을 일시 제거한 mutation에서 `universeApi.test.ts` 8개 중 1개가 `size=120` 수신으로 실패했다. 즉시 원복 후 GREEN을 확인했다.
+- 최종 검증: `npm test -- --run --maxWorkers=1` → 31 files/336 tests passed, 실패·오류·skip 0; `npm run lint` exit 0; `npm run build` exit 0(Vite 137 modules, 기존 >500KB warning만); `git diff --check -- frontend .claude/team/frontend` 오류 없음.
+- 미해결: 실제 backend DTO/OpenAPI/HTTP·MySQL 경쟁·독립 QA·디자인 원본 복구 후 1440px 시각 검증은 부모/QA 게이트다. 제품 dependency/audit는 변경하지 않았다.
+
+## 2026-11-07 16:33 KST — M5 디자인 원본 대조·최소 시각 보정
+
+- 담당/경계: frontend 역할 단일 작성자로 복구된 `docs/design/DESIGN-SYSTEM.md`와 `ZeroVerse Pages.dc.html`의 설정 유니버스(원본 319~345행)·Blog hero(69행)를 대조했다. 제품 수정은 `frontend/**`, 상태 기록은 `.claude/team/frontend/**`에만 했으며 backend·QA·root 문서와 Git은 건드리지 않았다.
+- 발견/결정: 정본 설정 카드 헤더는 `padding:12px 20px`, `13px/700`, `letter-spacing:2px`; 받은 신청 아바타는 38px와 `accentSm`/inert, 연결 행 아바타는 34px와 inert 인라인 버튼이었다. 원본의 두 카드/RSS는 승인된 PRD §9.8 여섯 카드/RSS 제외가 override하므로 범위를 줄이지 않았다. 상단 page eyebrow/소개와 2열은 원본 설정 main의 카드 연속 단일 열과 불일치해 시각 전용 텍스트를 제거하고 접근성 `sr-only` h1만 남겼다.
+- 산출물: `UniverseListCard`를 `CountBadge`·받은/보낸 38px·관계 34px 아바타, 정본 헤더 토큰, 관계 날짜 subtitle과 검색 필드 토큰으로 보정했다. `SettingsUniversePage`를 `gap-5` 단일 열로 변경하고 received accept=`accentSm`, pending/relationship inline=`inert`로 매핑했다. `BlogPage` guest/owner/relationship hero CTA에 3px border, `px-4 py-2 text-xs`, 4px rgba shadow를 적용하고 request 계열을 neutral로 정리했다.
+- TDD/검증: 먼저 `UniverseListCard.test.tsx`·`universeBehavior.test.tsx`에 정본 헤더/아바타/카드 열/액션 variant/hero CTA 기대값을 추가했다. 관련 RED는 2 files/18 tests 중 5 failures(기존 header class, 38px 관계 avatar, 2열, primary CTA/action variant)를 의도대로 확인했다. 구현 후 관련 2 files/18 tests passed.
+- 최종 명령: `npm test -- --run --maxWorkers=1` → 31 files/337 tests passed, failure/error/skip 0. `npm run lint` → exit 0. `npm run build` → exit 0 (`tsc -b`, Vite 137 modules; >500KB chunk warning만). `git diff --check -- frontend .claude/team/frontend` → 오류 없음.
+- 미해결: source token 대조만으로 1440px 시각 PASS를 주장하지 않는다. 부모/QA가 독립 브라우저와 backend 실제 DTO/HTTP를 확인해야 하며 기존 npm audit 2 moderate/6 high는 수정하지 않았다.
+
+## 2026-11-07 16:35 KST — M5 badge·inline action 수치 보정 및 재검증
+
+- 원본 대조 후속: `CountBadge`를 정본 `font-size:11px; padding:1px 8px`로 보정하고, 받은/보낸/관계 inline action은 정본에 맞춰 `accentSm` 또는 `inert`, 관계 버튼 `px-3 py-[5px] text-xs font-normal`로 고정했다.
+- 테스트: `UniverseListCard.test.tsx`에 badge 수치 회귀를 추가하고 `universeBehavior.test.tsx`에 관계 inline action 수치를 추가했다. 관련 2 files/18 tests passed.
+- 최종 재검증: `npm test -- --run --maxWorkers=1` → 31 files/337 tests passed, failure/error/skip 0; `npm run lint` → exit 0; `npm run build` → exit 0 (`tsc -b`, Vite 137 modules, >500KB chunk warning만). `git diff --check -- frontend .claude/team/frontend` → 오류 없음.
+- 미해결: root/QA의 독립 1440px browser 및 backend 실제 DTO/HTTP 대조 전에는 시각 PASS·M5 최종 승인을 주장하지 않는다.
+
+## 2026-11-07 16:36 KST — 아바타 flex 고정 최종 확인
+
+- `UniverseListCard`의 profile image에도 원본 `flex:none`과 같은 `shrink-0`를 적용해 34px·38px가 행 폭에서 축소되지 않게 했다.
+- 변경 후 `npm test -- --run --maxWorkers=1` 31 files/337 tests passed, `npm run lint` exit 0, `npm run build` exit 0(137 modules; >500KB warning만), root 기준 `git diff --check -- frontend .claude/team/frontend` exit 0을 재확인했다.
+
+## 2026-11-07 16:43 KST — M5 hero CTA 정본 카피 prefix 보정
+
+- 발견: root 독립 screenshot `build/m5-visual-qa/account-1-hero-none.png`의 NONE hero가 suffix형 `유니버스 신청 ✦`였고, `docs/design/ZeroVerse Pages.dc.html:69` 정본은 `✦ 유니버스 신청`이다.
+- TDD/구현: `universeBehavior.test.tsx`의 NONE·incoming ACCEPTED only·stale owner/account·초기 NONE 기대값과 guest CTA 테스트를 prefix형으로 먼저 갱신해 기존 production 카피에서 4개 상태 + guest 1개 실패를 확인했다. `BlogPage` 관계 label과 비로그인 `/signin` 링크 카피를 `✦ 유니버스 신청`으로 최소 수정했다. guest는 보호 snapshot을 호출하지 않는 것도 고정했다.
+- 검증: `npm test -- --run src/test/universeBehavior.test.tsx --maxWorkers=1` → 1 file/17 tests passed; `npm run lint` exit 0; `npm run build` exit 0 (`tsc -b`, Vite 137 modules, >500KB chunk warning만). 이후 전체 `npm test -- --run --maxWorkers=1` → 31 files/338 tests passed, failure/error/skip 0.
+- 인계: QA/root는 `account-1-hero-none.png`와 guest hero를 prefix 카피로 재캡처해야 한다. HeroStrip 밑단 paper pixel 및 PUBLIC LOGS 제목은 root 지시대로 기존 M4 범위라 이번 변경에서 건드리지 않았다.
+
+## 2026-11-07 최종 QA 인수 — M5 FE PASS 기록
+
+- 독립 QA final(`qa/M5-review.md`) 결과를 접수했다. 1440px 실제 API 기준 SettingsUniverse 6 cards, Blog hero 7 states, refresh, account switch, guest, keyboard 동작과 screenshot 대조가 PASS였고 V001/V002가 CLOSED됐다.
+- root가 최종 frontend 자동 검증 `31 files/338 tests passed`, `npm run lint` exit 0, `npm run build` exit 0 및 screenshot 대조를 직접 확인했다. 기존 >500KB chunk warning과 npm audit 2 moderate/6 high는 변경하지 않았다.
+- 상태: frontend 역할 산출물은 QA 인수 PASS로 기록했지만 실제 Git merge는 아직 root 소유 단계다. merge 전 M5 전체 완료를 단정하지 않는다. 제품 소스는 추가 변경하지 않았다.

@@ -217,3 +217,72 @@
 - root가 SHA-256 `D2B5FBB8A659D707F1A4039FB062D1768113D9AD53946F7A1D6AAA983783E2EF` artifact로 runtime을 재기동하고 독립 검증했다. `POST /api/v1/posts` 201, `POST /api/v1/uploads` 201, public image content GET, 기존 image 200 재조회와 동일 hash, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`가 통과했다.
 - whole independent review 결과는 Ready to merge `Yes`, 잔여 `0`이다. Git stage/commit/push/merge는 아직 대기 중이며 이 기록에서 완료로 표시하지 않는다.
 - 이 항목은 문서 기록만 갱신했다. 제품 소스·테스트·빌드·runtime·DB 및 Git은 변경하지 않았다.
+## 2026-11-07 KST — M5 Universe A-v2 backend
+
+- 한 일: `ErrorCode`에 `UNI_004/005`를 추가하고 `Universe` 상태 전이 factory/accept를 구현했다. V1 migration은 수정하지 않았다.
+- 한 일: `UniverseRepository`에 pair 조회, 방향·상태·닉네임 DB 필터, 친구 exists predicate, stable Pageable 목록 쿼리를 추가했다. `BlogRepository`에는 사용자별 blog slug batch 조회를 추가했다.
+- 한 일: `UniverseDtos`, `UniverseService`, `UniverseController`를 신설했다. ID 오름차순 사용자 pessimistic lock, lock 후 양방향 재조회, block hard-delete+flush, SUSPENDED/deleted 경계, 최소 사용자 DTO, 관계 snapshot의 `private,no-store`, 공통 응답/페이징을 반영했다.
+- 테스트: `UniverseEntityTest` RED/GREEN 범위( PENDING→ACCEPTED 1회 전이, BLOCKED factory )를 추가했다.
+- 검증 명령/실측: `.../java -classpath gradle/wrapper/gradle-wrapper.jar org.gradle.wrapper.GradleWrapperMain --no-daemon --max-workers=1 compileJava` → `BUILD SUCCESSFUL in 22s`; 동일 Gradle `test --tests com.zeroverse.domain.universe.UniverseEntityTest` → `BUILD SUCCESSFUL in 17s` (2 tests pass).
+- 미해결: Docker 부재로 실제 MySQL 동시성·MockMvc 전체 HTTP·bootJar/full test는 미실행이다. frontend 변경과 독립 QA가 완료되기 전 M5 완료/merge를 주장하지 않는다.
+## 2026-11-07 KST — M5 계약 테스트 보강·snapshot 차단 우선순위 수정
+
+- 원인 조사: `UniverseService.snapshot`이 incoming BLOCKED를 outgoing BLOCKED보다 먼저 판정해 양방향 차단에서 `UNAVAILABLE`을 반환했다. 이 경우 actor 자신의 차단 해제 경로가 숨겨지는 것이 승인 계약 위반의 직접 원인이다.
+- RED: `UniverseServiceTest`에 outgoing BLOCKED / incoming BLOCKED / both BLOCKED 3개를 추가하고 `bothBlockedPrioritizesOutgoingBlock`이 기대 `BLOCKED_BY_ME`, 실제 `UNAVAILABLE`로 실패하는 것을 확인했다.
+- GREEN: snapshot 분기에서 outgoing BLOCKED를 먼저 반환하도록 최소 수정했다. 동일 targeted suite 12건이 `BUILD SUCCESSFUL`로 통과했다.
+- 테스트 보강: mock 서비스 테스트로 중복 신청 `UNI_002`, 차단 우선 `UNI_003`, suspended actor `USER_003`, accept 비소유 `UNI_004`, invalid accept `UNI_005`, reject/cancel 소유권, block 양방향 삭제·opposite BLOCKED 보존, 방향별 PENDING requestId·ACCEPTED·최소 DTO를 검증했다.
+- 테스트 보강: standalone Controller 4건으로 request `201`, block `200` empty envelope, page 기본 `0/20`, snapshot `Cache-Control: private, no-store`와 주요 path를 검증했다. request OpenAPI의 잘못된 `400/401/403/404/409` 단일 response key를 400/401/403/404/409 개별 응답으로 수정하고 `OpenApiConfigTest`에 M5 path/security 응답 검증 1건을 추가했다.
+- 테스트 보강: `UniverseServiceMySqlTest` 3건을 추가해 실제 MySQL 8.4에서 신청→수락 snapshot, block flush/unblock 재신청, ID 오름차순 pair lock 양방향 동시 신청을 검증했다. 실행은 `DOCKER_HOST=unix:///private/tmp/zeroverse-colima/default/docker.sock TESTCONTAINERS_RYUK_DISABLED=true ... Gradle ... test --tests com.zeroverse.domain.universe.UniverseServiceMySqlTest` → `3 tests, failures/errors/skips 0/0/0`이다. Ryuk 기본 실행은 `No such container` 404로 실패해 sidecar 비활성화로 재실행했다.
+- 정리: 미사용 `UniverseRepository.deleteNonBlockedPair` 삭제. 사용자별 blog slug bulk query를 `order by b.user.id asc, b.id asc`로 deterministic하게 바꾸고 빈 page에서 `IN ()` query를 호출하지 않도록 guard했다.
+- 전체 회귀: `Gradle test`는 `448 tests completed, 7 failed`; 실패는 기존 upload 경로(`LocalImageStoreTest` 2, `UploadServiceTest` 5)에서 `LocalImageStore.resolveStoragePath:158`의 `COMMON_500`이며 M5 테스트는 포함되지 않는다. root가 upload 소유자와 별도 원인 분석한다.
+- 미해결: upload 7건이 해결되기 전 backend 전체 suite PASS로 보고하지 않는다. M5 targeted/MySQL/OpenAPI는 통과했다. Git stage/commit/push는 수행하지 않았다.
+## 2026-11-07 KST — M5 최종 backend targeted 인수 증거
+
+- 보완 검증: deterministic blog slug bulk query와 empty-page guard를 반영한 뒤 `UniverseServiceMySqlTest`를 재실행했다. `3 tests completed, failures/errors/skips 0/0/0`, 실제 MySQL 8.4/Flyway v3 context boot 및 목록 nickname/slug/page 경계가 통과했다.
+- 최종 targeted: `UniverseEntityTest` 2, `UniverseServiceTest` 12, `UniverseControllerTest` 4가 모두 `BUILD SUCCESSFUL`이며 failures/errors/skips `0/0/0`이다. `OpenApiConfigTest` 4도 M5 response/security assertion 포함으로 통과했다.
+- 패키징: `bootJar` `BUILD SUCCESSFUL`; `build/libs/zeroverse-server-0.0.1-SNAPSHOT.jar` SHA-256 `d7d4b2b47b4f699a046405f15d39badabf7e14ccac389fb39ffcb652aec46a47`.
+- 전체 회귀 재현 결과는 직전 항목과 동일하게 448건 중 upload 7건 실패다. 실패 XML에서 모두 `LocalImageStore.resolveStoragePath(LocalImageStore.java:158)`의 `COMMON_500`으로 확인했으며 M5 변경 경로와 무관하므로 upload 소유자/root에 이관했다.
+- 미해결: upload 7건이 해결되기 전 전체 backend 회귀 PASS는 아니다. M5 기능·OpenAPI·실제 MySQL targeted는 PASS 상태다.
+## 2026-11-07 KST — 독립 QA 수정 루프 BE-001/BE-002/QA-001/QA-002/DOC-001
+
+- BE-001 RED: `reject`, `cancel`, `deleteFollowing`, `unblock`이 초기 `findVisibleById`/target 조회 뒤 `findWithUsers`를 사용하던 결함을 4개 성공 기대 테스트로 고정했고, 기존 구현에서 모두 `UNI_004`로 실패했다.
+- BE-001 GREEN: `pairRelation(firstId,secondId,fromUserId,toUserId)` helper를 추가해 사용자 ID 오름차순 lock 이후 `findPair`를 반드시 재조회하고 정확한 방향 row를 선택하도록 통일했다. 행 소실/반대 방향만 남은 경우 `UNI_004`, 상태 불일치는 `UNI_005` 경계를 유지한다. 미사용 `findWithUsers`, `deleteByFromUserIdAndToUserId`, `findByFromUserIdAndToUserIdIn`은 제거했다.
+- BE-002 RED/GREEN: received/sent 목록도 page counterpart ID를 모아 `findByUserIdInAndDeletedAtIsNullOrdered` 한 번으로 slug map을 만들도록 바꿨다. mock 테스트에서 batch 1회와 per-row `findFirst` 미호출을 검증하고, 빈 page는 `IN ()` query를 호출하지 않는다.
+- QA-001: 실제 MySQL + `MockMvc` 통합 테스트를 추가했다. viewer→owner request→accept 후 `PostService`와 `GET /api/v1/posts/{id}`가 200, `deleteFollowing`/`block` 후 `POST_002`/HTTP 403, `notifications` row count 0을 확인했다.
+- QA-002/DOC-001: `SecurityAccessControlTest`에 snapshot 무토큰 `AUTH_004`를 추가했다. Universe 14개 operation에 개별 200/201 및 필요한 400/401/403/404/409 response annotation과 `ApiResponse` envelope schema를 명시하고 OpenAPI 테스트가 모든 path/method/error schema/security를 순회한다.
+- 검증: targeted 명령은 아래 selector로 실행했고 모두 통과했다. `UniverseEntityTest=2`, `UniverseServiceTest=19`, `UniverseControllerTest=4`, `UniverseServiceMySqlTest=4`, `OpenApiConfigTest=4`, `SecurityAccessControlTest=25` (합계 58 tests, failures/errors/skips `0/0/0`). MySQL 실행은 `DOCKER_HOST=unix:///private/tmp/zeroverse-colima/default/docker.sock TESTCONTAINERS_RYUK_DISABLED=true`를 사용했다.
+- 다음 full 예상 수: 직전 full `448`에서 이번 추가 테스트 9건이 늘어 `457`건이다. root가 전체 `Gradle test`를 재실행해야 하며, 이전 upload 7건(`LocalImageStore.resolveStoragePath:158`, `COMMON_500`)은 별도 기존 차단으로 남아 있다.
+## 2026-11-07 KST — M5 ACL HTTP assertion 보강
+
+- `UniverseServiceMySqlTest`의 M4 ACL 시나리오에 block 이후 실제 `GET /api/v1/posts/{postId}` MockMvc 403/`POST_002` assertion을 추가했다. deleteFollowing 이후 HTTP 403과 함께 서비스·HTTP 양쪽 철회를 고정한다.
+- 재검증: `UniverseServiceMySqlTest` 4건 `BUILD SUCCESSFUL`, failures/errors/skips `0/0/0`.
+
+## 2026-11-07 KST — root 최종 backend full·독립 QA closure 동기화
+
+- root 최종 검증: MySQL 8.4 Colima에서 backend full `70 files / 457 tests`, failures-errors-skips `0/0/0`, `BUILD SUCCESSFUL in 1m31s`; `bootJar`도 성공했다.
+- 환경 조건 해소: macOS `/var` symlink 아래 JUnit temp 경로가 `LocalImageStore` 방어 로직에 걸려 발생한 upload 테스트 실패는 test worker에 `JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=/private/tmp/zeroverse-junit-tmp`를 적용해 upload `15/15` 통과로 해소했다. 제품 코드 변경 없이 실행 환경을 명시한 결과다.
+- 독립 QA targeted는 `7 files / 61 tests`, failures-errors-skips `0/0/0`이며 BE-001/BE-002/QA-001/QA-002/DOC-001을 CLOSED 처리했다.
+- 판정: backend 기능/API/자동검증은 PASS다. ignored 상태로 복원되지 않은 디자인 원본에 대한 V-001 시각 blocker가 남아 있으므로 M5 전체 완료·merge-ready라고 주장하지 않는다.
+- 이 기록 갱신은 `.claude/team/backend/STATE.md`와 `WORKLOG.md`만 수정했으며 제품 코드와 Git 상태는 변경하지 않았다.
+
+## 2026-11-07 KST — M5 최종 브라우저 QA runtime 준비
+
+- 기존 `COLIMA_HOME=/private/tmp/zeroverse-colima` default VM을 권한 상승으로 재기동했다. 기존 컨테이너는 없었고 사용자 데이터와 분리된 볼륨 없는 `zeroverse-m5-mysql84` MySQL 8.4를 `127.0.0.1:13307->3306`으로 생성했다. DB는 `mysql-ready` 상태이며 기존 검증 자원만 재사용했다.
+- 기존 `build/libs/zeroverse-server-0.0.1-SNAPSHOT.jar`를 수정 없이 실행했다. DB 연결은 `jdbc:mysql://127.0.0.1:13307/zeroverse`, Flyway v1~v3 적용, Tomcat `18080`, readiness `ACCEPTING_TRAFFIC`를 확인했다. Java PID는 `30056`, 지속 실행 세션은 `48765`다.
+- runtime secret은 매 기동 시 셸 환경으로만 합성 주입했으며 기록·출력하지 않았다. CORS/auth allowed origin은 `http://localhost:5173`, local HTTP cookie는 `Secure=false`로 주입했다. 임시 upload/java-tmp 경로는 `/private/tmp/zeroverse-m5-*`로 분리했다.
+- 권한 상승 runtime context의 `GET http://127.0.0.1:18080/v3/api-docs`는 HTTP 200이다. 일반 sandbox context의 loopback 접근은 namespace 권한으로 거부되므로 root/브라우저 QA는 동일 host runtime context를 사용한다.
+- 디자인 원본 복구 후 V-001 외부 blocker는 해소되었고, root FE `5173`과 함께 최종 브라우저 QA를 재개할 수 있다. 최종 M5 완료·merge-ready 판정은 root의 브라우저 QA 결과에 따른다.
+
+## 2026-11-07 KST — M5 visual QA fixture runner 준비
+
+- 리더 배정 범위인 ignored `build/m5-visual-fixture-runner.mjs`를 추가했다. 매 실행 공개 nickname/slug seed와 독립된 `randomBytes` password로 fresh synthetic prefix A~H 계정을 API register→signin→initial-setup하고, A 기준 received/sent/following/followers/friends/blocks를 각각 1행 이상 만든다. 기존 데이터 삭제·`.env` 읽기/수정은 하지 않는다.
+- A/B credentials는 child `qa/m5-visual-qa.mjs` 환경으로만 전달하고 API access token은 runner 메모리에만 유지한다. credentials/token을 console·tracked 문서·파일에 출력하지 않도록 오류 출력도 상태/코드만 남긴다.
+- A 기준 B incoming PENDING, C outgoing PENDING, D 양방향 ACCEPTED friend, E incoming ACCEPTED follower, F actor BLOCKED, G NONE, H opposite BLOCKED/UNAVAILABLE을 구성하고, 대상 slug/ID·상태·request ID·FE expectedLabel을 비밀 없는 `M5_HERO_FIXTURES` JSON으로 child 환경에 전달한다.
+- 준비 검증: `node --check build/m5-visual-fixture-runner.mjs` 통과. QA 요청 전 runner는 실행하지 않았다.
+- 실행 명령: `node build/m5-visual-fixture-runner.mjs` (기본 BE `http://127.0.0.1:18080`, FE·Playwright·design env는 기존 runtime 환경을 전달).
+
+## 2026-11-07 KST — 최종 M5 QA 인수 판정 동기화
+
+- root/독립 QA의 최종 `qa/M5-review.md` 판정에서 V-001/V-002가 CLOSED되고 M5 전체 인수 PASS로 확정됐다.
+- backend 소스·테스트·runtime 제품 변경은 없으며 BE full `70 files / 457 tests`와 failures-errors-skips `0/0/0` 증거를 유지한다.
+- 현재 backend 역할의 잔여 작업은 없다. Git 마감 및 runtime(`session 48765`/Colima) 정상 정리는 root가 마감 절차에서 수행한다.

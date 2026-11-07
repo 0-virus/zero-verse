@@ -62,6 +62,8 @@ public enum ErrorCode {
     UNI_001("UNI_001", HttpStatus.BAD_REQUEST, "자기 자신에게 신청할 수 없습니다."),
     UNI_002("UNI_002", HttpStatus.CONFLICT, "이미 신청한 상대입니다."),
     UNI_003("UNI_003", HttpStatus.FORBIDDEN, "차단된 상태입니다."),
+    UNI_004("UNI_004", HttpStatus.NOT_FOUND, "유니버스 관계 또는 신청을 찾을 수 없습니다."),
+    UNI_005("UNI_005", HttpStatus.CONFLICT, "현재 상태에서는 유니버스 요청을 처리할 수 없습니다."),
 
     // --- COMMENT ---
     COM_001("COM_001", HttpStatus.NOT_FOUND, "댓글을 찾을 수 없습니다."),

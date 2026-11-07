@@ -2,50 +2,39 @@
 
 > 덮어쓰기 스냅샷. 시간순 이력은 `WORKLOG.md`, 마일스톤 이력은 `docs/worklog/**`를 본다.
 
-마지막 갱신: 2026-10-04 KST (사용자 승인에 따른 리더의 상태 문구 갱신)
+마지막 갱신: 2026-11-07 최종 QA 인수 시점 KST
 
 ## 현재 단계
 
-- 사용자 승인 로컬 파일 저장 범위의 M4 Task4~6 제품 FE 구현이 checkout에 반영되어 있다. 현재 checkout/HEAD와 다른 역할의 변경은 보존하며 Git stage/commit/push는 리더 소유다.
-- 소유 경계는 `frontend/**` 및 `.claude/team/frontend/**`다. backend/QA/root 정본·runtime·브라우저 최종 판정은 수정하지 않는다.
-- 독립 whole reviewer `m4_whole_review`는 최종 `Ready to merge: Yes`로 판정했고 R1~R8 및 R7 후속 잔여는 0이다. root의 API·Chrome R1/R4/R5·orderedList 표식 검증과 최종 PNG artifact도 보존되어 있다(`docs/worklog/M4-posts.md` 18:15 기록 참조).
-- frontend 리뷰·runtime 인계 및 Git 통합이 완료됐다. root가 구현 커밋 `4404f1e`를 푸시하고 PR #10을 `dev`에 머지했다(`c34ff4e979bd6efffc3a2aea28c2be307ccac3b5`). 제품 코드는 추가 변경하지 않았다.
+- M5 A-v2 FE 구현·디자인 대조·독립 QA를 PASS로 인수했고 root의 Git 통합을 기다리는 단계다.
+- 소유 경계는 `frontend/**` 및 `.claude/team/frontend/**`이며, backend·QA·root 문서·Git은 수정하지 않았다.
+- `docs/design/DESIGN-SYSTEM.md`와 `ZeroVerse Pages.dc.html` 원본을 직접 대조했으며, QA final(`qa/M5-review.md`)의 1440px 실제 API·시각·키보드 PASS와 V001/V002 CLOSED를 접수했다.
 
 ## 이번 wave 구현
 
-- `PostEditor` Markdown 일반 paste와 toolbar paste를 `insertContent(..., { contentType: 'markdown' })` 경로로 바꿔 현재 선택 영역의 앞뒤 본문을 보존하고, bold/link Markdown도 감지한다.
-- `DraftPicker`와 `SettingsPostsPage`가 표준 `page=0,size=20`에서 시작해 `hasNext/hasPrevious` 페이지 이동을 제공한다. EditPage는 picker 선택 시 `/edit/{id}`로 이동해 새 글의 full snapshot을 다시 조회한다.
-- DEFAULT 카테고리가 실제 목록에 있으면 GENERAL이 먼저 와도 실제 DEFAULT ID를 초기 선택·payload에 사용하고 빈 fallback option은 숨긴다. 기존 DEFAULT `미분류` label은 중복되지 않는다.
-- `Prose`는 비배열/잘못된 node content와 marks를 안전하게 무시하고, orderedList `start/type`, table header/cell `colspan/rowspan`을 허용된 값으로 렌더링한다.
-- orderedList `type`의 HTML 의미가 Tailwind `list-decimal`에 덮이지 않도록 `1/a/A/i/I`를 `decimal/lower-alpha/upper-alpha/lower-roman/upper-roman` inline style로 매핑한다.
-- 구현 하위 경로 지침을 동기화해 `frontend/src/features/post/AGENTS.md`와 `frontend/src/features/upload/AGENTS.md`를 추가했다. 제품 소스·테스트 동작은 변경하지 않았다.
-- TipTap 3.31.3 editor JSON fixture로 orderedList `start=5,type=A`, table `colspan=2,rowspan=2`의 상세 렌더·편집 저장 round-trip 회귀를 추가했다.
+- `frontend/src/features/universe/types.ts`에 최소 개인정보 사용자 요약, 방향별 관계 snapshot, 목록 DTO/Page 타입을 추가했다.
+- `frontend/src/features/universe/universeApi.ts`에 FR-UNI-01~12 경로·method·page/size/nickname query와 mutation API를 `apiClient` 기반으로 추가했다.
+- `UniverseListCard`를 추가해 받은/보낸 신청·연결·following/followers·차단 목록의 검색, 독립 로딩/오류/빈 상태, 페이지네이션, 액션을 렌더한다.
+- `SettingsUniversePage`를 scaffold에서 실제 여섯 카드 화면으로 교체했다. 목록별 request generation/account generation guard, 수락·거절·취소·연결 끊기·차단·해제와 mutation 후 canonical 재조회/409 재조회 안내를 구현했다.
+- `BlogPage`는 공개 blog load와 보호 관계 snapshot load를 분리한다. guest signin 유도, 본인 관리 액션, A-v2 snapshot 우선순위(차단 해제/비활성/수락/취소/연결 끊기/신청), 늦은 응답 guard와 충돌 재조회가 연결됐다.
+- Blog hero NONE와 guest signin CTA를 디자인 정본 카피 `✦ 유니버스 신청`으로 통일했다. guest는 동일 카피의 `/signin` 링크이며 보호 snapshot 요청은 하지 않는다.
+- 디자인 대조 wave에서 `UniverseListCard` 헤더를 정본 20px/12px·13px/2px tracking으로 맞추고, 받은 신청 카운트 `CountBadge`(11px·1px/8px), 신청/관계별 38px·34px 아바타, 인라인 `accentSm`/`inert` 액션, 날짜 관계 subtitle을 적용했다. SettingsUniversePage는 원본 설정 main과 같이 여섯 카드를 단일 열 `gap-5`로 이어 붙이고 시각 전용 eyebrow/소개를 제거하되 접근성 h1은 `sr-only`로 유지했다. Blog hero CTA는 정본 3px·16/8px·4px rgba shadow와 관계 신청 neutral variant를 사용한다.
+- `frontend/src/features/universe/AGENTS.md`와 API/카드/행동 테스트를 추가했다.
 
-## 검증 결과
+## 검증
 
-- RED: whole-review 회귀 묶음에서 8개 의도 실패를 재현했다(기존 문서 교체 2, category fallback 1, draft picker paging 1, Prose malformed/attrs 2, EditPage draft navigation 1, SettingsPosts paging 1). 첫 경로 지정 오류로 `No test files found`가 한 번 있었고, 올바른 상대 경로 RED는 `4 files / 8 failed / 61 passed`, exit 1이었다.
-- 관련 GREEN: `npm.cmd test -- --maxWorkers=1 src/features/post/PostEditor.test.tsx` → 1 file / 11 tests passed; `npm.cmd test -- --maxWorkers=1 src/test/components.test.tsx src/test/router.test.tsx src/test/categoryBehavior.test.tsx` → 3 files / 59 tests passed.
-- fresh 최종 구조화 전체: `npm.cmd test -- --maxWorkers=1 --reporter=json --outputFile=../build/m4-frontend-final-results.json` → JSON `testResults=28`, assertions `311`, passed `311`, failed `0`, skipped/todo `0`, exit 0. OOM을 힙 상향·skip·제외로 우회하지 않고 최소 worker 직렬 실행으로 종료를 확인했으며 root가 `build/m4-frontend-final-results.json`을 직접 읽을 수 있다.
-- `npm.cmd run lint` → exit 0.
-- `npm.cmd run build` → exit 0 (`tsc -b`, Vite 132 modules, JS 857.80 kB / gzip 264.76 kB); 500 kB chunk warning만 남았다.
-- R7 영향범위 구조화: `npm.cmd test -- --maxWorkers=1 --reporter=json --outputFile=../build/m4-frontend-r7-results.json src/test/components.test.tsx src/features/post/PostEditor.test.tsx` → `2 suites / 40 tests`, passed 40, failed/pending/todo 0, success true. 전체 311 suite는 재실행하지 않았다.
-- 변경 파일 재독 및 `git diff --check -- frontend .claude/team/frontend` → `DIFF_CHECK_EXIT=0`을 확인했다(LF→CRLF 경고만). backend API compatibility와 1440px 실제 화면은 root/독립 QA 범위다.
+- RED: 구현 전 `universeApi.test.ts`·`UniverseListCard.test.tsx`가 import resolution 실패로 종료했다.
+- GREEN: M5 targeted (`universeApi`, `UniverseListCard`, router/post behavior)와 확장 `universeBehavior.test.tsx`에서 관계 snapshot 우선순위·stale owner/account·6개 카드 mutation·409 reload·독립 검색/페이지를 검증했다.
+- RED mutation: `universeApi.ts`의 size clamp를 일시 제거했을 때 `universeApi.test.ts` 8개 중 1개가 `size=120` 수신으로 실패했고, `Math.min(...,100)` 원복 후 통과했다.
+- 디자인 RED: 기존 Panel 헤더/38px 일괄 아바타·2열·hero primary/설정 액션 variant를 회귀 테스트로 고정한 뒤 5개 실패를 확인하고 최소 구현했다. 관련 2 files/18 tests GREEN.
+- 카피 RED: 기존 suffix형 hero label과 guest CTA expectation을 prefix형으로 갱신한 뒤 4개 기존 상태 테스트 및 guest CTA 1개가 실패했고, `BlogPage` 카피를 수정해 17개 behavior tests GREEN을 확인했다.
+- 전체: 최종 `npm test -- --run --maxWorkers=1` → 31 files/338 tests passed, failure/error/skip 0.
+- `npm run lint` → exit 0.
+- `npm run build` → exit 0 (`tsc -b`, Vite 137 modules); 500 kB chunk warning만 남았다.
+- `git diff --check -- frontend .claude/team/frontend` → 오류 없음.
 
-## 최종 인계
+## 다음 작업 / 차단 요인
 
-- 독립 whole reviewer 최종 판정은 `Ready to merge: Yes`이며 R1~R8 및 R7 후속 잔여는 0이다.
-- root가 API, Chrome R1/R4/R5, orderedList `start=5,type=a`의 lower-alpha/marker `e.`, 최종 PNG artifact를 검증·보존했다. `type=A`와 표 span은 자동 회귀 증거로 구분한다.
-- FE 독립 review/runtime 및 Git 통합은 완료됐다. 실제 결과는 M4 worklog 최종 [리뷰]·[머지]를 따른다. Git 작업은 root가 수행했다.
-- 이 기록 이후 frontend 역할의 추가 문서 쓰기·제품 수정·테스트/빌드는 계획하지 않는다. logout UI는 이번 배정 범위가 아니다.
-
-## 주요 산출물
-
-- `frontend/src/features/post/PostEditor.tsx`
-- `frontend/src/features/post/DraftPicker.tsx`
-- `frontend/src/components/ui/Prose.tsx`
-- `frontend/src/pages/EditPage.tsx`
-- `frontend/src/pages/SettingsPostsPage.tsx`
-- `frontend/src/features/post/PostEditor.test.tsx`
-- `frontend/src/test/components.test.tsx`
-- `frontend/src/test/router.test.tsx`
-- `frontend/src/test/categoryBehavior.test.tsx`
+- QA가 1440px 실제 API 6개 카드·hero 7상태·refresh·계정 전환·guest·keyboard를 PASS했고 V001/V002를 닫았다. root가 같은 338/lint/build 결과와 screenshot 대조를 직접 확인했다.
+- 남은 단계는 root의 Git 통합·M5 최종 기록뿐이다. 실제 Git merge 전이므로 frontend 역할이 마일스톤 완료를 단정하지 않는다.
+- npm lockfile 기준 기존 audit 2 moderate/6 high는 임의 fix/upgrade하지 않았다.

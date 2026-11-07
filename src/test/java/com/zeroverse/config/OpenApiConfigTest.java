@@ -113,6 +113,63 @@ class OpenApiConfigTest extends MySqlTestSupport {
         }
     }
 
+    @Test
+    @DisplayName("M5 Universe operation은 bearer 보안과 유효한 개별 HTTP 응답 코드를 문서화한다")
+    void m5UniverseOperationsDocumentValidResponses() throws Exception {
+        String body = mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        JsonNode docs = objectMapper.readTree(body);
+
+        JsonNode request = docs.path("paths").path("/api/v1/universe/requests/{targetUserId}").path("post");
+        assertThat(request.path("security").path(0).has("bearerAuth")).isTrue();
+        assertThat(request.path("responses").has("201")).isTrue();
+        assertThat(request.path("responses").has("400")).isTrue();
+        assertThat(request.path("responses").has("401")).isTrue();
+        assertThat(request.path("responses").has("403")).isTrue();
+        assertThat(request.path("responses").has("404")).isTrue();
+        assertThat(request.path("responses").has("409")).isTrue();
+        assertThat(request.path("responses").has("400/401/403/404/409")).isFalse();
+
+        JsonNode snapshot = docs.path("paths")
+                .path("/api/v1/universe/relationship/{targetUserId}").path("get");
+        assertThat(snapshot.path("security").path(0).has("bearerAuth")).isTrue();
+        assertThat(snapshot.path("responses").has("200")).isTrue();
+
+        String[][] operations = {
+            {"/api/v1/universe/requests/{targetUserId}", "post", "201,400,401,403,404,409"},
+            {"/api/v1/universe/requests/received", "get", "200,401,404"},
+            {"/api/v1/universe/requests/sent", "get", "200,401,404"},
+            {"/api/v1/universe/requests/{requestId}/accept", "post", "200,401,403,404,409"},
+            {"/api/v1/universe/requests/{requestId}/reject", "post", "200,401,403,404,409"},
+            {"/api/v1/universe/requests/{requestId}", "delete", "200,401,403,404,409"},
+            {"/api/v1/universe/{targetUserId}", "delete", "200,401,403,404,409"},
+            {"/api/v1/universe/following", "get", "200,401,404"},
+            {"/api/v1/universe/followers", "get", "200,401,404"},
+            {"/api/v1/universe/friends", "get", "200,401,404"},
+            {"/api/v1/universe/blocks/{targetUserId}", "post", "200,400,401,403,404,409"},
+            {"/api/v1/universe/blocks/{targetUserId}", "delete", "200,401,403,404,409"},
+            {"/api/v1/universe/blocks", "get", "200,401,404"},
+            {"/api/v1/universe/relationship/{targetUserId}", "get", "200,401,404"}
+        };
+        for (String[] operation : operations) {
+            JsonNode node = docs.path("paths").path(operation[0]).path(operation[1]);
+            assertThat(node.path("security").path(0).has("bearerAuth"))
+                    .as("%s %s bearer", operation[1], operation[0]).isTrue();
+            for (String statusCode : operation[2].split(",")) {
+                JsonNode response = node.path("responses").path(statusCode);
+                assertThat(response.isMissingNode())
+                        .as("%s %s %s response", operation[1], operation[0], statusCode)
+                        .isFalse();
+                assertThat(firstSchemaRef(response))
+                        .as("%s %s %s envelope schema", operation[1], operation[0], statusCode)
+                        .isNotBlank();
+            }
+        }
+    }
+
     private static String firstSchemaRef(JsonNode response) {
         Iterator<JsonNode> mediaTypes = response.path("content").elements();
         while (mediaTypes.hasNext()) {

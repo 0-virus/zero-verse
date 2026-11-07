@@ -254,3 +254,53 @@
 - **정본 변경**: `docs/PRD.md` §9.7, `.claude/team/pm/STATE.md`의 OpenAPI 대기 문구를 제거하고 최종 runtime·헤더·독립 리뷰 수치를 반영했다. 브라우저 파일 선택/전송 자동화 제외, S3/U0 후속, M5 제외 경계는 유지했다.
 - **남은 사항**: 최종 QA 기록과 root의 명시 파일 stage/commit/push/PR/merge는 아직 완료로 기록하지 않는다. PM은 제품·테스트·M4 원 worklog·Git을 수정하지 않았다.
 - **검증**: 편집한 PRD/STATE/WORKLOG를 재독하고 `git diff --check -- docs/PRD.md .claude/team/pm/STATE.md .claude/team/pm/WORKLOG.md` 및 trailing whitespace 검색을 재실행한다.
+
+## 2026-11-07 10:51 KST — M5 독립 심의 결과·A-v2 사용자 결정 대기 상태 동기화
+
+- **근거 대조**: 최신 `docs/worklog/M5-universe.md` [계획]/[이슈·결정], `docs/governance/meetings/M5-20261107-universe.md` §1~§8, `DECISION-REGISTER.md`의 `M5-20261107-universe`, `RISK-REGISTER.md`의 `RISK-0014`를 재독했다. M5 착수 승인, `feature/M5-universe` 시작 HEAD `7b03de5`, M4 `dev` 통합 및 M5 구현 전 상태를 확인했다.
+- **독립 심의 결과**: Product `APPROVE_WITH_CHANGES/88/HIGH`, Architecture `APPROVE_WITH_CHANGES/93/HIGH`, Delivery & Risk `APPROVE_WITH_CHANGES/90/HIGH`로 세 검토자 모두 A 방향을 조건부 권고했다. 공통 보완은 방향별 snapshot과 각 PENDING `requestId`, 단일 pair-lock 경계, `UNI_004/005` 404/409 선형화, 개인정보 최소 DTO, MySQL 경쟁·OpenAPI·회귀 검증, 디자인 원본 복구다.
+- **진행자 종합 반영**: 최종 권고 A-v2는 V1/directional unique 유지, 모든 mutation의 ID 오름차순 pair lock 및 lock 후 양방향 재조회, 보호 `FR-UNI-12` snapshot(`availability`, `outgoing`, `incoming`, requestId), `UNI_004` 동일 404·`UNI_005` 상태 전이 409, SUSPENDED/deleted 경계, Blog hero 우선순위, M8 알림 row 제외를 포함한다. 이는 사용자 승인 전 제안이며 PM이 새 제품 결정으로 확정하지 않았다.
+- **상태 판정**: 회의·결정 레지스터는 `USER_DECISION_REQUIRED`, 위험 레지스터의 `RISK-0014`는 `OPEN(USER_DECISION_REQUIRED)`다. A-v2 사용자 승인 전 M5 제품 구현·정본 확정·Git 작업은 보류한다.
+- **디자인 gate**: `docs/design/AGENTS.md`가 명시한 `DESIGN-SYSTEM.md`, 두 `.dc.html`, `support.js`가 현재 clone에 없고 `AGENTS.md`만 존재함을 재확인했다. 원본 복구 전 최종 FE 시각 PASS와 M5 완료 판정을 하지 않는다.
+- **산출물**: `.claude/team/pm/STATE.md`를 현재 단계/진행 중/다음 작업/차단 요인 구조로 덮어썼고, 이 항목을 append했다. `docs/worklog/M5-universe.md`, 회의록, 결정/위험 레지스터, PRD, REQUIREMENTS, 제품 소스, Git은 수정하지 않았다.
+- **검증**: PM STATE·WORKLOG 재독, M5 worklog/회의록/레지스터 내용 검색, `git status --short --branch`로 기존 변경 보존을 확인했다. 종료 전에 PM 두 파일의 `git diff --check`와 핵심 상태 검색을 수행한다.
+- **미해결**: 사용자 A-v2 결정, 디자인 원본 복구, 승인 후 backend/frontend 구현·독립 QA·실제 MySQL 경쟁 및 1440px 시각 검증.
+
+## 2026-11-07 11:59 KST — 사용자 A-v2 승인·M5 정본 반영
+
+- **사용자 결정**: 사용자가 `M5-20261107-universe` §6의 A-v2를 승인했다. 승인 범위는 V1·directional unique 유지, ID 오름차순 pair lock과 lock 후 양방향 재조회, 방향별 `FR-UNI-12` snapshot·PENDING `requestId`, `UNI_004/005`, SUSPENDED/deleted 경계, Blog hero 우선순위, M8 알림 row 및 RSS·신고 제외다.
+- **PRD 반영**: `docs/PRD.md` 메타데이터를 2026-11-07/2.1로 갱신하고 §4.2~§4.4에 Universe 페이징·인증/no-store·오류 계약을, §5.6에 `FR-UNI-12`와 pair lock·최소 DTO를, §7.1/§7.6에 BlogPage·SettingsUniversePage API/UI 계약을, §9.8에 사용자 확정 결정 전문을, §10 M5·§11 테스트·§12 DoD·§13 확정 목록에 경계를 동기화했다.
+- **상태 반영**: `.claude/team/pm/STATE.md`를 `APPROVED / 정본 반영 진행`으로 갱신했다. 사용자 승인으로 계약 승인 차단은 해소했지만 디자인 원본 부재로 최종 FE 시각 PASS와 M5 완료 판정은 여전히 보류한다.
+- **범위·소유권**: 이번 턴에는 PM 소유 `docs/PRD.md`, `.claude/team/pm/STATE.md`, `.claude/team/pm/WORKLOG.md`만 편집했다. `REQUIREMENTS.md`, governance 회의록/레지스터, M5 worklog, 제품 소스, Git은 수정하지 않았다.
+- **검증**: 회의록 §6, 수정한 PRD 관련 절, STATE를 재독하고 A-v2 핵심 문자열·FR-UNI-12·디자인 gate를 검색한다. 종료 전에 PM 소유 파일에 `git diff --check`를 실행한다.
+- **미해결**: backend/frontend A-v2 구현·RED→GREEN 테스트·실제 MySQL 경쟁 검증·독립 QA, 디자인 원본 복구와 1440px 시각 대조. 구현 중 새 API/보안/개인정보 결정이 필요하면 별도 심의를 연다.
+
+## 2026-11-07 13:04 KST — M5 구현·QA 결과 및 시각 blocker 상태 정합화
+
+- **근거 대조**: `.claude/team/backend/STATE.md`·`WORKLOG.md`, `.claude/team/frontend/STATE.md`·`WORKLOG.md`, `.claude/team/qa/STATE.md`, `qa/M5-review.md` 수정 루프 최종 판정·closure matrix, `docs/worklog/M5-universe.md`, 현재 Git 상태를 재독했다. `find docs/design -maxdepth 1 -type f -print` 결과는 `docs/design/AGENTS.md` 하나뿐이었다.
+- **현재 구현·검증 사실**: 사용자 승인 A-v2 구현과 수정 루프가 완료됐고 독립 QA의 `BE-001`, `BE-002`, `QA-001`, `QA-002`, `DOC-001`은 모두 `CLOSED`다. 기능/API/자동검증은 `PASS · merge-ready YES`다. backend 전체는 `70 files / 457 tests / failures 0 / errors 0 / skipped 0`, `bootJar BUILD SUCCESSFUL`; frontend는 `31 files / 336 tests`, lint/build exit 0이다. — `qa/M5-review.md`, `.claude/team/frontend/STATE.md`
+- **최종 인수 경계**: `DESIGN-SYSTEM.md`, `ZeroVerse Pages.dc.html`, `ZeroVerse Main Feed v2.dc.html`, `support.js` 원본 4개가 없어 `V-001`은 `OPEN / BLOCKER`다. 따라서 1440px 시각 DoD, 전체 M5 final acceptance, Git merge-ready는 `NO`로 유지하며 기능/API PASS를 전체 완료로 확대하지 않는다.
+- **STATE 반영**: PM `STATE.md`를 `APPROVED / 구현·자동검증 완료, 시각 인수 대기`로 덮어쓰고, 다음 작업을 `디자인 원본 복구 → 독립 1440px QA → root final acceptance 및 Git closeout` 순서로 갱신했다. 기존의 “제품 구현 아직 없음/증거 없음” 현재형 판단은 제거했다.
+- **Git·소유권**: 아직 M5 commit/PR/merge는 없다. 이번 정합성 갱신은 PM 소유 `.claude/team/pm/STATE.md` 덮어쓰기와 이 `WORKLOG.md` append만 수행했으며 제품 소스·PRD·governance·M5 worklog·QA 산출물·Git은 수정하지 않았다.
+- **검증**: 역할 STATE·QA closure·M5 worklog·design 파일 목록·`git branch --show-current`/`git log`/`git status`를 직접 대조했다. 종료 전에 PM 두 파일 `git diff --check`, trailing whitespace, 변경 파일 범위를 다시 확인한다.
+- **미해결**: 디자인 원본 복구와 1440px 독립 시각 대조만 전체 M5 final acceptance를 막는 열린 gate다. 원본 복구 전 시각 PASS나 merge 승인을 기록하지 않는다.
+
+## 2026-11-07 16:42 KST — M5 디자인 원본 복구·시각 QA 진행 상태 동기화
+
+- **근거 대조**: `docs/PRD.md` §9.8·§10~§13, `docs/design/` 파일 목록, `build/m5-visual-qa/evidence.json`, frontend 인계 및 현재 Git 상태를 직접 대조했다. 디자인 원본 4개(`DESIGN-SYSTEM.md`, 두 `.dc.html`, `support.js`)가 현재 존재하고, evidence viewport는 `1440×1000`이다.
+- **시각 evidence**: `evidence.json`과 root screenshot 대조에서 SettingsUniversePage 여섯 카드, refresh/account switch, Blog hero 7개 관계 상태, 단일 hero action·RSS 미노출 checks가 PASS로 기록됐다. FE 최신 인계는 `31 files / 337 tests`, lint/build exit 0이다.
+- **잔여 gate**: evidence의 신청 CTA 기대 카피는 기존 `유니버스 신청 ✦`이므로 마지막 카피를 `✦ 유니버스 신청`으로 보정한 fresh 검증과 독립 QA final verdict가 필요하다. 이 verdict 전에는 전체 M5 final acceptance·시각 PASS·Git merge-ready를 선언하지 않는다.
+- **정본 반영**: PRD §9.8의 시각 상태, §10 M5 범위, §11 M5 FE 검증, §12 DoD, §13 확정 결정에서 “원본 부재” 현재형을 “원본 복구·시각 QA 진행”으로 갱신했다. A-v2 계약 원문·사용자 승인 이력과 원본 복구 전 PASS 금지 원칙은 보존했다.
+- **STATE 반영**: PM `STATE.md`를 `APPROVED / 구현·자동검증 완료, 시각 QA final verdict 대기`로 갱신하고 다음 작업을 CTA 보정 → 독립 QA final verdict → root final acceptance/Git closeout 순으로 정리했다. 기능/API/자동검증 PASS와 전체 final acceptance NO를 분리 유지했다.
+- **범위·소유권**: 이번 턴은 PM 소유 `docs/PRD.md`, `.claude/team/pm/STATE.md`, `.claude/team/pm/WORKLOG.md`만 수정했다. frontend/QA 산출물, governance, M5 worklog, Git은 수정하지 않았고 Git 조작도 하지 않았다.
+- **미해결**: 마지막 CTA 카피 보정, QA final verdict, 그 후 root의 최종 acceptance 및 Git closeout.
+
+## 2026-11-07 16:50 KST — M5 최종 QA 인수 PASS·Git closeout 대기 동기화
+
+- **근거 대조**: `qa/M5-review.md` 최종 독립 브라우저 재검토·finding closure·최종 판정, 최신 frontend STATE/WORKLOG, `build/m5-visual-qa/evidence.json`, `docs/design/` 원본과 현재 Git을 재독했다.
+- **최종 QA 사실**: `BE-001`, `BE-002`, `QA-001`, `QA-002`, `DOC-001`, `V-001`, `V-002`가 모두 `CLOSED`다. Backend root evidence는 `70 XML suites / 457 tests / failures-errors-skips 0/0/0`, bootJar 성공; frontend는 `31 files / 338 tests`, lint/build exit 0이다.
+- **브라우저 인수 사실**: 실제 API 기반 1440×1000 실행은 `14 screenshots / 43 checks / 28 PASS / failures=[]`이며 SettingsUniversePage 여섯 카드, refresh/account switch, Blog hero 7상태·guest·CTA `✦ 유니버스 신청`·RSS 미노출과 원본 screenshot 대조를 PASS로 기록했다. QA 최종 판정은 전체 M5 final acceptance **PASS · merge-ready YES**다.
+- **정본 반영**: PRD §9.8·§10 M5·§11 M5 FE·§12 DoD·§13 확정 결정에서 시각 gate를 PASS로 전환하고 V-001/V-002 closure와 CTA 보정을 반영했다. A-v2 계약 원문과 승인 이력은 보존했다.
+- **STATE 반영**: PM `STATE.md`를 `APPROVED / M5 인수 PASS, Git 마감 진행`으로 갱신했다. 제품 acceptance와 실제 Git closeout을 분리해 기록했다.
+- **Git·소유권**: 현재 branch에는 아직 M5 commit/push/PR/merge가 없다. 이번 턴은 PM 소유 `docs/PRD.md`, `.claude/team/pm/STATE.md`, `.claude/team/pm/WORKLOG.md`만 수정했고 제품 소스·QA·governance·M5 worklog·Git은 수정하지 않았다.
+- **다음 단계**: root가 명시 파일 commit/push, `dev` 대상 PR·독립 리뷰·merge를 수행한 뒤 실제 근거를 PM 기록에 append한다.

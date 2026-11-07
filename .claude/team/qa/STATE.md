@@ -2,40 +2,41 @@
 
 > 덮어쓰기 스냅샷. 시간순 이력은 `WORKLOG.md`, 심의·마일스톤 이력은 `docs/governance/**`와 `docs/worklog/**`를 본다.
 
-마지막 갱신: 2026-10-04 KST (사용자 승인에 따른 리더의 상태 문구 갱신)
-
 ## 현재 단계
 
-- **로컬 M4 최종 QA PASS**다. PRD §9.7·회의 §20.8의 승인 범위인 로컬 파일 저장, 인증 multipart/content API, 글·이미지 접근권한, 5MiB 제한, 자동 테스트와 root 독립 runtime/browser 증거를 닫았다.
-- 사용자가 **“브라우저 파일 업로드만 제외하고 API·자동 테스트로 검증해”**라고 결정했으므로 Chrome 파일 선택·전송 자동화는 실행하지 않았다. multipart API·FE 자동 업로드, 실제 파일 저장·권한·이미지 표시·재시작 보존은 검증했다.
-- 제품 로컬 M4 PASS와 별도로 root의 Git 통합도 확인됐다. 구현 커밋 `4404f1e` 푸시, PR #10 `dev` 머지(`c34ff4e979bd6efffc3a2aea28c2be307ccac3b5`) 완료다. 운영 배포 완료를 뜻하지 않으며 QA는 Git을 조작하지 않았다.
+- **M5 독립 최종 인수 완료 — 기능/API/자동검증/1440px 브라우저 시각 gate PASS, 전체 final acceptance PASS**다.
+- BE-001/BE-002/QA-001/QA-002/DOC-001과 V-001, 초기 CTA 카피 순서 V-002는 모두 CLOSED다.
+- 기능/API/자동검증 범위는 merge-ready YES이며, 실제 API fixture와 Playwright 브라우저에서 Settings Universe 6개 카드·Blog hero 7상태·refresh·계정 전환·guest를 확인했다.
+- QA는 commit/push/PR/merge를 수행하지 않는다. root의 명시된 Git 마감만 남는다.
 
-## 최종 검증 결과
+## 최종 실측
 
-- Backend full: `build/m4-final-backend-full-20261003-1900.log` BUILD SUCCESSFUL 13m49s, 보존 archive `build/m4-final-junit-20261003-1915` 직접 XML 집계 66 files/426 tests/0 failure/0 error/0 skipped.
-- Backend bootJar: `build/m4-final-bootjar-20261003-1920.log` BUILD SUCCESSFUL 18s. 최종 runtime `build/m4-runtime-20261003-181423.jar` SHA-256 `D2B5FBB8A659D707F1A4039FB062D1768113D9AD53946F7A1D6AAA983783E2EF`.
-- Frontend: `build/m4-frontend-final-results.json` 28 test files/311 passed/0 failed/0 pending; `build/m4-frontend-r7-results.json` 2 files/40 passed/0 failed/0 pending. frontend lint/build exit 0.
-- Root 7차 HTTP smoke exit 0. malformed leaf 400/VALIDATION_001, ordered-list attrs true/true, large page 2147483647 정상 empty page, 권한·MIME·5MiB·purpose/rebind/detach/delete/view/snapshot gates 통과.
-- 최종 D2B5 runtime에서 OpenAPI posts 201, uploads 201, content GET operation과 실제 오류 응답을 확인했다. 기존 image post23의 재시작 후 HTTP 200/395 bytes/image/png/no-store/nosniff와 원본·파일·HTTP SHA-256 `2F76F73080F7F5ACE1CA54507604FE80937718FB8A6E1757F9E71D125B243F67`가 일치한다.
-- 독립 whole review는 FE R1/R2 방어/R4/R5/R6/R7 및 BE R2/R3/R7/R8을 종료 가능으로 판정했고 추가 Critical/Important 회귀가 없다. root Chrome은 1440px과 ordered-list/image 표시를 확인했다. symlink proof도 read/write 차단과 marker 보존으로 통과했다.
+- Backend root 최신: 70 XML suites / 457 tests / failures-errors-skips `0/0/0`, `BUILD SUCCESSFUL`, `bootJar` 성공.
+- Frontend root 최신: 31 files / 338 tests, lint exit 0, production build exit 0.
+- 브라우저: Playwright + 시스템 Chrome, CSS viewport `1440×1000`, `deviceScaleFactor=1`, 실제 API `localhost:18080`, FE `localhost:5173`; 최종 QA child exit 0, evidence `failures=[]`.
+- 원본: `docs/design/`의 네 파일(`DESIGN-SYSTEM.md`, `ZeroVerse Pages.dc.html`, `ZeroVerse Main Feed v2.dc.html`, `support.js`) 복구를 확인했고, Pages 원본의 Blog/Settings 화면을 실제 렌더 확인했다.
+- 보조 keyboard: guest Blog Tab 순회에서 검색 input과 hero `/signin` link에 포커스 도달.
+
+## 산출물
+
+- `qa/M5-review.md`: 1차 finding, 수정 루프 closure, 최종 브라우저 evidence와 PASS 판정.
+- `qa/m5-visual-qa.mjs`: QA 전용 재현 harness. fixture 계정/토큰을 출력·기록하지 않으며 artifact는 Git 무시 `build/m5-visual-qa/`에 둔다.
+- 최종 artifact: `build/m5-visual-qa/evidence.json`, 원본/제품 Settings·Blog·7 hero 상태·두 계정·guest PNG.
 
 ## 다음 작업
 
-1. M4 인수와 원격 통합은 완료됐다. 최종 결과는 `docs/worklog/M4-posts.md` [머지]와 PR #10을 따른다.
-2. 후속 제품 변경이 있으면 해당 범위에 새 독립 검증을 적용한다. 기존 테스트를 새 실행으로 재기록하지 않는다.
-3. S3/presigned/AWS/LocalStack/U0 후속과 M5 이후 기능은 새 승인·별도 마일스톤으로 다룬다.
+1. root가 최신 제품 파일과 테스트 출력, QA 기록을 직접 확인한다.
+2. root가 승인된 파일만 commit/push/PR/merge하고 M5 `[머지]`를 기록한다.
+3. QA는 root가 추가로 요청할 때만 재검토한다.
 
-## 비차단 잔여 범위
+## 차단 요인
 
-- 브라우저 파일 선택·전송 자동화는 사용자 명시 결정으로 제외했다.
-- S3/실제 AWS/U0 및 운영 배포 hardening은 후속이며 기존 U0 `BLOCKED` 판정을 유지한다.
-- M5 관계 CRUD·댓글·좋아요는 이번 판정에 포함하지 않는다.
+- 없음. V-001 시각 원본 부재 차단은 원본 복구 및 최종 실제 브라우저 대조로 해소됐다.
 
-## 주요 산출물
+## 갱신 시각
 
-- `qa/M4-review.md`: 승인 계약, 전체 gate, 최종 로컬 M4 PASS 및 잔여 범위.
-- `qa/m4-api-smoke.ps1`: HTTP acceptance helper.
-- `qa/M4-u0-review.md`: U0-ALT 독립 판정 및 BLOCKED 위험.
-- `.claude/team/qa/WORKLOG.md`: append-only QA 검증 이력.
+- 2026-11-07 KST — 실제 API fixture/Playwright 최종 run 및 keyboard 보조 검증 후.
 
-QA는 제품 코드, 타 역할 테스트, runtime/DB/browser fixture, Git을 변경하지 않았다.
+## 소유권 준수
+
+QA는 `qa/**`, `.claude/team/qa/**`만 수정했고 제품 코드·타 역할 기록·governance·마일스톤 worklog·Git을 변경하지 않았다.

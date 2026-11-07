@@ -1,6 +1,8 @@
 package com.zeroverse.domain.universe.entity;
 
 import com.zeroverse.common.entity.BaseEntity;
+import com.zeroverse.common.exception.BusinessException;
+import com.zeroverse.common.exception.ErrorCode;
 import com.zeroverse.domain.user.entity.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -14,7 +16,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
-/** M4가 읽기 전용으로 소비하는 기존 Universe 관계 행. CRUD는 M5 범위다. */
+/** 유니버스 단방향 관계 행. 거절·취소·삭제·차단 해제는 행을 hard-delete한다. */
 @Entity
 @Table(name = "universes")
 public class Universe extends BaseEntity {
@@ -37,8 +39,29 @@ public class Universe extends BaseEntity {
 
     protected Universe() {}
 
+    private Universe(User fromUser, User toUser, UniverseStatus status) {
+        this.fromUser = fromUser;
+        this.toUser = toUser;
+        this.status = status;
+    }
+
+    public static Universe pending(User fromUser, User toUser) {
+        return new Universe(fromUser, toUser, UniverseStatus.PENDING);
+    }
+
+    public static Universe blocked(User fromUser, User toUser) {
+        return new Universe(fromUser, toUser, UniverseStatus.BLOCKED);
+    }
+
     public Long getId() { return id; }
     public User getFromUser() { return fromUser; }
     public User getToUser() { return toUser; }
     public UniverseStatus getStatus() { return status; }
+
+    public void accept() {
+        if (status != UniverseStatus.PENDING) {
+            throw new BusinessException(ErrorCode.UNI_005);
+        }
+        this.status = UniverseStatus.ACCEPTED;
+    }
 }

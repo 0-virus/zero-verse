@@ -85,6 +85,7 @@ class SecurityAccessControlTest extends MySqlTestSupport {
         "/api/v1/blogs/me",
         "/api/v1/posts/drafts",
         "/api/v1/universe/friends",
+        "/api/v1/universe/relationship/1",
         "/api/v1/notifications"
     })
     @DisplayName("대표 보호 경로는 토큰 없이 401 AUTH_004를 반환한다 (M2: /users/me, /blogs/me 포함)")

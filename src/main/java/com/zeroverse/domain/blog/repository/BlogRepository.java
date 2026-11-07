@@ -3,6 +3,8 @@ package com.zeroverse.domain.blog.repository;
 import com.zeroverse.domain.blog.entity.Blog;
 import jakarta.persistence.LockModeType;
 import java.util.Optional;
+import java.util.Collection;
+import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -30,6 +32,10 @@ public interface BlogRepository extends JpaRepository<Blog, Long> {
 
     /** 사용자의 기본 블로그. 현재는 사용자당 1개이며 가장 먼저 만들어진 것을 기본으로 본다. */
     Optional<Blog> findFirstByUserIdAndDeletedAtIsNullOrderByIdAsc(Long userId);
+
+    @Query("select b from Blog b where b.user.id in :userIds and b.deletedAt is null "
+            + "order by b.user.id asc, b.id asc")
+    List<Blog> findByUserIdInAndDeletedAtIsNullOrdered(@Param("userIds") Collection<Long> userIds);
 
     /**
      * 자신을 제외한 다른 블로그의 urlSlug 중복 검사(FR-SETTINGS-03).

@@ -434,3 +434,47 @@
 - root 통합 인계: PR #12가 `dev`에 머지됐다. 구현 SHA는 `55aedea966a45dc0e88a6b0d8926e709b366050e`, merge SHA는 `4399f73acf19d66d96fafd2c4784c6a03fcfa282`, root 확인 통합 tree는 `7dd390ace316a1d548e4755dfc84c21f9e7bcdce`이며 두 SHA diff 없음·local `dev` fast-forward가 확인됐다.
 - 최종 게이트: root 전달 기준 BE 490 tests, FE 369 tests, actual 52 checks, 최종 독립 QA PASS, WR01·WR02·WR03 CLOSED다. M6 FE 구현·리뷰 수정·실제 통합·독립 QA의 필수 게이트가 모두 닫혔다.
 - 범위/상태: frontend 역할은 `STATE.md`와 본 append만 갱신했다. 제품·테스트 소스 및 Git은 편집하지 않았고, M6은 차단 없이 통합 완료 상태다. 후속 마일스톤은 별도 범위로 남긴다.
+
+## 2026-11-09 22:23:32 KST — M7 FE Task3→4 구현·자동 검증 인계
+
+- 담당/경계: 사용자 `승인된 작업 시작해.` 재개 지시와 M7 회의 §6 A-v2를 반영해 `frontend/**` 및 본 역할 상태/로그만 수정했다. backend/rootdocs/QA/Git, root untracked `package.json`·lock·run scripts, `.env.local`은 변경하거나 실행하지 않았다. backend Task1~2와 병렬로 승인 DTO를 독립 소비했다.
+- 직접 대조: 헌법·루트/역할 지침·frontend STATE, REQUIREMENTS FR-FEED-01~02/FR-SEARCH-01·PRD §5.9/5.10/§7/§9.10, 디자인 시스템 §8.1/§8.8 및 Main Feed v2/Pages 원본, M7 worklog Task3~4와 회의 §6 A-v2를 읽고 구현 기준으로 삼았다.
+- TDD RED: `mainFeedBehavior.test.tsx`를 먼저 작성해 구현 전 6개 실패를 확인했고, feed/search API 테스트는 모듈 해석 실패 상태를 확인했다. API·화면 구현 후 draft indicator 회귀를 추가해 1개 실패를 확인한 뒤 `임시저장` 배지와 `/edit/:postId` 링크를 완성했다.
+- Task3 구현: `MainPage`에 URL 기준 `relation/keyword/page/size/sort`, guest public/auth universe 호출, `friend`→`friends` canonical, 3관계 탭, 제목/작성자 검색, page0 reset, server total, 카드 interactions와 페이지네이션을 연결했다. auth loading·계정/키 generation stale guard, AUTH_002/004·USER_001 결과 폐기·retry, following 보조문구를 반영했다. `RightPanel`은 기존 friends/following/followers를 각각 `page=0,size=1`로 읽어 totalElements를 독립 표시하고 following 통계의 친구 포함 설명 및 M8 알림 빈 상태를 유지했다.
+- Task4 구현: `TopBar`와 검색 API에 trim·연속공백·UTF-16 100자 규칙, blank 미호출을 연결했다. `SearchPage`에 URL canonical 복원, 5 facet server counts, 전체 `matchedTypes` 배지, 게시글 중심 카드/보조문구, draft edit URL·indicator, stale 계정/keyword/page 경계와 오류 retry를 구현했다. `features/feed`·`features/search` API/types 및 href/키보드 가능한 `PostCard` 확장을 추가했으며 기존 BlogPage 계약을 보존했다.
+- targeted 검증: `npm test -- --run src/test/mainFeedBehavior.test.tsx src/test/searchBehavior.test.tsx src/features/feed/feedApi.test.ts src/features/search/searchApi.test.ts --maxWorkers=1` → 4 files/17 tests passed.
+- 최종 검증: `npm test -- --run --maxWorkers=1` → 38 files/386 tests passed(실패·오류·skip 0); `npm run lint` exit 0; `npm run build` exit 0(`tsc -b`, Vite 143 modules, 기존 >500KB chunk warning만); `git diff --check -- frontend .claude/team/frontend` 오류 없음.
+- 인계/잔여: 제품 자동 검증은 완료했으나 실제 backend DTO/OpenAPI/HTTP, Chrome 1440px 시각·상호작용 및 root 독립 리뷰는 부모/QA 게이트다. 이번 역할에서는 시각 PASS나 M7 통합 완료를 주장하지 않으며, 부모에게 Task3 GREEN checkpoint와 Task4/최종 명령·count를 전달한다.
+
+## 2026-11-09 22:43:02 KST — M7 FE fix round1 — refresh expiry·stats 세대·검색 정본
+
+- 리뷰 재현/원인: 독립 리뷰의 Important 3건을 현재 소스와 통합 경로로 대조했다. 보호 feed/search가 401→refresh 최종 실패→`apiClient` 만료 handler→`AuthProvider user=null`로 전이한 뒤 request key의 guest 재조회로 개인 오류가 사라지는 경로를 실제 `AuthProvider`·`apiClient` fetch 회귀로 재현했다. RightPanel은 `stats`만 effect에서 reset해 viewer A→B의 첫 렌더가 A 숫자를 남겼고, Search는 공통 PostCard 기본 variant와 out-of-range empty 조건 때문에 원본 스타일·pagination 복귀 경로가 없었다.
+- TDD RED: `m7AuthExpiryIntegration.test.tsx` 2 tests가 Main public 재조회/만료 오류에서 실패했고, RightPanel 계정 전환 test가 이전 stats 노출로 실패했으며, Search variant test와 out-of-range pagination test가 각각 실패했다. 수정 전 이 출력들을 확인한 뒤 한 경계씩 수정했다.
+- 인증 수정: `AuthContext`에 `sessionExpired`를 추가하고 refresh 최종 실패 handler에서만 true, 명시 `clearSession`/signin에서 false로 구분했다. Main/Search request key에 만료 세대를 포함하고 auth loading보다 뒤, canonical/API보다 앞에서 빈 개인 결과+`세션이 만료되었습니다. 다시 로그인해 주세요.` 오류를 유지해 guest 자동 재조회를 차단했다. 통합 test는 refresh 성공→me→보호 조회 401→refresh 401을 실제 fetch 응답으로 검증하고, 별도 test는 명시 로그아웃 후 public 전환을 확인한다.
+- stats 수정: RightPanel에 `statsViewerId`를 저장하고 viewer ID가 일치하지 않는 첫 렌더에는 `…` 세 값을 표시한다. 새 계정 응답만 적용하며 기존 generation guard와 오류를 0으로 대체하지 않는 경계를 유지했다.
+- 검색/UI 수정: `PostCard variant="search"`를 추가해 Pages 원본 380~386의 padding/title/snippet 수치를 분리 적용했다. Search 빈 응답도 `totalElements>0`이면 범위초과 안내와 `Pagination`을 렌더하고 `page`를 유효 마지막 페이지로 clamp해 page0 복귀를 제공한다.
+- 행동 회귀 보강: Main keyword·탭 page0 reset, 계정/탭/page 늦은 resolve/reject, AUTH_002/AUTH_004/USER_001 오류 폐기·retry를 `m7FeedStateBehavior.test.tsx`에 추가했다. Search auth loading, 계정 resolve/reject, retry, back page 복원을 `m7SearchStateBehavior.test.tsx`에 추가했다. 기존 Search/Main/Auth integration test도 유지했다.
+- 검증: targeted `npm test -- --run src/test/mainFeedBehavior.test.tsx src/test/searchBehavior.test.tsx src/test/m7AuthExpiryIntegration.test.tsx src/test/m7FeedStateBehavior.test.tsx src/test/m7SearchStateBehavior.test.tsx --maxWorkers=1` → 5 files/29 tests passed. 최종 `npm test -- --run --maxWorkers=1` → 41 files/404 tests passed(실패·오류·skip 0); `npm run lint` exit 0; `npm run build` exit 0(`tsc -b`, Vite 143 modules, >500KB chunk warning만); `git diff --check -- frontend .claude/team/frontend` exit 0.
+- 인계/잔여: 제품 수정·테스트·상태/로그는 frontend 소유 경계만 변경했다. `build/m7-evidence/fe-fix1.log`는 root `build/` 소유 경계 밖이라 생성하지 않았으며 위 명령/실출력을 부모에게 전달한다. 실제 backend HTTP·Chrome 1440px 및 독립 재리뷰는 root/QA 게이트다.
+
+## 2026-11-09 22:48:47 KST — M7 FE fix2 — Main 범위초과 빈 피드 복귀 경로
+
+- 리뷰 반영: 독립 재검토에서 확인된 MainPage의 작은 공백을 수정했다. 서버 `totalElements > 0`인데 요청 page가 범위를 넘어 `items=[]`로 반환되는 경우에도 SearchPage와 동일하게 범위초과 안내를 표시하고 페이지네이션을 유지한다.
+- 구현: `paginationPage = min(page.page, totalPages - 1)`로 서버 page를 유효 마지막 page에 clamp하고, 카드 렌더와 분리된 공통 pagination 조건(`totalPages > 0`)으로 1 페이지 복귀 버튼을 노출했다. 실제 데이터가 없는 정상 빈 피드의 기존 카피는 유지했다.
+- 회귀: `mainFeedBehavior.test.tsx`에 page=3·server total=3/totalPages=1·empty response를 추가해 범위초과 안내, pagination 렌더, 1 페이지 클릭 후 URL `page=0`을 고정했다.
+- 검증: `npm test -- --run src/test/mainFeedBehavior.test.tsx --maxWorkers=1` (frontend cwd) → 1 file/8 tests passed, exit 0. stdout은 `frontend/.m7-evidence/fe-fix2-main.log`에 보존했고 `.m7-evidence/`는 `frontend/.gitignore`로 무시한다. 부모 지시대로 전체 suite/lint/build는 재실행하지 않았다.
+- 인계: 변경은 `frontend/src/pages/MainPage.tsx`, `frontend/src/test/mainFeedBehavior.test.tsx`, `frontend/.gitignore`, 역할 STATE/WORKLOG에 한정했다. root 독립 최종 검증 및 실제 HTTP/1440px 인수는 별도 게이트다.
+
+## 2026-11-09 23:28:41 KST — M7 frontend closeout 상태 동기화 — root 최종 게이트 인계
+
+- source freeze: 부모 지시에 따라 이번 closeout에서는 제품 소스·테스트·Git을 수정하지 않고 frontend 역할 `STATE.md`와 `WORKLOG.md`만 갱신했다. README/PRD/QA/rootdocs는 보존했다.
+- root 최종 fresh 실측: FE `41 files / 405 tests`, failure `0`, lint exit `0`, build exit `0`; stdout은 `build/m7-evidence/frontend-final-*.log`에 root가 보존했다. BE는 `5,380 / 0 / 0`으로 전달됐다.
+- 실제 acceptance run4: `build/m7-acceptance-20261109-232636/evidence.json`이 `259 PASS / 0 FAIL / 0 NOT RUN / exit 0`이며 source `354`와 JAR hash가 일치한다.
+- review 상태: full fresh review의 제품·QA fix blocking은 모두 `CLOSED`다. 독립 시각 QA 판정은 진행 중이며 dev merge는 아직 없다. 따라서 M7 통합 완료·merge SHA를 이 기록에서 주장하지 않는다.
+- root가 기록한 제품 커밋은 `5d7ede2`, `059ceed`, `0b3008a`다. merge SHA가 전달되면 source freeze를 해제하지 않고 최종 closeout history만 추가 인계한다.
+
+## 2026-11-09 23:30:37 KST — M7 closeout 수치 정정
+
+- 정정 근거: `build/m7-evidence/backend-final-1/summary.json`을 직접 확인했다. 정확한 BE 결과는 `91 suites`, `538 tests`, `failures 0`, `errors 0`, `skipped 0`이다.
+- 이전 23:28:41 closeout 항목의 `5,380 / 0 / 0` 표기는 띄어쓰기 없는 전달 문자열을 잘못 해석한 기록이므로 수치만 정정한다. 기존 이력은 보존하며 FE `41 files / 405 tests`, 실제 acceptance `259 PASS / 0 FAIL / 0 NOT RUN`은 유지한다.
+- source freeze를 유지하고 제품 소스·테스트·Git은 수정하지 않았다.

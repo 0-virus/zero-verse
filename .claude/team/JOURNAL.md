@@ -450,3 +450,40 @@
 - M6 전체 목표를 달성했다. 구현 `55aedea`, PR #12, dev merge `4399f73acf19d66d96fafd2c4784c6a03fcfa282`. 원격 병합과 로컬 dev fast-forward, 검증된 구현과 merge tree `7dd390ace316a1d548e4755dfc84c21f9e7bcdce` 동일성을 직접 확인했다.
 - 최종 증거는 BE490/FE369·lint/build/실제HTTP·Chrome52 PASS, 독립 source review와 QA PASS다. 권한 상실과 stale 응답 수정도 최종 실제 인수에 포함됐다. 미해결 blocker는 없다.
 - 검증용 API/FE/MySQL/Colima를 종료하고 데이터·산출물은 보존했다. README 현황과 역할별 상태/이력, PM PRD를 closeout한다. 추가 구현 범위는 M6 이후로 확장하지 않는다.
+
+## 2026-11-09 19:12 KST — M7 실행 시작
+
+- 사용자 `m7 완료를 목표로 작업 시작해줘`에 따라 M7 피드·검색의 계획→독립 심의→필요한 구체 승인→구현/검증→dev 통합을 시작했다. 실행 상태는 진행이며 M8 구현은 제외한다.
+- brief로 dev `bc99cba`, M6 통합·역할 상태·실제 보존 BE XML 77/490 및 0/0/0을 대조했다. 루트 미추적 package/package-lock/run-backend/run-frontend 4개와 사용자 영속 데이터는 보존한다.
+- `/root/m7_backend_prep`, `/root/m7_frontend_prep`에 준비 조사와 각 역할 기록만 배정했다. 제품·테스트 변경은 승인 전 보류한다. 리더가 `docs/worklog/M7-feed-search.md`와 governance의 단일 작성자다.
+- 다음: HTML 본문 검색·관계 필터·검색 counts/DTO·메인 현황 계약 구체화, 실행계획 작성, 같은 안건을 독립 심의 3인에게 전달한다.
+
+## 2026-11-09 — M7 A-v2 독립 심의 완료·사용자 결정 대기
+
+- root가 feature/M7-feed-search를 dev bc99cba에서 생성했다. Product88/Architecture87/Delivery91은 모두 APPROVE_WITH_CHANGES·HIGH이며 서로 중간결과를 공유하지 않았다. 실제 PostContentService 빈doc·V1 updated_at·M6 controller 인증검사와 대조하고 회의 §6 A-v2에 필수보완을 반영했다.
+- 공개 API/DB계약 A-v2(피드전용following·post중심검색facets·정확text캐시V4/V5·인증상태표·RR·이관audit/전체rollback·offline복구)를 사용자에게 async 전체승인 요청했다. 현재 실행상태 **대기(사용자 결정)**. 제품/테스트/마이그레이션은 미구현·미실행이며 무응답을 승인으로 보지 않는다.
+- docs/worklog/M7-feed-search.md Task1~6, governance 회의/레지스터/RISK0016, QA 준비 매트릭스를 작성했다. root가 문서 재독·git diff --check를 확인했다. 사용자 root4미추적파일은 소유권 밖이며 run-backend.sh hash가 준비 도중 바뀐 것은 사용자/외부 작업으로 보존했다; root/역할이 편집하거나 실행하지 않았다.
+- 승인대기 독립준비: PM은 PRD 동기화할 절/참조를 조사하고 자신의 상태만 갱신; QA는 A-v2 매트릭스 문서만 보완한다. 승인 응답이 오면 root REQUIREMENTS·PM PRD 정합화와 backend Task1~2/frontend Task3~4를 배정하며 실제 QA→dev통합까지 이어간다. M8은 범위 밖이다.
+
+## 2026-11-09 — M7 전체 승인·사용자 정지
+
+- 사용자 원문: `전체 승인. 하지만 작업 착수는 추가 지시가 있을 때까지 잠시 보류.` A-v2 계약은 승인됐고 실행 상태는 **사용자 정지/일시 보류**다. 앞선 자동 후속 배정 계획보다 이 지시가 우선한다.
+- 활성 `/root/m6_pm_closeout`, `/root/m5_independent_qa`를 즉시 interrupt했고 실행 중 하위 에이전트가 없음을 확인했다. 예약 재개를 등록하지 않았다. 제품·migration·테스트·runtime·Git 통합에 착수하지 않았다.
+- 승인/보류 체크포인트만 root 소유 회의록·레지스터·M7 worklog·JOURNAL에 기록한다. 역할 STATE가 승인대기라고 남아 있어도 본 사용자 결정이 우선하며 추가 작업을 배정해 상태를 고치지 않는다.
+- 명시 재개 시 brief로 사용자 변경과 중단된 문서를 확인한 뒤 REQUIREMENTS/PRD 정합화부터 이어간다. A-v2는 재승인 불필요, M8은 제외다.
+
+## 2026-11-09 22:05 KST — M7 사용자 명시 재개·역할 구현 배정
+
+- 사용자 `승인된 작업 시작해.`로 M7 보류를 해제했다. A-v2승인은유지되고 실행상태는 진행이다. branch feature/M7-feed-search/basebc99cba를 유지하며 사용자root미추적4파일을보존한다.
+- backend m7_backend_impl(Task1~2), frontend m7_frontend_impl(Task3~4), PM m6_pm_closeout(PRD), QA m5_independent_qa(인수harness준비)를배정했다. root는REQUIREMENTS6.10-A동기화·worklog/governance·runtime·Git소유. 다른역할파일수정/Git무단조작금지.
+- Colima격리VM재기동exit0. 사용자DockerDesktop13307은건드리지않으며 실제M7인수용13317/18087/5177을분리한다. Testcontainers는명시socket·임의포트 사용.
+- 다음은구현별자체검증→저자와다른컨텍스트review→실제QA→dev통합이다. M8제외, 같은승인재질문없음.
+
+## 2026-11-09 — M7 자동 검증·독립 리뷰·제품 커밋
+
+- Task1/Task2/FE는 소유 경로를 분리해 구현했다. Task2 helper는 신규 HTTP/RR 테스트 2파일만 담당했고 최종 QA와 분리했다. Task1→root로 Gradle 단일 실행 조정을 인계했다.
+- 독립 task review의 코드·검증 결함을 원 작성자에게 돌려 수정했다. 마지막 Task1/Task2/FE blocking 항목은 모두 ADDRESSED이며, 상세 실패 원인·정정·재실측은 M7 worklog에 보존했다.
+- root 최종 자동 검증: backend 91 suites/538 tests, frontend 41 files/405 tests, 실패·오류·skip 0. FE lint/build 및 BE bootJar exit 0. 증거 `build/m7-evidence/`; immutable JAR SHA256 `0cfc53e777449a430cf2f17114113850d9d94d04a4b172a230599e7e41e5d672`.
+- 새 컨텍스트 `/root/m7_whole_branch_review`는 전체 제품 코드에 신규 Critical/Important 없음을 확인했다. QA harness의 결과 판정 허점과 실제 브라우저 흐름 누락을 원 QA 작성자가 보강 중이다. 실제 인수 1차는 fixture slug 형식 오류로 중단되어 실패 상태를 유지한다.
+- 검증된 제품 변경만 리더가 원자적으로 커밋했다: text/migration `5d7ede2`, API/contract tests `059ceed`, frontend `0b3008a`. 아직 push/PR/dev merge는 수행하지 않았다. 사용자 root 4파일·기존 DB·환경 파일은 보존했다.
+- 다음: QA 보강 완료→새 고유 actual run→독립 시각·결과 판정/whole-review 수정 재검토→역할·governance 기록→PR/dev 통합. M8은 배정하지 않는다.

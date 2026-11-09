@@ -1,8 +1,8 @@
 # backend 현재 상태
 
-## 2026-11-09 — M6 backend 구현·전체 자동검증 PASS, 독립 통합 대기
+## 2026-11-09 — M6 backend 구현·dev 통합 완료
 
-- 현재 단계: 사용자 `A-v2 전체 승인` 후 `feature/M6-comments-likes`에서 Task1 댓글 CRUD/paging/soft-delete와 Task2 likes/interactions를 구현했다. M6 제품 source/test 변경은 backend 소유 범위에만 있으며 Git commit/push/merge는 하지 않았다.
+- 현재 단계: 사용자 `A-v2 전체 승인` 후 `feature/M6-comments-likes`에서 Task1 댓글 CRUD/paging/soft-delete와 Task2 likes/interactions를 구현했고, PR #12가 `dev`에 통합됐다. 구현 commit `55aedea966a45dc0e88a6b0d8926e709b366050`, merge commit `4399f73acf19d66d96fafd2c4784c6a03fcfa282`, 통합 tree `7dd390ace316a1d548e4755dfc84c21f9e7bcdce`는 root가 실제 Git 대조를 완료했다. M6 이후 backend 후속 마일스톤은 별도 범위이며 아직 착수하지 않았다.
 - 구현 사실: V1 `comments`/`post_likes`와 `(post_id,user_id)` unique를 유지한다. 댓글은 plain text trim/UTF-16 1~2000, root/reply PageResponse, 삭제 placeholder, 1단계 reply, COM 오류·ACTIVE/ACL/block 정책을 적용한다. root page의 최초 replies는 MySQL `ROW_NUMBER()` batch(최대 root100×reply20)와 author ID batch이며 큰 offset은 page-zero count 후 empty PageResponse다.
 - 구현 사실: 좋아요는 멱등 POST/DELETE, hard delete, 대상 Like row current locking과 READ_COMMITTED post-scoped aggregate count, `InteractionState(postId,commentCount,likeCount,liked,canComment,canLike,canUnlike)`, PUBLIC/UNIVERSE ACL·양방향 BLOCKED·SUSPENDED/보존 like 규칙을 적용한다. interactions/comment GET은 optional auth, malformed Bearer 거부, `private,no-store`다.
 - 잠금/snapshot: user join 없는 scalar blog lock → 관련 user ID 오름차순 lock → post → comment/like 순서를 공통 helper로 사용한다. M6 mutation과 `PostService.get`은 `READ_COMMITTED` 및 lock 후 current ACL/pair read를 사용해 RR stale snapshot을 줄였다. `PostService.get`의 기존 view/ACL 의미는 유지한다.
@@ -10,7 +10,7 @@
 - TDD/검증: RED에서 미구현 댓글 3건이 `3 tests completed, 3 failed`였고 이후 최소 구현 GREEN으로 전환했다. 최신 본체 targeted는 `CommentBatch 1 + CommentBehavior 9 + CommentController 3 + LikeController 10 + LikeConcurrency 1 + OpenApiConfig 5 = 29 tests`, 모두 failures/errors/skips `0/0/0`; 기존 `PostServiceIntegrationTest` 8건도 별도 재실행해 `0/0/0`이다. CommentBatch는 guest와 ACTIVE viewer 모두에서 1 root 대비 100 roots의 Hibernate prepare-statement 상한과 100×21→20 bounded replies를 실제 MySQL에서 고정하고, 댓글/좋아요 no-notification count도 검증한다. 최신 표준 full은 두 helper 포함 `77 XML files / 490 tests / failures-errors-skips 0/0/0`, `BUILD SUCCESSFUL`이다.
 - 경쟁 검증: `M6InteractionConcurrencyMySqlTest` 3건과 `M6InteractionCrossRaceMySqlTest` 5건이 모두 통과했다. 첫 helper 실행의 SpringData spy latch timeout은 helper 소유자가 실제 service 호출·performance_schema transaction wait 관측으로 수정했고, 재실행에서 `8/8` PASS로 해소됐다. CrossRace는 block↔comment/like, root-delete↔reply, post-delete↔comment/like를 고정했다.
 - 실행 환경: JDK `/private/tmp/zeroverse-jdk21/jdk-21.0.13+9/Contents/Home`, Gradle cache `/private/tmp/zeroverse-gradle-user-home`, MySQL 8.4 Testcontainers Colima socket `unix:///private/tmp/zeroverse-colima/default/docker.sock`, `TESTCONTAINERS_RYUK_DISABLED=true`, `JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=/private/tmp/zeroverse-junit-tmp`.
-- 남은 단계/위험: backend source/full/bootJar 자동검증은 PASS다. root의 FE·실제 HTTP/브라우저 QA·독립 최종 review와 Git 통합이 남았으므로 이 역할은 M6 merge-ready나 전체 제품 완료를 단정하지 않는다.
+- 남은 단계/위험: M6 backend source/full/bootJar, FE, 실제 HTTP, 독립 QA 및 dev 통합이 모두 PASS/완료됐다. 현재 backend 차단은 없으며 후속 마일스톤은 별도 승인·배정 범위다.
 - 갱신 시각: 2026-11-09 KST
 
 ## 2026-10-04 — M4 로컬 인수·Git 통합 완료

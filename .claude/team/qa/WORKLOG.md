@@ -637,3 +637,9 @@
 - FR-COM-01~04/FR-LIKE-01~03, 자동검증, 경쟁/query-bound/rollback/no-notification, FE stale·권한, PostDetail 시각 gate를 **PASS / merge-ready: Yes**로 판정했다. QA blocker는 없다.
 - BlogPage/PostCard count 변경과 M8 notification 생성은 승인 범위상 이번 M6 PASS에서 제외한다. Git 통합·마일스톤 closeout은 root 소유 후속이다.
 - QA는 `qa/**`, `.claude/team/qa/**`만 수정했고 제품 코드·타 역할 테스트·정본·Git은 수정하지 않았다.
+
+## 2026-11-09 KST — M6 dev 통합 및 QA closeout 확인
+
+- root 보고의 PR #12(`https://github.com/0-virus/zero-verse/pull/12`)를 기준으로 M6 구현 commit `55aedea966a45dc0e88a6b0d8926e709b366050e`가 `dev`에 merge된 것을 확인했다. merge SHA는 `4399f73acf19d66d96fafd2c4784c6a03fcfa282`이며, root가 확인한 통합 tree는 `7dd390ace316a1d548e4755dfc84c21f9e7bcdce`다.
+- QA 최종 판정(PASS / merge-ready Yes), backend 77 suites/490 tests 0/0/0, FE 34 files/369 tests·lint/build PASS, immutable runtime 52/52 PASS 및 1440px PostDetail 시각 PASS는 dev 통합 후에도 유지된다. M6 QA blocker는 없고 QA closeout을 완료했다.
+- QA는 제품 코드·타 역할 테스트·Git을 수정하지 않았으며, 이 closeout은 `.claude/team/qa/STATE.md`와 이 append-only WORKLOG만 갱신했다.

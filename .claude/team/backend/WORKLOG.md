@@ -343,3 +343,8 @@
 - 최신 표준 전체: `... GradleWrapperMain --no-daemon --max-workers=1 --rerun-tasks test` → `BUILD SUCCESSFUL in 1m50s`; XML 직접 집계 `77 files / 490 tests / failures 0 / errors 0 / skipped 0`이다. 두 helper가 포함된 수치다.
 - 최종 패키지: `... GradleWrapperMain --no-daemon --max-workers=1 bootJar` → `BUILD SUCCESSFUL in 3s`; `build/libs/zeroverse-server-0.0.1-SNAPSHOT.jar`, SHA-256 `f0cbf9c2fd027510b03a00ce752f2f39040f5870bafaef360895343856d056ab`.
 - `git diff --check`는 오류 없이 완료했다. 이 역할은 commit/push/merge를 수행하지 않았으며, root의 FE/실제 브라우저 QA·독립 최종 review·Git 통합을 대기한다.
+## 2026-11-09 KST — M6 backend dev 통합 closeout
+
+- root가 PR #12(`https://github.com/0-virus/zero-verse/pull/12`)를 `dev`에 통합했다. 구현 commit `55aedea966a45dc0e88a6b0d8926e709b366050`, merge commit `4399f73acf19d66d96fafd2c4784c6a03fcfa282`, 통합 tree `7dd390ace316a1d548e4755dfc84c21f9e7bcdce`이며 root가 두 SHA diff와 tree 일치 및 local `dev` fast-forward를 실제 확인했다.
+- 최종 인수 근거: backend `490 tests` PASS, frontend `369 tests` PASS, 실제 HTTP `52 checks` PASS, 독립 QA PASS. M6 backend 기능/API/자동검증 및 dev 통합을 완료 상태로 기록한다.
+- 이번 closeout은 `.claude/team/backend/STATE.md`와 이 WORKLOG만 갱신했다. 제품·테스트·Gradle·Git은 변경하지 않았다. M7 이후 마일스톤은 별도 범위로 남긴다.

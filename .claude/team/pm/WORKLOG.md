@@ -330,3 +330,10 @@
 - **FR 추적 정정**: root가 REQUIREMENTS에 추가한 `FR-LIKE-03` interactions GET을 확인해 PRD §5.8, §9.9, §11의 좋아요 추적 범위를 `FR-LIKE-01~03`으로 맞췄다. REQUIREMENTS·governance·타 역할·Git은 수정하지 않았다.
 - **검증**: `rg --files`로 초기 산출물과 `rg -n 'FR-LIKE-01~03|M6 A-v2|13.2 M6' docs/PRD.md`를 확인하고, PM 소유 파일 `git diff --check`를 재실행한다. 제품 테스트·빌드·Git 조작은 수행하지 않는다.
 - **미해결**: BE 댓글/좋아요 제품 구현과 FE PostDetail 연동, RED→GREEN·MySQL 경쟁·OpenAPI·1440px 독립 QA, root의 PR/merge가 남아 있다.
+
+## 2026-11-09 14:57 KST — M6 완료 문서 closeout 동기화
+
+- **한 일**: `docs/worklog/M6-comments-likes.md` 마지막 `[머지·완료]`, `qa/M6-review.md` §11, backend/frontend/qa STATE 및 실제 Git을 교차 대조했다. PM 소유 `docs/PRD.md` M6 현황에 완료 증거 1개 문단을 추가하고, `.claude/team/pm/STATE.md`를 M6 완료·`dev` 통합 스냅샷으로 갱신했다. 승인된 A-v2 계약은 변경하지 않았다.
+- **산출물**: PR #12 `merged=true`, 구현 `55aedea966a45dc0e88a6b0d8926e709b366050e`, merge `4399f73acf19d66d96fafd2c4784c6a03fcfa282`, 통합 tree `7dd390ace316a1d548e4755dfc84c21f9e7bcdce` 및 local `dev` fast-forward를 PRD/STATE에 기록했다. M6 범위 밖인 BlogPage/PostCard count, M8 notification row, M7 착수는 후속으로 남겼다.
+- **검증**: backend 77 suites/490 tests 및 failures/errors/skips 0/0/0, frontend 34 files/369 tests·lint/build PASS, 실제 API·Chrome 1440px 52/52 PASS, 독립 QA M6 PASS/merge-ready Yes 및 WR-01~03 CLOSED/ADDRESSED를 원문에서 확인했다. 구현/merge diff empty와 tree 동일·`dev` fast-forward를 `git diff`/`git rev-parse`/`git merge-base`로 확인했고, PM 소유 변경 후 `git diff --check`도 오류 없이 통과했다.
+- **미해결**: M6 blocker 없음. M7 및 후속 count/알림은 별도 사용자 지시·승인·계획 전 착수하지 않는다.

@@ -1,8 +1,8 @@
 # M7 — 피드·검색 독립 QA 최종 검토
 
-> **현재 상태: A-v2 APPROVED / FINAL QA PASS / MERGE-READY BEFORE DEV INTEGRATION**
+> **현재 상태: A-v2 APPROVED / FINAL QA PASS / DEV INTEGRATED**
 >
-> 최종 판정은 제품 구현자와 분리된 QA 컨텍스트에서, source 동결본·immutable JAR·격리 MySQL·실제 HTTP·system Chrome 1440px 결과를 대조해 내렸다. M7은 아직 `dev`에 통합되지 않았으므로 이 문서는 **dev 통합 전** 판정이다.
+> 최종 판정은 제품 구현자와 분리된 QA 컨텍스트에서, source 동결본·immutable JAR·격리 MySQL·실제 HTTP·system Chrome 1440px 결과를 대조해 내렸다. M7은 독립 QA PASS 후 PR #13으로 `dev`에 통합됐다.
 
 ## 1. 검토 경계와 정본
 
@@ -13,7 +13,7 @@
 - `docs/design/DESIGN-SYSTEM.md` §8.1/§8.8 및 `docs/design/ZeroVerse Main Feed v2.dc.html`, `docs/design/ZeroVerse Pages.dc.html`
 - `docs/governance/meetings/M7-20261109-feed-search.md` §6 A-v2 (사용자 전체 승인 및 이후 실행 재개 기록 포함)
 - `docs/worklog/M7-feed-search.md` Task 1~5 및 최신 구현·검증 기록
-- 최종 source commit `0b3008a`와 QA 소유 `qa/m7-acceptance.mjs`
+- 최종 제품 source commit `0b3008a`, acceptance/test 기록을 포함한 tested head `2b984b6`, QA 소유 `qa/m7-acceptance.mjs`
 
 회의록의 최초 `실행 보류` 표현은 당시 승인 체크포인트 이력이다. 이후 사용자의 `승인된 작업 시작해.` 지시와 회의록/PRD의 재개 기록을 현재 계약·실행 기준으로 삼았다.
 
@@ -97,11 +97,19 @@ run4는 실제 API에 연결된 system Chrome에서 CSS viewport 1440px로 실�
 ## 7. 잔여 gate와 경계
 
 - **QA gate:** 기능/API/DB/자동검증/실제 브라우저/1440px 시각 인수는 PASS다. 단, owner draft `/edit/:id` 직접 Chrome 클릭은 별도 실행하지 않았고 FE 행동 테스트·source·HTTP로 대체 증명했다(브라우저-only 정책이면 후속 micro-check).
-- **통합 gate:** `dev` 통합·PR·최종 root closeout은 QA 소유가 아니며 아직 이 문서의 판정 범위 밖이다. 통합 전까지 최종 source commit `0b3008a`, manifest/JAR SHA, run4 evidence를 함께 보존해야 한다.
+- **통합 gate:** **CLOSED** — PR #13이 `dev`에 merge됐다. merge SHA는 `08863207b8385177b619091410bbbd43e52a337c`, 통합 tree는 `dc68037477c6fed6b77d537235d79093803a983e`이며 tested head `2b984b6`의 tree와 일치한다. QA는 merge 후 제품 수정·재실행을 하지 않았다.
 - **범위 제외:** M8 notification 생성, S3, 관리자, 기존 BlogPage 목록 count 확장은 M7 A-v2 범위가 아니다. M7 read side-effect가 없음을 확인했으며 M8 notification 기능 PASS를 주장하지 않는다.
 
 ## 8. 최종 판정
 
-**M7 독립 QA: PASS. Merge-ready: Yes (dev 통합 전).**
+**M7 독립 QA: PASS. Merge-ready: Yes. Dev 통합: 완료.**
 
-근거는 최종 source/runtime SHA 일치, backend 91 suites/538 tests 0/0/0, frontend 41 files/405 tests·lint/build exit 0, 실제 격리 HTTP/DB/Chrome run4 `259 PASS / 0 FAIL / 0 NOT_RUN`, 4개 원본·제품 screenshot 직접 대조 PASS다. owner draft 직접 Chrome click만 별도 실행하지 않았다는 증거 경계를 보존하며, 해당 route는 FE 행동 테스트·source·HTTP로 닫혔다. 이후 필요한 작업은 root의 PR/`dev` 통합과 마일스톤 closeout이며, QA는 제품 수정이나 전체 테스트 반복을 요구하지 않는다.
+근거는 최종 source/runtime SHA 일치, backend 91 suites/538 tests 0/0/0, frontend 41 files/405 tests·lint/build exit 0, 실제 격리 HTTP/DB/Chrome run4 `259 PASS / 0 FAIL / 0 NOT_RUN`, 4개 원본·제품 screenshot 직접 대조 PASS다. owner draft 직접 Chrome click만 별도 실행하지 않았다는 증거 경계를 보존하며, 해당 route는 FE 행동 테스트·source·HTTP로 닫혔다. PR #13 merge 후 통합 tree가 tested head와 동일함을 확인했으며, QA는 추가 제품 수정이나 테스트 반복을 요구하지 않는다.
+
+## 9. Dev 통합 closeout
+
+- PR #13: <https://github.com/0-virus/zero-verse/pull/13>
+- merge commit: `08863207b8385177b619091410bbbd43e52a337c`
+- tested head: `2b984b6a2fc3aafd6d650c6ccb1cd8213a528545`
+- 통합 tree: `dc68037477c6fed6b77d537235d79093803a983e` (tested head tree와 동일)
+- 현재 브랜치: `dev`; M7 QA evidence·시각 판정·merge-ready 상태는 통합 후에도 유지된다.

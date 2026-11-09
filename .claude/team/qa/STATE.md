@@ -4,7 +4,7 @@
 
 ## 현재 단계
 
-- **M7 피드·검색은 A-v2 승인·구현·독립 최종 QA까지 완료**했다. `qa/M7-review.md`의 최종 판정은 **PASS / merge-ready: Yes (dev 통합 전)**이다. 최종 source `0b3008a`, backend 91 suites/538 tests·failures/errors/skips `0/0/0`, frontend 41 files/405 tests·lint/build exit 0, 실제 격리 HTTP/DB/Chrome run4 `259 PASS / 0 FAIL / 0 NOT_RUN`, 원본·제품 1440px screenshot 4개 직접 대조와 source/JAR SHA 독립 검증을 모두 확인했다. M7은 아직 `dev` 통합 전이며 root의 PR/merge/closeout만 남았다.
+- **M7 피드·검색은 A-v2 승인·구현·독립 최종 QA·dev 통합까지 완료**했다. `qa/M7-review.md`의 최종 판정은 **PASS / merge-ready: Yes / dev 통합 완료**다. 최종 source `0b3008a`, tested head `2b984b6`, backend 91 suites/538 tests·failures/errors/skips `0/0/0`, frontend 41 files/405 tests·lint/build exit 0, 실제 격리 HTTP/DB/Chrome run4 `259 PASS / 0 FAIL / 0 NOT_RUN`, 원본·제품 1440px screenshot 4개 직접 대조와 source/JAR SHA 독립 검증을 모두 확인했다. PR #13 merge SHA `08863207b8385177b619091410bbbd43e52a337c`, 통합 tree `dc68037477c6fed6b77d537235d79093803a983e`는 tested head tree와 일치한다.
 - **M5 독립 최종 인수·dev 통합은 완료** 상태다. M5 finding BE-001/BE-002/QA-001/QA-002/DOC-001/V-001/V-002는 이전 최종 기록대로 CLOSED다.
 - **M6 댓글·좋아요 최종 독립 QA는 PASS**다. `docs/governance/meetings/M6-20261109-comments-likes.md`의 보완 A-v2는 `APPROVED`·HIGH이며 `REQUIREMENTS` FR-LIKE-03/확정 세부 계약과 `PRD`에 동기화됐다.
 - 최종 source 동결본을 backend/FE 독립 검토하고, backend 77 suites/490 tests, FE 34 files/369 tests·lint/build, 실제 HTTP/Chrome 1440px 52 checks, MySQL 경쟁/query-bound/no-notification 증거를 대조했다. 모든 필수 M6 gate가 CLOSED이며 PR #12가 `dev`에 통합됐다(merge `4399f73acf19d66d96fafd2c4784c6a03fcfa282`).
@@ -39,17 +39,17 @@
 - `qa/m6-visual-qa.mjs`: 승인 계약에 맞춘 API/Chrome 1440px PostDetail 검증 harness(최종 acceptance 증거와 함께 검토 완료).
 - `qa/m6-acceptance.mjs`: random synthetic fixture 생성·seed와 실제 브라우저 mutation/access-loss acceptance harness(최종 실행 52/52 PASS). credentials/token은 메모리 전용이다.
 - `build/m6-acceptance/evidence.json`: 최종 immutable runtime 결과 `52 PASS / 0 FAIL`, 1440px screenshot 3개 및 synthetic fixture ID만 기록(credential/token 없음).
-- `qa/M7-review.md`: M7 A-v2 정본 대조, FR-FEED-01/02·FR-SEARCH-01 인수 매트릭스, run1~3 QA-only 실패 이력, 최종 run4 증거와 **PASS / merge-ready (dev 통합 전)** 판정.
+- `qa/M7-review.md`: M7 A-v2 정본 대조, FR-FEED-01/02·FR-SEARCH-01 인수 매트릭스, run1~3 QA-only 실패 이력, 최종 run4 증거와 **PASS / merge-ready / DEV INTEGRATED** 판정.
 - `qa/m7-acceptance.mjs`: M7 승인 후 QA-only synthetic fixture·HTTP/API/OpenAPI·ACL/facet/text-cache/no-side-effect·Playwright 1440px Main/Search/account-stale harness. 최종 run4 evidence는 259/259 PASS이며 credentials/token은 남기지 않았다.
 
 ## 다음 작업
 
-1. root가 최종 source/runtime SHA와 run4 evidence를 보존한 채 M7 PR을 `dev`에 통합하고 마일스톤 closeout을 기록한다.
-2. QA는 추가 제품 수정·테스트 반복 없이 root의 통합 결과만 확인한다. M6 QA 및 dev 통합 closeout은 완료 상태이며, M8 notification 생성/BlogPage count 확장은 이번 범위가 아니다.
+1. M7 PR #13의 `dev` 통합·tree 동일성을 확인했으며 QA closeout을 유지한다.
+2. 다음 마일스톤은 M8 승인·계획 절차에 따라 별도 착수한다. M6 QA 및 dev 통합 closeout은 완료 상태이며, M8 notification 생성/BlogPage count 확장은 M7 범위가 아니었다.
 
 ## 차단 요인
 
-- M7 QA blocker는 없다. source/test closure, 합성 status-ready, exact expired token, API/FE runtime, source/runtime SHA, 실제 HTTP/DB/Chrome 및 시각 gate를 모두 run4와 최종 XML에서 확인했다. `dev` 통합·PR·root closeout만 남았다.
+- M7 QA blocker는 없다. source/test closure, 합성 status-ready, exact expired token, API/FE runtime, source/runtime SHA, 실제 HTTP/DB/Chrome 및 시각 gate를 모두 run4와 최종 XML에서 확인했고, PR #13 `dev` 통합과 tree 동일성도 확인했다.
 - M7의 hero 하단 pixel staircase는 M4/M5 기존 baseline으로 분류했고, Main 검색 입력은 승인된 M7 추가 범위로 분리했다. 이는 최종 M7 finding이 아니다.
 - M6 QA blocker는 없다. backend/FE 최종 source·자동검증·MySQL 경쟁/query-bound/no-notification/ACL·HTTP/Chrome evidence가 모두 closure됐다.
 - M6 승인 계약상 notification row는 생성하지 않고 FR-NOT-05는 M8 범위다. 최종 backend 증거에서 M6 mutation 전후 notification 불변을 확인했으며, M8 생성 자체는 이번 판정 범위가 아니다.
@@ -57,6 +57,7 @@
 ## 갱신 시각
 
 - 2026-11-09 KST — M7 최종 독립 QA closeout. `qa/M7-review.md`에 source commit `0b3008a`, backend 91 suites/538 tests 0/0/0, FE 41 files/405 tests·lint/build PASS, run4 실제 acceptance 259/259 PASS·0 NOT_RUN, source/JAR SHA 독립 일치, 원본/제품 1440px PNG 4개 직접 대조 결과를 기록했다. run1 slug·run2 selector·run3 page-order 실패는 QA-only 이력으로 CLOSED했고 제품 Critical/Important/Minor finding은 없다. 최종 판정은 **M7 QA PASS / merge-ready Yes (dev 통합 전)**이며 root의 PR/`dev` 통합/closeout만 잔여다. M6 최종 독립 QA PASS 및 dev 통합 완료 상태(M6 FE-001~006 CLOSED, WR-01/02/03 ADDRESSED, backend 77 suites/490 tests 0/0/0, FE 34 files/369 tests·lint/build PASS, final immutable runtime 52/52 PASS, PR #12 merge SHA `4399f73acf19d66d96fafd2c4784c6a03fcfa282`, 통합 tree `7dd390ace316a1d548e4755dfc84c21f9e7bcdce`)는 유지된다.
+- 2026-11-09 KST — M7 dev 통합 closeout. PR #13 merge SHA `08863207b8385177b619091410bbbd43e52a337c`, tested head `2b984b6a2fc3aafd6d650c6ccb1cd8213a528545`, 통합 tree `dc68037477c6fed6b77d537235d79093803a983e`를 read-only 대조했고 tested head tree와 일치했다. 기존 독립 시각 포함 QA PASS·merge-ready 판정을 유지하며, `qa/M7-review.md`를 **DEV INTEGRATED**로 갱신했다. 추가 테스트·제품 수정·Git 조작은 하지 않았다.
 
 ## 소유권 준수
 

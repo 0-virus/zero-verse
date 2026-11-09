@@ -2,13 +2,13 @@
 
 > 덮어쓰기 스냅샷. 시간순 이력은 `WORKLOG.md`, 마일스톤 이력은 `docs/worklog/**`를 본다.
 
-마지막 갱신: 2026-11-09 23:28:41 KST
+마지막 갱신: 2026-11-09 23:46:32 KST
 
 ## 현재 단계
 
-- M7 A-v2 사용자 승인 후 frontend Task3(MainPage·RightPanel)와 Task4(TopBar·SearchPage) 구현 및 자동 검증을 완료했다. root의 fresh FE 검증과 실제 acceptance run도 통과했고, full fresh review의 제품·QA blocking은 CLOSED다.
-- 작업 브랜치는 `feature/M7-feed-search`이며 backend Task1~2와 병렬이다. backend/rootdocs/QA 경로, Git, 의존성, `.env.local`은 수정하지 않았다.
-- 실제 HTTP/acceptance는 root가 통과 판정했으며 독립 시각 QA 판정과 dev merge가 아직 남아 있다. source freeze를 유지하고 merge SHA 확인 후 최종 closeout을 추가 인계한다.
+- M7 A-v2 사용자 승인 후 frontend Task3(MainPage·RightPanel)와 Task4(TopBar·SearchPage) 구현 및 자동 검증을 완료했다. root의 fresh FE 검증·실제 acceptance·독립 시각 QA까지 PASS했고, full fresh review의 제품·QA blocking은 CLOSED다.
+- 구현 브랜치는 `feature/M7-feed-search`였고 현재 로컬은 `dev` 통합 상태다. backend/rootdocs/QA 경로, Git, 의존성, `.env.local`은 이 역할에서 수정하지 않았다.
+- PR #13이 `dev`에 merge되어 M7은 merge-ready/통합 완료다. M8은 착수하지 않으며 docs-only 최종 커밋은 root가 수행한다.
 
 ## M7 Task3 — 메인 피드·관계 현황
 
@@ -37,16 +37,17 @@
 - M7 fix2 targeted: `npm test -- --run src/test/mainFeedBehavior.test.tsx --maxWorkers=1` (frontend cwd) → 1 file/8 tests passed. stdout은 ignored `frontend/.m7-evidence/fe-fix2-main.log`에 보존했다.
 - 구현 역할의 이전 자동 검증: `npm test -- --run --maxWorkers=1` → 41 files/404 tests passed(실패·오류·skip 0); `npm run lint` exit 0; `npm run build` exit 0(`tsc -b`, Vite 143 modules, 기존 >500KB chunk warning만).
 - root 최종 fresh 직접 실측: FE 41 files/405 tests, failures 0; lint exit 0; build exit 0. 관련 stdout은 `build/m7-evidence/frontend-final-*.log`에 root가 보존했다. BE는 538 tests / failures 0 / errors 0 / skipped 0 (91 suites)다.
-- root acceptance run4: `build/m7-acceptance-20261109-232636/evidence.json` → 259 PASS / 0 FAIL / 0 NOT RUN / exit 0, source 354와 JAR hash 일치. full fresh review 및 제품/QA fix blocking은 CLOSED이며 독립 시각 QA 판정만 진행 중이다.
-- `git diff --check -- frontend .claude/team/frontend` 오류 없음. dev merge는 아직 없고, 최종 통합 전 source freeze를 유지한다.
+- root acceptance run4: `build/m7-acceptance-20261109-232636/evidence.json` → 259 PASS / 0 FAIL / 0 NOT RUN / exit 0, source 354와 JAR hash 일치. full fresh review·제품/QA fix·독립 시각 QA가 모두 PASS다.
+- PR #13 `https://github.com/0-virus/zero-verse/pull/13`이 `dev`에 merge됐다. merge SHA는 `08863207b8385177b619091410bbbd43e52a337c`, merge tree는 `dc68037477c6fed6b77d537235d79093803a983e`; tested head `2b984b6`와 diff exit 0으로 동일하다.
+- `git diff --check -- frontend .claude/team/frontend` 오류 없음. M7 source freeze를 유지하며 M8은 시작하지 않는다.
 - 이번 wave에서 편집한 제품 경계는 `frontend/**`, 상태/로그는 `.claude/team/frontend/**`뿐이다. root untracked package/lock/run scripts 및 타 역할 변경은 열거나 수정·실행하지 않았다.
 
 ## 다음 작업 / 차단 요인
 
-- 제품 차단 없음. full fresh review와 실제 acceptance의 blocking은 닫혔고 독립 시각 QA 판정 및 dev merge SHA 확인을 기다린다.
-- source freeze 중에는 제품/테스트/Git을 수정하지 않는다. merge SHA가 전달되면 frontend closeout history만 추가한다.
+- M7 제품 차단 없음. full fresh review, 실제 acceptance, 독립 시각 QA와 dev merge가 모두 닫혔다.
+- M8은 착수하지 않는다. source freeze를 유지하고 추가 문서-only 통합 커밋은 root 소유로 둔다.
 
 ## M7 closeout gate (root 전달 기준)
 
-- 제품 커밋(통합 전): `5d7ede2`, `059ceed`, `0b3008a`가 root 기록에 있다. 이 역할은 Git을 조작하지 않았고 dev merge를 주장하지 않는다.
+- 제품 커밋(통합 전): `5d7ede2`, `059ceed`, `0b3008a`가 root 기록에 있다. PR #13 merge SHA는 `08863207b8385177b619091410bbbd43e52a337c`다. 이 역할은 Git을 조작하지 않았다.
 - root 최종 실측 로그와 acceptance evidence는 root 소유 경로를 참조만 한다. README/PRD/QA/rootdocs는 수정하지 않는다.

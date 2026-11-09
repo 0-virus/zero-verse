@@ -368,3 +368,11 @@
 - **남은 인수 경계**: QA가 run4의 Main/Search 4 screenshots를 디자인 원본과 최종 대조하고 `qa/M7-review.md` 독립 시각 판정을 갱신 중이다. 따라서 actual acceptance PASS는 기록하되 최종 M7 Ready-to-merge, push/PR/`dev` merge는 기록하지 않았다. M8은 착수하지 않는다.
 - **정본·STATE 반영**: 위 상태를 PM 소유 `docs/PRD.md` §9.10·§10 M7·§13 item 9/§13.3와 `.claude/team/pm/STATE.md`에 반영했다. A-v2 범위·post-centric 검색·following 의미·content_text/migration/RR/auth 계약과 M8 제외는 유지했다.
 - **소유권·검증**: 이번 갱신은 `docs/PRD.md`, `.claude/team/pm/STATE.md`, `.claude/team/pm/WORKLOG.md`만 수정했다. REQUIREMENTS·governance·M7 worklog·QA/product source·Git은 수정·되돌리지 않았다. 종료 전 PM 파일 재독, `git diff --check`, trailing whitespace 및 `/universe/summary` 잔존 참조를 확인한다.
+
+## 2026-11-09 23:51 KST — M7 최종 QA·dev 통합 closeout 정합화
+
+- **근거 대조**: `docs/worklog/M7-feed-search.md` 최종 `[머지]`, `qa/M7-review.md` 최종 4 screenshot 직접 대조 및 M7 QA PASS/merge-ready Yes, backend/frontend STATE, 실제 local Git `dev`를 재독했다. M7 PR [#13](https://github.com/0-virus/zero-verse/pull/13)은 tested head `2b984b6a2fc3aafd6d650c6ccb1cd8213a528545`에서 merge SHA `08863207b8385177b619091410bbbd43e52a337c`로 `dev`에 통합됐고, merge tree `dc68037477c6fed6b77d537235d79093803a983e`가 tested head tree와 동일하다.
+- **최종 증거**: backend `91 suites/538 tests`, failures/errors/skips `0/0/0`, bootJar 성공; frontend `41 files/405 tests`, lint/build exit 0; 실제 HTTP·Chrome 1440px run4 `259 PASS / 0 FAIL / 0 NOT_RUN`, `failures=[]`; source manifest 354개와 source/JAR SHA 일치; 제품·QA fix finding CLOSED, 독립 시각 QA PASS다. 이전 run1~3 fixture/harness 실패 이력은 M7 worklog에 보존했다.
+- **정본·STATE 반영**: PM 소유 `docs/PRD.md` §9.10·§10 M7·§13 item 9/§13.3을 M7 구현·자동검증·실제 acceptance·독립 시각 QA PASS 및 PR #13 `dev` 통합 완료로 갱신했다. `.claude/team/pm/STATE.md`를 `M7 완료·dev 통합`, 차단 없음, M8 미착수 상태로 갱신했다. API18087/FE5177·전용 MySQL/Colima 정리와 사용자 환경·DB·업로드 보존은 root 기록을 근거로 반영했다.
+- **범위·검증**: 이번 턴은 `docs/PRD.md`, `.claude/team/pm/STATE.md`, `.claude/team/pm/WORKLOG.md`만 수정했다. M8은 시작하지 않았고 제품·QA·governance·마일스톤 worklog·Git은 수정하지 않았다. 변경 후 PRD/STATE/WORKLOG를 재독하고 PM 소유 tracked 파일 `git diff --check`, trailing whitespace, `/universe/summary` 의도적 잔존 문구를 검색한다.
+- **미해결**: M7 차단 요인은 없다. root의 docs-only 최종 커밋/푸시 후 사용자 다음 지시 전 M8을 착수하지 않는다.

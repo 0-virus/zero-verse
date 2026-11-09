@@ -797,3 +797,9 @@
 - `qa/M7-review.md`를 최종 FR/NFR·FE/브라우저 매트릭스와 evidence 경로로 갱신하고, QA STATE를 **M7 QA PASS / merge-ready Yes (dev 통합 전)**으로 갱신했다. `dev` 통합·PR·root closeout은 QA 소유가 아니며 후속 gate로 남겼다.
 - A-v2 owner draft `/edit/:id`는 FE `searchBehavior.test.tsx` 행동 테스트·`SearchPage.tsx` source·run4 owner HTTP ACL·harness href 계산으로 확인했다. run4 Chrome에서 owner draft 카드를 직접 클릭하는 별도 check는 실행하지 않았음을 문서에 명시했으며, browser-only 운영 정책이 있으면 후속 micro-check 대상이다. 이는 제품 finding이 아니다.
 - QA는 `qa/**`, `.claude/team/qa/**`만 수정했으며 제품 코드·타 역할 테스트·정본·Git은 수정하지 않았다.
+
+## 2026-11-09 KST — M7 PR #13 dev 통합 후 QA closeout
+
+- root 보고의 PR #13(`https://github.com/0-virus/zero-verse/pull/13`) merge를 read-only 대조했다. merge SHA는 `08863207b8385177b619091410bbbd43e52a337c`, tested head는 `2b984b6a2fc3aafd6d650c6ccb1cd8213a528545`, 현재 브랜치는 `dev`다.
+- 현재 `dev` tree `dc68037477c6fed6b77d537235d79093803a983e`와 tested head tree가 동일함을 확인했다. 기존 backend 538 tests, frontend 405 tests/lint/build, 실제 HTTP+Chrome `259 PASS / 0 FAIL / 0 NOT_RUN`, 독립 1440px 시각 PASS 및 owner draft 증거 경계는 유지된다.
+- `qa/M7-review.md` 상태를 **DEV INTEGRATED**로 갱신하고 PR/tree 정보를 §9에 기록했다. QA는 추가 테스트·제품 수정·Git 조작을 하지 않았으며 M8은 착수하지 않는다.

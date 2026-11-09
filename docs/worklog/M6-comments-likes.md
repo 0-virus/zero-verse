@@ -1,6 +1,6 @@
 # M6 — 댓글·좋아요
 
-> 현재 실행: **READY FOR MERGE / 구현·독립 QA 완료**. 사용자 `A-v2 전체 승인`(2026-11-09), 승인 계약은 회의 §6 및 PRD §9.9다. 아래 착수·대기 기록은 시간순 이력이며 제품 검증·완료를 의미하지 않는다.
+> 현재 실행: **COMPLETE / 구현·독립 QA·dev 통합 완료**. 사용자 `A-v2 전체 승인`(2026-11-09), 승인 계약은 회의 §6 및 PRD §9.9다. 아래 착수·대기 기록은 시간순 이력이며 제품 검증·완료를 의미하지 않는다.
 
 ## [계획]
 
@@ -197,3 +197,11 @@
 - 최종 immutable JAR와 FE round3로 `qa/m6-acceptance.mjs`를 실행한 evidence를 root가 직접 확인했다. **52checks PASS / 0 FAIL**, 누락 항목 없음. 실제 Chrome1440px에서 댓글/답글 작성·독립 페이지·수정·soft-delete·좋아요/취소·새로고침·실패 rollback 및 원본 화면 대조를 수행했다.
 - 추가 권한 인수: 합성 owner가 글을 PUBLIC→PRIVATE로 수정한 뒤 actor의 기존 화면에서 like가 LIKE001, 후속 interactions GET이 POST002를 반환했다. 좋아요 count/버튼·댓글·댓글 action이 폐기되는 6개 검증이 모두 통과했다. 합성 fixture 외 사용자 데이터는 변경하지 않았다.
 - artifact는 ignored `build/m6-acceptance/evidence.json` 및 screenshot3개다. 앞선46건은 이전 실행 증거이며 이52건이 최종 실제 인수 증거다. 독립 QA의 최종 기록 반영 후 명시 파일 commit/PR/dev merge를 진행한다.
+
+### [머지·완료] 2026-11-09 14:52 KST
+
+- 독립 최종 QA는 **M6 PASS / merge-ready Yes**로 판정했고 필수 gate와 finding을 모두 닫았다. 구현 커밋 `55aedea966a45dc0e88a6b0d8926e709b366050e`를 push하고 [PR #12](https://github.com/0-virus/zero-verse/pull/12)를 `dev` 대상으로 생성했다.
+- GitHub의 mergeable=true, head SHA 일치를 확인한 뒤 expected-head 조건으로 병합했다. 결과 `merged=true`, merge SHA `4399f73acf19d66d96fafd2c4784c6a03fcfa282`. 설정된 commit status는 빈 목록이며 실제 판정은 위 로컬/독립 검증 증거를 따른다.
+- root가 origin/dev를 fetch하고 로컬 dev를 fast-forward했다. 구현 SHA와 merge SHA의 diff가 비었고 두 tree가 `7dd390ace316a1d548e4755dfc84c21f9e7bcdce`로 일치한다. 검증 뒤 제품 소스 변경은 없다.
+- API·FE 검증 프로세스와 합성 MySQL 컨테이너를 중지했고 Colima VM 정상 종료(exit0)를 확인했다. 새 테스트 컨테이너 잔여는 없으며 기존 합성 DB·업로드·증거 파일·사용자 .local-data/.env.local은 보존했다.
+- README의 M5 이후 미포함이라는 오래된 실행 안내를 현재 댓글·답글·좋아요 사용 위치와 M4/M5/M6 검증 기록 링크로 갱신했다. 역할 STATE/WORKLOG 및 PRD 현황은 소유자별 closeout으로 동기화한다. 이번 실행의 M6 Task1~6은 완료이며 M7 이후 구현은 포함하지 않는다.

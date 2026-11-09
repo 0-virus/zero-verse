@@ -444,3 +444,9 @@
 - frontend는첫전체353→수정357→round2전체363까지통과했으나독립전체review에서권한폐기·stalecallback경계를추가발견하여round3수정중이다. 통과한테스트수만으로M6완료를주장하지않는다.
 - 실제API/Chrome1440중간인수46checksPASS. 실행중원본JAR재빌드경합을immutable복사본으로해소했고최종BEJAR서버로교체했다. QA는합성글PUBLIC→PRIVATE후actor상호작용폐기인수를추가했으며최종FE완료후재실행한다.
 - 다음: FE수정scoped재리뷰→최종실제인수/증거동일성→명시파일commit·devPR·merge. M7이후로범위를확장하지않는다. 사용자영속데이터/.env.local/디자인정본은변경하지않았다.
+
+## 2026-11-09 — M6 dev 통합 완료
+
+- M6 전체 목표를 달성했다. 구현 `55aedea`, PR #12, dev merge `4399f73acf19d66d96fafd2c4784c6a03fcfa282`. 원격 병합과 로컬 dev fast-forward, 검증된 구현과 merge tree `7dd390ace316a1d548e4755dfc84c21f9e7bcdce` 동일성을 직접 확인했다.
+- 최종 증거는 BE490/FE369·lint/build/실제HTTP·Chrome52 PASS, 독립 source review와 QA PASS다. 권한 상실과 stale 응답 수정도 최종 실제 인수에 포함됐다. 미해결 blocker는 없다.
+- 검증용 API/FE/MySQL/Colima를 종료하고 데이터·산출물은 보존했다. README 현황과 역할별 상태/이력, PM PRD를 closeout한다. 추가 구현 범위는 M6 이후로 확장하지 않는다.

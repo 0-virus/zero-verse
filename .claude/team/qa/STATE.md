@@ -6,7 +6,7 @@
 
 - **M5 독립 최종 인수·dev 통합은 완료** 상태다. M5 finding BE-001/BE-002/QA-001/QA-002/DOC-001/V-001/V-002는 이전 최종 기록대로 CLOSED다.
 - **M6 댓글·좋아요 최종 독립 QA는 PASS**다. `docs/governance/meetings/M6-20261109-comments-likes.md`의 보완 A-v2는 `APPROVED`·HIGH이며 `REQUIREMENTS` FR-LIKE-03/확정 세부 계약과 `PRD`에 동기화됐다.
-- 최종 source 동결본을 backend/FE 독립 검토하고, backend 77 suites/490 tests, FE 34 files/369 tests·lint/build, 실제 HTTP/Chrome 1440px 52 checks, MySQL 경쟁/query-bound/no-notification 증거를 대조했다. 모든 필수 M6 gate가 CLOSED이며 Git 통합·closeout만 root 후속이다.
+- 최종 source 동결본을 backend/FE 독립 검토하고, backend 77 suites/490 tests, FE 34 files/369 tests·lint/build, 실제 HTTP/Chrome 1440px 52 checks, MySQL 경쟁/query-bound/no-notification 증거를 대조했다. 모든 필수 M6 gate가 CLOSED이며 PR #12가 `dev`에 통합됐다(merge `4399f73acf19d66d96fafd2c4784c6a03fcfa282`).
 
 ## 진행 중
 
@@ -27,7 +27,7 @@
 
 ## 다음 작업
 
-1. root가 QA 최종 PASS와 artifact 경로를 확인하고 Git 통합·M6 closeout을 수행한다.
+1. M6 QA 및 dev 통합 closeout 완료. 후속 마일스톤 착수 시 새 승인 정본과 별도 QA 범위를 만든다.
 2. 후속 마일스톤에서는 M6 범위 밖 BlogPage/PostCard count 및 M8 notification 계약을 별도 기준으로 검토한다.
 
 ## 차단 요인
@@ -37,7 +37,7 @@
 
 ## 갱신 시각
 
-- 2026-11-09 KST — M6 최종 독립 QA PASS. FE-001~006 CLOSED, WR-01/02/03 ADDRESSED, backend 77 suites/490 tests 0/0/0, FE 34 files/369 tests·lint/build PASS, final immutable runtime 52/52 PASS, 1440px 원본·제품 PostDetail 대조 PASS. Git 통합·closeout은 root 후속.
+- 2026-11-09 KST — M6 최종 독립 QA PASS 및 dev 통합 완료. FE-001~006 CLOSED, WR-01/02/03 ADDRESSED, backend 77 suites/490 tests 0/0/0, FE 34 files/369 tests·lint/build PASS, final immutable runtime 52/52 PASS, 1440px 원본·제품 PostDetail 대조 PASS. PR #12 merge SHA `4399f73acf19d66d96fafd2c4784c6a03fcfa282`, 통합 tree `7dd390ace316a1d548e4755dfc84c21f9e7bcdce`를 root 보고로 확인했다.
 
 ## 소유권 준수
 

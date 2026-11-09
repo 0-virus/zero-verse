@@ -428,3 +428,9 @@
 - 테스트/검증: `m6PostDetailBehavior.test.tsx`에 삭제 글 `POST_001` 좋아요와 댓글 `POST_002` mutation 상태 폐기 2 tests를 추가했다. RED는 28 tests 중 2 failures로 확인했고 수정 후 targeted `npm test -- --run src/features/comment/commentApi.test.ts src/features/like/likeApi.test.ts src/test/m6PostDetailBehavior.test.tsx --maxWorkers=1` → 3 files/31 tests passed.
 - 최종 명령: 전체 `npm test -- --run --maxWorkers=1` → 34 files/369 tests passed, failure/error/skip 0; `npm run lint` exit 0; `npm run build` exit 0(`tsc -b`, Vite 141 modules; >500KB chunk warning만); `git diff --check -- frontend .claude/team/frontend` 오류 없음.
 - 인계/잔여: FE 소유 범위만 수정했으며 backend·QA·root 문서·Git은 건드리지 않았다. 실제 HTTP ACL/DTO와 독립 1440px 동작·시각 재리뷰는 여전히 부모·QA 게이트다.
+
+## 2026-11-09 14:48:17 KST — M6 dev 통합 closeout
+
+- root 통합 인계: PR #12가 `dev`에 머지됐다. 구현 SHA는 `55aedea966a45dc0e88a6b0d8926e709b366050e`, merge SHA는 `4399f73acf19d66d96fafd2c4784c6a03fcfa282`, root 확인 통합 tree는 `7dd390ace316a1d548e4755dfc84c21f9e7bcdce`이며 두 SHA diff 없음·local `dev` fast-forward가 확인됐다.
+- 최종 게이트: root 전달 기준 BE 490 tests, FE 369 tests, actual 52 checks, 최종 독립 QA PASS, WR01·WR02·WR03 CLOSED다. M6 FE 구현·리뷰 수정·실제 통합·독립 QA의 필수 게이트가 모두 닫혔다.
+- 범위/상태: frontend 역할은 `STATE.md`와 본 append만 갱신했다. 제품·테스트 소스 및 Git은 편집하지 않았고, M6은 차단 없이 통합 완료 상태다. 후속 마일스톤은 별도 범위로 남긴다.

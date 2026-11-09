@@ -57,3 +57,26 @@ dependencies {
 tasks.named('test') {
     useJUnitPlatform()
 }
+
+tasks.register('verifyPostSearchText', JavaExec) {
+    group = 'verification'
+    description = 'Verify M7 post search text cache using an offline JDBC connection.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.zeroverse.tools.PostSearchTextMaintenance'
+    args 'verify'
+}
+
+tasks.register('rebuildPostSearchText', JavaExec) {
+    group = 'verification'
+    description = 'Rebuild M7 post search text cache after explicit offline/apply confirmation.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.zeroverse.tools.PostSearchTextMaintenance'
+    args 'rebuild'
+    doFirst {
+        if (project.findProperty('m7TextApply') != 'true'
+                || project.findProperty('m7TextOffline') != 'true') {
+            throw new GradleException(
+                    'rebuildPostSearchText requires -Pm7TextApply=true -Pm7TextOffline=true')
+        }
+    }
+}

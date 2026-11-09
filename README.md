@@ -21,6 +21,32 @@ npm.cmd --version
 API만 확인한다면 Node/npm과 프론트 실행은 생략할 수 있습니다.
 현재 로컬 인증·블로그·카테고리·글·이미지 기능에는 LocalStack/S3가 필요하지 않습니다.
 
+### M7 검색 본문 이관과 복구
+
+M7 서버는 시작할 때 Flyway V4로 `posts.content_text`를 추가하고 V5로 기존 글의 JSON 본문에서 검색 텍스트를 채웁니다. 삭제 글과 임시저장 글도 이관하며 원문·HTML·조회수·작성/수정 시각은 보존합니다. 기존 DB에 적용하기 전에는 모든 쓰기 서버를 중지하고 DB 백업을 확보하세요. 이관 중 잘못된 본문을 만나면 해당 글 ID와 함께 시작에 실패하며, V5의 텍스트 변경 전체는 롤백되고 V4 컬럼은 남습니다.
+
+검증·복구 도구는 Spring 서버를 실행하지 않는 JDBC 명령입니다. 대상 DB URL·사용자·비밀번호는 `M7_TEXT_DB_URL`, `M7_TEXT_DB_USER`, `M7_TEXT_DB_PASSWORD` 환경변수로만 전달합니다. 비밀번호를 명령문이나 Git 파일에 넣지 마세요. 설정 후 저장소 루트에서 실행합니다.
+
+```powershell
+# 읽기 전용: NULL·stale cache·잘못된 본문의 건수/ID 확인
+.\gradlew.bat verifyPostSearchText
+
+# 모든 쓰기 서버 중지 및 백업 후에만: 전체 cache 재계산
+.\gradlew.bat rebuildPostSearchText -Pm7TextApply=true -Pm7TextOffline=true
+.\gradlew.bat verifyPostSearchText
+```
+
+macOS/Linux에서는 실행 권한에 의존하지 않고 JDK 21의 Java로 wrapper를 직접 실행할 수 있습니다.
+
+```sh
+java -classpath gradle/wrapper/gradle-wrapper.jar org.gradle.wrapper.GradleWrapperMain verifyPostSearchText
+java -classpath gradle/wrapper/gradle-wrapper.jar org.gradle.wrapper.GradleWrapperMain rebuildPostSearchText -Pm7TextApply=true -Pm7TextOffline=true
+```
+
+검증 결과가 `null=0 stale=0 invalid=0`일 때 새 서버를 시작합니다. 복구 task의 두 플래그는 운영자가 쓰기 중지와 적용을 확인했다는 표시이며, 실행 중인 다른 서버를 자동으로 멈추지는 않습니다.
+
+구버전 서버는 `content_text`를 갱신하지 않으므로 구버전으로 돌아가 글을 수정한 뒤에는 쓰기를 다시 중지하고 위 검증·재구축을 거쳐야 합니다. V5 실패 원문 수정·Flyway repair·백업 복원은 실제 DB에 대한 별도 승인과 원인 확인 후 수행합니다. 실패 행을 삭제하거나 HTML로 대체해 이관을 우회하지 않습니다. 상세 계약과 합성 DB 검증 결과는 [ADR-0006](docs/governance/decisions/ADR-0006-feed-search-contract.md) 및 [M7 기록](docs/worklog/M7-feed-search.md)을 확인하세요.
+
 ### M4 로컬 이미지 저장
 
 2026-10-03 승인된 M4는 LocalStack 없이 서버 로컬 파일 업로드를 사용합니다. 글·이미지 권한과 최대 5MB(5,242,880바이트)를 유지하며 S3 연동은 후속 범위입니다. 구현·인수 결과는 [M4 기록](docs/worklog/M4-posts.md)을 확인하세요. 아래 U0 설명은 과거 별도 검증 환경이며 현재 M4 실행에 필요하지 않습니다.

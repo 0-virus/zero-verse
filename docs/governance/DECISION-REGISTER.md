@@ -23,5 +23,7 @@
 | M4-20261003-local | 2026-10-03 | 로컬 파일 업로드 기반 M4 완성·실행계획 | HIGH | APPROVED(구현 진행) | 사용자 `로컬 파일 저장으로 M4 완성` 및 Task1~7 실행 요청에 `yes`; 로컬 API·DB·콘텐츠·권한·5MB·화면·독립QA, S3후속/M5제외 | [회의록 §20.7~20.8](meetings/M4-20260908-posts.md), [실행계획](../worklog/M4-posts.md) |
 | M5-20261107-universe | 2026-11-07 | M5 Universe pair lock·snapshot·오류 계약 | HIGH | APPROVED | 사용자 `승인`; 독립 3인 보완 반영 A-v2, 디자인 원본 복구는 최종 시각 gate | [회의록](meetings/M5-20261107-universe.md), [M5 계획](../worklog/M5-universe.md) |
 | M6-20261109-comments-likes | 2026-11-09 | M6 댓글·좋아요 A-v2: bounded tree·상태 GET·차단/취소·잠금 순서 | HIGH | APPROVED | 사용자 `A-v2 전체 승인`; 독립 3인 보완 반영, 구현·독립QA·dev 통합 | [회의록 §6](meetings/M6-20261109-comments-likes.md), [M6 계획](../worklog/M6-comments-likes.md) |
+| M7-20261109-feed-search | 2026-11-09 | M7 A-v2: 피드 관계·게시글 검색/건수·본문 cache·인증/RR·이관/복구 | HIGH | APPROVED | 사용자 A-v2 전체 승인 후 `승인된 작업 시작해.`로 2026-11-09 실행 재개 | [회의록 §6~7](meetings/M7-20261109-feed-search.md), [M7 계획](../worklog/M7-feed-search.md) |
+| ADR-0006 | 2026-11-09 | M7 피드·검색·권한별 집계·파생 본문 캐시와 복구 | HIGH | ACCEPTED | 사용자 M7 A-v2 전체 승인 및 명시 재개; 회의 승인 내용을 지속 계약으로 정리 | [ADR-0006](decisions/ADR-0006-feed-search-contract.md), [M7 회의 §6](meetings/M7-20261109-feed-search.md) |
 
 M4 현재 실행 판단에는 마지막 `M4-20261003-local`을 적용한다. 이전 준비/U0 BLOCKED 행은 당시 결정·실측의 이력이며 로컬 M4 제품 구현의 현재 차단 조건이 아니다.

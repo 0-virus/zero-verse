@@ -52,6 +52,19 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
             + "where c.post.id = :postId and c.deletedAt is null and u.deletedAt is null")
     long countVisibleByPostId(@Param("postId") Long postId);
 
+    interface PostCount {
+        Long getPostId();
+
+        Long getCount();
+    }
+
+    /** M7 카드 metadata를 선택 post ID 집합에 대해 한 번에 집계한다. */
+    @Query("select c.post.id as postId, count(c.id) as count "
+            + "from Comment c join c.user u "
+            + "where c.post.id in :postIds and c.deletedAt is null and u.deletedAt is null "
+            + "group by c.post.id")
+    List<PostCount> countVisibleByPostIdIn(@Param("postIds") java.util.Collection<Long> postIds);
+
     @Query("select c.parent.id as parentId, count(c) as count "
             + "from Comment c "
             + "where c.parent.id in :parentIds "

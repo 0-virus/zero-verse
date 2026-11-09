@@ -1,2 +1,5 @@
 # Local package caches created while developing the frontend.
 .npm-cache-m4/
+
+# Local M7 verification stdout; do not commit evidence artifacts.
+.m7-evidence/

@@ -337,3 +337,34 @@
 - **산출물**: PR #12 `merged=true`, 구현 `55aedea966a45dc0e88a6b0d8926e709b366050e`, merge `4399f73acf19d66d96fafd2c4784c6a03fcfa282`, 통합 tree `7dd390ace316a1d548e4755dfc84c21f9e7bcdce` 및 local `dev` fast-forward를 PRD/STATE에 기록했다. M6 범위 밖인 BlogPage/PostCard count, M8 notification row, M7 착수는 후속으로 남겼다.
 - **검증**: backend 77 suites/490 tests 및 failures/errors/skips 0/0/0, frontend 34 files/369 tests·lint/build PASS, 실제 API·Chrome 1440px 52/52 PASS, 독립 QA M6 PASS/merge-ready Yes 및 WR-01~03 CLOSED/ADDRESSED를 원문에서 확인했다. 구현/merge diff empty와 tree 동일·`dev` fast-forward를 `git diff`/`git rev-parse`/`git merge-base`로 확인했고, PM 소유 변경 후 `git diff --check`도 오류 없이 통과했다.
 - **미해결**: M6 blocker 없음. M7 및 후속 count/알림은 별도 사용자 지시·승인·계획 전 착수하지 않는다.
+
+## 2026-11-09 22:08 KST — M7 A-v2 승인·PRD 정본 동기화 및 구현 재개
+
+- **한 일**: 헌법·AGENTS·PM 지침/STATE, `docs/governance/meetings/M7-20261109-feed-search.md` §6 A-v2, `docs/worklog/M7-feed-search.md` 전체, `qa/M7-review.md`, REQUIREMENTS §6.10-A 및 현재 Git/source baseline을 직접 대조했다. 사용자의 `승인된 작업 시작해.` 지시로 A-v2 승인·보류 해제를 확인하고 PM 소유 `docs/PRD.md`만 승인 계약에 맞춰 갱신했다.
+- **PRD 산출물**: §5.9/§5.10에 feed/search API·ACL·post-centric 검색·counts/matchedTypes를, §7.1/§7.2와 SearchPage에 기존 세 Universe 목록 `page=0,size=1` `totalElements` 공급원·`/universe/summary` 미생성·피드 전용 following(친구 제외)과 기존 following 현황(친구 포함)을, §9.10에 인증 상태표·paging/sort·RR snapshot·`content_text` V4/V5/audit/`updated_at`/전체 rollback/offline 복구·FE stale 계약을 기록했다. §10 M7 실행 순서·§11 테스트·§12 DoD·§13 item 9/§13.3 현황도 정합화했으며 post-centric 보조 카피와 M8/BlogPage count/S3/admin 제외를 명시했다. PRD 최종 개정일은 2026-11-09로 갱신했다.
+- **상태 산출물**: `.claude/team/pm/STATE.md`를 `M7 승인된 정본 동기화·구현 착수 준비`로 갱신했다. REQUIREMENTS·governance·M7 마일스톤 worklog·제품 source·테스트·Git은 수정하지 않았고 사용자 미추적 `package.json`, `package-lock.json`, `run-backend.sh`, `run-frontend.sh`, `.env.local`, `.local-data/`, 기존 DB·업로드 보존을 기록했다.
+- **검증**: `rg`/`sed`로 PRD §5.9/§5.10/§7/§9.10/§10/§11/§12/§13.3 및 `/universe/summary`, `/universe/following`, `content_text`, `following` 잔존 참조를 재검색한다. 제품 구현·테스트·runtime·Git 조작은 하지 않았다. 현재 source baseline은 `feature/M7-feed-search` HEAD `bc99cba`이고 M7 acceptance는 NOT RUN이다.
+- **미해결**: root REQUIREMENTS §6.10-A 동기화, Task1~4 구현/TDD, V4/V5 격리 migration·복구·RR/query-bound 증거, 실제 HTTP/MySQL/Chrome 1440px, 독립 QA·PR/merge가 남아 있다. 현재 Colima socket 부재는 승인 후 root가 해소할 실행 조건이다. M7 완료/PASS와 M8 착수는 주장하지 않는다.
+
+## 2026-11-09 22:13 KST — M7 현재 구현 산출물 재대조 정정
+
+- **재대조**: 승인 재개 직후 동시 작업자의 변경을 다시 읽어, backend `PostTextExtractor`/`PostTextExtractorV1`·`Post`/`PostContentService` `content_text` 연계 및 관련 테스트 소스, frontend `features/feed`·`features/search` API/types와 `mainFeedBehavior`·`searchBehavior` 테스트 소스가 일부 추가된 사실을 확인했다. MainPage/SearchPage/TopBar 실제 연결, feed/search backend service·repository·controller·DTO, V4/V5 migration·maintenance/복구 및 M7 인수는 아직 남아 있다.
+- **정본·STATE 정정**: 위 부분 진행을 `docs/PRD.md` §9.10 실행 상태·§10 M7·§13.3 및 PM `STATE.md`에 반영했다. M7은 **부분 구현 진행 중**이며 해당 소스의 테스트 실행·PASS, 전체 M7 완료/PASS, 독립 QA·실제 HTTP/MySQL/Chrome·PR/merge를 주장하지 않는다. 이전 22:08 기록은 당시 baseline 관측으로 보존한다.
+- **소유권·검증**: PM 소유 `docs/PRD.md`, `.claude/team/pm/STATE.md`, `.claude/team/pm/WORKLOG.md`만 수정했고 REQUIREMENTS·governance·M7 worklog·backend/frontend/qa 산출물·Git은 건드리거나 되돌리지 않았다. 다음 검증에서 편집 파일 재독·`git diff --check`·핵심 계약/잔존 route 참조를 확인한다.
+- **미해결**: root REQUIREMENTS §6.10-A 대조, Task1 V4/V5 및 Task2 서버 구현, Task3/4 페이지 연결·full tests, Task5 독립 인수와 Task6 Git closeout이 남아 있다. `/universe/summary`는 PRD route-map에서 기존 세 목록 `totalElements` 공급원으로 대체한 승인 계약을 유지한다.
+
+## 2026-11-09 23:14 KST — M7 구현 checkpoint·실제 인수 대기 정합화
+
+- **근거 대조**: `docs/worklog/M7-feed-search.md` 최신 구현 checkpoint, `build/m7-evidence/backend-final-1/summary.json`·`backend-final-1.log`·`frontend-final-{tests,lint,build}.log`·`acceptance-1.log`, backend/frontend/qa STATE와 현재 Git을 직접 대조했다. 구현 commit은 Task1 `5d7ede211bb0093c31d8ef09a2c861868e107e1d`, Task2 `059ceed9b941c74cb092e490b6402958abcf1136`, FE `0b3008ad72b571afb47fc64936d0d745b6a4157e`이며 현재 HEAD는 FE commit이다.
+- **자동검증·리뷰**: backend `91 suites/538 tests`, failures/errors/skips `0/0/0`, `BUILD SUCCESSFUL`, immutable JAR SHA-256 `0cfc53e777449a430cf2f17114113850d9d94d04a4b172a230599e7e41e5d672`; frontend `41 files/405 tests`, lint/build exit 0이다. 전체 독립 리뷰는 신규 Critical/Important 없음으로 기록됐지만 최종 QA PASS는 아니다.
+- **실제 인수 경계**: acceptance run1은 actor/friend fixture까지 진행한 뒤 oneWay 초기 설정에서 camelCase slug fixture의 400 `BLOG_003`으로 중단됐다. 따라서 실제 HTTP/MySQL/Chrome 1440px acceptance, 5탭·page/back·empty/error/retry 보강 결과, QA PASS/merge-ready를 완료로 기록하지 않았다. QA harness는 result-card 판정과 해당 브라우저 흐름을 보강 중이다.
+- **정본·STATE 반영**: 위 사실을 PM 소유 `docs/PRD.md`의 §9.10 실행 상태·§10 M7·§13 item 9/§13.3 및 `.claude/team/pm/STATE.md`에 반영했다. 과거 승인 대기·제품 미착수 문구는 현재 사실로 남기지 않고, A-v2 승인·M8 제외·실제 인수/통합 미완료 경계는 유지했다.
+- **소유권·미해결**: 이번 갱신은 `docs/PRD.md`, `.claude/team/pm/STATE.md`, `.claude/team/pm/WORKLOG.md`만 수정했다. REQUIREMENTS·governance·M7 worklog·제품 source·QA harness·Git은 수정·되돌리지 않았다. 세 구현 commit은 아직 push/PR/`dev` merge되지 않았고, QA run2·독립 최종 review·root Git closeout이 남아 있다. M8은 착수하지 않는다.
+
+## 2026-11-09 23:29 KST — M7 actual acceptance PASS·시각 QA 대기 정합화
+
+- **근거 대조**: `build/m7-acceptance-20261109-232636/evidence.json`과 `docs/worklog/M7-feed-search.md` 최신 checkpoint를 직접 읽었다. run4는 1440×1000에서 `259 PASS / 0 FAIL / 0 NOT_RUN`, `failures=[]`로 종료했고, `verification.filesChecked=354`, source hash와 actual source hash `974f5174a5c6c181bbd228c5c29215450da0413a7ce9a9f8036daec9d0164e6c`, JAR hash와 actual JAR hash `0cfc53e777449a430cf2f17114113850d9d94d04a4b172a230599e7e41e5d672`가 각각 일치했다. 4개 screenshot artifact도 생성됐다.
+- **자동검증·독립 리뷰**: backend `91 suites/538 tests`, failures/errors/skips `0/0/0`, bootJar 성공, frontend `41 files/405 tests`, lint/build exit 0을 유지한다. `/root/m7_whole_branch_review`의 제품·QA fix finding은 모두 CLOSED이며 신규 Critical/Important는 없다. 이전 run1~3 실패/중단 이력은 기존 M7 worklog 항목을 그대로 보존했다.
+- **남은 인수 경계**: QA가 run4의 Main/Search 4 screenshots를 디자인 원본과 최종 대조하고 `qa/M7-review.md` 독립 시각 판정을 갱신 중이다. 따라서 actual acceptance PASS는 기록하되 최종 M7 Ready-to-merge, push/PR/`dev` merge는 기록하지 않았다. M8은 착수하지 않는다.
+- **정본·STATE 반영**: 위 상태를 PM 소유 `docs/PRD.md` §9.10·§10 M7·§13 item 9/§13.3와 `.claude/team/pm/STATE.md`에 반영했다. A-v2 범위·post-centric 검색·following 의미·content_text/migration/RR/auth 계약과 M8 제외는 유지했다.
+- **소유권·검증**: 이번 갱신은 `docs/PRD.md`, `.claude/team/pm/STATE.md`, `.claude/team/pm/WORKLOG.md`만 수정했다. REQUIREMENTS·governance·M7 worklog·QA/product source·Git은 수정·되돌리지 않았다. 종료 전 PM 파일 재독, `git diff --check`, trailing whitespace 및 `/universe/summary` 잔존 참조를 확인한다.

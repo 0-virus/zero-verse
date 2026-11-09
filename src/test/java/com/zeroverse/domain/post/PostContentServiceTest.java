@@ -186,4 +186,16 @@ class PostContentServiceTest {
         var result = service.validateAndRender(doc, "<p>attacker</p>", true);
         assertThat(result.html()).contains("safe").doesNotContain("attacker");
     }
+
+    @Test
+    void derivesTheSameCanonicalSearchTextAsTheContentJson() throws Exception {
+        JsonNode doc = objectMapper.readTree("""
+                {"type":"doc","content":[
+                  {"type":"paragraph","content":[{"type":"text","text":"sp"},{"type":"text","text":"ring","marks":[{"type":"bold"}]}]},
+                  {"type":"paragraph","content":[{"type":"text","text":"A & B"}]}
+                ]}
+                """);
+
+        assertThat(service.validateAndRender(doc, null, false).text()).isEqualTo("spring A & B");
+    }
 }

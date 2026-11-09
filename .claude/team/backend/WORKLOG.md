@@ -348,3 +348,61 @@
 - root가 PR #12(`https://github.com/0-virus/zero-verse/pull/12`)를 `dev`에 통합했다. 구현 commit `55aedea966a45dc0e88a6b0d8926e709b366050`, merge commit `4399f73acf19d66d96fafd2c4784c6a03fcfa282`, 통합 tree `7dd390ace316a1d548e4755dfc84c21f9e7bcdce`이며 root가 두 SHA diff와 tree 일치 및 local `dev` fast-forward를 실제 확인했다.
 - 최종 인수 근거: backend `490 tests` PASS, frontend `369 tests` PASS, 실제 HTTP `52 checks` PASS, 독립 QA PASS. M6 backend 기능/API/자동검증 및 dev 통합을 완료 상태로 기록한다.
 - 이번 closeout은 `.claude/team/backend/STATE.md`와 이 WORKLOG만 갱신했다. 제품·테스트·Gradle·Git은 변경하지 않았다. M7 이후 마일스톤은 별도 범위로 남긴다.
+
+## 2026-11-09 22:30 KST — M7 Task1 검색 텍스트 캐시 구현·전체 검증
+
+- 배정/범위: 사용자 `승인된 작업 시작해.` 재개 지시와 M7 A-v2 §6.4에 따라 backend 소유 `src/**`, `build.gradle`, backend STATE/WORKLOG만 편집했다. Task2 feed/search/QueryDSL/DiscoveryViewerResolver 신규 파일은 root의 별도 `/root/m7_discovery_impl` 배정 전혀 편집하지 않았다. V1~V3 migration, 사용자 `.env.local`·`.local-data`, Git은 변경하지 않았다.
+- TDD RED: `PostTextExtractorTest`를 먼저 추가한 뒤 extractor 미구현으로 compile RED가 발생했다(3 symbol errors). `PostContentServiceTest`의 `.text()` assertion도 accessor 부재로 compile RED, `PostTextCacheTest`의 `Post.getContentText()`도 accessor 부재로 compile RED였다. V4/V5 migration test는 V4 column 부재로 `BadSqlGrammarException` 및 rollback 기대 실패 RED, maintenance test는 `PostSearchTextMaintenance` 부재로 compile RED, readiness test는 class 부재로 compile RED였다.
+- 구현: `PostTextExtractorV1`/wrapper, `Post.contentText`, `PostContentService.ValidatedContent.text`, V4 nullable `content_text`, V5 versioned Java migration, startup NULL readiness, offline `PostSearchTextMaintenance`, `verifyPostSearchText`/guarded `rebuildPostSearchText` Gradle task를 추가했다. V5/maintenance는 keyset 100, full DML rollback, original updated_at 재대입, invalid ID-only failure, env secret 비출력을 사용한다.
+- GREEN: 다음 targeted 명령을 지정 JDK21/Gradle cache/Colima socket/`JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=/private/tmp/zeroverse-junit-tmp`로 실행했다.
+  - `... GradleWrapperMain test --tests '*PostTextExtractorTest' --tests '*PostTextCacheTest' --tests '*PostContentServiceTest' --tests '*PostSearchTextReadinessTest' --tests '*PostSearchTextMigrationMySqlTest' --tests '*PostSearchTextMaintenanceMySqlTest' --tests '*PostServiceIntegrationTest' --no-daemon --max-workers=1` → `BUILD SUCCESSFUL in 27s`.
+  - V4/V5 실제 MySQL 8.4에서 100/101/201 batch·ID gap, invalid JSON 중간 실패 후 content_text 전체 NULL rollback/V4 history 잔존, 원문/content_html/published_at/view_count/updated_at 보존을 검증했다. maintenance는 stale·NULL/구 writer를 verify하고 offline rebuild 후 stale 0을 확인했다.
+  - `... GradleWrapperMain rebuildPostSearchText --no-daemon --max-workers=1` → 의도된 실패 `rebuildPostSearchText requires -Pm7TextApply=true -Pm7TextOffline=true`를 확인했다.
+- 최종 검증: `JAVA_HOME=/private/tmp/zeroverse-jdk21/jdk-21.0.13+9/Contents/Home GRADLE_USER_HOME=/private/tmp/zeroverse-gradle-user-home JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=/private/tmp/zeroverse-junit-tmp TESTCONTAINERS_RYUK_DISABLED=true DOCKER_HOST=unix:///private/tmp/zeroverse-colima/default/docker.sock .../GradleWrapperMain --no-daemon --max-workers=1 test bootJar` → `BUILD SUCCESSFUL in 2m 9s`. `build/test-results/test` XML 직접 집계 `82 files / 504 tests / failures 0 / errors 0 / skipped 0`; JAR `66,450,070 bytes`, SHA-256 `66d8f77d67e1426bde61ea3cfef286246ec47e49e398001d3e8cdb571e1b6b3a`.
+- 파일 재독/정합성: 편집한 Java/SQL/Gradle/test 파일을 완료 전에 재독했고, scoped `git diff --check -- <Task1 files>`는 무출력 exit 0이었다. `./gradlew` 직접 호출은 저장소 wrapper 권한/커스텀 getopt로 실패해 표준 `GradleWrapperMain` equivalent를 사용했다(제품 파일은 수정하지 않음).
+- 남은 위험/인계: Task1은 자체 검증 PASS지만 M7 전체 완료/merge-ready가 아니다. 별도 Task2의 ACL/facets/RR/query-bound/OpenAPI와 FE/독립 QA/실제 HTTP가 남아 있으며, Task2가 Post entity/content_text 계약을 전제로 통합 후 전체 회귀를 다시 실행해야 한다. 이 역할은 commit/push/merge를 수행하지 않았다.
+
+## 2026-11-09 22:30 KST — M7 Task1 V5 repair·재실행 검증 보강
+
+- 최신 테스트 변경: `PostSearchTextMigrationMySqlTest`의 101행 중간 malformed JSON 시나리오가 V5 실패 history(`success=0`)와 V4 성공 history를 확인한 뒤, offending row를 유효 JSON으로 수리하고 Flyway `repair()`→최신 `migrate()`를 재실행해 `content_text IS NULL = 0`, V5 `success=1`을 확인하도록 보강했다.
+- 실측 명령: `env JAVA_HOME=/private/tmp/zeroverse-jdk21/jdk-21.0.13+9/Contents/Home GRADLE_USER_HOME=/private/tmp/zeroverse-gradle-user-home JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=/private/tmp/zeroverse-junit-tmp TESTCONTAINERS_RYUK_DISABLED=true DOCKER_HOST=unix:///private/tmp/zeroverse-colima/default/docker.sock .../GradleWrapperMain test --tests '*PostSearchTextMigrationMySqlTest' --no-daemon --max-workers=1` → `BUILD SUCCESSFUL in 14s`, XML `build/test-results/test/TEST-com.zeroverse.migration.PostSearchTextMigrationMySqlTest.xml`: `3 tests`, failures/errors/skips `0/0/0`.
+- 인계: 이 보강은 테스트 파일만 추가한 것이며 Task2 파일은 여전히 0개 편집이다. 이전 Task1 전체 검증 `82 suites / 504 tests`는 보강 전 production과 동일했고, Task2 통합 뒤 root가 단일 최종 full `test bootJar`를 실행해 새 XML/log 증거를 `build/m7-evidence/`에 보존한다. 현재 `build/test-results/test`는 targeted 실행 결과만 남아 있어 보강 전 full raw log 경로는 없다.
+
+## 2026-11-09 22:44 KST — M7 Task1 독립 review round1 수정·GREEN
+
+- 원인 조사/RED: 독립 리뷰가 지적한 V5 `readTree`와 maintenance `readTree`가 기본 설정으로 trailing root를 첫 JSON 뒤에 묵인하고, `SQLException` cause에 Jackson 예외를 연결해 malformed payload가 stacktrace에 따라갈 수 있음을 확인했다. 보강 테스트를 먼저 추가해 extractor/migration/maintenance 17건 중 3건이 실제 RED(`BUILD FAILED`, trailing invalid 미검출·late invalid rollback 미진입)임을 재현했다.
+- 수정: V5와 `PostSearchTextMaintenance`의 고정 `ObjectMapper`에 `FAIL_ON_TRAILING_TOKENS`를 적용해 migrate/verify/rebuild 모두 전체 입력을 파싱한다. extraction 실패는 `post search text extraction failed for id=<id>`만 담은 cause 없는 `SQLException`으로 변환해 원문·malformed token이 cause/suppressed/stacktrace/stdout/stderr에 남지 않게 했다.
+- 검증 추가: maintenance 후반 101행 invalid fixture는 앞 100행 update까지 전부 rollback하고 `content_json/content_text/updated_at`, autoCommit/readOnly/isolation을 보존한다. malformed sentinel의 stacktrace/stdout/stderr 비노출도 확인했다. 별도 MySQL 8.4 Testcontainer에서 실제 snapshot table을 생성·복사하고 restore table로 되돌린 뒤 rowcount/maxID 및 `content_json/content_html/thumbnail/visibility/view/publish/create/update/delete` legacy 열을 비교했다.
+- migration fixture 보강: 201행에서 100/101/201 경계와 ID gap을 유지하면서 deleted row와 draft row, `content_html`, `thumbnail_url`, visibility, view/publish/deleted/updated audit를 모두 비교했다. extractor는 hardBreak·empty paragraph·depth 32/33·node 10000/10001·정확 UTF-8 1MiB 경계를 추가했다.
+- GREEN 명령: 공통 JDK21/Gradle/Colima env로 `.../GradleWrapperMain test --tests com.zeroverse.domain.post.PostTextExtractorTest --tests com.zeroverse.migration.PostSearchTextMigrationMySqlTest --tests com.zeroverse.migration.PostSearchTextMaintenanceMySqlTest --no-daemon --max-workers=1` → `BUILD SUCCESSFUL in 24s`; XML `build/m7-evidence/task1-review-green-20261109-2241/test-results/`, `3 files / 17 tests / failures 0 / errors 0 / skipped 0` (extractor 8, migration 5, maintenance 4). 명령 요약과 RED→GREEN 근거는 `build/m7-evidence/task1-review-green-20261109-2241.log`에 보존했다.
+- 범위/인계: Task2 신규 feed/search/QueryDSL/security 파일은 여전히 0개 편집했다. 이번 review fix로 Task1 production/test가 바뀌었으므로 기존 82/504 full·bootJar는 historical baseline으로만 유지하고, Task2와 helper freeze 뒤 root 단일 최종 full `test bootJar` 및 XML/log 보존을 수행한다. 사용자 DB/`.env.local`/`.local-data`/Git은 건드리지 않았다.
+
+## 2026-11-09 22:55 KST — M7 Task1 독립 review round2 테스트 보강 준비
+
+- 리뷰 잔여 1(backup 복원): 기존 보강은 수동 `posts_snapshot` 복사만 확인했으므로 `PostSearchTextMigrationMySqlTest`를 수정해 별도 MySQL Testcontainer를 V3 Flyway로 초기화한 뒤 source V3의 모든 base table과 `flyway_schema_history`를 generated column 제외 규칙으로 복사한다. 복원 직후 posts legacy 열·rowcount·maxID와 history(`installed_on`·execution 포함)를 source와 비교하고, 두 격리 DB에서 각각 V4/V5를 실행한 뒤 `content_text` 포함 전체 post 결과와 성공 history metadata를 비교하도록 바꿨다.
+- 리뷰 잔여 2(정확 batch 경계): fixture를 201 insert에서 202 insert로 바꾸고 offset50 ID 하나를 삭제해 정확히 201행(100+100+1)으로 남긴다. deleted row와 draft row의 content_html/thumbnail/visibility/view/publish/deleted/updated 및 content_text를 함께 단언한다.
+- 실행 경계: root 요청에 따라 이번 수정 후 Gradle을 실행하지 않았다. 파일 재독·정적 API 확인과 scoped `git diff --check`만 수행하고, Task2/helper 공유 source freeze 뒤 root가 migration class 및 전체 suite를 실행한다. 이전 `201`/수동 backup 증거와 evidence log는 이력으로 보존하고 본 정정은 append-only로 기록한다.
+
+## 2026-11-09 23:02 KST — M7 Task1 review round2 FK session fix
+
+- root targeted 실측에서 migration class 5건 중 backup 복원 1건만 `DataIntegrityViolationException`으로 실패했다. XML/로그의 `blogs.fk_blogs_user`를 따라가 현재 원인을 확인한 결과, `DriverManagerDataSource` 기반 `JdbcTemplate.execute("SET FOREIGN_KEY_CHECKS=0")`와 후속 `batchUpdate`가 서로 다른 connection을 사용해 FK 비활성화가 insert connection에 전달되지 않았다.
+- 최소 수정: `copyV3DatabaseToBackup`의 전체 delete/copy를 하나의 명시적 backup `Connection`에 묶고, 같은 session에서 `FOREIGN_KEY_CHECKS=0` → 모든 table 복사 → `FOREIGN_KEY_CHECKS=1`을 실행한다. 영구 제약 삭제나 production code 변경은 없다. PreparedStatement batch insert와 generated-column 제외 규칙은 유지한다.
+- 검증 경계: 이번 수정 후 Gradle은 실행하지 않았다(공유 Task2/helper source freeze와 root 단일 Gradle runner 정책). test 파일 재독·scoped `git diff --check`만 수행했고, root에게 migration class 재실행을 요청한다.
+
+## 2026-11-09 23:15 KST — M7 Task1 backup audit timestamp filter correction
+
+- root `migration-fix2-recheck`에서 FK session fix 이후 backup 복원 단계가 진행됐으나 created_at/updated_at만 1초 차이로 실패했다. source evidence가 `EXTRA NOT LIKE '%GENERATED%'` 조건이 MySQL `DEFAULT_GENERATED` audit columns까지 제외해 backup insert 때 defaults가 재생성된 것을 확인했다.
+- 최소 수정: `copyTable` information_schema filter를 `NOT LIKE '%VIRTUAL GENERATED%' AND NOT LIKE '%STORED GENERATED%'`로 좁혀 virtual/stored generated column만 제외하고 created_at/updated_at의 DEFAULT_GENERATED 값은 원본대로 복사한다. audit assertion은 유지하며 테스트 완화·production 변경은 없다.
+- Gradle은 실행하지 않았다. test 파일 재독 및 scoped diff check 후 root가 migration class를 재실행한다.
+
+## 2026-11-09 23:08 KST — M7 Task1 FK session fix compile propagation
+
+- root의 `migration-fix2` compile 출력에서 새 명시적 backup connection/PreparedStatement의 try-with-resources에 checked `SQLException` 선언이 없는 12개 오류를 확인했다. backup test method, `copyV3DatabaseToBackup`, `copyTable`, `setForeignKeyChecks`에만 `throws SQLException`을 전파했다.
+- 다른 로직·조건·production source·테스트 완화는 하지 않았다. Gradle은 계속 실행하지 않았고, 파일 재독 및 scoped diff check 후 root의 compileTestJava→migration targeted 재실행을 대기한다.
+
+## 2026-11-09 23:31 KST — M7 backend 최종 검증·closeout 인계
+
+- 한 일: root가 Task1 review fix와 Task2/helper source freeze 후 실행한 최종 backend 증거, Task2 원저자 보고서, helper 계약 테스트 보고서를 읽고 backend 현재 상태를 최종 검증 상태로 갱신했다. Task1은 이 역할의 구현이며 Task2 feed/search/QueryDSL/ACL/OpenAPI는 `/root/m7_discovery_impl`, 추가 real-JWT/ACL/paging/no-side-effect/RR 테스트는 `/root/m7_discovery_contract_tests`가 작성했다. 기존 backup 실패→FK session 수정→audit timestamp filter 수정과 source fix2 이력은 앞선 append 항목을 그대로 보존했다.
+- 산출물: `.claude/team/backend/STATE.md`의 M7 current section을 최종 인계 상태로 갱신했다. 제품 source/test/Gradle, `docs/`·FE·QA 파일, Git은 이 closeout에서 변경하지 않았다.
+- 검증: `build/m7-evidence/backend-final-1.log`는 root의 `test bootJar`를 `BUILD SUCCESSFUL in 2m 16s`로 보존한다. `perl` XML 집계 명령으로 `build/m7-evidence/backend-final-1/test-results/*.xml`을 직접 읽어 `xml_files=91 tests=538 failures=0 errors=0 skipped=0`을 확인했고, `build/m7-evidence/backend-final-1/summary.json`의 JAR SHA-256은 `0cfc53e777449a430cf2f17114113850d9d94d04a4b172a230599e7e41e5d672`임을 재확인했다. 실제 인수 `build/m7-acceptance-20261109-232636/evidence.json`은 `259 PASS / 0 FAIL / 0 NOT_RUN`, source SHA `974f5174a5c6c181bbd228c5c29215450da0413a7ce9a9f8036daec9d0164e6c`와 JAR SHA가 manifest/actual 일치, `filesChecked=354`다.
+- 미해결: backend 자체 Critical/Important 독립 review finding은 없다. QA 시각 최종 판정과 root의 M7 worklog 종합·`dev` merge가 남아 있으며, 이 역할은 추가 Gradle 실행·제품 수정·Git 작업을 하지 않는다.

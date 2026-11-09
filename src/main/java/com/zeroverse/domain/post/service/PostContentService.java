@@ -30,9 +30,11 @@ public class PostContentService {
 
     private final ObjectMapper objectMapper;
     private final PolicyFactory htmlPolicy;
+    private final PostTextExtractor textExtractor;
 
     public PostContentService(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
+        this.textExtractor = new PostTextExtractor(objectMapper);
         this.htmlPolicy = new HtmlPolicyBuilder()
                 .allowElements("p", "br", "strong", "em", "u", "s", "code", "pre",
                         "ul", "ol", "li", "blockquote", "h1", "h2", "h3", "hr",
@@ -83,10 +85,12 @@ public class PostContentService {
         if (publish && excerpt.isBlank() && imageUrls.isEmpty()) {
             throw invalid("발행할 본문 또는 이미지가 필요합니다.");
         }
-        return new ValidatedContent(contentJson.deepCopy(), sanitized, excerpt, Set.copyOf(imageUrls));
+        String text = textExtractor.extract(contentJson);
+        return new ValidatedContent(contentJson.deepCopy(), sanitized, excerpt, text, Set.copyOf(imageUrls));
     }
 
-    public record ValidatedContent(JsonNode json, String html, String excerpt, Set<String> imageUrls) {}
+    public record ValidatedContent(
+            JsonNode json, String html, String excerpt, String text, Set<String> imageUrls) {}
 
     private void validateNode(JsonNode node, int depth, Counter counter, Set<String> imageUrls) {
         counter.nodes++;

@@ -58,6 +58,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 
 /** 게시글 CRUD·목록·조회수와 tag/PostImage snapshot 동기화. */
 @Service
@@ -84,6 +85,7 @@ public class PostService {
     private final EntityManager entityManager;
     private final Clock clock;
     private final UploadService uploadService;
+    private final PostInteractionLockService interactionLockService;
     private final String viewerHmacSecret;
 
     public PostService(
@@ -101,6 +103,7 @@ public class PostService {
             EntityManager entityManager,
             Clock clock,
             UploadService uploadService,
+            PostInteractionLockService interactionLockService,
             @Value("${zeroverse.upload.viewer-hmac-secret}")
                     String viewerHmacSecret) {
         this.blogRepository = blogRepository;
@@ -117,6 +120,7 @@ public class PostService {
         this.entityManager = entityManager;
         this.clock = clock;
         this.uploadService = uploadService;
+        this.interactionLockService = interactionLockService;
         if (viewerHmacSecret == null || viewerHmacSecret.getBytes(StandardCharsets.UTF_8).length < 32) {
             throw new IllegalStateException("zeroverse.upload.viewer-hmac-secret must be at least 32 UTF-8 bytes");
         }
@@ -187,11 +191,10 @@ public class PostService {
         postRepository.saveAndFlush(post);
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public PostDetail get(Long postId, Long viewerId, String anonymousKey) {
-        Post post = postRepository.findByIdAndDeletedAtIsNullForUpdate(postId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.POST_001));
-        if (!accessPolicy.canRead(post, viewerId)) {
+        Post post = interactionLockService.lockPost(postId, List.of()).post();
+        if (!accessPolicy.canReadCurrent(post, viewerId)) {
             throw new BusinessException(viewerId == null ? ErrorCode.AUTH_004 : ErrorCode.POST_002);
         }
         recordView(post, viewerId, anonymousKey);

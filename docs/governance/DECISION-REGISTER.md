@@ -22,5 +22,6 @@
 | M4-20260923-u0-remediation | 2026-09-23 | PAB501·브라우저 초과 파일 오류 원인 조사·최소 수정·재검증 | HIGH | APPROVED(진단 수행·두 문제 미해결) | 사용자 `두 문제 해결을 먼저 수행해줄래?`; PAB handler 미구현 확인, raw HTTP403·exactACAO·close, fetch 및 XHR 모두 응답 미가독. vendor 보안 구현·지원 환경 변경은 별도 결정 | [회의록 §19](meetings/M4-20260908-posts.md), [M4 기록](../worklog/M4-posts.md) |
 | M4-20261003-local | 2026-10-03 | 로컬 파일 업로드 기반 M4 완성·실행계획 | HIGH | APPROVED(구현 진행) | 사용자 `로컬 파일 저장으로 M4 완성` 및 Task1~7 실행 요청에 `yes`; 로컬 API·DB·콘텐츠·권한·5MB·화면·독립QA, S3후속/M5제외 | [회의록 §20.7~20.8](meetings/M4-20260908-posts.md), [실행계획](../worklog/M4-posts.md) |
 | M5-20261107-universe | 2026-11-07 | M5 Universe pair lock·snapshot·오류 계약 | HIGH | APPROVED | 사용자 `승인`; 독립 3인 보완 반영 A-v2, 디자인 원본 복구는 최종 시각 gate | [회의록](meetings/M5-20261107-universe.md), [M5 계획](../worklog/M5-universe.md) |
+| M6-20261109-comments-likes | 2026-11-09 | M6 댓글·좋아요 A-v2: bounded tree·상태 GET·차단/취소·잠금 순서 | HIGH | APPROVED | 사용자 `A-v2 전체 승인`; 독립 3인 보완 반영, 구현·독립QA·dev 통합 | [회의록 §6](meetings/M6-20261109-comments-likes.md), [M6 계획](../worklog/M6-comments-likes.md) |
 
 M4 현재 실행 판단에는 마지막 `M4-20261003-local`을 적용한다. 이전 준비/U0 BLOCKED 행은 당시 결정·실측의 이력이며 로컬 M4 제품 구현의 현재 차단 조건이 아니다.

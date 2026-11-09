@@ -17,6 +17,22 @@ import org.springframework.data.repository.query.Param;
 
 public interface PostRepository extends JpaRepository<Post, Long> {
 
+    interface LockTarget {
+        Long getPostId();
+
+        Long getBlogId();
+
+        Long getOwnerId();
+    }
+
+    @Query(value = """
+            select p.id as postId, p.blog_id as blogId, p.user_id as ownerId
+            from posts p
+            where p.id = :id
+              and p.deleted_at is null
+            """, nativeQuery = true)
+    Optional<LockTarget> findLockTargetById(@Param("id") Long id);
+
     @EntityGraph(attributePaths = {"blog", "user", "category"})
     @Query("""
             select p from Post p

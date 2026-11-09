@@ -377,3 +377,54 @@
 - root 전달 결과를 반영했다. PR #11(`https://github.com/0-virus/zero-verse/pull/11`)이 merge SHA `30a863000a918075e9e1530ec6627e2f9167989a`로 `dev`에 통합됐고, 구현 기준 `impl060bbcf`가 반영됐다.
 - root 확인상 `origin/dev` tree `ae40db51c5de9f9d262347802962579775ee7c77`가 검증 HEAD와 일치하며 local `dev` fast-forward도 완료됐다.
 - frontend 제품·테스트·Git은 추가 변경하지 않았다. M5 FE 범위는 QA PASS 및 dev 통합까지 닫혔고, 후속 closeout 문서 기록은 root 소유다.
+
+## 2026-11-09 13:07:58 KST — M6 FE 준비·계약 승인 대기 스냅샷
+
+- 조사: 헌법·루트/역할 지침·STATE, 디자인 정본의 PostDetail 원본, PRD M6/PostDetail, REQUIREMENTS FR-COM/FR-LIKE와 현재 `PostDetailPage`·post API/types/tests를 대조했다. 현재 FE는 M4 글 상세·공유·owner 수정/삭제만 구현되어 있고 M6 댓글/대댓글/좋아요 제품 구현은 시작하지 않았다.
+- 계약: 최신 M6 회의 §6 A안은 `PROPOSED`·사용자 승인 대기다. bounded root/reply paging, `canEdit/canDelete/canReply`, interactions `canUnlike`, 차단 관계의 새 좋아요 거부(`LIKE_001`)와 기존 unlike 허용을 반영한 계약으로 기록됐다.
+- 인계: 승인 전 제품 소스·API/types·테스트·의존성·Git은 변경하지 않는다. 승인 후 backend DTO/OpenAPI/HTTP 동기화 뒤 `API/types → RED 행동 테스트 → UI/state → test/lint/build → 독립 1440px QA` 순서로 착수한다. post/account stale guard, optimistic rollback·canonical reload, guest/차단/삭제 댓글 오류 UX를 필수 경계로 유지한다.
+- 검증/경계: `git branch --show-current`=`feature/M6-comments-likes`, HEAD=`c46a26d`; 이번 wave는 역할 STATE/WORKLOG만 갱신했고 M6 제품 테스트·lint·build·브라우저 검증은 실행하지 않았다. M5의 기존 31 files/338 tests·lint/build PASS를 M6 PASS로 재사용하지 않는다.
+
+## 2026-11-09 13:32:33 KST — M6 FE Task3→4 구현·자동 검증 인계
+
+- 승인/범위: 사용자 `A-v2 전체 승인` 후 M6 회의 §6, REQUIREMENTS §6.7/6.8·FR-LIKE-03, worklog Task3/4를 기준으로 `frontend/**`와 본인 역할 기록만 수정했다. backend·QA·root 문서와 Git은 건드리지 않았다.
+- TDD RED: `commentApi.test.ts`·`likeApi.test.ts`를 먼저 작성해 구현 전 2 suites/0 tests의 import resolution 실패를 확인했다. API/type 구현 후 2 files/3 tests GREEN. PostDetail 행동 테스트 5개도 UI 연결 전 RED로 확인했다.
+- 구현: `features/comment`에 최소 개인정보 `CommentItem` DTO, root/reply 독립 PageResponse query(size 20, max 100), create/update/delete API와 댓글 행/섹션을 추가했다. 삭제 placeholder·plain text 렌더링·서버 `canEdit/canDelete/canReply`·수정/삭제/답글·guest/오류 UX를 반영했다.
+- 구현: `features/like`에 interactions DTO와 GET/POST/DELETE API를 추가하고 `PostDetailPage`에 optimistic 좋아요, canonical 응답·rollback, `canLike/canUnlike` disabled/오류 UX, post/account generation guard를 연결했다. canonical reload chain의 await 경계마다 generation을 재확인하고, 댓글 mutation 성공 DTO를 임시 음수 id와 교체해 후속 GET 실패에도 음수 임시행이 남지 않게 했다.
+- 디자인: `ZeroVerse Pages.dc.html`/`DESIGN-SYSTEM.md`의 상세 헤더 28px/34px·26px avatar·우측 tag, actionbar 18px/34px·3px/6px, 댓글 26px·34px avatar·13.5px body·입력 copy를 대조해 최소 정렬했다. 댓글은 본문 아래 단일 컬럼이며 BlogPage count는 확장하지 않았다.
+- 행동 회귀: `m6PostDetailBehavior.test.tsx`를 12개로 보강해 canonical/rollback like·unlike, 삭제·탈퇴 placeholder, root/reply 독립 paging, stale like mutation·stale 댓글 GET 계정 전환, 댓글 optimistic/canonical/rollback 및 GET 실패 임시 id 제거, canEdit/canDelete soft-delete, guest CTA를 고정했다. 기존 `postBehavior.test.tsx`도 M6 API mock과 댓글/좋아요 표시를 포함해 M4 공유·owner 삭제 회귀를 유지했다.
+- 최종 명령/출력: `npm test -- --run --maxWorkers=1` → 34 files/353 tests passed, failure/error/skip 0. `npm run lint` → exit 0. `npm run build` → exit 0(`tsc -b`, Vite 141 modules; >500KB chunk warning만). `git diff --check -- frontend .claude/team/frontend` → 오류 없음.
+- 인계/잔여: FE 자동 검증은 완료했으나 backend 실제 HTTP/DTO·ACL 통합과 독립 1440px 동작·시각 QA는 부모/QA가 수행할 게이트다. 따라서 M6 전체 완료·시각 PASS는 아직 주장하지 않는다. 기존 npm audit 2 moderate/6 high는 변경하지 않았다.
+
+## 2026-11-09 14:04:09 KST — M6 독립 QA FE-001~004 수정 루프
+
+- RED 재현: `qa/M6-review.md` FE-001~004를 직접 대조하고, mutation API 성공 뒤 canonical GET 실패가 create/edit/delete를 snapshot rollback하는 문제, post/account 전환 뒤 `isLikeBusy` 고착, root page 왕복 중 늦은 reply GET 재주입, capability/placeholder 테스트 공백을 `m6PostDetailBehavior.test.tsx`에서 고정·재현했다.
+- 수정: `CommentSection`의 create/update/delete mutation catch와 canonical reload catch를 분리해 mutation 실패만 optimistic rollback하도록 했다. 성공 DTO·soft-delete placeholder는 유지하고 canonical GET 실패는 별도 notice와 `다시 시도` 경로로 표시한다. post/account generation 변경 시 `isLikeBusy`를 reset하고, root page generation을 reply request guard에 포함해 이전 root의 늦은 응답을 폐기했다.
+- 테스트: `m6PostDetailBehavior.test.tsx`에 retry 성공, edit/delete 성공 뒤 GET 실패 상태 유지, 새 account 좋아요 버튼 enabled·재mutation, root page 0→1→0 stale reply, 비작성자/deleted root·reply capability와 post owner delete 경계를 보강했다. targeted `npm test -- --run src/features/comment/commentApi.test.ts src/features/like/likeApi.test.ts src/test/m6PostDetailBehavior.test.tsx --maxWorkers=1` → 3 files/19 tests passed.
+- 최종 검증: 전체 `npm test -- --run --maxWorkers=1` → 34 files/357 tests passed, failure/error/skip 0; `npm run lint` exit 0; `npm run build` exit 0(`tsc -b`, Vite 141 modules, >500KB chunk warning만); `git diff --check -- frontend .claude/team/frontend` 오류 없음.
+- 미해결/인계: frontend 소유 파일과 역할 STATE/WORKLOG만 수정했다. 실제 backend HTTP·ACL/DTO, 독립 Chrome 1440px 동작·시각 QA는 부모/QA 게이트이며 이번 루프에서 PASS를 주장하지 않는다.
+
+## 2026-11-09 14:23:33 KST — M6 FE fix round2 권한·reply loading 경계
+
+- RED 재현: root page 0→1→0 왕복 중 지연된 reply GET이 stale guard로 폐기되어도 `replyLoading[rootId]=true`가 남아 새 root의 embedded replies와 다음 reply 페이지 버튼을 막는 테스트를 추가해 실패를 확인했다. 또한 `refreshInteractions`와 CommentSection canonical GET의 `AUTH_004/POST_002/POST_001` 오류가 기존 flags/count/comments를 유지하는 테스트를 추가해 실패를 확인했다.
+- 수정: root `loadRootPage` 시작과 post/account reset에서 `replyRequestRef`, `replyLoading`, `replyErrors`를 함께 세대 초기화했다. `CommentSection`은 읽기권한 오류에 한해 댓글 tree를 폐기하고 부모 callback으로 interaction을 폐기하며, `PostDetailPage`는 권한상실 시 좋아요 count/flags 및 댓글 섹션을 숨긴다. transient network와 `LIKE_001`은 PUBLIC 읽기 상태를 유지하고 별도 오류 UX만 표시한다. `POST_001`도 권한상실 분류에 포함했다.
+- 행동 테스트: `m6PostDetailBehavior.test.tsx`에 root 복귀 후 embedded reply 표시·reply next 재요청, canonical comment access denial parent callback, 초기 interactions `AUTH_004/POST_002/POST_001` 3종 폐기, `LIKE_001` 상태 보존을 고정했다. targeted `npm test -- --run src/features/comment/commentApi.test.ts src/features/like/likeApi.test.ts src/test/m6PostDetailBehavior.test.tsx --maxWorkers=1` → 3 files/25 tests passed.
+- 최종 검증: 전체 `npm test -- --run --maxWorkers=1` → 34 files/363 tests passed, failure/error/skip 0; `npm run lint` exit 0; `npm run build` exit 0(`tsc -b`, Vite 141 modules, >500KB chunk warning만); `git diff --check -- frontend .claude/team/frontend` 오류 없음.
+- 미해결/인계: frontend 및 본인 역할 STATE/WORKLOG만 수정했고 Git/타 역할 파일은 건드리지 않았다. 실제 backend HTTP/ACL 및 독립 Chrome 1440px 최종 재리뷰는 부모/QA 게이트다.
+
+## 2026-11-09 14:32:28 KST — M6 FE fix round3 LIKE_001 재확인·canonical 세대 경계
+
+- 담당/경계: 독립 최종 리뷰가 지적한 FE round3를 frontend 소유 범위에서 수정했다. 제품 변경은 `frontend/src/pages/PostDetailPage.tsx`, `frontend/src/features/comment/CommentSection.tsx`, 행동 회귀는 `frontend/src/test/m6PostDetailBehavior.test.tsx`에 한정했고, backend·QA·root 문서·Git은 건드리지 않았다.
+- RED: 기존 `npm test -- --run src/test/m6PostDetailBehavior.test.tsx --maxWorkers=1`에서 `LIKE_001` 재확인 canonical/권한폐기/일시오류 3 tests가 interactions 호출 1회 또는 재시도 안내 부재로 실패했다(24 tests 중 3 failures). 추가한 글·계정 전환 뒤 늦은 CommentSection canonical `POST_002` 거부 테스트도 부모 상태를 지워 25 tests 중 4 failures로 재현했다.
+- 수정: `PostDetailPage`가 `LIKE_001` mutation 실패 후 `getInteractions`를 재확인해 canonical flags를 반영하고, 재확인 GET의 `AUTH_004/POST_001/POST_002`만 interaction·댓글을 폐기하며 transient 오류는 이전 상태와 `다시 시도` UX를 유지하도록 했다. 재확인/재시도/optimistic finally의 page generation guard를 유지했고, 일반 mutation 오류는 기존 rollback 경계를 유지했다. `CommentSection.refreshCanonical`의 `onRefreshInteractions` catch는 captured generation이 현재일 때만 `clearReadState`를 호출하도록 보강했다. post/account 전환 effect에서 이전 댓글 mutation의 `busy`도 초기화했다.
+- 행동 테스트: `m6PostDetailBehavior.test.tsx`에 `LIKE_001` 3분기, 늦은 `LIKE_001` 거부 후 새 계정 좋아요 mutation 보존, 글·계정 전환 뒤 늦은 canonical 권한거부가 새 댓글·새 mutation을 지우지 않는 경계를 추가했다. 수정 후 targeted `npm test -- --run src/features/comment/commentApi.test.ts src/features/like/likeApi.test.ts src/test/m6PostDetailBehavior.test.tsx --maxWorkers=1` → 3 files/29 tests passed.
+- 최종 검증: `npm test -- --run --maxWorkers=1` → 34 files/367 tests passed, failure/error/skip 0. `npm run lint` → exit 0. `npm run build` → exit 0(`tsc -b`, Vite 141 modules; >500KB chunk warning만). `git diff --check -- frontend .claude/team/frontend` → 오류 없음.
+- 인계/잔여: round3 자동 검증은 통과했지만 실제 backend HTTP/ACL·DTO와 독립 Chrome 1440px 동작/시각 재리뷰는 부모·QA 게이트다. 시각 PASS나 M6 전체 완료를 이 역할에서 주장하지 않는다. 기존 npm audit 2 moderate/6 high와 dependency는 변경하지 않았다.
+
+## 2026-11-09 14:35:41 KST — M6 FE fix round3 직접 mutation 권한거부 보강
+
+- 추가 리뷰 근거: 승인된 backend 계약상 삭제 글 좋아요 mutation은 `POST_001`(404), ACL 상실 댓글 mutation은 `POST_002`(403)을 직접 반환한다. 기존 `toggleLike`·댓글 mutation catch가 이를 일반 실패처럼 optimistic 이전 상태로 rollback하던 경계를 추가 RED로 고정했다.
+- 수정: `PostDetailPage`의 좋아요 mutation catch에서 `isReadAccessError`를 `LIKE_001` 재확인 분기보다 우선 처리해 interaction·댓글 섹션을 폐기한다. `CommentSection` create/update/delete 직접 mutation catch도 `AUTH_004/POST_001/POST_002`이면 `clearReadState`로 parent interaction과 댓글 tree를 함께 폐기하고, COM003/LIKE001 및 일반 네트워크 오류의 rollback 경계는 유지했다.
+- 테스트/검증: `m6PostDetailBehavior.test.tsx`에 삭제 글 `POST_001` 좋아요와 댓글 `POST_002` mutation 상태 폐기 2 tests를 추가했다. RED는 28 tests 중 2 failures로 확인했고 수정 후 targeted `npm test -- --run src/features/comment/commentApi.test.ts src/features/like/likeApi.test.ts src/test/m6PostDetailBehavior.test.tsx --maxWorkers=1` → 3 files/31 tests passed.
+- 최종 명령: 전체 `npm test -- --run --maxWorkers=1` → 34 files/369 tests passed, failure/error/skip 0; `npm run lint` exit 0; `npm run build` exit 0(`tsc -b`, Vite 141 modules; >500KB chunk warning만); `git diff --check -- frontend .claude/team/frontend` 오류 없음.
+- 인계/잔여: FE 소유 범위만 수정했으며 backend·QA·root 문서·Git은 건드리지 않았다. 실제 HTTP ACL/DTO와 독립 1440px 동작·시각 재리뷰는 여전히 부모·QA 게이트다.

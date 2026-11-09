@@ -313,3 +313,20 @@
 - **STATE 반영**: PM `STATE.md`를 `APPROVED / M5 완료·dev 통합`으로 갱신했다. 제품·QA·시각·Git 통합 blocker 없음과 M6 이후 자동 착수 금지를 명시했다.
 - **범위·소유권**: 이번 턴은 PM 소유 `docs/PRD.md`, `.claude/team/pm/STATE.md`, `.claude/team/pm/WORKLOG.md`만 수정했다. 제품 소스·테스트·QA·governance·Git 조작은 수행하지 않았다.
 - **다음 단계**: root의 문서 closeout 정합성 대조 후 M5를 마감 상태로 유지한다. M6 이후는 사용자의 명시 지시 전 착수하지 않는다.
+
+## 2026-11-09 13:15 KST — M6 A-v2 사용자 승인·PRD 정본 동기화 및 구현 착수
+
+- **근거 대조**: 사용자 `A-v2 전체 승인`을 M6 회의록 §6 A-v2의 전체 계약 승인으로 확인하고, `docs/worklog/M6-comments-likes.md` Task1~6, backend/frontend/qa STATE, `DECISION-REGISTER.md`의 M6 행, 실제 Git `feature/M6-comments-likes`/`c46a26d`를 재독했다. 독립 Product/Architecture/Delivery 3인의 `APPROVE_WITH_CHANGES/HIGH`와 기존 M5 승인 범위를 M6 승인과 혼동하지 않았다.
+- **정본 반영**: PM 소유 `docs/PRD.md`에 회의 §6 원문 링크와 승인된 전체 A-v2 정책을 §9.9로 기록하고, §5.7/§5.8 댓글·좋아요 계약, §7.2 PostDetail UI·M6 시각 범위, §10 M6 실행 순서, §11 M6 검증·M8 알림 분리, §13 확정 결정/§13.2 실행 상태를 동기화했다. 양방향 block-like 금지, ACL 상실 후 unlike 거부·like row 보존, bounded root/reply, 삭제 root GET·placeholder/count, scalar lock·PostService.get 정렬, invalid Bearer·ACL·no-view-increment, BlogPage count 미확장, M6 notification row 미생성을 새로 결정하지 않고 회의 §6 그대로 반영했다.
+- **상태 반영**: PM `STATE.md`를 `APPROVED / M6 구현 착수`로 덮어썼다. 사용자 승인 blocker는 해소됐지만 실제 제품 구현·테스트·독립 QA·1440px 인수·Git 통합 전에는 M6 완료/PASS를 주장하지 않으며 backend Task1→2, frontend Task3→4, QA Task5, root Task6 순서를 기록했다.
+- **소유권**: 이번 작업은 PM 소유 `docs/PRD.md`, `.claude/team/pm/STATE.md`, `.claude/team/pm/WORKLOG.md`만 수정했다. REQUIREMENTS·governance·M6 worklog·backend/frontend/qa 산출물·제품 source·Git은 수정하지 않았고, 기존 타 작업자 변경을 되돌리지 않았다.
+- **검증**: 변경 후 PRD §5.7/§5.8/§7.2/§9.9/§10/§11/§13.2, STATE 현재 단계·진행 중·다음 작업·차단 요인, WORKLOG append를 재독하고 핵심 문자열을 검색한다. `git diff --check -- docs/PRD.md .claude/team/pm/STATE.md .claude/team/pm/WORKLOG.md`와 변경 파일 범위를 확인한다. 제품 테스트·빌드·Git 조작은 수행하지 않는다.
+- **미해결**: backend/frontend 실제 구현과 RED→GREEN·MySQL 경쟁·OpenAPI, QA 실제 HTTP/Chrome 1440px 인수, root의 commit/PR/merge는 후속이며 M8 알림 생성은 M6 완료 범위가 아니다.
+
+## 2026-11-09 13:17 KST — M6 초기 구현 산출물 재대조 정정
+
+- **재대조**: 승인 직후 실제 작업 트리를 다시 확인해 `frontend/src/features/comment/`·`frontend/src/features/like/`의 API/types/targeted tests와 `src/test/java/com/zeroverse/domain/comment/CommentControllerTest.java`가 생성된 사실을 확인했다. backend domain 구현, PostDetail 연결, full test/실제 HTTP·MySQL·Chrome 검증은 아직 완료되지 않았다.
+- **STATE 정정**: PM `STATE.md`의 “구현 착수”를 실제 초기 산출물과 맞췄고, 남은 BE domain/FE 연결/독립 QA/Git gate를 분리했다. 타 역할 STATE의 승인 대기 문구는 소유자가 갱신할 영역으로 그대로 보존했다.
+- **FR 추적 정정**: root가 REQUIREMENTS에 추가한 `FR-LIKE-03` interactions GET을 확인해 PRD §5.8, §9.9, §11의 좋아요 추적 범위를 `FR-LIKE-01~03`으로 맞췄다. REQUIREMENTS·governance·타 역할·Git은 수정하지 않았다.
+- **검증**: `rg --files`로 초기 산출물과 `rg -n 'FR-LIKE-01~03|M6 A-v2|13.2 M6' docs/PRD.md`를 확인하고, PM 소유 파일 `git diff --check`를 재실행한다. 제품 테스트·빌드·Git 조작은 수행하지 않는다.
+- **미해결**: BE 댓글/좋아요 제품 구현과 FE PostDetail 연동, RED→GREEN·MySQL 경쟁·OpenAPI·1440px 독립 QA, root의 PR/merge가 남아 있다.

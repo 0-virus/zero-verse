@@ -170,6 +170,49 @@ class OpenApiConfigTest extends MySqlTestSupport {
         }
     }
 
+    @Test
+    @DisplayName("M6 댓글·좋아요 operation은 optional GET와 개별 오류 상태를 문서화한다")
+    void m6CommentLikeOperationsDocumentValidResponses() throws Exception {
+        JsonNode docs = objectMapper.readTree(mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        assertM6Operation(docs, "/api/v1/posts/{postId}/comments", "get",
+                "200,400,401,403,404", false);
+        assertM6Operation(docs, "/api/v1/posts/{postId}/comments", "post",
+                "201,400,401,403,404", true);
+        assertM6Operation(docs, "/api/v1/comments/{commentId}", "put",
+                "200,400,401,403,404", true);
+        assertM6Operation(docs, "/api/v1/comments/{commentId}", "delete",
+                "200,401,403,404", true);
+        assertM6Operation(docs, "/api/v1/posts/{postId}/interactions", "get",
+                "200,401,403,404", false);
+        assertM6Operation(docs, "/api/v1/posts/{postId}/likes", "post",
+                "200,401,403,404", true);
+        assertM6Operation(docs, "/api/v1/posts/{postId}/likes", "delete",
+                "200,401,403,404", true);
+    }
+
+    private static void assertM6Operation(
+            JsonNode docs, String path, String method, String responseCodes, boolean secured) {
+        JsonNode operation = docs.path("paths").path(path).path(method);
+        assertThat(operation.isMissingNode()).as("%s %s exists", method, path).isFalse();
+        if (secured) {
+            assertThat(operation.path("security").path(0).has("bearerAuth"))
+                    .as("%s %s bearer", method, path).isTrue();
+        } else {
+            assertThat(operation.path("security").isArray())
+                    .as("%s %s optional auth", method, path).isTrue();
+            assertThat(operation.path("security").size()).isZero();
+        }
+        for (String code : responseCodes.split(",")) {
+            JsonNode response = operation.path("responses").path(code);
+            assertThat(response.isMissingNode()).as("%s %s %s", method, path, code).isFalse();
+            assertThat(firstSchemaRef(response)).as("%s %s %s schema", method, path, code)
+                    .isNotBlank();
+        }
+        assertThat(operation.path("responses").has("400/401/403/404/409")).isFalse();
+    }
+
     private static String firstSchemaRef(JsonNode response) {
         Iterator<JsonNode> mediaTypes = response.path("content").elements();
         while (mediaTypes.hasNext()) {

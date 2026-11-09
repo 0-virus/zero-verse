@@ -7,6 +7,8 @@ import { PostDetailPage } from '../pages/PostDetailPage';
 import { HeroBlogProvider } from '../lib/heroBlogContext';
 import type { AuthUser } from '../types/auth';
 import type { PageResponse, PostDetail, PostSummary } from '../features/post/types';
+import type { CommentItem } from '../features/comment/types';
+import type { InteractionState } from '../features/like/types';
 
 const postApi = vi.hoisted(() => ({
   listBlogPostsBySlug: vi.fn(),
@@ -16,6 +18,17 @@ const postApi = vi.hoisted(() => ({
 const blogApi = vi.hoisted(() => ({
   getPublicBlog: vi.fn(),
 }));
+const commentApi = vi.hoisted(() => ({
+  listComments: vi.fn(),
+  createComment: vi.fn(),
+  updateComment: vi.fn(),
+  deleteComment: vi.fn(),
+}));
+const likeApi = vi.hoisted(() => ({
+  getInteractions: vi.fn(),
+  likePost: vi.fn(),
+  unlikePost: vi.fn(),
+}));
 const auth = vi.hoisted(() => ({
   useAuth: vi.fn(),
   useOptionalAuth: vi.fn(),
@@ -24,6 +37,8 @@ let clipboardWrite: ReturnType<typeof vi.fn>;
 
 vi.mock('../features/post/postApi', () => postApi);
 vi.mock('../features/blog/blogApi', () => blogApi);
+vi.mock('../features/comment/commentApi', () => commentApi);
+vi.mock('../features/like/likeApi', () => likeApi);
 vi.mock('../lib/authContext', () => auth);
 
 const viewer: AuthUser = {
@@ -95,6 +110,26 @@ function page(items: PostSummary[], pageNumber = 0): PageResponse<PostSummary> {
   };
 }
 
+const emptyComments: PageResponse<CommentItem> = {
+  items: [],
+  page: 0,
+  size: 20,
+  totalElements: 0,
+  totalPages: 0,
+  hasNext: false,
+  hasPrevious: false,
+};
+
+const detailInteractions: InteractionState = {
+  postId: 4,
+  commentCount: 0,
+  likeCount: 0,
+  liked: false,
+  canComment: true,
+  canLike: true,
+  canUnlike: false,
+};
+
 function renderBlog(initialEntry = '/blog/orbit?categoryId=3&sort=popular&page=0') {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
@@ -128,6 +163,13 @@ beforeEach(() => {
   postApi.listBlogPostsBySlug.mockResolvedValue(page([summary]));
   postApi.getPost.mockResolvedValue(detail);
   postApi.deletePost.mockResolvedValue(null);
+  commentApi.listComments.mockResolvedValue(emptyComments);
+  commentApi.createComment.mockResolvedValue(null);
+  commentApi.updateComment.mockResolvedValue(null);
+  commentApi.deleteComment.mockResolvedValue(null);
+  likeApi.getInteractions.mockResolvedValue(detailInteractions);
+  likeApi.likePost.mockResolvedValue({ ...detailInteractions, liked: true, likeCount: 1, canLike: false, canUnlike: true });
+  likeApi.unlikePost.mockResolvedValue(detailInteractions);
   clipboardWrite = vi.fn().mockResolvedValue(undefined);
   Object.defineProperty(window.navigator, 'clipboard', {
     configurable: true,
@@ -142,7 +184,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('M4 BlogPage/PostDetailPage 행동', () => {
+describe('M4 BlogPage와 M6 PostDetailPage 행동', () => {
   it('URL query의 category/sort/page를 실제 slug 목록 API와 동기화하고 다음 페이지로 이동한다', async () => {
     const user = userEvent.setup();
     renderBlog();
@@ -164,7 +206,7 @@ describe('M4 BlogPage/PostDetailPage 행동', () => {
     }));
   });
 
-  it('상세가 실제 JSON 본문·읽기 메타·공유 URL·owner 수정/삭제만 제공한다', async () => {
+  it('상세가 JSON 본문·읽기 메타·M6 상호작용·공유·owner 수정/삭제를 제공한다', async () => {
     const user = userEvent.setup();
     clipboardWrite = vi.spyOn(window.navigator.clipboard, 'writeText').mockResolvedValue(undefined);
     renderDetail();
@@ -174,8 +216,8 @@ describe('M4 BlogPage/PostDetailPage 행동', () => {
     expect(screen.getByText('안전한 본문')).toBeInTheDocument();
     expect(screen.getByText(/조회 12/)).toBeInTheDocument();
     expect(screen.getByText(/읽는 데/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /좋아요/ })).not.toBeInTheDocument();
-    expect(screen.queryByText(/댓글/)).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /좋아요 0/ })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: '■ 댓글 0' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '공유' }));
     expect(clipboardWrite).toHaveBeenCalledWith(window.location.href);

@@ -86,6 +86,12 @@ public class SecurityConfig {
                         .requestMatchers(RegexRequestMatcher.regexMatcher(
                                 HttpMethod.GET, "/api/v1/posts/[0-9]+"))
                         .permitAll()
+                        .requestMatchers(RegexRequestMatcher.regexMatcher(
+                                HttpMethod.GET, "/api/v1/posts/[0-9]+/comments(?:\\?.*)?"))
+                        .permitAll()
+                        .requestMatchers(RegexRequestMatcher.regexMatcher(
+                                HttpMethod.GET, "/api/v1/posts/[0-9]+/interactions(?:\\?.*)?"))
+                        .permitAll()
 
                         // API 문서.
                         .requestMatchers(HttpMethod.GET,

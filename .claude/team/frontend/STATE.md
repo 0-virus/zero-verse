@@ -2,39 +2,35 @@
 
 > 덮어쓰기 스냅샷. 시간순 이력은 `WORKLOG.md`, 마일스톤 이력은 `docs/worklog/**`를 본다.
 
-마지막 갱신: 2026-11-07 16:53:41 KST
+마지막 갱신: 2026-11-09 14:35:41 KST
 
 ## 현재 단계
 
-- M5 A-v2 FE 구현·디자인 대조·독립 QA를 PASS로 인수했고 PR #11의 `dev` merge까지 반영된 단계다.
-- 소유 경계는 `frontend/**` 및 `.claude/team/frontend/**`이며, backend·QA·root 문서·Git은 수정하지 않았다.
-- `docs/design/DESIGN-SYSTEM.md`와 `ZeroVerse Pages.dc.html` 원본을 직접 대조했으며, QA final(`qa/M5-review.md`)의 1440px 실제 API·시각·키보드 PASS와 V001/V002 CLOSED를 접수했다.
+- M5 A-v2 FE 구현·디자인 대조·독립 QA를 PASS로 인수했고, root 확인 기준 M5는 `dev`에 통합된 완료 상태다.
+- M5 closeout 기준 commit은 `c46a26d`이며, 현재 checkout은 `feature/M6-comments-likes`다.
+- 소유 경계는 `frontend/**` 및 `.claude/team/frontend/**`다. M6 구현 wave와 독립 리뷰 round3 수정에서도 backend·QA·root 문서·Git은 수정하지 않았다.
 
-## 이번 wave 구현
+## M6 준비·계약 상태
 
-- `frontend/src/features/universe/types.ts`에 최소 개인정보 사용자 요약, 방향별 관계 snapshot, 목록 DTO/Page 타입을 추가했다.
-- `frontend/src/features/universe/universeApi.ts`에 FR-UNI-01~12 경로·method·page/size/nickname query와 mutation API를 `apiClient` 기반으로 추가했다.
-- `UniverseListCard`를 추가해 받은/보낸 신청·연결·following/followers·차단 목록의 검색, 독립 로딩/오류/빈 상태, 페이지네이션, 액션을 렌더한다.
-- `SettingsUniversePage`를 scaffold에서 실제 여섯 카드 화면으로 교체했다. 목록별 request generation/account generation guard, 수락·거절·취소·연결 끊기·차단·해제와 mutation 후 canonical 재조회/409 재조회 안내를 구현했다.
-- `BlogPage`는 공개 blog load와 보호 관계 snapshot load를 분리한다. guest signin 유도, 본인 관리 액션, A-v2 snapshot 우선순위(차단 해제/비활성/수락/취소/연결 끊기/신청), 늦은 응답 guard와 충돌 재조회가 연결됐다.
-- Blog hero NONE와 guest signin CTA를 디자인 정본 카피 `✦ 유니버스 신청`으로 통일했다. guest는 동일 카피의 `/signin` 링크이며 보호 snapshot 요청은 하지 않는다.
-- 디자인 대조 wave에서 `UniverseListCard` 헤더를 정본 20px/12px·13px/2px tracking으로 맞추고, 받은 신청 카운트 `CountBadge`(11px·1px/8px), 신청/관계별 38px·34px 아바타, 인라인 `accentSm`/`inert` 액션, 날짜 관계 subtitle을 적용했다. SettingsUniversePage는 원본 설정 main과 같이 여섯 카드를 단일 열 `gap-5`로 이어 붙이고 시각 전용 eyebrow/소개를 제거하되 접근성 h1은 `sr-only`로 유지했다. Blog hero CTA는 정본 3px·16/8px·4px rgba shadow와 관계 신청 neutral variant를 사용한다.
-- `frontend/src/features/universe/AGENTS.md`와 API/카드/행동 테스트를 추가했다.
+- `docs/governance/meetings/M6-20261109-comments-likes.md` §6 A-v2가 사용자 승인되어 M6 FE Task3→4 구현 및 QA FE-001~004 수정 루프·round2 Important 수정·자체 검증을 완료했다. 실제 backend HTTP 통합과 독립 QA는 부모/QA 게이트다.
+- 최신 §6 계약에는 bounded root/reply 댓글 페이징, `CommentItem.canEdit/canDelete/canReply`, interactions의 `canUnlike`가 반영되어 있다.
+- 차단 관계에서는 PUBLIC 글에도 새 좋아요를 허용하지 않고(`LIKE_001`, `canLike=false`), 기존 좋아요 취소는 별도 허용하는 방향으로 계약이 정리됐다.
+- FE에 댓글/대댓글 API·types·행동 UI, interactions/좋아요 API·optimistic/canonical 상태, stale guard를 추가했고 `PostDetailPage`에 단일 컬럼 댓글 섹션과 원본 액션바를 연결했다.
 
-## 검증
+## M6 조사 결과
 
-- RED: 구현 전 `universeApi.test.ts`·`UniverseListCard.test.tsx`가 import resolution 실패로 종료했다.
-- GREEN: M5 targeted (`universeApi`, `UniverseListCard`, router/post behavior)와 확장 `universeBehavior.test.tsx`에서 관계 snapshot 우선순위·stale owner/account·6개 카드 mutation·409 reload·독립 검색/페이지를 검증했다.
-- RED mutation: `universeApi.ts`의 size clamp를 일시 제거했을 때 `universeApi.test.ts` 8개 중 1개가 `size=120` 수신으로 실패했고, `Math.min(...,100)` 원복 후 통과했다.
-- 디자인 RED: 기존 Panel 헤더/38px 일괄 아바타·2열·hero primary/설정 액션 variant를 회귀 테스트로 고정한 뒤 5개 실패를 확인하고 최소 구현했다. 관련 2 files/18 tests GREEN.
-- 카피 RED: 기존 suffix형 hero label과 guest CTA expectation을 prefix형으로 갱신한 뒤 4개 기존 상태 테스트 및 guest CTA 1개가 실패했고, `BlogPage` 카피를 수정해 17개 behavior tests GREEN을 확인했다.
-- 전체: 최종 `npm test -- --run --maxWorkers=1` → 31 files/338 tests passed, failure/error/skip 0.
-- `npm run lint` → exit 0.
-- `npm run build` → exit 0 (`tsc -b`, Vite 137 modules); 500 kB chunk warning만 남았다.
-- `git diff --check -- frontend .claude/team/frontend` → 오류 없음.
+- `frontend/src/pages/PostDetailPage.tsx`와 `frontend/src/features/post/postApi.ts`·`types.ts`를 정본과 대조한 뒤, 댓글/좋아요 계약을 새 `features/comment`·`features/like`로 분리했다.
+- 디자인 정본의 PostDetail 헤더 `28px 34px`·26px avatar·우측 tag, 액션바 `18px 34px`·3px border/6px shadow, 댓글 `26px` 간격·34px avatar·13.5px body를 반영했다.
+- root/reply 독립 loading/error/page, deleted placeholder, server canEdit/canDelete/canReply, guest/차단 common UX, optimistic rollback와 canonical reload, post/account 세대 guard를 구현했다. QA FE-001 수정으로 mutation API 성공 뒤 canonical GET 실패 시 성공 DTO·soft-delete 상태를 유지하고, GET 오류만 별도 notice/다시 시도 상태로 남긴다. round2에서 root page 전환 시 reply loading/error/request 세대를 함께 초기화하고, `AUTH_004/POST_001/POST_002` 읽기권한 상실은 parent/child 댓글·interaction 상태를 폐기하며 `LIKE_001`·transient 오류는 기존 PUBLIC 읽기 상태를 유지한다. FE-002의 post/account busy reset과 FE-003의 root page generation 포함 reply guard를 적용했다. round3에서 `LIKE_001` mutation 뒤 interactions 재확인(공식 canonical·읽기권한 폐기·일시 오류 보존/재시도)과 canonical callback의 세대 검사를 보강했으며, 글·계정 전환 시 CommentSection의 이전 busy mutation도 초기화한다. 직접 확정된 읽기권한 mutation 거부(`POST_001` 좋아요, `POST_002` 댓글)도 rollback 대신 interaction·댓글 상태를 폐기한다.
+
+## 검증·변경 경계
+
+- 이번 M6 wave에서 변경한 제품 경로는 `frontend/**`뿐이며 새 domain 지침 `frontend/src/features/comment/AGENTS.md`, `frontend/src/features/like/AGENTS.md`를 추가했다. dependency·Git은 변경하지 않았다.
+- TDD RED→GREEN: comment/like API 모듈 해석 실패 2 suites/0 tests 후 2 files/3 tests GREEN; QA 수정 전 canonical rollback·busy 고착·root page stale race RED를 재현했다. round2에서 root 복귀 답글 loading 고착과 permission GET 상태 잔존 RED를 재현했다. round3에서 `LIKE_001` 재확인 3분기, 전환 뒤 늦은 canonical 권한거부 전파, 직접 mutation `POST_001/POST_002` 상태 폐기를 RED로 재현한 뒤 수정했다.
+- 최종 검증: targeted `npm test -- --run src/features/comment/commentApi.test.ts src/features/like/likeApi.test.ts src/test/m6PostDetailBehavior.test.tsx --maxWorkers=1` → 3 files/31 tests passed; 전체 `npm test -- --run --maxWorkers=1` → 34 files/369 tests passed, failure/error/skip 0; `npm run lint` exit 0; `npm run build` exit 0(`tsc -b`, Vite 141 modules, >500KB chunk warning만); `git diff --check -- frontend .claude/team/frontend` 오류 없음.
+- 브라우저/API 실제 통합 검증은 backend 구현 및 독립 QA가 아직 진행 중이므로 시각 PASS나 M6 전체 완료를 주장하지 않는다. npm audit의 기존 2 moderate/6 high는 변경하지 않았다.
 
 ## 다음 작업 / 차단 요인
 
-- QA가 1440px 실제 API 6개 카드·hero 7상태·refresh·계정 전환·guest·keyboard를 PASS했고 V001/V002를 닫았다. root가 같은 338/lint/build 결과와 screenshot 대조를 직접 확인했다.
-- PR #11(`https://github.com/0-virus/zero-verse/pull/11`)이 2026-11-07 16:53:41 KST `30a863000a918075e9e1530ec6627e2f9167989a`로 `dev`에 merge됐다. root 확인상 `origin/dev` tree `ae40db51c5de9f9d262347802962579775ee7c77`와 검증 HEAD가 일치하고 local `dev` fast-forward도 완료됐다. M5 FE 범위는 통합 완료 상태이며, 이후 closeout 기록은 root 소유다.
-- npm lockfile 기준 기존 audit 2 moderate/6 high는 임의 fix/upgrade하지 않았다.
+- 다음 단계는 backend 실제 API와 DTO/ACL 통합, 독립 1440px 동작·시각 QA, 발견 시 FE 수정 루프다. 부모가 실제 통합 전까지 M6 전체 완료를 닫지 않는다.
+- 현재 FE 자체 단계는 구현·자동 검증 완료이며, actual HTTP/visual gate만 남았다.

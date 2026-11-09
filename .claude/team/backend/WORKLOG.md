@@ -292,3 +292,54 @@
 - root가 PR #11(`https://github.com/0-virus/zero-verse/pull/11`)을 2026-11-07 16:53:41 KST `dev`에 머지했다. merge SHA는 `30a863000a918075e9e1530ec6627e2f9167989a`, 구현 SHA는 `060bbcf`다.
 - root는 검증 HEAD와 동일한 `origin/dev` tree `ae40db51c5de9f9d262347802962579775ee7c77`를 확인하고 local `dev`를 fast-forward했다. M5 인수·backend 자동검증·브라우저 QA 결과를 이 통합 상태로 확정한다.
 - 이번 역할 범위는 M5에서 종료하며 M6은 착수하지 않았다. runtime 종료 여부는 root가 별도 확인 후 처리한다.
+
+## 2026-11-09 KST — M6 backend 조사·계약 승인 대기
+
+- 한 일: 사용자 승인 전 read-only 범위로 REQUIREMENTS §4/FR-COM-01~04/FR-LIKE-01~02/NFR-04·08·09, PRD §5.7/5.8/§7.2/§9.2-P/§9.3-③/§10/§11/§12, V1 schema와 실제 `PostService`·`PostAccessPolicy`·`PostRepository`·`BlogRepository`·`UserRepository`·`UniverseRepository/Service`·`SecurityConfig`를 대조했다. 제품 source/test/Gradle/Git은 수정하지 않았다.
+- 현재 사실: M6 Java/API/FE는 미구현이고 V1 `comments`/`post_likes`만 존재한다. 공통 `ApiResponse`/`PageResponse`, 기존 POST/COM/LIKE 오류 코드, M5의 사용자 ID 오름차순 pair lock을 재사용할 수 있다.
+- 잠금 결론: 기존 `BlogRepository`/`PostRepository`의 `JOIN FETCH ... FOR UPDATE`는 joined row 잠금 범위를 보장하지 않으므로 M6은 user join 없는 scalar blog lock 뒤 관련 user ID를 오름차순으로 lock하고 post→comment/like를 잠가야 한다. `PostService.get`도 blog→owner→post 순서로 정렬해야 하며, 기존 owner 쓰기 검증 helper를 read path에 재사용하지 않는다.
+- snapshot 결론: lock 전에는 `postId/blogId/ownerId`와 reply parent 식별자만 scalar projection으로 읽고, lock 후 Post/Comment/Universe pair를 current read로 재조회한다. UNIVERSE ACL query가 lock 전 REPEATABLE_READ snapshot을 만들지 않도록 관계 판정을 최종 lock 이후로 미룬다.
+- batch 결론: MySQL 8.4 `ROW_NUMBER`/`COUNT OVER` CTE로 root IDs 전체의 replies 첫 20개와 parent별 total을 한 query로 가져오는 방식을 확인했다. 최대 root 100×reply20으로 bounded하며 author는 LEFT JOIN 또는 ID batch map으로 N+1을 막는다. `rootIds`가 비면 query를 생략한다.
+- 미해결: content 최대 2000 UTF-16, 삭제 parent의 기존 reply 조회·신규 reply, 탈퇴 parent author `canReply`, deleted comment/user·차단 후 기존 row의 count, SUSPENDED 사용자의 unlike/edit/delete 경계는 사용자 승인안에서 확정해야 한다.
+- 검증: 조사 턴에는 Gradle/Docker/MySQL/bootJar를 실행하지 않았다. 편집 후 STATE/WORKLOG 재독과 `git diff --check -- .claude/team/backend/STATE.md .claude/team/backend/WORKLOG.md`만 수행한다. 다음 단계는 승인 후 TDD 구현이다.
+
+## 2026-11-09 KST — M6 A-v2 backend Task1/2 구현·검증
+
+- 승인/범위: 사용자 `A-v2 전체 승인` 후 `feature/M6-comments-likes`에서 backend 소유 `src/main/**`, `src/test/**`, backend STATE/WORKLOG만 수정했다. V1 migration·신규 dependency·Git commit/push는 수행하지 않았다.
+- TDD RED: 구현 전 `CommentControllerTest` 3건을 실행해 미구현 endpoint의 실제 실패를 확인했다(`3 tests completed, 3 failed`). 이후 최소 댓글 entity/repository/service/controller를 구현하고 GREEN으로 전환했다.
+- Task1 구현: `Comment` soft-delete entity, 최소 author/CommentItem DTO, create/update/delete/list API, root/reply offset paging(기본20·최대100·createdAt DESC/id DESC), 삭제 root reply GET, parent same-post/root/deleted-author 경계, 2000 UTF-16 trim/blank validation, block/ACL/ACTIVE·ownership flags를 반영했다. root 100개 최초 replies는 MySQL `ROW_NUMBER()` batch로 최대 2,000행이며 author는 ID batch다.
+- Task2 구현: `Like` V1 매핑(생성시각만), unique 보존 hard delete repository, 멱등 like/unlike, interactions 상태 GET, 댓글/좋아요 count·liked·can* flags, 양방향 BLOCKED, 접근권한 상실 후 unlike 거부·보존 row, SUSPENDED viewer liked 보존을 반영했다. 대상 Like row `FOR UPDATE`와 READ_COMMITTED post-scoped aggregate count로 duplicate like race를 해결했다. aggregate `FOR UPDATE`는 관련 user lock 순서를 흐릴 수 있어 사용하지 않는다.
+- 잠금/일관성: `PostInteractionLockService`가 scalar post/blog lookup 후 user join 없는 blog lock → owner/actor/parent author ID 오름차순 user lock → post lock을 통일했다. Universe pair/current ACCEPTED read도 lock 후 수행하고 M6 mutation·`PostService.get`은 `READ_COMMITTED`를 명시했다. `PostService.get` 기존 ACL/view/readTags/readImages/adjacent 응답은 유지했다.
+- 공개/문서: `SecurityConfig`에 숫자 postId comments/interactions의 GET-only query-string 허용 matcher를 추가했다. malformed Bearer는 controller에서 AUTH_004로 거부하고 신규 GET 응답은 `private,no-store`다. `CommentController`/`LikeController` OpenAPI 응답을 개별 status key로 명시했다.
+- 추가 RED→GREEN: 실제 MySQL latch에서 concurrent duplicate like가 unique violation으로 RED였고, current row/count locking 후 1행 수렴 GREEN. 삭제 root reply 순회·탈퇴 parent author COM_001·삭제 댓글 author placeholder·양방향 block·reply depth/length·큰 offset root/reply·21 replies bounded/page2·SUSPENDED liked·query-string guest·ACCEPTED UNIVERSE interactions·malformed Bearer를 테스트로 고정했다.
+- 검증 명령/실측(2026-11-09):
+  - targeted: JDK21/GradleWrapper + `DOCKER_HOST=unix:///private/tmp/zeroverse-colima/default/docker.sock TESTCONTAINERS_RYUK_DISABLED=true JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=/private/tmp/zeroverse-junit-tmp`로 CommentBehavior 8, CommentController 3, LikeController 8, LikeConcurrency 1, OpenApiConfig 5, 기존 PostServiceIntegration suite를 실행해 모두 `0/0/0`.
+  - full: 동일 환경 `.../GradleWrapperMain --no-daemon --max-workers=1 test` → `BUILD SUCCESSFUL in 11m 12s`; XML 합산 `74 files / 478 tests / failures 0 / errors 0 / skipped 0`.
+  - package: `.../GradleWrapperMain --no-daemon --max-workers=1 bootJar` → `BUILD SUCCESSFUL in 3s`, `build/libs/zeroverse-server-0.0.1-SNAPSHOT.jar` 생성.
+- 남은 검토: 독립 backend code review, root가 배정한 별도 `M6InteractionConcurrencyMySqlTest`, FE/QA 통합 결과를 기다린다. 현재 backend 자체 검증은 PASS이나 merge-ready/전체 M6 완료는 root 최종 판정 전 주장하지 않는다.
+## 2026-11-09 KST — M6 본체 targeted·query 상한·최종 JAR 재검증
+
+- 보완 테스트: `CommentBatchTest`에 Hibernate `prepareStatementCount` 측정을 추가해 1 root와 100 roots의 list 호출 SQL 증가가 `+2` 이내인지 고정했다. 같은 테스트에서 100 roots×21 replies가 root당 최초 20개와 total 21개로 bounded 되는지 확인한다. `CommentBehaviorTest`의 댓글 생성·`LikeControllerTest`의 멱등 like/unlike에 `notifications` count 0 assertion을 추가해 M8 알림 row가 생성되지 않음을 고정했다.
+- 수정: `CommentService`의 batch author mapping에 필요한 `java.util.function.Function` import를 복구했다. helper 소유 `M6InteractionConcurrencyMySqlTest`와 새 cross-race helper는 편집하지 않았다.
+- 검증 명령(공통 환경): JDK `/private/tmp/zeroverse-jdk21/jdk-21.0.13+9/Contents/Home`, Gradle cache `/private/tmp/zeroverse-gradle-user-home`, `JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=/private/tmp/zeroverse-junit-tmp`, MySQL Testcontainers `DOCKER_HOST=unix:///private/tmp/zeroverse-colima/default/docker.sock TESTCONTAINERS_RYUK_DISABLED=true`.
+- `... GradleWrapperMain --no-daemon --max-workers=1 --rerun-tasks test --tests com.zeroverse.domain.comment.CommentBatchTest --tests com.zeroverse.domain.comment.CommentBehaviorTest --tests com.zeroverse.domain.comment.CommentControllerTest --tests com.zeroverse.domain.like.LikeControllerTest --tests com.zeroverse.domain.like.LikeConcurrencyTest --tests com.zeroverse.config.OpenApiConfigTest` → `BUILD SUCCESSFUL`; XML 합산 `29 tests, failures/errors/skips 0/0/0`.
+- `... GradleWrapperMain --no-daemon --max-workers=1 --rerun-tasks test --tests com.zeroverse.domain.post.PostServiceIntegrationTest` → `BUILD SUCCESSFUL`; `8 tests, failures/errors/skips 0/0/0`.
+- helper 재실행은 `M6InteractionConcurrencyMySqlTest` 3건 중 2건 통과, `getQueuedBehindUpdateReturnsOneLatestSnapshot`가 제품 assertion 전 scalar projection latch timeout(10초, line 217)으로 실패했다. 이는 helper 소유 테스트의 관측 조건이며 제품 source는 추가 변경하지 않았다. 새 cross-race helper는 아직 실행하지 않았다.
+- `... GradleWrapperMain --no-daemon --max-workers=1 bootJar` → `BUILD SUCCESSFUL in 3s`; artifact `build/libs/zeroverse-server-0.0.1-SNAPSHOT.jar`, SHA-256 `f0cbf9c2fd027510b03a00ce752f2f39040f5870bafaef360895343856d056ab`.
+- 판정: 본체 M6 targeted·기존 PostService 회귀·bootJar는 PASS. 최신 helper/full backend와 root 통합·QA가 남아 있으므로 merge-ready나 M6 전체 완료는 주장하지 않는다.
+## 2026-11-09 KST — M6 backend 본체 전체 회귀·경쟁 helper 결과
+
+- 본체 전체 회귀: helper 소유 `M6InteractionConcurrencyMySqlTest` 및 `M6InteractionCrossRaceMySqlTest`를 Gradle filter에서 제외하고 나머지 test classes를 실제 MySQL 8.4/Colima에서 실행했다. `74 XML files / 480 tests / failures 0 / errors 0 / skipped 0`, `BUILD SUCCESSFUL in 1m39s`였다. 이는 helper를 제외한 최신 제품 본체 증거이며 전체 helper 포함 PASS가 아니다.
+- 두 helper targeted: `M6InteractionConcurrencyMySqlTest` 3건 중 2건 PASS·1건 FAIL, `M6InteractionCrossRaceMySqlTest` 5건 전부 PASS. 실패는 동일하게 `M6InteractionConcurrencyMySqlTest.java:217`의 `get scalar post projection completed` latch timeout(10초)이며 제품 assertion까지 도달하지 않았다. CrossRace의 block↔comment/like, root-delete↔reply, post-delete↔comment/like 5 시나리오는 `0/0/0`이다.
+- helper 파일은 이 역할에서 수정하지 않았다. 기존 helper latch 실패는 원 작성자/root가 관측 조건을 보완한 뒤 재실행해야 한다.
+## 2026-11-09 KST — CommentBatch ACTIVE viewer query-bound 보강
+
+- `CommentBatchTest`에 ACTIVE actor viewer 경로도 추가해 1 root와 100 roots의 `prepareStatementCount` 증가가 `+2` 이내인지 검증했다. root별 `findPair`/block N+1이 없는 batch 경로를 guest와 인증 viewer 양쪽에서 고정한다.
+- 실행: `... GradleWrapperMain --no-daemon --max-workers=1 --rerun-tasks test --tests com.zeroverse.domain.comment.CommentBatchTest` → `BUILD SUCCESSFUL in 14s`, `1 test`, failures/errors/skips `0/0/0`.
+## 2026-11-09 KST — M6 최신 전체 회귀·경쟁 gate·bootJar 최종 PASS
+
+- helper 원 작성자가 `M6InteractionConcurrencyMySqlTest`의 SpringData repository spy latch를 제거하고 실제 `PostService.get` 호출과 `performance_schema` transaction wait를 관측하도록 수정했다. 이 역할은 해당 helper를 편집하지 않았다.
+- 두 helper targeted 재실행: `M6InteractionConcurrencyMySqlTest` 3 + `M6InteractionCrossRaceMySqlTest` 5 = `8 tests`, failures/errors/skips `0/0/0`, `BUILD SUCCESSFUL in 24s`였다. 기존 get snapshot 경쟁과 block↔comment/like, root-delete↔reply, post-delete↔comment/like 경계가 모두 통과했다.
+- 최신 표준 전체: `... GradleWrapperMain --no-daemon --max-workers=1 --rerun-tasks test` → `BUILD SUCCESSFUL in 1m50s`; XML 직접 집계 `77 files / 490 tests / failures 0 / errors 0 / skipped 0`이다. 두 helper가 포함된 수치다.
+- 최종 패키지: `... GradleWrapperMain --no-daemon --max-workers=1 bootJar` → `BUILD SUCCESSFUL in 3s`; `build/libs/zeroverse-server-0.0.1-SNAPSHOT.jar`, SHA-256 `f0cbf9c2fd027510b03a00ce752f2f39040f5870bafaef360895343856d056ab`.
+- `git diff --check`는 오류 없이 완료했다. 이 역할은 commit/push/merge를 수행하지 않았으며, root의 FE/실제 브라우저 QA·독립 최종 review·Git 통합을 대기한다.

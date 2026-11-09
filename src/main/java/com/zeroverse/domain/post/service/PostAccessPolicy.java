@@ -40,6 +40,26 @@ public class PostAccessPolicy {
                         viewerId, post.getUser().getId(), UniverseStatus.ACCEPTED);
     }
 
+    /** M6 mutation과 정렬된 post 상세에서 user lock 후 최신 관계를 판정한다. */
+    public boolean canReadCurrent(Post post, Long viewerId) {
+        if (post.isDeleted() || post.getBlog().isDeleted() || post.getUser().isDeleted()) {
+            return false;
+        }
+        if (isOwner(post, viewerId)) {
+            return true;
+        }
+        if (post.getPublishedAt() == null) {
+            return false;
+        }
+        if (post.getVisibility() == Visibility.PUBLIC) {
+            return true;
+        }
+        return post.getVisibility() == Visibility.UNIVERSE
+                && viewerId != null
+                && !universeRepository.findCurrentByFromUserIdAndToUserIdAndStatusForUpdate(
+                        viewerId, post.getUser().getId(), UniverseStatus.ACCEPTED).isEmpty();
+    }
+
     public boolean canWrite(Post post, Long userId) {
         return isOwner(post, userId) && post.getUser().isActive();
     }

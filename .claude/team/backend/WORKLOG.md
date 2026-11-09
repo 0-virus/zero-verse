@@ -406,3 +406,10 @@
 - 산출물: `.claude/team/backend/STATE.md`의 M7 current section을 최종 인계 상태로 갱신했다. 제품 source/test/Gradle, `docs/`·FE·QA 파일, Git은 이 closeout에서 변경하지 않았다.
 - 검증: `build/m7-evidence/backend-final-1.log`는 root의 `test bootJar`를 `BUILD SUCCESSFUL in 2m 16s`로 보존한다. `perl` XML 집계 명령으로 `build/m7-evidence/backend-final-1/test-results/*.xml`을 직접 읽어 `xml_files=91 tests=538 failures=0 errors=0 skipped=0`을 확인했고, `build/m7-evidence/backend-final-1/summary.json`의 JAR SHA-256은 `0cfc53e777449a430cf2f17114113850d9d94d04a4b172a230599e7e41e5d672`임을 재확인했다. 실제 인수 `build/m7-acceptance-20261109-232636/evidence.json`은 `259 PASS / 0 FAIL / 0 NOT_RUN`, source SHA `974f5174a5c6c181bbd228c5c29215450da0413a7ce9a9f8036daec9d0164e6c`와 JAR SHA가 manifest/actual 일치, `filesChecked=354`다.
 - 미해결: backend 자체 Critical/Important 독립 review finding은 없다. QA 시각 최종 판정과 root의 M7 worklog 종합·`dev` merge가 남아 있으며, 이 역할은 추가 Gradle 실행·제품 수정·Git 작업을 하지 않는다.
+
+## 2026-11-09 23:46 KST — M7 PR #13 dev 통합·최종 인계
+
+- 한 일: root가 독립 QA 시각 검토를 포함한 M7 최종 PASS를 확정하고 PR #13을 `dev`에 merge한 결과를 확인해 backend STATE를 완료 상태로 갱신했다. M7 Task1은 이 역할, Task2는 `/root/m7_discovery_impl`, 추가 계약 테스트는 `/root/m7_discovery_contract_tests`의 저자 분리를 유지한다.
+- 산출물: PR #13 merge SHA `08863207b8385177b619091410bbbd43e52a337c`, merge tree `dc68037477c6fed6b77d537235d79093803a983e`; tested head `2b984b6a2fc3aafd6d650c6ccb1cd8213a528545`와 tree가 동일하다. 현재 branch는 `dev`다.
+- 검증: 읽기 전용 `git diff --exit-code 2b984b6 08863207b8385177b619091410bbbd43e52a337c`가 exit 0이었다. 기존 최종 backend evidence는 `91 suites / 538 tests / failures 0 / errors 0 / skipped 0`, `bootJar` SHA `0cfc53e777449a430cf2f17114113850d9d94d04a4b172a230599e7e41e5d672`이며, 실제 HTTP·Chrome acceptance는 `259 PASS / 0 FAIL / 0 NOT_RUN`이다.
+- 미해결: M7 backend/QA/merge 차단은 없다. M8은 착수하지 않으며 root가 docs-only 최종 commit과 다음 마일스톤 준비를 담당한다. 이 closeout에서 제품 소스·테스트·Gradle·Git은 변경하지 않았다.

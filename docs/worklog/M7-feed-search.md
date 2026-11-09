@@ -1,6 +1,6 @@
 # M7 — 피드·검색
 
-> 현재 실행: **A-v2 전체 승인 / 구현·자동검증·실제 인수·독립 QA PASS / dev 통합 진행**. 사용자 `승인된 작업 시작해.`로 이전 보류를 해제했다. BE 538 tests, FE 405 tests, 실제 인수 259 checks를 통과했으며 M8 구현은 제외한다.
+> 현재 실행: **완료 — A-v2 구현·자동검증·실제 인수·독립 QA PASS / PR #13 dev 통합 완료**. 사용자 `승인된 작업 시작해.`로 이전 보류를 해제했다. BE 538 tests, FE 405 tests, 실제 인수 259 checks를 통과했으며 M8 구현은 제외한다.
 
 ## [계획]
 
@@ -180,3 +180,12 @@
 - owner draft `/edit/:id`는 FE 행동 회귀·source·실제 HTTP owner draft 접근으로 검증했다. Chrome에서 별도 draft 클릭을 실행했다고 주장하지 않으며 QA 기록의 증거 경계를 유지한다.
 - README의 macOS/Linux 명령은 실제 검증에 사용한 Java `GradleWrapperMain` 경로를 병기해 tracked wrapper의 실행 권한(100644)에 의존하지 않도록 정리했다. 원문/audit/호환·복구 계약 변경은 없다.
 - 모든 필수 제품/검증 finding이 닫혔으므로 승인된 PR/dev 통합을 진행한다. 새 사용자 승인 안건은 없다.
+
+### 2026-11-09 23:47 KST — [머지] M7 완료
+
+- PR [#13](https://github.com/0-virus/zero-verse/pull/13)을 승인된 dev로 merge했다. 최종 PR head `2b984b6a2fc3aafd6d650c6ccb1cd8213a528545`, merge commit `08863207b8385177b619091410bbbd43e52a337c`다.
+- 원격 dev를 fetch한 뒤 PR head와 `git diff --exit-code`가 0임을 확인했다. merged tree `dc68037477c6fed6b77d537235d79093803a983e`는 검증된 최종 tree와 동일하다. 로컬 dev도 fast-forward했다.
+- 최종 근거: backend 91 suites / 538 tests, frontend 41 files / 405 tests, lint/build/bootJar 성공, 실제 HTTP·Chrome 259 PASS / 0 FAIL / 0 NOT_RUN. 독립 전체 리뷰와 시각 QA 모두 PASS이며 미해결 제품 Critical/Important는 없다. 동일 트리 머지 및 완료 기록 변경만으로 전체 테스트를 다시 실행하지 않았다.
+- 구현·검증·기록·dev 통합까지 승인 범위를 완료했다. M8은 시작하지 않는다. 사용자 루트 미추적 4파일과 기존 DB·환경·업로드 데이터는 보존한다.
+
+- 23:48 KST runtime 정리: 실행 경로를 확인한 M7 Vite 5177/API 18087 프로세스를 TERM으로 종료했고 listener가 없음을 확인했다. 전용 `zeroverse-m7-mysql84`를 삭제 없이 stop한 뒤 전용 Colima VM 정지 exit 0을 확인했다. 합성 DB/검증 증거는 보존했으며 사용자 Docker Desktop·기존 DB/업로드는 조작하지 않았다.

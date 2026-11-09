@@ -478,3 +478,10 @@
 - 정정 근거: `build/m7-evidence/backend-final-1/summary.json`을 직접 확인했다. 정확한 BE 결과는 `91 suites`, `538 tests`, `failures 0`, `errors 0`, `skipped 0`이다.
 - 이전 23:28:41 closeout 항목의 `5,380 / 0 / 0` 표기는 띄어쓰기 없는 전달 문자열을 잘못 해석한 기록이므로 수치만 정정한다. 기존 이력은 보존하며 FE `41 files / 405 tests`, 실제 acceptance `259 PASS / 0 FAIL / 0 NOT RUN`은 유지한다.
 - source freeze를 유지하고 제품 소스·테스트·Git은 수정하지 않았다.
+
+## 2026-11-09 23:46:32 KST — M7 PR #13 dev merge·최종 독립 QA closeout
+
+- 통합: PR #13(https://github.com/0-virus/zero-verse/pull/13)이 `dev`에 merge됐다. merge SHA는 `08863207b8385177b619091410bbbd43e52a337c`, merge tree는 `dc68037477c6fed6b77d537235d79093803a983e`다. tested head `2b984b6`와 merge tree는 diff exit 0으로 동일하다.
+- 최종 게이트: BE `538 tests`(91 suites, failures/errors/skipped 0), FE `405 tests`(failures 0), 실제 HTTP+Chrome `259 PASS / 0 FAIL / 0 NOT_RUN`이다. full fresh review와 제품/QA fix blocking, 독립 시각 QA가 모두 PASS이며 merge-ready다.
+- 상태: 구현 브랜치 작업 결과는 현재 `dev`에 통합됐다. M7은 통합 완료로 기록하고, M8은 착수하지 않는다. 추가 docs-only 최종 커밋은 root가 수행한다.
+- 범위: 이번 closeout도 frontend `STATE.md`/`WORKLOG.md`만 갱신했다. 제품 소스·테스트·Git·타 역할 파일은 수정하지 않았다.

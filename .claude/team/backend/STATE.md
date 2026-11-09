@@ -1,15 +1,15 @@
 # backend 현재 상태
 
-## 2026-11-09 23:31 KST — M7 backend 최종 검증·closeout 인계
+## 2026-11-09 23:46 KST — M7 backend 최종 검증·dev 통합 완료
 
 - 현재 단계: M7 backend Task1(immutable text extractor, V4/V5 backfill·rollback·backup/restore, offline maintenance/readiness)과 Task2 통합 후 최종 backend 검증이 완료됐다. Task1은 이 역할이 작성했고, Task2 feed/search/QueryDSL/ACL/OpenAPI 소스는 `/root/m7_discovery_impl`, 추가 HTTP/RR 계약 테스트는 `/root/m7_discovery_contract_tests`가 작성했다. 이 역할이 Task2 저자였다고 기록하지 않는다.
 - 구현 사실: Task1의 canonical V1 extractor, `Post.contentText`/content service 연계, V4 nullable cache, V5 keyset 100·단일 DML transaction·전체 rollback·원래 `updated_at` 보존·ID-only 오류, strict full-input JSON parse, offline verify/rebuild guard와 startup NULL readiness가 유지된다. 독립 review에서 발견한 malformed token 비노출, 후반 invalid 전체 rollback, 실제 격리 V3 backup/history 복원, FK session, `DEFAULT_GENERATED` audit timestamp 복사, 정확 202 insert−1 gap=201(100+100+1) 보강 이력은 WORKLOG에 모두 append되어 있다.
 - 최종 backend 실측: `build/m7-evidence/backend-final-1.log`의 root 실행 `test bootJar`는 `BUILD SUCCESSFUL in 2m 16s`였다. `build/m7-evidence/backend-final-1/test-results/` XML 직접 집계는 `91 suites / 538 tests / failures 0 / errors 0 / skipped 0`; `build/m7-evidence/backend-final-1/summary.json`의 bootJar SHA-256은 `0cfc53e777449a430cf2f17114113850d9d94d04a4b172a230599e7e41e5d672`이다.
 - 실제 인수 실측: `build/m7-acceptance-20261109-232636/evidence.json`은 `259 PASS / 0 FAIL / 0 NOT_RUN`, `filesChecked=354`이며 source SHA `974f5174a5c6c181bbd228c5c29215450da0413a7ce9a9f8036daec9d0164e6c`와 JAR SHA `0cfc53e777449a430cf2f17114113850d9d94d04a4b172a230599e7e41e5d672`의 manifest/actual 값이 각각 일치한다. 제품 구현 commit은 Task1 `5d7ede2`, Task2 `059ceed`, FE `0b3008a`로 저자를 분리해 기록한다.
-- 진행 중: 독립 QA의 시각 최종 판정과 root의 M7 문서 종합·`dev` 통합은 아직 진행 중이다. backend 소스는 freeze 상태이며 이 closeout에서는 제품 소스·테스트·Gradle·Git을 변경하지 않았다.
-- 다음 작업: root가 독립 QA 최종 판정 및 Git 통합 결과를 기록한 뒤, finding이 생길 때만 해당 소유자가 재현·수정·재검증한다. 정상적으로는 이 역할의 M7 backend 구현·검증 작업은 종료한다.
-- 차단 요인: backend 자체 Critical/Important 독립 review finding은 없다. 전체 M7의 최종 완료·merge 판정은 QA 시각 검토와 root의 `dev` 통합에 의존하며, 이 역할이 임의로 완료·merge를 선언하지 않는다.
-- 갱신 시각: 2026-11-09 23:31 KST
+- 진행 중: 없음. 독립 QA 시각 검토를 포함한 M7 최종 판정은 PASS다. root가 PR #13을 `dev`에 merge했고 현재 로컬 branch도 `dev`다. merge SHA `08863207b8385177b619091410bbbd43e52a337c`의 tree `dc68037477c6fed6b77d537235d79093803a983e`가 tested head `2b984b6a2fc3aafd6d650c6ccb1cd8213a528545`와 동일하며 `git diff` exit 0이다.
+- 다음 작업: M7 backend 작업은 종료한다. M8은 별도 명시 배정·승인 전 착수하지 않으며, root가 docs-only 최종 commit과 다음 마일스톤 준비를 수행한다.
+- 차단 요인: M7 backend 및 전체 M7 merge gate에 남은 차단 요인은 없다. 이 갱신에서 제품 소스·테스트·Gradle·Git은 변경하지 않았다.
+- 갱신 시각: 2026-11-09 23:46 KST
 
 ## 2026-11-09 — M6 backend 구현·dev 통합 완료
 

@@ -487,3 +487,11 @@
 - 새 컨텍스트 `/root/m7_whole_branch_review`는 전체 제품 코드에 신규 Critical/Important 없음을 확인했다. QA harness의 결과 판정 허점과 실제 브라우저 흐름 누락을 원 QA 작성자가 보강 중이다. 실제 인수 1차는 fixture slug 형식 오류로 중단되어 실패 상태를 유지한다.
 - 검증된 제품 변경만 리더가 원자적으로 커밋했다: text/migration `5d7ede2`, API/contract tests `059ceed`, frontend `0b3008a`. 아직 push/PR/dev merge는 수행하지 않았다. 사용자 root 4파일·기존 DB·환경 파일은 보존했다.
 - 다음: QA 보강 완료→새 고유 actual run→독립 시각·결과 판정/whole-review 수정 재검토→역할·governance 기록→PR/dev 통합. M8은 배정하지 않는다.
+
+## 2026-11-09 23:47 KST — M7 독립 QA PASS·dev 통합 완료
+
+- 최종 실제 인수 run4는 HTTP·Chrome 259 PASS / 0 FAIL / 0 NOT_RUN이다. 원 작성자와 다른 전체 리뷰 및 시각 QA가 모든 필수 finding을 CLOSED/PASS로 판정했다. BE 538 tests, FE 405 tests 및 lint/build/bootJar 성공 증거는 M7 worklog와 qa/M7-review.md에 연결했다.
+- PR #13 https://github.com/0-virus/zero-verse/pull/13 을 dev로 merge했다. merge SHA `08863207b8385177b619091410bbbd43e52a337c`, tree `dc68037477c6fed6b77d537235d79093803a983e`다. fetch 후 tested head `2b984b6`와 diff 0, 로컬 dev fast-forward를 직접 확인했다.
+- backend/frontend/QA/PM 소유자에게 역할 기록과 PRD의 완료 동기화만 배정했다. root는 최종 기록 커밋과 M7 전용 runtime 종료를 담당한다. 사용자 미추적 4파일·기존 영속 데이터는 보존하고 M8 구현은 배정하지 않는다.
+
+- 23:48 KST runtime 정리: 실행 경로를 확인한 M7 Vite 5177/API 18087 프로세스를 TERM으로 종료했고 listener가 없음을 확인했다. 전용 `zeroverse-m7-mysql84`를 삭제 없이 stop한 뒤 전용 Colima VM 정지 exit 0을 확인했다. 합성 DB/검증 증거는 보존했으며 사용자 Docker Desktop·기존 DB/업로드는 조작하지 않았다.

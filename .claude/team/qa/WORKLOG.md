@@ -643,3 +643,157 @@
 - root 보고의 PR #12(`https://github.com/0-virus/zero-verse/pull/12`)를 기준으로 M6 구현 commit `55aedea966a45dc0e88a6b0d8926e709b366050e`가 `dev`에 merge된 것을 확인했다. merge SHA는 `4399f73acf19d66d96fafd2c4784c6a03fcfa282`이며, root가 확인한 통합 tree는 `7dd390ace316a1d548e4755dfc84c21f9e7bcdce`다.
 - QA 최종 판정(PASS / merge-ready Yes), backend 77 suites/490 tests 0/0/0, FE 34 files/369 tests·lint/build PASS, immutable runtime 52/52 PASS 및 1440px PostDetail 시각 PASS는 dev 통합 후에도 유지된다. M6 QA blocker는 없고 QA closeout을 완료했다.
 - QA는 제품 코드·타 역할 테스트·Git을 수정하지 않았으며, 이 closeout은 `.claude/team/qa/STATE.md`와 이 append-only WORKLOG만 갱신했다.
+
+## 2026-11-09 KST — M7 피드·검색 승인 전 독립 QA 준비
+
+### 범위와 정본 대조
+
+- 헌법·루트/QA 지침·QA `STATE.md`를 먼저 읽고, `docs/worklog/M7-feed-search.md`, `docs/governance/meetings/M7-20261109-feed-search.md`, `docs/REQUIREMENTS.md` FR-FEED-01~02/FR-SEARCH-01/NFR-04/09, `docs/PRD.md` §5.9/5.10·§7·§9-G/N/S·§10~12, `docs/design/DESIGN-SYSTEM.md` §8.1/8.8 및 Main Feed v2/Pages 원본을 직접 대조했다.
+- M7 회의는 현재 `REVIEWING`이고 A안은 사용자 승인 전 미확정이다. 따라서 이 항목은 계획·인수 준비만 수행하고 제품 구현, 제품/타 역할 테스트 수정, runtime 기동, M7 acceptance 실행 또는 PASS 판정을 하지 않았다.
+- `feature/M7-feed-search` HEAD `bc99cba`를 read-only 확인했다. `MainPage`/`SearchPage`/`TopBar`는 골격이며 M7 feed/search 서비스·검색용 `content_text` 구현은 아직 없다. `SecurityConfig`의 public matcher와 기존 security 테스트는 실제 API 구현의 증거로 세지 않았다.
+
+### 준비 산출물과 위험
+
+- `qa/M7-review.md`에 FR-FEED-01/02·FR-SEARCH-01별 ACL/visibility, DB filter-before-page, deterministic sort, count/facet, text cache/migration, error/no-store, stale account/keyword, 1440px browser 인수 매트릭스를 기록했다. 모든 항목은 `NOT RUN`이다.
+- M6 `qa/m6-acceptance.mjs`의 memory-only fixture·실제 HTTP·Playwright Chrome 패턴을 재사용 후보로 확인했지만 M7 전용 harness는 만들지 않았다. M6 PostDetail visual harness는 M7 근거로 직접 재사용하지 않는다.
+- 승인 blocker로 A안 미확정(PLAN-001), PRD §7.1의 `/universe/summary`와 A안 §6.5의 세 universe list endpoint count 공급원 불일치(PLAN-002), REQUIREMENTS/PRD의 HTML text와 A안 §6.4 canonical `content_text` 계약 동기화 필요(PLAN-003), matcher와 실제 API 경계(PLAN-004)를 분리 기록했다.
+- 실제 최종 검증은 격리 MySQL/API/FE와 1440px Chrome에서 수행해야 한다. Java 21, Node, `frontend/node_modules`, system Chrome와 기존 Playwright 모듈은 존재하지만 현재 Colima socket이 없어 runtime은 가동하지 않았다.
+
+### 검증·소유권
+
+- read-only 명령으로 branch/HEAD/status, `qa/**` 파일 목록, M7 endpoint/source marker, Java/Node/Chrome/Playwright/Colima 상태를 확인했다. 확인 결과 branch=`feature/M7-feed-search`, HEAD=`bc99cba`, Colima socket absent, Java 21/Node 26/Chrome/Playwright present다.
+- M7 backend/FE 테스트, migration, HTTP, MySQL query-bound/rollback/no-notification, Chrome screenshot, `node --check`는 실행하지 않았다. M7 evidence/credential/token artifact도 생성하지 않았다.
+- 수정 파일은 `qa/M7-review.md`, `.claude/team/qa/STATE.md`, 이 QA WORKLOG뿐이다. 제품 코드·타 역할 테스트·PRD·REQUIREMENTS·governance/worklog 원본·Git 및 사용자 미추적 파일은 수정하지 않았다.
+
+## 2026-11-09 KST — M7 A-v2 승인 후 acceptance harness 준비
+
+### 범위와 설계
+
+- 사용자의 `승인된 작업 시작해.` 지시와 A-v2 전체 승인, `REQUIREMENTS.md` §6.10-A 및 회의 §6을 다시 읽고 승인 전 `NOT RUN` 문서 경계를 `APPROVED / IMPLEMENTATION IN PROGRESS / ACCEPTANCE PREP`로 정합화했다. PRD route map `/universe/summary`는 기존 friends/following/followers page0-size1 total로 동기화될 대상이며, runtime 중지는 승인 blocker가 아닌 실제 인수 전 실행 선행조건으로 기록했다.
+- `qa/m7-acceptance.mjs`를 추가했다. runner는 owner/actor/friend/one-way/unrelated/blocked/suspended/deleted 합성 계정·블로그를 HTTP로 만들고, actor→owner/one-way/suspended/deleted, actor↔friend, actor→blocked 후 block 관계를 구성한다. owner PUBLIC/UNIVERSE/PRIVATE/draft, rich inline-mark/entity/literal wildcard, 21개 page fixture와 decoy 글을 생성한다.
+- 상태 변경 endpoint가 없는 SUSPENDED/deleted author는 기존 사용자 DB에 접근하지 않는다. runner가 ID만 포함한 `build/m7-acceptance/fixture-seed.json`을 쓴 뒤, root가 합성 M7 DB에서만 상태를 변경하고 `status-ready.json`을 만들면 `M7_WAIT_FOR_STATUS_FIXTURES=1`로 이어서 실행한다. 상태 fixture가 없으면 full runner는 NOT RUN failure로 멈춘다.
+
+### 검증 범위
+
+- 실제 HTTP: public/universe/search ACL·관계(`all/friends/following`)·deleted/suspended/blocked·PUBLIC/UNIVERSE/PRIVATE/draft, guest/malformed/expired/deleted-user 인증 표, 21+ page/tie/query params, wildcard literal, inline mark/`&`/`<tag>`/entity 오탐, ALL distinct/matchedTypes/counts snapshot, owner draft ACL, batch count DTO/no-store/envelope/OpenAPI, viewCount·notification side-effect 불변을 확인하도록 구성했다.
+- migration/maintenance gate는 source/test와 MySQL 증거를 조합한다. V4/V5 keyset100, empty doc/image-only, malformed/non-doc/unknown node, 100/101/201/ID gap/late-invalid, 전체 DML transaction rollback/Flyway history, repair/re-run/backup-restore, versioned `PostTextExtractorV1`, offline verify/rebuild와 old-writer 복귀 경계를 `qa/M7-review.md`에 명시했다.
+- 실제 Chrome 1440x1000: Main Feed 원본/제품 screenshot, 3 관계 탭의 canonical `friends`/`following`, guest protected-tab no-call/login prompt, TopBar→`/search`, 5 facet tabs/post-centric copy, URL/reload/back, owner private→actor clear, delayed stale account response, real API result 및 viewport를 확인하도록 구성했다.
+- source revision/runtime source manifest/immutable JAR SHA-256은 environment로 주입해 서로 다른 산출물이 섞이지 않았음을 확인한다. source revision과 JAR SHA-256은 서로 다른 값일 수 있어 runtime source manifest와 source revision을 비교한다.
+
+### 실행·보안 경계
+
+- 기본 대상은 API `http://localhost:18087`, FE `http://localhost:5177`, Playwright system Chrome이며, root가 immutable final JAR/FE/isolated MySQL를 고정한 뒤에만 실행한다. 현재는 runtime을 호출하지 않았다.
+- `M7_EXPIRED_TOKEN`은 exact `AUTH_002` 검증용으로만 memory/env에서 받아 evidence/stdout에 출력하지 않는다. register/signin token·password·email·content marker는 모두 memory-only다. seed/evidence에는 합성 ID·check·screenshot 파일명만 남긴다.
+- 사용자 `13307` DB, 기존 M5 data, `.env.local`, root untracked files에 접근·수정하지 않았다. 제품 코드·backend/frontend 테스트·root helper/Git은 수정하지 않았다.
+
+### 검증 결과와 미해결
+
+- `node --check qa/m7-acceptance.mjs` 성공. 실제 backend/frontend/API/DB/Chrome와 M7 full tests는 아직 실행하지 않았다.
+- 최종 실행 전 root가 status-ready 합성 fixture, expired token, API/FE runtime, source/runtime SHA를 전달해야 한다. 실행 신호 전 harness를 호출하지 않는다.
+
+## 2026-11-09 KST — M7 harness 실행 전 독립 증거 보강
+
+### 보강 내용
+
+- `/notifications` GET은 M8 미구현/범위 의존이라 side-effect gate에서 제거했다. `qa/m7-acceptance.mjs`는 root 소유 `build/m7-runtime.py sql`을 child process stdio로 호출해 합성 actor의 `notifications` COUNT와 ID/receiver/actor/type/target/timestamp/read/delete fingerprint를 전후 읽고 비교한다. SQL 결과·자격증명·원문은 출력/evidence에 남기지 않는다. helper 실패는 available=false로 기록되어 required full gate를 통과하지 못한다.
+- `status-ready.json`은 `ready: true`와 `suspendedUserId`, `deletedUserId`, `suspendedPostId`, `deletedPostId` 네 값이 현재 seed ID와 정확히 일치해야 한다. 빈 JSON/누락/불일치는 ready로 인정하지 않는다.
+- source/runtime 검증은 환경값 존재만으로 통과시키지 않는다. 기본 `build/m7-evidence/tested-version.json`(`M7_VERSION_MANIFEST` override 가능)의 `files[]`를 repository-relative로 다시 SHA-256하고 path\0hash\n aggregate를 계산해 `sourceSha256`과 비교한다. manifest `jarPath`의 immutable JAR도 harness가 직접 SHA-256해 `jarSha256`과 비교한다. path escape, 누락 파일, manifest/hash 불일치는 FAIL/NOT RUN이다.
+
+### 검증·경계
+
+- `node --check qa/m7-acceptance.mjs`, trailing whitespace 검사, `git diff --check -- qa .claude/team/qa`를 재실행한다.
+- API/FE/JAR가 아직 최종 준비되지 않았으므로 실제 API 호출, SQL helper 호출, Chrome, DB, M7 full tests는 실행하지 않았다. expired token은 root가 합성 runtime key로 발급해 `M7_EXPIRED_TOKEN` memory/env로 주입할 때만 `AUTH_002`를 확인한다.
+- 수정 파일은 `qa/m7-acceptance.mjs`, `qa/M7-review.md`, `.claude/team/qa/STATE.md`, 이 WORKLOG뿐이다. 제품 코드·root helper·타 역할 테스트·Git은 수정하지 않았다.
+
+## 2026-11-09 KST — M7 harness 오류 응답·snapshot 비교 보강
+
+### 한 일
+
+- `qa/m7-acceptance.mjs`의 `read-snapshot-no-mutation`을 `JSON.stringify(Set)` 비교에서 정렬된 ID 배열 기반 양방향 diff로 교체했다. `missing`과 `unexpected`를 모두 evidence detail에 남기며, 고정 synthetic Set을 이용한 QA self-check로 두 방향 검출을 먼저 확인한다.
+- malformed/missing/expired/deleted 인증, feed validation, search blank/missing validation의 각 오류 HTTP 응답에 `Cache-Control: private, no-store`와 공통 envelope 검사를 추가했다. 기존 성공 응답 검사는 유지한다.
+
+### 검증·경계
+
+- `node --check qa/m7-acceptance.mjs` 성공. QA harness·STATE·WORKLOG의 trailing whitespace 검사와 추적 QA 기록의 `git diff --check`도 성공했다.
+- API/DB/SQL helper/Chrome 및 M7 full acceptance는 runtime 준비 신호 전이므로 실행하지 않았다. 제품 코드·타 역할 테스트·root helper·정본·Git은 수정하지 않았다.
+
+## 2026-11-09 KST — M7 acceptance run1 실패 진단 및 fixture 보정
+
+### 관측·진단
+
+- root가 실행한 고유 output `build/m7-acceptance-20261109-230615`의 `evidence.json`과 `build/m7-evidence/acceptance-1.log`를 읽었다. OpenAPI, owner/actor/friend register/signin/initial-setup까지 PASS했지만 `oneWay-initial-setup`에서 중단되어 screenshot·status fixture·HTTP matrix·Chrome evidence는 생성되지 않았다.
+- `build/m7-evidence/api-runtime.log`에서 실제 `PUT /api/v1/blogs/me/initial-setup` 응답이 400 `BLOG_003`(주소 형식 오류)이며 request `urlSlug=m7-oneWay-...`의 camel-case가 원인임을 확인했다. 요구사항의 slug lowercase 계약을 완화하지 않고 QA fixture 생성식만 `.toLowerCase()`로 보정했다.
+
+### 검증·경계
+
+- `node --check qa/m7-acceptance.mjs`와 trailing-whitespace 검사를 보정 후 재실행해 성공했다.
+- run1은 실패로 유지한다. 제품 버그·PASS·시각 gate 완료로 기록하지 않으며, root가 새 고유 run2를 실행한 뒤 결과를 다시 독립 검토해야 한다. credentials/token은 로그/evidence에 기록하지 않았다.
+
+## 2026-11-09 KST — M7 browser acceptance false-positive 보정 및 상호작용 gate 확장
+
+### 한 일
+
+- Main Feed의 owner PUBLIC blog title은 actor의 following feed에서 정상 노출될 수 있으므로 `browser-main-no-private`를 blog title body 문자열 검사에서 owner PRIVATE/draft의 실제 `article > h2` 카드 검사로 좁혔다.
+- Search의 result/owner-private/account-switch/stale 검사를 query heading/input 문자열이 아닌 실제 `article > h2` PostCard로 바꾸고, `waitForSearchResponse`/`navigateSearchAndWait`로 API 응답 완료를 기다리도록 했다. 고정 250/500ms 대기 의존을 제거했다.
+- Chrome 1440px flow에 5개 facet 탭 실제 클릭과 URL/type/count 응답 대조, 21+ 검색 pagination page0/page1·disjoint·back 복원, 고유 keyword empty state·무카드, 일회성 intercepted HTTP 500·재시도 후 실제 API/card 복귀를 추가했다. guest feed도 public API 응답 완료 후 protected-tab no-call을 판정한다.
+
+### 검증·경계
+
+- `node --check qa/m7-acceptance.mjs`, QA 파일 trailing-whitespace 검사 및 추적 QA 기록 `git diff --check` 성공.
+- run1의 setup 실패는 그대로 FAIL이며 browser flow는 아직 실행되지 않았다. 제품 코드/테스트·root helper·Git은 수정하지 않았고, 새 고유 run2 결과와 screenshot을 받은 뒤 독립 판정한다.
+
+## 2026-11-09 KST — M7 run2 직전 렌더 안정성 보강
+
+- `waitForSearchReady`가 `검색 결과를 불러오는 중...` indicator가 숨겨질 때까지 조건 대기하도록 했고, facet 탭은 API snapshot count가 실제 `[role=tab]` label에 반영될 때까지 `page.waitForFunction`으로 기다리도록 했다. fixed sleep은 추가하지 않았다.
+- `node --check qa/m7-acceptance.mjs`, trailing-whitespace 검사, 추적 QA 기록 `git diff --check` 성공. run2 및 Chrome/screenshot evidence는 아직 실행 전이다.
+
+## 2026-11-09 KST — M7 acceptance run2 HTTP 통과·browser selector 중단
+
+### 관측·분류
+
+- `build/m7-acceptance-20261109-231741/evidence.json`과 `build/m7-evidence/acceptance-2.log`를 독립 집계했다. synthetic fixture/status-ready, public/universe/search ACL·pagination·facet/text/no-view/no-notification, suspended/deleted auth와 source manifest 354개 파일/JAR SHA 재계산까지 **203 PASS / 0 FAIL / 0 NOT RUN**이었다.
+- runner는 browser 시작 후 TopBar 검색과 Main Feed 피드 검색이 모두 `getByRole('searchbox', {name:'검색'})`에 매칭되어 strict-mode exception으로 중단됐다. 이는 제품 결함이 아닌 QA selector 결함이다. 원본 Main Feed와 제품 `main-actor.png` 및 source SHA는 생성됐지만 Search 제품 screenshot·후속 browser matrix는 생성되지 않았다.
+- `searchInput`은 `header` scope, reload input sync용 `searchInputValue`는 `main` scope의 exact role selector로 보정했다. run2는 runner failure가 있으므로 M7 PASS로 기록하지 않는다.
+
+### 검증·경계
+
+- selector 보정 후 `node --check qa/m7-acceptance.mjs`, trailing-whitespace 검사와 추적 QA 기록 `git diff --check` 성공.
+- 새 고유 run3에서 browser 전체 flow·5 facet/pagination/back/empty/retry/account stale/guest protected tab 및 Search screenshot을 재실행해야 한다.
+
+## 2026-11-09 KST — M7 run3 직전 Search input scope 정정
+
+- SearchPage source를 재확인해 keyword 결과 상태에는 main 검색 input이 없고, keyword 없는 상태의 label은 `검색어`이며 TopBar만 `aria-label="검색"`임을 확인했다. `searchInputValue`를 `header` scope로 정정했다.
+- `node --check qa/m7-acceptance.mjs`와 trailing-whitespace 검사를 통과했다. 제품 source는 수정하지 않았다.
+
+## 2026-11-09 KST — M7 run3 결과·Search page0 기대값 독립 보정
+
+### 관측·분류
+
+- run3 output `build/m7-acceptance-20261109-232138`은 **256 PASS / 3 FAIL / 0 NOT RUN**으로 종료됐다. 실패는 `browser-search-result`, `browser-search-retry-success`, `browser-account-switch-actor-result`이며, screenshot에서 기본 size20 page0가 최신 `owner.page[20]`부터 시작하고 오래된 `owner.multi`는 page1인 것이 확인됐다. HTTP/API/제품 search 결과 결함이 아니라 harness가 고정 fixture title을 기대한 오류다.
+- run3는 browser screenshot 4개를 생성했지만 runner failures가 있어 최종 PASS가 아니다. 실제 Search response page0은 30 total·20 items·2 pages로 보였고 facet/pagination/back/empty/retry-error/stale/guest checks는 통과했다.
+
+### 보정·검증
+
+- 초기/재시도/계정전환 Search response의 실제 `data.items[0]`을 읽어 ID/title/publishedAt/author/blogSlug 기반 canonical `/blog/{slug}/{id}` 또는 own draft `/edit/{id}`를 계산하고, 렌더 `article > h2` 및 anchor href와 대조하도록 변경했다. 고정 page 정렬 가정과 임의 heading/any-text 검사를 사용하지 않는다.
+- `node --check qa/m7-acceptance.mjs` 및 trailing-whitespace 검사 성공. 새 고유 run4에서 재실행 전이며 제품 source는 수정하지 않았다.
+
+## 2026-11-09 KST — M7 run4 최종 독립 QA·시각 판정 및 dev 통합 전 closeout
+
+### 최종 증거 재검증
+
+- root가 실행한 고유 output `build/m7-acceptance-20261109-232636`의 `evidence.json`과 `build/m7-evidence/acceptance-4.log`를 QA가 다시 집계했다. **259 PASS / 0 FAIL / 0 NOT_RUN / `failures=[]`**, `statusFixtureReady=true`이며, run1~3 실패 후 보정한 동일 QA harness의 전체 HTTP·DB·Chrome 경로가 종료됐다.
+- run4는 8개 합성 계정과 합성 MySQL만 사용했다. public/universe/search ACL·정확한 `AUTH_004`/`AUTH_002`/`USER_001`, no-store/envelope, relation/facet/count/paging, wildcard·본문 extractor 경계, view/notification side-effect 불변, RR snapshot, 5 facet 탭·pagination/back·empty·500 retry·owner/actor 전환·stale·guest protected no-call을 실제 API/브라우저로 확인했다. credentials/token은 출력·artifact에 남기지 않았다.
+- `build/m7-evidence/tested-version.json`의 354 source file hash를 각 파일에서 독립 재계산하고 path\0hash\n aggregate를 비교해 source `974f5174a5c6c181bbd228c5c29215450da0413a7ce9a9f8036daec9d0164e6c` 일치를 확인했다. `build/m7-api-data/runtime.jar`의 SHA-256 `0cfc53e777449a430cf2f17114113850d9d94d04a4b172a230599e7e41e5d672`도 manifest/JAR와 일치했다.
+- 보존 XML에서 backend 91 suites/538 tests, failures/errors/skips 0/0/0을 확인했고, Feed/Discovery query-bound·Search query/snapshot·M7 HTTP/ACL/snapshot·PostTextExtractor/Cache·PostSearchTextMigration 5·Maintenance 4가 모두 통과했다. `migration-snapshot-fix2/summary.json` 11 tests도 0/0/0이다. FE log는 41 files/405 tests, lint/build exit0다.
+
+### 독립 시각 판정
+
+- `design-main-feed.png`(1440×1445), `design-search.png`(1440×1007), `main-actor.png`(1440×4114), `search-actor.png`(1440×3755)를 직접 열어 원본 Main Feed/Pages Search와 제품을 비교했다. 1440px 폭, cream/ink/purple 토큰, hero·탭·단일 컬럼 카드·배지/meta/title/snippet·border/shadow·pagination은 M7 범위에서 **PASS**다.
+- Pages 원본의 `SCREENS` 디자인 보드 chrome은 제품 shell 요구사항이 아니므로 차이로 세지 않았다. hero 하단 pixel staircase는 M4/M5 기존 baseline, Main 검색 입력은 승인된 M7 추가 범위로 분리했다. 신규 시각 blocker는 없다.
+
+### 최종 판정·소유권
+
+- run1 slug, run2 searchbox selector, run3 page0 고정 item 기대는 모두 QA-only finding으로 CLOSED했으며 제품 Critical/Important/Minor finding은 없다.
+- `qa/M7-review.md`를 최종 FR/NFR·FE/브라우저 매트릭스와 evidence 경로로 갱신하고, QA STATE를 **M7 QA PASS / merge-ready Yes (dev 통합 전)**으로 갱신했다. `dev` 통합·PR·root closeout은 QA 소유가 아니며 후속 gate로 남겼다.
+- A-v2 owner draft `/edit/:id`는 FE `searchBehavior.test.tsx` 행동 테스트·`SearchPage.tsx` source·run4 owner HTTP ACL·harness href 계산으로 확인했다. run4 Chrome에서 owner draft 카드를 직접 클릭하는 별도 check는 실행하지 않았음을 문서에 명시했으며, browser-only 운영 정책이 있으면 후속 micro-check 대상이다. 이는 제품 finding이 아니다.
+- QA는 `qa/**`, `.claude/team/qa/**`만 수정했으며 제품 코드·타 역할 테스트·정본·Git은 수정하지 않았다.

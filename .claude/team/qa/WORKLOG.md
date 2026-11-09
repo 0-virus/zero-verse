@@ -486,3 +486,154 @@
 - root 확인 origin/dev tree `ae40db51c5de9f9d262347802962579775ee7c77`가 QA가 최종 검증한 커밋 트리와 동일하다. QA는 read-only로 HEAD/base 및 clean tree를 확인했으며 추가 테스트를 반복하지 않았다.
 - M5 독립 QA 최종 판정(PASS / merge-ready YES)과 BE-001/BE-002/QA-001/QA-002/DOC-001/V-001/V-002 CLOSED 상태는 dev 통합 후에도 유지된다.
 - QA 소유 STATE만 closeout/dev 통합 상태로 갱신했다. `qa/M5-review.md`는 최종 PASS 기록을 유지하며, 제품/테스트/Git은 변경하지 않았다.
+
+## 2026-11-09 KST — M6 QA 사전 검토·계획 대기
+
+### 한 일
+
+- `.claude/CONSTITUTION.md` → `AGENTS.md` → `.claude/team/qa/CLAUDE.md` → `STATE.md` → `qa/AGENTS.md` 순서로 읽고 `$brief` 절차에 따라 branch/status/log와 QA 이력을 확인했다.
+- `docs/worklog/M6-comments-likes.md`, `docs/governance/meetings/M6-20261109-comments-likes.md` 최신 A안, REQUIREMENTS FR-COM-01~04/FR-LIKE-01~02/NFR-04/09, PRD §5.7/5.8/§7.2/§9.2-P/§9.3-③/§10~12, 디자인 원본과 기존 backend/frontend source를 읽기 전용 대조했다.
+- 독립 3인 보완 A-v2가 `AWAITING_USER_APPROVAL`·HIGH로 사용자 승인 질문에 올라갔고 worklog에 제품 구현 미착수라고 기록된 것을 확인했다. source에서도 V1 `comments`/`post_likes`만 있고 제품 comment/like domain·API·PostDetail UI는 아직 없음을 확인했다.
+
+### 산출물
+
+- `qa/M6-review.md`에 승인 전 판정 경계, 현재 source baseline, `M6-CONTRACT-01~06` 정합성 쟁점, FR별 인수 매트릭스와 실제 HTTP/Chrome 1440px·MySQL 경쟁·query bound·transaction rollback·account stale 시나리오를 작성했다. 삭제 root reply GET/create, count 제외, 양방향 block/unlike, guest ACL, scalar lock 및 PostDetail 시각 범위를 A-v2 후보로 반영했다.
+- 모든 매트릭스 항목은 `NOT RUN — 승인 대기`로 기록했다. PASS, 제품 테스트 실행, runtime 기동, 브라우저 캡처, DB mutation은 수행하지 않았다.
+
+### 확인된 미해결
+
+- A-v2 §6.4의 M6 notification row 불생성과 REQUIREMENTS FR-NOT-05/PRD §5.11·§11/12의 댓글·좋아요 알림 생성 요구가 충돌한다.
+- A-v2 신규 interactions endpoint, 삭제 root reply GET/create, count 제외, 댓글 길이/DTO/placeholder, 양방향 block/unlike, blog/user/post lock 순서는 기존 정본에 완전히 확정되지 않았다. 사용자 승인 또는 정본/ADR 반영 전 QA 기준으로 고정하지 않는다.
+
+### 검증·경계
+
+- 실행한 read-only 명령: `git branch --show-current`(`feature/M6-comments-likes`), `git status --short`(root의 JOURNAL/M6 정본 변경만 확인), `git log --oneline -10`, source/doc `cat`·`sed`·`rg`·`find` 대조.
+- backend/frontend 제품 테스트·lint/build·실제 HTTP/MySQL/Chrome은 실행하지 않았다. QA는 제품 코드·타 역할 테스트·PRD·governance·M6 worklog·Git을 수정하지 않았고, `qa/M6-review.md`와 QA STATE/WORKLOG만 편집했다.
+
+## 2026-11-09 KST — M6 A-v2 승인·QA harness 준비
+
+### 한 일
+
+- root가 전달한 사용자 `A-v2 전체 승인`과 `docs/governance/meetings/M6-20261109-comments-likes.md` `APPROVED` 상태를 확인했다. `docs/REQUIREMENTS.md` FR-LIKE-03·M6 확정 세부 계약 및 `docs/PRD.md` PostDetail/M6 범위 동기화를 다시 읽었다.
+- 승인된 기준으로 QA 문서의 상태·매트릭스를 `NOT RUN — 구현 대기`로 정합화했다. M6는 notification row를 생성하지 않고 FR-NOT-05는 M8 범위라는 계약, 양방향 block like 거부·PUBLIC 기존 like unlike·ACL 상실 row 보존/취소 거부, 삭제 root reply GET/create 분리, 살아 있는 root+reply count, PostDetail 시각 범위를 반영했다.
+- 실제 API/Chrome 1440px 검증 harness `qa/m6-visual-qa.mjs`를 준비했다. synthetic fixture runner가 제공하는 계정·slug·post ID를 환경으로 받아 실제 FE/API를 확인하며, 비밀값을 로그·artifact에 기록하지 않고 결과는 ignored `build/m6-visual-qa/`에 둔다.
+
+### 현재 경계
+
+- source 구현·backend/frontend 테스트·runtime 기동·실제 HTTP/MySQL 경쟁·Chrome 캡처는 아직 실행하지 않았다. 제품 구현 완료와 root의 fixture/runtime 제공 후에만 harness를 실행한다.
+- QA 판정은 보류다. 이 기록은 승인된 계약의 독립 검증 준비이며 PASS/merge-ready 주장이 아니다.
+
+### 검증·소유권
+
+- 승인 회의·REQUIREMENTS·PRD·기존 source를 read-only로 재대조하고 QA 문서/상태를 다시 읽었다. `git diff --check`는 QA 소유 변경에 대해 종료 시 확인한다.
+- QA가 수정한 것은 `qa/**`, `.claude/team/qa/**`뿐이다. 제품 코드·src/frontend 테스트·governance/worklog 원본·Git은 수정하지 않았다.
+
+## 2026-11-09 KST — M6 QA harness 정합성 보정
+
+### 한 일
+
+- 현재 source를 다시 확인해 baseline을 보정했다. backend 댓글/좋아요 domain·service·controller는 아직 없고, frontend `features/comment/**`·`features/like/**`의 API/types·M6 단위 테스트 초안은 존재하지만 `PostDetailPage` 실연결은 아직 없다. 이 부분 구현을 M6 최종 PASS로 해석하지 않는다.
+- `qa/m6-visual-qa.mjs`에 실제 API envelope/status/cache-control/invalid Bearer와 guest/authenticated/second-account PostDetail, Pages 원본 `게시글 상세`, 새로고침, no-mutation passive capture, 선택적 delayed-route/account-switch stale probe를 추가했다. 이메일·비밀번호·access token은 evidence/stdout에 기록하지 않는다.
+
+### 검증·경계
+
+- `node --check qa/m6-visual-qa.mjs` 및 `git diff --check -- qa .claude/team/qa`가 성공했다.
+- M6 backend/frontend 제품 테스트, lint/build, 실제 HTTP/MySQL 경쟁·rollback/query bound, Chrome 캡처는 **실행하지 않았다**. runtime fixture와 구현 closure가 제공된 뒤 root가 지정한 독립 QA 단계에서 실행한다.
+- QA는 `qa/**`, `.claude/team/qa/**`만 수정했으며 제품 코드·타 역할 테스트·정본·Git은 수정하지 않았다.
+
+## 2026-11-09 KST — M6 FE round1 재검토 및 immutable runtime acceptance
+
+### FE 재검토
+
+- FE 담당 round1 수정 후 `PostDetailPage.tsx`, `CommentSection.tsx`, `CommentRow.tsx`, comment/like API와 `m6PostDetailBehavior.test.tsx`를 다시 읽었다. FE-001은 mutation API 실패와 canonical GET 실패를 분리해 accepted DTO/placeholder를 유지하고 재시도 상태만 표시한다. FE-002는 post/account effect에서 `isLikeBusy`를 초기화하고 계정 전환 후 새 like 동작을 테스트한다. FE-003은 `rootPageGenerationRef`를 reply guard에 포함하고 root page 왕복 stale 응답 테스트를 추가했다. FE-004는 deleted root/reply action, capability flags, guest CTA, server `canDelete` 경계를 테스트한다.
+- FE-001~004를 **source/unit 기준 CLOSED**로 `qa/M6-review.md`와 STATE에 갱신했다. 이는 backend DTO와 실제 browser/API 통합 PASS가 아니다. root 제공 FE `34 files / 357 tests`, lint/build PASS는 교차 참고로만 사용했다.
+
+### acceptance 실행 경계
+
+- 첫 실행은 API listen 상태에서 원본 JAR 재빌드 산출물 교체로 lazy class loading 오류가 난 runtime 경합 때문에 `POST /api/v1/auth/register`가 timeout됐다. root 로그로 제품 결함이 아닌 환경 원인을 확인했고, 해당 실행은 fixture/browser 단계에 진입하지 않았다.
+- immutable JAR 기동 후 `M6_PLAYWRIGHT_MODULE=.../playwright`, system Chrome, `M6_HEADLESS=1`, `M6_REQUIRE_FULL=1`로 `qa/m6-acceptance.mjs`를 재실행했다. synthetic owner/actor register·signin·initial setup, PUBLIC post 2개, root/reply 21+ seed, guest/invalid Bearer/no-store, 실제 Chrome 1440px root/reply create·edit·soft-delete·like/unlike·refresh·rollback까지 **46 PASS / 0 FAIL**, screenshot 3개를 얻었다. credentials/token은 출력·artifact에 기록하지 않았다.
+- 두 번째 실행 중 발견한 harness strict locator(`댓글 {rootId} 답글`가 pagination label과 substring 충돌)는 QA 소유 `qa/m6-acceptance.mjs`에서 `exact: true`로만 보정했으며 제품 파일은 수정하지 않았다. 보정 후 acceptance가 완료됐다.
+
+### 검증
+
+- `build/m6-acceptance/evidence.json`에 fixture ID·check·screenshot만 기록됐고 비밀값은 없다. `node --check qa/m6-acceptance.mjs`, `node --check qa/m6-visual-qa.mjs`, `git diff --check -- qa .claude/team/qa`를 재확인한다.
+- 이 결과는 FE/API·browser 중간 acceptance 증거다. MySQL 경쟁/query bound/rollback/no-notification/ACL 전체 gate와 backend 최종 full test는 별도 증거와 대조해야 한다.
+- M6-BE-03 query-string 공개 matcher는 `.param` 추정이 아니라 실제 immutable runtime URL `comments?page=0&size=20`, `parentId` reply page, guest interactions와 malformed Bearer 401/no-store를 evidence에서 확인해 **CLOSED (실제 HTTP 경계)**로 갱신했다. 나머지 backend 경쟁/ACL/query bound/no-notification gate는 대기한다.
+
+## 2026-11-09 KST — M6 whole review 추가 FE Important findings
+
+- whole review에서 FE round1 closure 이후 현재 source를 다시 대조했다. `FE-005`는 `CommentSection.tsx:209-235`에서 root page generation 변경으로 stale reply 응답의 `finally`가 loading 해제를 건너뛰어 root page 왕복 후 `replyLoading[rootId]`가 true로 고착될 수 있는 문제다. 기존 stale payload 비주입 테스트만으로 spinner/pagination 회복을 증명하지 못한다.
+- `FE-006`은 `PostDetailPage.tsx:141-155`의 canonical interactions GET 실패와 `CommentSection.tsx:181-203`의 canonical comments GET 실패가 `401/AUTH_004`, `403/POST_002`, `404/POST_001` 권한·리소스 거부에서 이전 interaction/comments 상태를 유지하는 문제다. 회의 §6.3의 권한 상실 시 개인화 상태 폐기·flags/count 비노출 계약과 어긋날 수 있다. network/5xx accepted-state 보존과 거부 응답 clear를 분리해야 한다.
+- `FE-005`·`FE-006`을 **OPEN / Important**로 `qa/M6-review.md`와 STATE에 기록하고 frontend round2 수정·독립 재리뷰를 요청했다. 기존 FE-001~004 CLOSED와 M6-BE-03 CLOSED는 유지한다.
+- 이전 immutable runtime `46 PASS / 0 FAIL` 및 screenshot 3개는 round2 finding 발견 전 중간 증거이며 M6 final PASS가 아니다. backend 보강·helper·whole review가 끝난 뒤 수정 소스 기준 acceptance를 재실행한다.
+- 제품 코드·타 역할 테스트·PRD·REQUIREMENTS·governance·Git은 수정하지 않았다.
+
+## 2026-11-09 KST — M6 진행 중 source 재확인
+
+- 동시 구현 변경을 다시 읽어 현재 상태를 보정했다. backend에는 `Comment`·`Like` entity와 `PostInteractionLockService` 초안이 추가됐고, frontend에는 comment/like feature 및 `PostDetailPage` 연결 초안이 추가됐다. 그러나 repository·service·controller/OpenAPI와 최종 runtime/test closure는 아직 QA 인수 전 단계다.
+- 따라서 QA STATE/`M6-review.md`의 표현을 “미착수”에서 “부분 구현 진행·인수 대기”로 정정했다. 실제 HTTP/MySQL/Chrome 및 제품 테스트는 계속 **미실행**으로 유지한다.
+
+## 2026-11-09 KST — M6 synthetic mutation acceptance harness 준비
+
+### 한 일
+
+- root 요청에 따라 `qa/m6-acceptance.mjs`를 추가했다. runner는 random synthetic owner/actor를 register→signin→initial-setup하고 PUBLIC 글 2개를 만든 뒤 API로 root 댓글 21개와 한 root의 답글 21개를 seed한다. 기존 데이터 조회·삭제·청소는 하지 않는다.
+- Playwright Chrome 1440px에서 실제 계정 로그인과 PostDetail을 열고, root 댓글 작성·답글 작성·root/reply page 2 이동·댓글 수정·soft-delete·좋아요·취소·새로고침을 사용자 label 기반으로 수행한다. 실패 like 응답을 주입해 optimistic rollback도 확인한다. 설계 원본 PostDetail 캡처와 PUBLIC guest/invalid Bearer/no-store HTTP 경계도 함께 기록한다.
+- evidence에는 synthetic 대상 user/blog/post/comment ID와 PASS/FAIL/check 이름만 남기며, random email/password/access token/본문 marker는 stdout·artifact에 저장하지 않는다.
+
+### 검증·경계
+
+- `node --check qa/m6-acceptance.mjs` 및 `git diff --check -- qa .claude/team/qa`가 성공했다.
+- 이 runner와 기존 `qa/m6-visual-qa.mjs`는 아직 실행하지 않았다. backend API/service/controller/OpenAPI 구현 closure와 runtime 준비 후 실제 HTTP/MySQL/Chrome 인수에서 실행한다. notification row 불변·suspended/deleted/block ACL 및 경쟁/query bound는 backend 독립 증거와 조합한다.
+
+## 2026-11-09 KST — M6 FE 독립 source review
+
+### 검토 범위
+
+- `dev c46a26d` 대비 `frontend/src/pages/PostDetailPage.tsx`, untracked `features/comment/**`, `features/like/**`, `CommentSection/CommentRow`, M6 FE tests를 읽었다. 승인 회의 §6 A-v2, REQUIREMENTS FR-COM-01~04/FR-LIKE-01~03, PRD §9.9/§7.2/§11~§12, 디자인 원본과 대조했다.
+- root의 FE `34 files / 353 tests / lint / build PASS`는 참고 증거로만 사용했고 FE 회귀를 중복 실행하지 않았다. 제품/테스트 파일은 수정하지 않았다.
+
+### Findings
+
+- `FE-001` Important OPEN: `CommentSection.tsx:228-242` canonical follow-up GET 실패가 create/edit/delete `catch(:324-328,362-367,394-399)`의 before-state rollback으로 이어져, 이미 서버에 커밋된 mutation을 UI에서 실패처럼 되돌린다. create 재시도 중복·edit/delete stale가 가능하다. 테스트 `m6PostDetailBehavior.test.tsx:291-305`도 이 잘못된 동작을 검증한다.
+- `FE-002` Important OPEN: `PostDetailPage.tsx:75-112,183-193,281-289`에서 세대 전환 시 `isLikeBusy` reset이 없고 stale mutation finally가 skip되어 post/account 전환 뒤 좋아요 버튼이 영구 disabled될 수 있다. 기존 늦은 응답 테스트는 enabled 복귀를 확인하지 않는다.
+- `FE-003` Important OPEN: `CommentSection.tsx:201-226` reply guard가 component generation과 root ID별 request id만 보며 root page 전환을 무효화하지 않아, page 0→1→0 중 오래된 reply 응답이 현재 root card에 재주입될 수 있다. 순차 page 테스트만 있고 지연 race 테스트는 없다.
+- `FE-004` Minor OPEN: server `canReply/canEdit/canDelete`와 삭제/탈퇴 placeholder 렌더 방향은 맞지만 deleted root/reply action 비노출·비작성자 action guard·owner delete 경계의 FE 테스트 증거가 부족하다.
+
+### 판정·경계
+
+- FE-001~003은 독립 source review 기준 Important OPEN이며, 수정 루프와 재검토 전 FE PASS 또는 M6 final acceptance를 주장하지 않는다. FE-004는 Minor test gap이다.
+- 실제 API/브라우저/rollback은 backend runtime 준비 후 별도 실행한다. QA는 `qa/**`, `.claude/team/qa/**`만 수정했다.
+- QA는 `qa/**`, `.claude/team/qa/**`만 수정했으며 제품 코드·타 역할 테스트·정본·Git은 수정하지 않았다.
+
+## 2026-11-09 KST — M6 읽기 권한 상실 독립 acceptance 시나리오 보강
+
+### 한 일
+
+- `qa/m6-acceptance.mjs`의 기존 actor browser flow 끝에 QA 전용 synthetic access-loss 시나리오를 추가했다. owner token은 메모리에만 보관하고, REQUIREMENTS FR-POST-02의 전체 `UpdatePostRequest` 필드로 같은 합성 PUBLIC 글을 `PRIVATE`로 전환한다.
+- actor의 열린 PostDetail에서 stale like를 다시 눌러 `POST /likes`의 `LIKE_001`을 받고, FE가 호출하는 canonical interactions GET의 `POST_002`를 실제 브라우저 응답으로 확인하도록 구성했다. 이후 좋아요 action/count, 댓글 heading/composer, 댓글 action button이 제거되는지 확인한다.
+- 기존 46-check 경로와 1440px screenshot 흐름은 보존했고, 이 시나리오는 최종 FE round3·immutable backend runtime 고정 뒤 실행한다. 기존 `build/m6-acceptance/evidence.json` 46/46에는 아직 반영되지 않았다.
+
+### 검증·경계
+
+- `node --check qa/m6-acceptance.mjs` 및 `git diff --check -- qa/m6-acceptance.mjs` 성공.
+- 제품 코드·타 역할 테스트·정본·Git은 수정하지 않았다. 실제 access-loss HTTP/Chrome 결과와 M6 최종 PASS는 아직 주장하지 않는다.
+
+## 2026-11-09 KST — M6 최종 독립 QA closure
+
+### 최종 backend 대조
+
+- root가 보존한 immutable final XML `build/m6-evidence/backend-final/` 77 suites를 직접 파싱해 **490 tests / failures 0 / errors 0 / skipped 0**을 확인했다. `CommentBehaviorTest`, `CommentBatchTest`, `CommentControllerTest`, `LikeControllerTest`, `LikeConcurrencyTest`, `M6InteractionConcurrencyMySqlTest`, `M6InteractionCrossRaceMySqlTest`, `OpenApiConfigTest`의 소스·테스트 이름·XML 결과를 승인 A-v2와 대조했다.
+- 100-root reply bounded/query statement bound, no-notification, deleted root/reply, BLOCKED/UNIVERSE/PRIVATE ACL, SUSPENDED actor/viewer, lock 경쟁·stale snapshot·rollback과 OpenAPI 경계가 최종 XML 및 source에 반영됐다. M6-BE-01~07은 CLOSED로 기록한다.
+
+### FE 및 실제 HTTP/Chrome closure
+
+- FE whole-review의 WR-01/02/03이 ADDRESSED·새 Critical/Important 없음으로 재검토됐고, root fresh `34 files / 369 tests`, lint/build exit0를 인계받아 `qa/M6-review.md`의 FE-001~006을 모두 CLOSED로 갱신했다. FE-005는 `loadRootPage` 세대 시작 시 reply map/request를 초기화하는 round2 source invariant와 WR-01 증거를 연결했고, FE-006은 권한 거부 시 interaction/comments clear와 세대 guard를 WR-02/03에 연결했다.
+- 최종 immutable runtime(JAR SHA-256 `f0cbf9c2fd027510b03a00ce752f2f39040f5870bafaef360895343856d056ab`)에서 `M6_REQUIRE_FULL=1 M6_HEADLESS=1`로 `qa/m6-acceptance.mjs`를 실행했다. **52 PASS / 0 FAIL**, fixture ID만 evidence에 남았다. 기존 46개에 owner PUBLIC→PRIVATE 전환, actor stale like `LIKE_001`, canonical `POST_002`, like count/comments/comment actions clear 6개를 추가로 확인했다.
+- 실제 HTTP guest comments/interactions, query string, malformed Bearer AUTH_004, private/no-store, authenticated parentId reply page와 Chrome 1440px owner/actor root·reply page2, create/edit/delete, like/unlike, refresh, optimistic rollback을 확인했다. `design-post-detail.png`, `owner-initial.png`, `actor-final.png`를 직접 열어 Pages 원본과 PostDetail 레이아웃/카드/댓글/reply 시각을 대조해 M6 시각 범위 PASS로 판정했다.
+
+### 최종 판정 및 경계
+
+- FR-COM-01~04/FR-LIKE-01~03, 자동검증, 경쟁/query-bound/rollback/no-notification, FE stale·권한, PostDetail 시각 gate를 **PASS / merge-ready: Yes**로 판정했다. QA blocker는 없다.
+- BlogPage/PostCard count 변경과 M8 notification 생성은 승인 범위상 이번 M6 PASS에서 제외한다. Git 통합·마일스톤 closeout은 root 소유 후속이다.
+- QA는 `qa/**`, `.claude/team/qa/**`만 수정했고 제품 코드·타 역할 테스트·정본·Git은 수정하지 않았다.

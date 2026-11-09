@@ -15,9 +15,20 @@ import org.springframework.data.repository.query.Param;
  */
 public interface UserRepository extends JpaRepository<User, Long> {
 
+    interface Target {
+        Long getUserId();
+
+        java.time.LocalDateTime getDeletedAt();
+    }
+
     Optional<User> findByEmailAndDeletedAtIsNull(String email);
 
     Optional<User> findByIdAndDeletedAtIsNull(Long id);
+
+    /** Lock 전 관련 사용자 생존 여부만 확인하는 scalar projection. */
+    @Query(value = "select id as userId, deleted_at as deletedAt from users where id = :id",
+            nativeQuery = true)
+    Optional<Target> findTargetById(@Param("id") Long id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from User u where u.id = :id and u.deletedAt is null")

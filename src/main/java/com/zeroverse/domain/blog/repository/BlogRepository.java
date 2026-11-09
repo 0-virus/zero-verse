@@ -17,6 +17,12 @@ import org.springframework.data.repository.query.Param;
  */
 public interface BlogRepository extends JpaRepository<Blog, Long> {
 
+    interface LockTarget {
+        Long getBlogId();
+
+        Long getOwnerId();
+    }
+
     boolean existsByUrlSlug(String urlSlug);
 
     Optional<Blog> findByIdAndDeletedAtIsNull(Long id);
@@ -29,6 +35,19 @@ public interface BlogRepository extends JpaRepository<Blog, Long> {
     @Query("SELECT b FROM Blog b JOIN FETCH b.user "
             + "WHERE b.id = :blogId AND b.deletedAt IS NULL AND b.user.deletedAt IS NULL")
     Optional<Blog> findByIdAndDeletedAtIsNullForUpdate(@Param("blogId") Long blogId);
+
+    /**
+     * M6 interaction lock target. The native query intentionally selects only the blog table so
+     * the owner row is not implicitly locked before the caller applies the global user-id order.
+     */
+    @Query(value = """
+            select b.id as blogId, b.user_id as ownerId
+            from blogs b
+            where b.id = :blogId
+              and b.deleted_at is null
+            for update
+            """, nativeQuery = true)
+    Optional<LockTarget> findLockTargetByIdForUpdate(@Param("blogId") Long blogId);
 
     /** 사용자의 기본 블로그. 현재는 사용자당 1개이며 가장 먼저 만들어진 것을 기본으로 본다. */
     Optional<Blog> findFirstByUserIdAndDeletedAtIsNullOrderByIdAsc(Long userId);

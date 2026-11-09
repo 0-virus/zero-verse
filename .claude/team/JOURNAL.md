@@ -418,3 +418,29 @@
 - 구현 `060bbcf15d54025a8e098627be279143e4e3094a`를 push하고 PR #11을 `dev`에 merge했다. 실제 merge SHA는 `30a863000a918075e9e1530ec6627e2f9167989a`이며 GitHub merged=true를 확인했다. 독립 QA가 커밋된 44개 파일도 검증본과 동일하고 merge-ready YES라고 재확인했다.
 - 리더가 검증 HEAD와 origin/dev tree `ae40db51c5de9f9d262347802962579775ee7c77` 동일, diff exit 0을 확인한 뒤 local dev를 fast-forward했다. BE457/FE338·브라우저14screenshots/43checks/failures[]·전체 독립 인수 PASS의 제품 버전이 그대로 통합됐다.
 - M5 목표 완료, 제품 작업 종료. 역할 소유자가 실제 머지 상태를 각각 갱신하고 리더가 문서 closeout 커밋을 남긴다. 검증용 FE/API/MySQL/Colima는 정상 종료하며 합성 데이터와 사용자 원본은 보존했다. M6 이후 및 S3/U0는 별도 착수 범위다.
+
+## 2026-11-09 — M6 착수·계약 조사
+
+- 실행 `진행`. 사용자 `m6 구현 완료를 목표로 시작해줘`에 따라 M6만 착수한다. dev/c46a26d clean과 M5 독립 인수·PR #11 통합 기록을 대조했다. 리더가 feature/M6-comments-likes를 생성했다.
+- backend/frontend 기존 역할 에이전트에 read-only 코드·디자인 조사를 배정했다. 리더가 docs/worklog/M6-comments-likes.md 단일 작성자와 governance/Git을 소유한다.
+- 현재 선행조건은 M6 API·권한·페이징·경쟁 처리의 구체화 및 필수 독립 3인 심의다. 제품 구현은 새 계약 승인 이후 배정한다. M7 이후 자동 확대는 없다.
+
+## 2026-11-09 — M6 A-v2 심의 완료·사용자 승인 대기
+
+- 실행 `대기`(계약), QA 인수 준비는 `진행`. 독립 Product/Architecture/Delivery 모두 APPROVE_WITH_CHANGES·HIGH를 반환했다. 소스 확인으로 FR-UNI-09 좋아요 차단 누락과 joined lock 순서 위험을 보완했다.
+- 사용자 승인 패키지는 docs/governance/meetings/M6-20261109-comments-likes.md §6 A-v2 및 docs/worklog/M6-comments-likes.md Task1~6이다. 2000자·bounded root/reply·삭제 placeholder/count·상태 GET·양방향 차단·ACL 상실 시 unlike 거부/row 보존·scalar blog와 M4 get 잠금 정렬을 명시하고 비동기 승인 질문을 제출했다.
+- backend/frontend는 조사와 자기 기록만 갱신했다. QA는 qa/M6-review.md 인수 매트릭스를 준비 중이다. 제품 구현·테스트·정본 개정은 아직 하지 않았다. 승인 도착 시 PM/리더 정본 동기화 후 backend Task1→2 및 frontend Task3→4를 배정한다.
+
+## 2026-11-09 — M6 A-v2 승인·구현 배정
+
+- 실행 `진행`. 사용자 비동기 질문 응답 `A-v2 전체 승인`을 확인해 회의·결정 레지스터를 APPROVED로 변경하고 REQUIREMENTS §6.7/6.8·API 목록을 동기화했다. FR-LIKE-03은 승인된 interactions 조회를 식별한다. PM은 PRD §9.9와 관련 본문을 동기화한다.
+- backend `/root/m5_backend_impl`에 Task1→2 단일소유 순차 구현, frontend `/root/m5_frontend_impl`에 Task3→4를 승인 DTO 기반 병렬 배정했다. QA `/root/m5_independent_qa`는 독립 인수 매트릭스·harness를 준비한다. 모두 소유 경로만 쓰고 Git은 리더가 최종 검증 후 담당한다.
+- 기존 Colima VM을 데이터 보존 조건으로 재기동 중이다. 검증 JVM temp/caches와 Java21을 재사용하며 새 라이브러리·DB migration을 추가하지 않는다. 최종 제품 PASS는 아직 없다.
+
+## 2026-11-09 — M6 구현·독립 검증 체크포인트
+
+- 사용자 A-v2 전체승인 범위에서 backend/frontend 구현, PM PRD정합성, QA 실제HTTP/Chrome인수를 진행했다. feature/M6-comments-likes base c46a26d이며현재origin/dev도같은커밋이다. Git통합은아직미실행.
+- backend원작성자와별도helper의잠금경쟁8건을포함한최종77suite/490tests failure/error/skip0,bootJar SHA256 f0cbf9c2fd027510b03a00ce752f2f39040f5870bafaef360895343856d056ab를root가직접확인했다. 독립backendreview에서기존finding해소와신규Important없음을확인했다.
+- frontend는첫전체353→수정357→round2전체363까지통과했으나독립전체review에서권한폐기·stalecallback경계를추가발견하여round3수정중이다. 통과한테스트수만으로M6완료를주장하지않는다.
+- 실제API/Chrome1440중간인수46checksPASS. 실행중원본JAR재빌드경합을immutable복사본으로해소했고최종BEJAR서버로교체했다. QA는합성글PUBLIC→PRIVATE후actor상호작용폐기인수를추가했으며최종FE완료후재실행한다.
+- 다음: FE수정scoped재리뷰→최종실제인수/증거동일성→명시파일commit·devPR·merge. M7이후로범위를확장하지않는다. 사용자영속데이터/.env.local/디자인정본은변경하지않았다.

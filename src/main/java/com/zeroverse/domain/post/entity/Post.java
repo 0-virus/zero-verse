@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zeroverse.common.entity.BaseSoftDeleteEntity;
 import com.zeroverse.domain.blog.entity.Blog;
 import com.zeroverse.domain.category.entity.Category;
+import com.zeroverse.domain.post.service.PostTextExtractorV1;
 import com.zeroverse.domain.user.entity.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -27,6 +28,7 @@ import org.hibernate.annotations.DynamicUpdate;
 public class Post extends BaseSoftDeleteEntity {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final PostTextExtractorV1 TEXT_EXTRACTOR = new PostTextExtractorV1(MAPPER);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -53,6 +55,10 @@ public class Post extends BaseSoftDeleteEntity {
     @Column(name = "content_html", columnDefinition = "LONGTEXT")
     private String contentHtml;
 
+    /** Server-derived canonical plain text used by M7 search. */
+    @Column(name = "content_text", columnDefinition = "LONGTEXT")
+    private String contentText;
+
     @Column(name = "thumbnail_url", length = 500)
     private String thumbnailUrl;
 
@@ -77,6 +83,7 @@ public class Post extends BaseSoftDeleteEntity {
         this.title = title;
         this.contentJson = writeJson(contentJson);
         this.contentHtml = contentHtml;
+        this.contentText = TEXT_EXTRACTOR.extract(contentJson);
         this.thumbnailUrl = thumbnailUrl;
         this.visibility = visibility;
         this.publishedAt = publishedAt;
@@ -97,6 +104,7 @@ public class Post extends BaseSoftDeleteEntity {
         this.title = title;
         this.contentJson = writeJson(contentJson);
         this.contentHtml = contentHtml;
+        this.contentText = TEXT_EXTRACTOR.extract(contentJson);
         this.thumbnailUrl = thumbnailUrl;
         this.visibility = visibility;
         if (publish) {
@@ -126,6 +134,7 @@ public class Post extends BaseSoftDeleteEntity {
     }
     public String getContentJsonText() { return contentJson; }
     public String getContentHtml() { return contentHtml; }
+    public String getContentText() { return contentText; }
     public String getThumbnailUrl() { return thumbnailUrl; }
     public Visibility getVisibility() { return visibility; }
     public Integer getViewCount() { return viewCount; }

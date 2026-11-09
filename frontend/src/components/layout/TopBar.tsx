@@ -1,4 +1,6 @@
-import { Link } from 'react-router-dom';
+import { useEffect, useState, type FormEvent } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { normalizeSearchKeyword } from '../../features/search/searchApi';
 
 /**
  * 전 화면 공통 상단바.
@@ -14,11 +16,37 @@ import { Link } from 'react-router-dom';
  *
  * **관리자 전용 버튼은 없다**(PRD §9-K 폐기). `/admin` 진입은 프로필 메뉴 경유.
  *
- * M0는 구조와 스타일만 확정한다. 검색 실행·알림 카운트 배지·프로필 메뉴 동작은 후속 마일스톤이다.
+ * 검색 submit은 `/search?keyword=...`로 이동하고, 빈 입력은 API를 호출하지 않는다(M7).
  */
 export function TopBar({ nickname }: { nickname?: string | null }) {
   const isSignedIn = Boolean(nickname);
   const profileLabel = nickname || '로그인';
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [keyword, setKeyword] = useState(searchParams.get('keyword') ?? '');
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setKeyword(searchParams.get('keyword') ?? '');
+    setError(null);
+  }, [searchParams.toString()]);
+
+  const submitSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    try {
+      const normalized = normalizeSearchKeyword(keyword);
+      if (!normalized) {
+        setError('검색어를 입력해 주세요.');
+        return;
+      }
+      const params = new URLSearchParams();
+      params.set('keyword', normalized);
+      setError(null);
+      navigate(`/search?${params.toString()}`);
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : '검색어를 확인해 주세요.');
+    }
+  };
 
   return (
     <header
@@ -43,13 +71,18 @@ export function TopBar({ nickname }: { nickname?: string | null }) {
       <div className="flex flex-1 justify-center">
         <form
           role="search"
-          onSubmit={(e) => e.preventDefault()}
+          onSubmit={submitSearch}
           style={{ width: 520 }}
           className="flex border-[3px] border-ink bg-surface shadow-btn"
         >
           <input
             type="search"
             aria-label="검색"
+            value={keyword}
+            onChange={(event) => {
+              setKeyword(event.target.value);
+              setError(null);
+            }}
             placeholder="유니버스 전체 검색 — 글 · 블로그 · 사용자 · 태그"
             className="min-w-0 flex-1 border-0 bg-transparent px-3 py-[9px] text-[13px] text-ink outline-0"
           />
@@ -61,6 +94,11 @@ export function TopBar({ nickname }: { nickname?: string | null }) {
             검색
           </button>
         </form>
+        {error && (
+          <span role="alert" className="absolute mt-[58px] text-xs text-danger">
+            {error}
+          </span>
+        )}
       </div>
 
       <nav aria-label="사용자 메뉴" className="flex items-center gap-3">

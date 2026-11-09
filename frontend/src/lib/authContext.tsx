@@ -35,6 +35,8 @@ export interface AuthContextValue {
   /** 초기 세션 복구가 끝나기 전. 이 동안 가드는 판단을 미룬다. */
   isLoading: boolean;
   isAuthenticated: boolean;
+  /** 보호 요청의 refresh가 최종 실패해 guest로 강등된 상태인지. 명시 로그아웃과 구분한다. */
+  sessionExpired: boolean;
   signin: (request: SigninRequest) => Promise<void>;
   /** 가입 후 자동 로그인까지 시도한다. 결과로 자동 로그인 성공 여부를 알린다. */
   register: (request: RegisterRequest) => Promise<RegisterOutcome>;
@@ -60,6 +62,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   const loadUser = useCallback(async () => {
     const me = await apiClient.get<AuthUser>('/api/v1/auth/me');
@@ -69,6 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const clearSession = useCallback(() => {
     setAccessToken(null);
     setUser(null);
+    setSessionExpired(false);
   }, []);
 
   // 앱 시작 시 Refresh 쿠키로 세션을 복구한다.
@@ -106,12 +110,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // refresh까지 실패하면 apiClient가 알려준다.
   useEffect(() => {
-    setAuthExpiredHandler(() => setUser(null));
+    setAuthExpiredHandler(() => {
+      setSessionExpired(true);
+      setUser(null);
+    });
     return () => setAuthExpiredHandler(null);
   }, []);
 
   const signin = useCallback(
     async (request: SigninRequest) => {
+      setSessionExpired(false);
       const token = await apiClient.post<AuthTokenResponse>('/api/v1/auth/signin', request);
       if (!token) {
         throw new Error('로그인 응답이 비어 있습니다.');
@@ -156,12 +164,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       isLoading,
       isAuthenticated: user !== null,
+      sessionExpired,
       signin,
       register,
       signout,
       refreshUser: loadUser,
     }),
-    [user, isLoading, signin, register, signout, loadUser],
+    [user, isLoading, sessionExpired, signin, register, signout, loadUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

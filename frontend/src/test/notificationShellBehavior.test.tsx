@@ -91,6 +91,23 @@ describe('notification shell UI', () => {
     expect(listNotifications).toHaveBeenCalledWith({ read: 'all', page: 0, size: 3 });
   });
 
+  it('TopBar dropdown은 SUSPENDED preview를 읽기 전용으로 안내한다', async () => {
+    const user = userEvent.setup();
+    vi.mocked(listNotifications).mockResolvedValue({ ...page, canManage: false });
+    render(
+      <MemoryRouter>
+        <NotificationProvider>
+          <TopBar nickname="세븐별" />
+        </NotificationProvider>
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole('link', { name: '알림' }));
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      '정지된 계정은 알림을 읽기 전용으로 확인할 수 있습니다.',
+    );
+  });
+
   it('TopBar preview 클릭은 read 응답의 canonical href로 이동한다', async () => {
     const user = userEvent.setup();
     render(
@@ -173,6 +190,21 @@ describe('notification shell UI', () => {
     expect(await screen.findByText(item.message)).toBeInTheDocument();
     expect(screen.getByText('읽지 않음 1')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '알림 센터 열기 →' })).toHaveAttribute('href', '/notifications');
+  });
+
+  it('RightPanel은 SUSPENDED preview를 읽기 전용으로 안내한다', async () => {
+    vi.mocked(listNotifications).mockResolvedValue({ ...page, canManage: false });
+    render(
+      <MemoryRouter>
+        <NotificationProvider>
+          <RightPanel />
+        </NotificationProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      '정지된 계정은 알림을 읽기 전용으로 확인할 수 있습니다.',
+    );
   });
 
   it('RightPanel read 실패는 같은 mutation을 다시 시도한다', async () => {

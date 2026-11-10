@@ -10,10 +10,11 @@ import type { NotificationItem } from '../../features/notifications/types';
 import { ApiRequestError } from '../../lib/apiClient';
 
 type NotificationRetry = () => Promise<void>;
+const READ_ONLY_NOTIFICATION_MESSAGE = '정지된 계정은 알림을 읽기 전용으로 확인할 수 있습니다.';
 
 function notificationErrorMessage(error: unknown): string {
   if (error instanceof ApiRequestError) {
-    if (error.code === 'USER_003') return '정지된 계정은 알림을 읽기 전용으로 확인할 수 있습니다.';
+    if (error.code === 'USER_003') return READ_ONLY_NOTIFICATION_MESSAGE;
     if (error.code === 'USER_001' || error.code === 'AUTH_002' || error.code === 'AUTH_004') {
       return '로그인이 만료되었습니다. 다시 접속해 주세요.';
     }
@@ -111,7 +112,7 @@ export function TopBar({ nickname }: { nickname?: string | null }) {
       return;
     }
     if (!notifications || notifications.canManage !== true) {
-      setNotificationError('정지된 계정은 알림을 읽기 전용으로 확인할 수 있습니다.');
+      setNotificationError(READ_ONLY_NOTIFICATION_MESSAGE);
       setNotificationRetry(null);
       return;
     }
@@ -276,6 +277,11 @@ export function TopBar({ nickname }: { nickname?: string | null }) {
                 </button>
               )}
             </div>
+          )}
+          {canRenderPreview && notifications?.canManage === false && (
+            <p role="status" className="border-b border-line bg-warning-bg px-3.5 py-2 text-xs text-warning">
+              {READ_ONLY_NOTIFICATION_MESSAGE}
+            </p>
           )}
           {notifications?.isAuthFailure && (
             <p className="px-3.5 py-6 text-center text-xs text-danger">

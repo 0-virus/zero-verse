@@ -63,7 +63,7 @@ class NotificationControllerTest extends MySqlTestSupport {
             {"/api/v1/notifications", "get", "200,400,401,404"},
             {"/api/v1/notifications/{notificationId}/read", "put", "200,400,401,403,404"},
             {"/api/v1/notifications/read-all", "put", "200,401,403,404"},
-            {"/api/v1/notifications/{notificationId}", "delete", "200,401,403,404"}
+            {"/api/v1/notifications/{notificationId}", "delete", "200,400,401,403,404"}
         };
         for (String[] operation : operations) {
             com.fasterxml.jackson.databind.JsonNode node = docs.path("paths").path(operation[0])

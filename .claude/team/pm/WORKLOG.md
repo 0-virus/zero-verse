@@ -440,3 +440,9 @@
 - **정본/STATE 반영**: PRD M8 상태·§13.4와 PM STATE를 Task1~6 완료·최종 PASS/merge-ready·`dev` 통합 완료로 갱신했다. M9는 별도 사용자 지시 전 대기한다.
 - **소유권·후속**: 이번 갱신은 `docs/PRD.md`, `.claude/team/pm/STATE.md`, `.claude/team/pm/WORKLOG.md`만 수정했다. root가 post-merge docs-only closeout을 기록할 예정이다. 제품 코드·QA·governance·runtime·기타 역할 파일은 수정하지 않았다.
 - **검증**: 편집한 PRD·STATE·WORKLOG를 재독하고 최종 PASS/PR #14/tree/hash 문자열을 검색한 뒤 PM 소유 파일 `git diff --check`를 실행한다.
+
+## 2026-11-10 17:51:01 KST — M8 §10 현재 완료 경계 문구 정정
+
+- 최종 브리프에서 현재 M8 §10의 `구현·자동검증·독립 QA·실제 인수·dev 통합은 별도 완료 gate이며 아직 완료를 주장하지 않는다` 문구가 최종 상태와 충돌함을 확인했다. 해당 문장을 QA §10 `Ready to merge: Yes`, run3 `323 PASS / 0 FAIL / 0 NOT_RUN`, PR #14 `dev` 통합 완료 근거로 교체했다.
+- 역사적 승인·계약 설명의 “별도 완료 gate” 문구는 당시 심의/계약 의미를 보존하기 위해 유지했고, 현재 M8 상태 문구와 충돌하지 않는지 재검색했다. PM STATE의 M8 gate 문구도 모두 통과한 상태로 정정했다.
+- 검증: PRD·STATE·WORKLOG 재독 및 `git diff --check`를 실행한다. 제품 코드·QA·runtime·Git은 수정하지 않는다.

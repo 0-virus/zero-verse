@@ -415,15 +415,26 @@ async function seedNotificationEvents(accounts, posts) {
   const friendAfterPrivate = await fetchAllNotifications(accounts.friend.token);
   await updatePost(accounts.owner, posts.owner.transition, { visibility: 'UNIVERSE', publish: true });
   const friendAfterPrivateUniverse = await fetchAllNotifications(accounts.friend.token);
-  const transitionCounts = [
-    countType(friendAfterDraftPublish, 'POST', posts.owner.transition.id) - countType(friendBefore, 'POST', posts.owner.transition.id),
-    countType(friendAfterBodyEdit, 'POST', posts.owner.transition.id) - countType(friendAfterDraftPublish, 'POST', posts.owner.transition.id),
-    countType(friendAfterPublicUniverse, 'POST', posts.owner.transition.id) - countType(friendAfterBodyEdit, 'POST', posts.owner.transition.id),
-    countType(friendAfterUniversePublic, 'POST', posts.owner.transition.id) - countType(friendAfterPublicUniverse, 'POST', posts.owner.transition.id),
-    countType(friendAfterPrivate, 'POST', posts.owner.transition.id) - countType(friendAfterUniversePublic, 'POST', posts.owner.transition.id),
-    countType(friendAfterPrivateUniverse, 'POST', posts.owner.transition.id) - countType(friendAfterPrivate, 'POST', posts.owner.transition.id),
-  ];
-  check('generation-post-transition-table', transitionCounts.join(',') === '1,0,0,0,0,1', 'POST is created only on eligible publication transitions');
+  // targetId is intentionally masked while the friend loses access to the PRIVATE
+  // post, so count stable notification IDs rather than the projected targetId.
+  const transitionSnapshots = [
+    friendBefore,
+    friendAfterDraftPublish,
+    friendAfterBodyEdit,
+    friendAfterPublicUniverse,
+    friendAfterUniversePublic,
+    friendAfterPrivate,
+    friendAfterPrivateUniverse,
+  ].map((items) => new Set(items.filter((item) => item.type === 'POST').map((item) => Number(item.id))));
+  const transitionCounts = transitionSnapshots.slice(1).map((current, index) => {
+    const previous = transitionSnapshots[index];
+    return [...current].filter((id) => !previous.has(id)).length;
+  });
+  const privateProjection = friendAfterPrivate.find((item) => item.type === 'POST' && item.available === false);
+  check('generation-post-private-masking', Boolean(privateProjection) && unavailableShape(privateProjection),
+    'POST target projection is masked while the friend cannot access the private post');
+  check('generation-post-transition-table', transitionCounts.join(',') === '1,0,0,0,0,1',
+    'POST is created only on eligible publication transitions using stable notification IDs');
 
   const ownerBeforeFinal = await fetchAllNotifications(accounts.owner.token);
   const ownerRows = ownerBeforeFinal.filter((item) => Number.isInteger(Number(item.id)));
@@ -435,7 +446,7 @@ async function seedNotificationEvents(accounts, posts) {
   const friendRows = await fetchAllNotifications(accounts.friend.token);
   const accessLossRow = friendRows.find((item) => item.type === 'POST' && Number(item.targetId) === Number(posts.owner.transition.id));
   const suspendedRows = await fetchAllNotifications(accounts.suspended.token);
-  const suspendedReceiverRow = suspendedRows.find((item) => Number(item.targetId) === Number(posts.suspended.public.id));
+  const suspendedReceiverRow = suspendedRows.find((item) => Number(item.targetId) === Number(suspendedReceiverComment.id));
   events.notificationIds = {
     blocked: blockedRow?.id ?? null,
     deletedActor: deletedActorRow?.id ?? null,
@@ -554,15 +565,18 @@ async function runHttpAcceptance(accounts, posts, events) {
   if (performanceBeforeSize.available && performanceAfterSizeOne.available && performanceAfterSize100.available) {
     const deltaSizeOne = performanceAfterSizeOne.count - performanceBeforeSize.count;
     const deltaSize100 = performanceAfterSize100.count - performanceAfterSizeOne.count;
+    const sizeCostDifference = deltaSize100 - deltaSizeOne;
     evidence.performance.notificationSelectQueryBound = {
       user: 'zeroverse_m8',
       sizeOneSelectDelta: deltaSizeOne,
-      size100AdditionalSelectDelta: deltaSize100,
-      totalSizeOneTo100Delta: performanceAfterSize100.count - performanceBeforeSize.count,
+      size100SelectDelta: deltaSize100,
+      sizeCostDifference,
     };
     check('http-query-bound-actual-bearer', ownerSizeOne.status === 200 && ownerSize100.status === 200
-      && deltaSizeOne >= 0 && deltaSizeOne <= 14 && deltaSize100 === 0,
-    'actual bearer size=1 query count is <=14 and size=100 adds zero SELECT statements');
+      && deltaSizeOne > 0 && deltaSizeOne <= 14
+      && deltaSize100 > 0 && deltaSize100 <= 14
+      && sizeCostDifference === 0,
+    'actual bearer size=1 and size=100 each use 1..14 SELECT statements with equal bounded cost');
   } else {
     evidence.performance.notificationSelectQueryBound = { available: false };
     notRun('http-query-bound-actual-bearer', 'performance_schema app-account SELECT counter was unavailable');
@@ -618,7 +632,7 @@ async function runHttpAcceptance(accounts, posts, events) {
 
   const deletedActorItem = findItem(unblocked, events.notificationIds.deletedActor);
   const deletedCommentItem = findItem(unblocked, events.notificationIds.deletedComment);
-  check('http-unavailable-mask', unavailableShape(deletedActorItem) && unavailableShape(deletedCommentItem), 'deleted actor/comment rows use generic masking and null sensitive fields');
+  check('http-unavailable-actor-mask', unavailableShape(deletedActorItem), 'deleted actor rows use generic masking and null sensitive fields');
 
   const friendBeforeLoss = await listNotifications(accounts.friend.token, 'all', 0, 100);
   const accessLossId = events.notificationIds.accessLoss;
@@ -641,6 +655,9 @@ async function runHttpAcceptance(accounts, posts, events) {
   const ownerAfterDeleteComment = await listNotifications(accounts.owner.token, 'all', 0, 100);
   check('http-comment-delete-preserves-history', deleteComment.status === 200
     && unavailableShape(findItem(ownerAfterDeleteComment, events.notificationIds.deletedComment)), 'comment delete preserves an unavailable notification row');
+  check('http-comment-delete-mask', deletedCommentItem?.available === true
+    && unavailableShape(findItem(ownerAfterDeleteComment, events.notificationIds.deletedComment)),
+  'comment notification becomes unavailable only after the source comment is deleted');
 
   const relationDelete = await apiCall('DELETE', `/api/v1/universe/${accounts.parent.me.id}`, accounts.actor.token);
   const parentAfterRelationDelete = await listNotifications(accounts.parent.token, 'all', 0, 100);
@@ -723,9 +740,14 @@ async function runNotificationEndpointAuthMatrix(accounts, readTarget) {
       check(`auth-expired-${endpoint}`, response.status === 401 && response.errorCode === 'AUTH_002', `expired ${endpoint} returns 401 AUTH_002`);
       checkResponseHeaders(`auth-expired-${endpoint}`, response);
     }
-    const wrongTypeHeader = Buffer.from(JSON.stringify({ alg: 'HS384', typ: 'REFRESH' })).toString('base64url');
-    const expiredParts = expired.split('.');
-    const wrongType = expiredParts.length === 3 ? `${wrongTypeHeader}.${expiredParts[1]}.${expiredParts[2]}` : 'not-a-jwt';
+  } else {
+    for (const endpoint of ['list', 'read', 'read-all', 'delete']) {
+      notRun(`auth-expired-${endpoint}`, 'M8_EXPIRED_TOKEN was not provided by isolated runtime');
+    }
+  }
+
+  const wrongType = process.env.M8_WRONG_TYPE_TOKEN;
+  if (wrongType) {
     for (const [endpoint, invoke] of notificationEndpointCalls(readTarget.id, undefined, `Bearer ${wrongType}`)) {
       const response = await invoke();
       check(`auth-wrong-type-${endpoint}`, response.status === 401 && response.errorCode === 'AUTH_004', `wrong JWT type ${endpoint} returns 401 AUTH_004`);
@@ -733,7 +755,7 @@ async function runNotificationEndpointAuthMatrix(accounts, readTarget) {
     }
   } else {
     for (const endpoint of ['list', 'read', 'read-all', 'delete']) {
-      notRun(`auth-expired-${endpoint}`, 'M8_EXPIRED_TOKEN was not provided by isolated runtime');
+      notRun(`auth-wrong-type-${endpoint}`, 'M8_WRONG_TYPE_TOKEN was not provided by isolated runtime');
     }
   }
 
@@ -788,8 +810,9 @@ async function runBrowserAcceptance(accounts, posts, events) {
     check('browser-dropdown-open-no-read', mutationRequests.length === openMutationCount, 'opening dropdown does not mark rows read');
     check('browser-dropdown-width', await dropdownWidth(page), 'TopBar notification dropdown is approximately 330px wide');
     check('browser-shared-unread-center-topbar', await sharedUnreadCount(page), 'center and topbar expose same unread count');
+    await captureProduct(page, 'topbar-notifications');
 
-    const row = await notificationRow(page, browserNotification);
+    const row = await notificationRow(page, browserNotification, ownerRows);
     const clickResponse = waitForNotificationMutation(page, 'PUT', `/notifications/${browserNotification.id}/read`);
     await clickRowWithoutDelete(row);
     const clickResult = await clickResponse;
@@ -807,11 +830,13 @@ async function runBrowserAcceptance(accounts, posts, events) {
     await waitForNotificationGet(page);
     check('browser-read-all-count-server', (await extractCenterUnread(page)) === 0, 'center count follows server re-fetch after read-all');
 
-    const deleteItem = (await fetchAllNotifications(accounts.owner.token)).find((item) => item.available !== false && item.id !== browserNotification.id);
+    const deletePage = await listNotifications(accounts.owner.token, 'all', 0, 20);
+    const deleteItems = Array.isArray(deletePage.data?.items) ? deletePage.data.items : [];
+    const deleteItem = deleteItems.find((item) => item.available !== false && item.id !== browserNotification.id);
     if (!deleteItem) throw new Error('browser delete fixture row missing');
     await page.goto(`${frontendUrl}/notifications`, { waitUntil: 'domcontentloaded' });
     await waitForNotificationsReady(page);
-    const deleteRow = await notificationRow(page, deleteItem);
+    const deleteRow = await notificationRow(page, deleteItem, deleteItems);
     await page.route(`**/api/v1/notifications/${deleteItem.id}`, async (route) => {
       await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({
         success: false, data: null, error: { code: 'COMMON_500', message: 'synthetic delete failure', details: [] }, timestamp: new Date().toISOString(),
@@ -829,7 +854,8 @@ async function runBrowserAcceptance(accounts, posts, events) {
 
     await page.goto(`${frontendUrl}/`, { waitUntil: 'domcontentloaded' });
     await waitForMainReady(page);
-    check('browser-right-panel-recent', await page.getByText('최근 알림', { exact: true }).count() > 0, 'Main right panel renders recent notifications');
+    check('browser-right-panel-recent', await page.locator('aside section h2').filter({ hasText: '최근 알림' }).count() > 0,
+      'Main right panel renders recent notifications');
     const recentCount = await recentNotificationRows(page);
     check('browser-right-panel-three-or-fewer', recentCount >= 1 && recentCount <= 3, 'Main right panel renders recent 3 rows or fewer when data exists');
     check('browser-shared-unread-right-panel', await sharedUnreadCount(page), 'right panel unread count agrees with topbar/center');
@@ -853,7 +879,7 @@ async function runBrowserReentryAndReadRetry(page, accounts, events) {
   const ownerRows = await fetchAllNotifications(accounts.owner.token);
   const retryItem = ownerRows.find((item) => Number(item.id) === Number(events.notificationIds.browser) && item.available !== false);
   if (!retryItem) throw new Error('read retry notification fixture row missing');
-  const retryRow = await notificationRow(page, retryItem);
+  const retryRow = await notificationRow(page, retryItem, ownerRows);
   let failedReadInjected = false;
   await page.route(`**/api/v1/notifications/${retryItem.id}/read`, async (route) => {
     if (!failedReadInjected) {
@@ -955,7 +981,7 @@ async function runBrowserTransientListAndAuth(accounts) {
     const authFailureMessage = page.getByText('로그인이 만료되었습니다. 다시 접속해 주세요.', { exact: true }).first();
     await authFailureMessage.waitFor({ state: 'visible', timeout: 5_000 });
     check('browser-user001-clears-notification-state', authFailureResult.status() === 404
-      && await page.locator('[data-notification-id]').count() === 0
+      && await notificationCenterRows(page).count() === 0
       && await page.locator('header [aria-label="알림"] span').count() === 0,
     'USER_001 clears notification rows, unread summary, and management state');
   } finally {
@@ -1037,33 +1063,82 @@ async function runBrowserUnavailableAndStale(accounts, posts, events) {
   await runBrowserSameAccountStale(accounts, posts);
   const context = await newBrowserContext();
   const page = await context.newPage();
-  let delayedObserved = false;
-  const ownerRows = await fetchAllNotifications(accounts.owner.token);
-  const staleOwnerItem = ownerRows.find((item) => Number(item.id) !== Number(events.notificationIds.browser)
-    && Number(item.id) !== Number(events.notificationIds.accessLoss));
-  await page.route('**/api/v1/notifications*', async (route) => {
-    if (!delayedObserved && route.request().method() === 'GET') {
-      delayedObserved = true;
-      await new Promise((resolvePromise) => setTimeout(resolvePromise, 1200));
-    }
-    try { await route.continue(); } catch { /* navigation may cancel the stale request */ }
-  });
+  let heldOwnerRoute = null;
+  let heldOwnerUrl = null;
+  let heldOwnerStatus = null;
+  let heldOwnerResponse = null;
+  let resolveOwnerHold;
+  let resolveOwnerRelease;
+  const ownerHoldObserved = new Promise((resolvePromise) => { resolveOwnerHold = resolvePromise; });
+  const ownerRelease = new Promise((resolvePromise) => { resolveOwnerRelease = resolvePromise; });
+  const friendRows = await fetchAllNotifications(accounts.friend.token);
+  const ownerPage = await listNotifications(accounts.owner.token, 'all', 0, 20);
+  const ownerVisibleRows = Array.isArray(ownerPage.data?.items) ? ownerPage.data.items : [];
+  const staleOwnerItem = ownerVisibleRows.find((item) => item.available !== false
+    && Number(item.id) !== Number(events.notificationIds.browser)
+    && Number(item.id) !== Number(events.notificationIds.accessLoss)
+    && !friendRows.some((friendItem) => notificationDisplayMessage(friendItem) === notificationDisplayMessage(item)
+      && notificationTimeLabel(friendItem.createdAt) === notificationTimeLabel(item.createdAt)));
   try {
     await signInUi(page, fixture.accounts.owner);
     await page.goto(`${frontendUrl}/notifications`, { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(120);
-    await signInUi(page, fixture.accounts.friend);
-    await page.goto(`${frontendUrl}/notifications`, { waitUntil: 'domcontentloaded' });
     await waitForNotificationsReady(page);
-    check('browser-stale-request-observed', delayedObserved, 'delayed owner notification request was observed');
-    const hasStableRows = await page.locator('[data-notification-id]').count() > 0;
-    const stalePresent = staleOwnerItem && hasStableRows
-      ? await page.locator(`[data-notification-id="${staleOwnerItem.id}"]`).count() > 0
-      : staleOwnerItem?.message
-        ? await page.getByText(staleOwnerItem.message, { exact: true }).count() > 0
-        : false;
+    const ownerRowBeforeSwitch = staleOwnerItem
+      ? await notificationRowsContaining(page, staleOwnerItem).count()
+      : 0;
+    await page.route('**/api/v1/notifications*', async (route) => {
+      const requestUrl = new URL(route.request().url());
+      if (!heldOwnerRoute && route.request().method() === 'GET' && requestUrl.searchParams.get('size') === '20') {
+        heldOwnerRoute = route;
+        heldOwnerUrl = route.request().url();
+        try {
+          heldOwnerResponse = await route.fetch();
+          heldOwnerStatus = heldOwnerResponse.status();
+          resolveOwnerHold(true);
+          await ownerRelease;
+          await route.fulfill({ response: heldOwnerResponse });
+        } catch {
+          resolveOwnerHold(false);
+          try { await route.continue(); } catch { /* request may be canceled during the account switch */ }
+        }
+        return;
+      }
+      try { await route.continue(); } catch { /* navigation may cancel the stale request */ }
+    });
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    const observed = await Promise.race([
+      ownerHoldObserved,
+      new Promise((resolvePromise) => setTimeout(() => resolvePromise(false), 15_000)),
+    ]);
+    check('browser-stale-owner-response-held', observed === true && ownerRowBeforeSwitch > 0 && heldOwnerStatus === 200,
+      'a real owner center response is held after the owner screen is ready with upstream status 200');
+    const expiryResult = await triggerBrowserSessionExpiry(page);
+    check('browser-session-expiry-injected', expiryResult.ok === false
+      && expiryResult.meCalls >= 1
+      && expiryResult.refreshCalls >= 1
+      && page.url().endsWith('/signin'),
+    'a scoped synthetic session expiry invokes the existing auth-expired path without adding logout UI');
+    await signInUi(page, fixture.accounts.friend, { spa: true });
+    await page.evaluate(() => {
+      window.history.pushState({}, '', '/notifications');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    await waitForNotificationsReady(page);
+    const staleResponse = heldOwnerRoute && heldOwnerUrl
+      ? page.waitForResponse((response) => response.url() === heldOwnerUrl, { timeout: 15_000 })
+      : null;
+    if (heldOwnerRoute) resolveOwnerRelease(true);
+    const releasedResponse = staleResponse ? await staleResponse : null;
+    check('browser-stale-request-observed', releasedResponse?.status() === 200,
+      'held owner notification response completed after the SPA account switch');
+    await page.waitForTimeout(150);
+    const stalePresent = staleOwnerItem
+      ? await notificationRowsContaining(page, staleOwnerItem).count() > 0
+      : false;
     check('browser-stale-account-cleared', !stalePresent, 'late owner response cannot repopulate friend notifications');
   } finally {
+    resolveOwnerRelease?.(true);
+    await page.unroute('**/api/v1/notifications*').catch(() => undefined);
     await context.close();
   }
 
@@ -1076,15 +1151,66 @@ async function runBrowserUnavailableAndStale(accounts, posts, events) {
     const generic = unavailablePage.getByText('더 이상 확인할 수 없는 알림입니다', { exact: true });
     check('browser-unavailable-generic', await generic.count() > 0, 'unavailable row uses generic message');
     if (await generic.count() > 0) {
-      const hrefsBefore = await unavailablePage.locator('a').evaluateAll((links) => links.map((link) => link.getAttribute('href')));
-      await generic.first().click();
+      const unavailableUrl = unavailablePage.url();
+      const unavailableItem = ownerVisibleRows.find((item) => item.available === false);
+      const unavailableRow = unavailableItem
+        ? await notificationRow(unavailablePage, unavailableItem, ownerVisibleRows)
+        : generic.first().locator('..');
+      const readMutation = unavailableItem
+        ? waitForNotificationMutation(unavailablePage, 'PUT', `/notifications/${unavailableItem.id}/read`)
+        : null;
+      await unavailableRow.click();
+      if (readMutation) {
+        const response = await readMutation;
+        const body = await response.json().catch(() => null);
+        check('browser-unavailable-read-mask', response.status() === 200
+          && body?.success === true
+          && body?.data?.available === false
+          && body?.data?.href == null,
+        'unavailable row may be marked read but remains masked with no canonical href');
+      }
       await unavailablePage.waitForTimeout(100);
-      const hrefsAfter = await unavailablePage.locator('a').evaluateAll((links) => links.map((link) => link.getAttribute('href')));
-      check('browser-unavailable-no-navigation', JSON.stringify(hrefsBefore) === JSON.stringify(hrefsAfter), 'unavailable row does not navigate');
+      check('browser-unavailable-no-navigation', unavailablePage.url() === unavailableUrl, 'unavailable row does not navigate');
     }
   } finally {
     await unavailableContext.close();
   }
+}
+
+async function triggerBrowserSessionExpiry(page) {
+  const failureBody = JSON.stringify({
+    success: false,
+    data: null,
+    error: { code: 'AUTH_004', message: 'synthetic session expiry', details: [] },
+    timestamp: new Date().toISOString(),
+  });
+  let meCalls = 0;
+  let refreshCalls = 0;
+  await page.route('**/api/v1/auth/me', async (route) => {
+    meCalls += 1;
+    await route.fulfill({ status: 401, contentType: 'application/json', body: failureBody });
+  });
+  await page.route('**/api/v1/auth/refresh', async (route) => {
+    refreshCalls += 1;
+    await route.fulfill({ status: 401, contentType: 'application/json', body: failureBody });
+  });
+  let result;
+  try {
+    result = await page.evaluate(async () => {
+      const { apiClient } = await import('/src/lib/apiClient.ts');
+      try {
+        await apiClient.get('/api/v1/auth/me');
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, message: error instanceof Error ? error.message : String(error) };
+      }
+    });
+  } finally {
+    await page.unroute('**/api/v1/auth/me').catch(() => undefined);
+    await page.unroute('**/api/v1/auth/refresh').catch(() => undefined);
+  }
+  await page.getByLabel('이메일').waitFor({ state: 'visible', timeout: 10_000 });
+  return { ...result, meCalls, refreshCalls };
 }
 
 async function runGuestNotificationGuard() {
@@ -1124,7 +1250,8 @@ async function captureDesignOriginal() {
 
     const main = await context.newPage();
     await main.goto(pathToFileURL(designMainFile).href, { waitUntil: 'load' });
-    check('design-main-notifications-original', /최근 알림/.test(await main.innerText()) && /알림 센터 열기/.test(await main.innerText()), 'Main original renders recent notifications panel');
+    const mainBodyText = await main.locator('body').innerText();
+    check('design-main-notifications-original', /최근 알림/.test(mainBodyText) && /알림 센터 열기/.test(mainBodyText), 'Main original renders recent notifications panel');
     await main.screenshot({ path: resolve(outputDir, 'design-main-notifications.png'), fullPage: true });
     evidence.screenshots.push('design-main-notifications.png');
   } catch (error) {
@@ -1134,8 +1261,16 @@ async function captureDesignOriginal() {
   }
 }
 
-async function signInUi(page, account) {
-  await page.goto(`${frontendUrl}/signin`, { waitUntil: 'domcontentloaded' });
+async function signInUi(page, account, { spa = false } = {}) {
+  if (spa) {
+    await page.evaluate(() => {
+      window.history.pushState({}, '', '/signin');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    await page.getByLabel('이메일').waitFor({ state: 'visible', timeout: 10_000 });
+  } else {
+    await page.goto(`${frontendUrl}/signin`, { waitUntil: 'domcontentloaded' });
+  }
   await page.getByLabel('이메일').fill(account.email);
   await page.getByLabel('비밀번호').fill(account.password);
   await page.getByRole('button', { name: /접속하기|로그인/ }).last().click();
@@ -1166,6 +1301,8 @@ function waitForNotificationMutation(page, method, suffixPart) {
 }
 
 async function alarmControl(page) {
+  const explicit = page.locator('header a[aria-label="알림"]').first();
+  if (await explicit.count() > 0) return explicit;
   const header = page.locator('header');
   const candidates = [
     header.getByRole('button', { name: /알림/ }).first(),
@@ -1176,14 +1313,57 @@ async function alarmControl(page) {
   throw new Error('notification alarm control not found');
 }
 
-async function notificationRow(page, item) {
-  const byId = page.locator(`[data-notification-id="${item.id}"]`);
-  if (await byId.count() > 0) return byId.first();
-  const message = typeof item.message === 'string' ? page.getByText(item.message, { exact: true }).first() : null;
-  if (message && await message.count() > 0) return message.locator('..');
-  const generic = page.getByText('더 이상 확인할 수 없는 알림입니다', { exact: true }).first();
-  if (item.available === false && await generic.count() > 0) return generic.locator('..');
-  throw new Error(`notification row ${item.id} not found in browser`);
+function notificationDisplayMessage(item) {
+  return item?.available === false ? '더 이상 확인할 수 없는 알림입니다' : item?.message;
+}
+
+function notificationTimeLabel(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? '시간 미정'
+    : new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+}
+
+function notificationCenterRows(page) {
+  return page.locator('section[aria-label="알림 센터"] [role="button"][tabindex="0"]');
+}
+
+function notificationRowsContaining(page, item) {
+  const display = notificationDisplayMessage(item);
+  return page.locator(
+    'section[aria-label="알림 센터"] [role="button"][tabindex="0"], '
+      + '[role="dialog"][aria-label="최근 알림"] button',
+  ).filter({ hasText: display ?? '' });
+}
+
+async function notificationRow(page, item, orderedItems = []) {
+  const display = notificationDisplayMessage(item);
+  if (typeof display !== 'string') throw new Error(`notification row ${item.id} has no display message`);
+  const time = notificationTimeLabel(item.createdAt);
+  const center = page.locator('section[aria-label="알림 센터"]').first();
+  const dialog = page.getByRole('dialog', { name: '최근 알림', exact: true }).first();
+  const surfaces = [];
+  if (await dialog.count() > 0) surfaces.push({ locator: dialog.locator('button'), kind: 'preview' });
+  if (await center.count() > 0) surfaces.push({ locator: center.locator('[role="button"][tabindex="0"]'), kind: 'center' });
+  for (const surface of surfaces) {
+    const allRows = surface.locator;
+    const matching = allRows.filter({ hasText: display });
+    const timed = matching.filter({ hasText: time });
+    if (await timed.count() === 1) return timed.first();
+    if (await matching.count() === 1) return matching.first();
+    if (await matching.count() > 1 && orderedItems.length > 0) {
+      const occurrence = orderedItems
+        .filter((candidate) => notificationDisplayMessage(candidate) === display
+          && notificationTimeLabel(candidate.createdAt) === time)
+        .findIndex((candidate) => Number(candidate.id) === Number(item.id));
+      if (occurrence >= 0 && occurrence < await matching.count()) return matching.nth(occurrence);
+      const fallbackOccurrence = orderedItems
+        .filter((candidate) => notificationDisplayMessage(candidate) === display)
+        .findIndex((candidate) => Number(candidate.id) === Number(item.id));
+      if (fallbackOccurrence >= 0 && fallbackOccurrence < await matching.count()) return matching.nth(fallbackOccurrence);
+    }
+  }
+  throw new Error(`notification row ${item.id} not found in browser using message/time/order`);
 }
 
 async function clickRowWithoutDelete(row) {
@@ -1208,12 +1388,9 @@ async function clickDeleteControl(row) {
 async function centerContainer(page) {
   const explicit = page.locator('[data-testid="notification-center"], [data-testid="notifications-page"]').first();
   if (await explicit.count() > 0) return explicit.boundingBox();
-  const heading = page.getByRole('heading', { name: '알림 센터', exact: true });
-  const parent = heading.locator('..');
-  const box = await parent.boundingBox();
-  if (!box) return null;
-  const main = page.locator('main').first();
-  return main.boundingBox();
+  const appLayout = page.locator('[data-layout="app"]').first();
+  if (await appLayout.count() > 0) return appLayout.boundingBox();
+  return page.locator('main').first().boundingBox();
 }
 
 async function dropdownWidth(page) {
@@ -1229,27 +1406,31 @@ async function dropdownWidth(page) {
 
 async function sharedUnreadCount(page) {
   const center = await extractCenterUnread(page);
-  const alarm = await alarmControl(page);
-  const badge = alarm.locator('span').filter({ hasText: /^\d+$/ }).first();
-  const badgeValue = await badge.count() > 0 ? Number((await badge.innerText()).trim()) : null;
-  if (center == null || badgeValue == null) return false;
+  await alarmControl(page);
+  const badge = page.locator('header a[aria-label="알림"] span').first();
+  const badgeValue = await badge.count() > 0 ? Number((await badge.innerText()).trim()) : 0;
+  if (center == null || !Number.isFinite(badgeValue)) return false;
   return center === badgeValue;
 }
 
 async function extractCenterUnread(page) {
+  const centerSection = page.locator('main section[aria-label="알림 센터"]').first();
+  const rightPanel = page.locator('aside section').filter({ hasText: '최근 알림' }).first();
+  const scope = await centerSection.count() > 0 ? centerSection : rightPanel;
+  if (await scope.count() === 0) return null;
   const selectors = [
     '[data-testid="notification-unread-count"]',
     '[aria-label^="읽지 않음"]',
   ];
   for (const selector of selectors) {
-    const node = page.locator(selector).first();
+    const node = scope.locator(selector).first();
     if (await node.count() > 0) {
       const text = await node.innerText().catch(() => '');
       const match = text.match(/(\d+)/);
       if (match) return Number(match[1]);
     }
   }
-  const badge = page.getByText(/읽지 않음\s*\d+/, { exact: false }).first();
+  const badge = scope.getByText(/읽지 않음\s*\d+/, { exact: false }).first();
   if (await badge.count() > 0) {
     const match = (await badge.innerText()).match(/읽지 않음\s*(\d+)/);
     if (match) return Number(match[1]);
@@ -1260,9 +1441,9 @@ async function extractCenterUnread(page) {
 async function recentNotificationRows(page) {
   const explicit = page.locator('[data-testid="recent-notification"]');
   if (await explicit.count() > 0) return explicit.count();
-  const aside = page.locator('aside').filter({ hasText: '최근 알림' }).first();
-  if (await aside.count() === 0) return 0;
-  return aside.locator('[data-notification-id], article, li').count();
+  const panel = page.locator('aside section').filter({ hasText: '최근 알림' }).first();
+  if (await panel.count() === 0) return 0;
+  return panel.locator('button').count();
 }
 
 async function captureProduct(page, label) {
@@ -1399,11 +1580,31 @@ async function unblockUser(from, target) {
 async function syntheticNotificationSnapshot(userId) {
   if (!Number.isInteger(Number(userId))) return { available: false, fingerprint: 'invalid-user-id' };
   const numericId = String(userId).replace(/[^0-9]/g, '');
-  const sql = `SELECT COUNT(*), SHA2(COALESCE(GROUP_CONCAT(CONCAT_WS(':', id, receiver_user_id, actor_user_id, type, target_type, target_id, created_at, read_at, deleted_at) ORDER BY id SEPARATOR '|'), ''), 256) FROM notifications WHERE receiver_user_id = ${numericId};`;
+  // Read one scalar JSON row at a time. GROUP_CONCAT/CONCAT_WS can truncate or
+  // silently drop NULLs, which would let a tail/audit-field mutation evade the
+  // M7 read-only fingerprint check. HEX keeps mysql --batch output lossless.
+  const sql = `SELECT COUNT(*) FROM notifications WHERE receiver_user_id = ${numericId};
+SELECT HEX(JSON_ARRAY(id, receiver_user_id, actor_user_id, type, target_type, target_id, message, read_at, created_at, updated_at, deleted_at))
+FROM notifications WHERE receiver_user_id = ${numericId} ORDER BY id;`;
   try {
     const output = await runSyntheticDbSql(sql);
-    const [count, fingerprint] = output.trim().split(/\s+/);
-    if (!/^\d+$/.test(count ?? '') || !/^[0-9a-f]{64}$/i.test(fingerprint ?? '')) return { available: false, fingerprint: 'malformed-sql-result' };
+    const lines = output.split(/\r?\n/).map((line) => line.trim()).filter((line, index) => index === 0 || line.length > 0);
+    const count = lines[0];
+    if (!/^\d+$/.test(count ?? '')) return { available: false, fingerprint: 'malformed-sql-count' };
+    const rows = [];
+    for (const encoded of lines.slice(1)) {
+      if (!/^[0-9a-f]+$/i.test(encoded) || encoded.length % 2 !== 0) {
+        return { available: false, fingerprint: 'malformed-sql-row' };
+      }
+      try {
+        rows.push(JSON.parse(Buffer.from(encoded, 'hex').toString('utf8')));
+      } catch {
+        return { available: false, fingerprint: 'malformed-json-row' };
+      }
+    }
+    if (rows.length !== Number(count)) return { available: false, fingerprint: 'row-count-mismatch' };
+    const canonical = JSON.stringify(rows);
+    const fingerprint = createHash('sha256').update(canonical, 'utf8').digest('hex');
     return { available: true, count: Number(count), fingerprint };
   } catch {
     return { available: false, fingerprint: 'synthetic-sql-unavailable' };
@@ -1452,7 +1653,9 @@ async function verifyVersionManifest() {
   if (entries.some((entry) => typeof entry.path !== 'string' || !/^[0-9a-f]{64}$/i.test(entry.expectedSha ?? ''))) {
     return { ok: false, detail: 'version manifest has an invalid source file entry', evidence: base };
   }
-  entries.sort((left, right) => left.path.localeCompare(right.path));
+  // Match build/m8-runtime.py and the M7 manifest's byte/ordinal path order;
+  // localeCompare is host-locale dependent and produced a false hash failure.
+  entries.sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0);
   const actualHashes = [];
   for (const entry of entries) {
     const filePath = resolve(root, entry.path);

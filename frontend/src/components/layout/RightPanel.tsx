@@ -6,11 +6,26 @@ import { useOptionalAuth } from '../../lib/authContext';
 import { listUniverse } from '../../features/universe/universeApi';
 import type { UniverseListKind } from '../../features/universe/types';
 import {
+  isNotificationAuthFailure,
   isNotificationMutationSuperseded,
   useNotificationPreview,
   type NotificationContextValue,
 } from '../../features/notifications/NotificationProvider';
 import type { NotificationItem } from '../../features/notifications/types';
+import { ApiRequestError } from '../../lib/apiClient';
+
+type NotificationRetry = () => Promise<void>;
+
+function notificationErrorMessage(error: unknown): string {
+  if (error instanceof ApiRequestError) {
+    if (error.code === 'USER_003') return '정지된 계정은 알림을 읽기 전용으로 확인할 수 있습니다.';
+    if (error.code === 'USER_001' || error.code === 'AUTH_002' || error.code === 'AUTH_004') {
+      return '로그인이 만료되었습니다. 다시 접속해 주세요.';
+    }
+    return error.message || '알림 요청을 처리하지 못했습니다.';
+  }
+  return error instanceof Error && error.message ? error.message : '알림을 읽지 못했습니다.';
+}
 
 /** `/` 오른쪽 레일의 서버 관계 현황과 M8 공유 알림 preview. */
 type StatKey = 'friends' | 'following' | 'followers';
@@ -37,11 +52,13 @@ function notificationGlyph(item: NotificationItem): string {
 function RecentNotification({
   item,
   context,
-  onError,
+  onFailure,
+  onSuccess,
 }: {
   item: NotificationItem;
   context: NotificationContextValue;
-  onError: (message: string) => void;
+  onFailure: (message: string, retry?: NotificationRetry) => void;
+  onSuccess: () => void;
 }) {
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
@@ -52,16 +69,20 @@ function RecentNotification({
       return;
     }
     if (context.canManage !== true) {
-      onError('정지된 계정은 알림을 읽기 전용으로 확인할 수 있습니다.');
+      onFailure('정지된 계정은 알림을 읽기 전용으로 확인할 수 있습니다.');
       return;
     }
     setBusy(true);
     try {
       const current = await context.markRead(item.id);
+      onSuccess();
       if (current.available && current.href) navigate(current.href);
     } catch (error) {
       if (!isNotificationMutationSuperseded(error)) {
-        onError(error instanceof Error ? error.message : '알림을 읽지 못했습니다.');
+        onFailure(
+          notificationErrorMessage(error),
+          isNotificationAuthFailure(error) ? undefined : () => handleClick(),
+        );
       }
     } finally {
       setBusy(false);
@@ -97,6 +118,7 @@ export function RightPanel({ blog }: { blog?: DefaultBlog | null }) {
   const [stats, setStats] = useState<StatState>(IDLE_STATS);
   const [statsViewerId, setStatsViewerId] = useState<number | null>(null);
   const [notificationError, setNotificationError] = useState<string | null>(null);
+  const [notificationRetry, setNotificationRetry] = useState<NotificationRetry | null>(null);
   const generation = useRef(0);
 
   useEffect(() => {
@@ -176,20 +198,39 @@ export function RightPanel({ blog }: { blog?: DefaultBlog | null }) {
         }
       >
         {notificationError && (
-          <p role="alert" className="border-b border-line bg-danger-bg px-3.5 py-2 text-xs text-danger">
+          <div role="alert" className="border-b border-line bg-danger-bg px-3.5 py-2 text-xs text-danger">
             {notificationError}
-          </p>
+            {notificationRetry && (
+              <button
+                type="button"
+                onClick={() => {
+                  const retry = notificationRetry;
+                  setNotificationError(null);
+                  setNotificationRetry(null);
+                  void retry();
+                }}
+                className="ml-2 border-2 border-danger bg-surface px-2 py-1 font-bold"
+              >
+                다시 시도
+              </button>
+            )}
+          </div>
         )}
         {notifications?.isAuthLoading && (
           <p className="px-5 py-8 text-center text-[13px] text-text-muted">인증 상태를 확인하는 중...</p>
         )}
-        {!notifications?.isAuthLoading && (!notifications || !notifications.isAuthenticated) && (
+        {notifications?.isAuthFailure && (
+          <p className="px-5 py-8 text-center text-[13px] text-danger">
+            로그인이 만료되었습니다. 다시 접속해 주세요.
+          </p>
+        )}
+        {!notifications?.isAuthLoading && !notifications?.isAuthFailure && (!notifications || !notifications.isAuthenticated) && (
           <p className="px-5 py-8 text-center text-[13px] text-text-muted">아직 알림이 없습니다.</p>
         )}
-        {notifications?.isAuthenticated && notifications.preview.loading && !notifications.preview.page && (
+        {notifications?.isAuthenticated && !notifications.isAuthFailure && notifications.preview.loading && !notifications.preview.page && (
           <p className="px-5 py-8 text-center text-[13px] text-text-muted">알림을 불러오는 중...</p>
         )}
-        {notifications?.isAuthenticated && Boolean(notifications.preview.error) && !notifications.preview.loading && (
+        {notifications?.isAuthenticated && !notifications.isAuthFailure && Boolean(notifications.preview.error) && !notifications.preview.loading && (
           <div className="px-3.5 py-5 text-center text-xs text-danger">
             알림을 불러오지 못했습니다.
             <button
@@ -201,22 +242,29 @@ export function RightPanel({ blog }: { blog?: DefaultBlog | null }) {
             </button>
           </div>
         )}
-        {notifications?.isAuthenticated && notifications.preview.page && notifications.preview.page.items.length === 0 && !notifications.preview.loading && (
+        {notifications?.isAuthenticated && !notifications.isAuthFailure && notifications.preview.page && notifications.preview.page.items.length === 0 && !notifications.preview.loading && (
           <p className="px-5 py-8 text-center text-[13px] text-text-muted">아직 알림이 없습니다.</p>
         )}
-        {notifications?.isAuthenticated && notifications.preview.page && notifications.preview.page.items.length > 0 && (
+        {notifications?.isAuthenticated && !notifications.isAuthFailure && notifications.preview.page && notifications.preview.page.items.length > 0 && (
           <div>
             {notifications.preview.page.items.slice(0, 3).map((item) => (
               <RecentNotification
                 key={item.id}
                 item={item}
                 context={notifications}
-                onError={setNotificationError}
+                onFailure={(message, retry) => {
+                  setNotificationError(message);
+                  setNotificationRetry(retry ? () => retry : null);
+                }}
+                onSuccess={() => {
+                  setNotificationError(null);
+                  setNotificationRetry(null);
+                }}
               />
             ))}
           </div>
         )}
-        {notifications?.isAuthenticated && notifications.preview.page && !notifications.preview.loading && !notifications.preview.error && (
+        {notifications?.isAuthenticated && !notifications.isAuthFailure && notifications.preview.page && !notifications.preview.loading && !notifications.preview.error && (
           <Link
             to="/notifications"
             className="block px-3.5 py-2.5 text-center text-xs text-text-muted hover:text-accent"

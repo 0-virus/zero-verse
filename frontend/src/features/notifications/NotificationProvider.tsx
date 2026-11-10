@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { ApiRequestError } from '../../lib/apiClient';
 import { useOptionalAuth } from '../../lib/authContext';
 import {
   deleteNotification,
@@ -38,6 +39,7 @@ export interface NotificationContextValue {
   isReadOnly: boolean;
   isAuthLoading: boolean;
   isAuthenticated: boolean;
+  isAuthFailure: boolean;
   viewerId: number | null;
   refreshPreview: () => Promise<void>;
   refreshCenter: (page?: number, size?: number) => Promise<void>;
@@ -66,6 +68,13 @@ export class NotificationMutationSupersededError extends Error {
 
 export function isNotificationMutationSuperseded(error: unknown): boolean {
   return error instanceof NotificationMutationSupersededError;
+}
+
+export function isNotificationAuthFailure(error: unknown): boolean {
+  return (
+    error instanceof ApiRequestError &&
+    (error.code === 'USER_001' || error.code === 'AUTH_002' || error.code === 'AUTH_004')
+  );
 }
 
 interface MutationSnapshot {
@@ -107,6 +116,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [center, setCenter] = useState<NotificationLayerState>(EMPTY_LAYER);
   const [unreadCount, setUnreadCount] = useState<number | null>(null);
   const [canManage, setCanManage] = useState<boolean | null>(null);
+  const [authFailure, setAuthFailure] = useState<unknown | null>(null);
   const accountGeneration = useRef(0);
   const mutationGeneration = useRef(0);
   const summaryRequestGeneration = useRef(0);
@@ -120,6 +130,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const mutationInFlight = useRef(new Map<string, Promise<unknown>>());
   const centerQuery = useRef<LayerQuery>({ page: 0, size: 20 });
   const centerActive = useRef(false);
+  const authFailureGeneration = useRef<number | null>(null);
 
   useLayoutEffect(() => {
     accountGeneration.current += 1;
@@ -129,11 +140,34 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     setCenter(EMPTY_LAYER);
     setUnreadCount(null);
     setCanManage(null);
+    setAuthFailure(null);
+    authFailureGeneration.current = null;
     inFlight.current = { preview: null, center: null };
     mutationInFlight.current.clear();
   }, [authKey]);
 
-  const ready = !isAuthLoading && isAuthenticated && viewerId !== null;
+  const ready = !isAuthLoading && isAuthenticated && viewerId !== null && authFailure === null;
+
+  const clearForAuthFailure = useCallback((error: unknown, requestAccountGeneration: number) => {
+    if (
+      requestAccountGeneration !== accountGeneration.current ||
+      authFailureGeneration.current === requestAccountGeneration
+    ) {
+      return;
+    }
+    authFailureGeneration.current = requestAccountGeneration;
+    mutationGeneration.current += 1;
+    appliedSummaryGeneration.current = 0;
+    previewRequestGeneration.current += 1;
+    centerRequestGeneration.current += 1;
+    inFlight.current = { preview: null, center: null };
+    mutationInFlight.current.clear();
+    setPreview({ ...EMPTY_LAYER, error });
+    setCenter({ ...EMPTY_LAYER, error });
+    setUnreadCount(null);
+    setCanManage(null);
+    setAuthFailure(error);
+  }, []);
 
   const applySummary = useCallback(
     (
@@ -191,9 +225,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         ) {
           return;
         }
+        if (inFlight.current.preview?.key === key) inFlight.current.preview = null;
         setPreview({ page: loaded, loading: false, error: null, key });
         applySummary(loaded, summaryGeneration, requestAccountGeneration, requestMutationGeneration);
       } catch (error) {
+        if (isNotificationAuthFailure(error)) {
+          if (inFlight.current.preview?.key === key) inFlight.current.preview = null;
+          clearForAuthFailure(error, requestAccountGeneration);
+          return;
+        }
         if (
           requestGeneration === previewRequestGeneration.current &&
           isCurrent(
@@ -203,6 +243,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
             mutationGeneration,
           )
         ) {
+          if (inFlight.current.preview?.key === key) inFlight.current.preview = null;
           setPreview((previous) => ({ ...previous, loading: false, error, key }));
         }
       }
@@ -213,7 +254,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     } finally {
       if (inFlight.current.preview?.promise === promise) inFlight.current.preview = null;
     }
-  }, [applySummary, isAuthenticated, ready, viewerId]);
+  }, [applySummary, clearForAuthFailure, isAuthenticated, ready, viewerId]);
 
   const refreshCenter = useCallback(
     async (page = 0, size = 20): Promise<void> => {
@@ -248,9 +289,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           ) {
             return;
           }
+          if (inFlight.current.center?.key === key) inFlight.current.center = null;
           setCenter({ page: loaded, loading: false, error: null, key });
           applySummary(loaded, summaryGeneration, requestAccountGeneration, requestMutationGeneration);
         } catch (error) {
+          if (isNotificationAuthFailure(error)) {
+            if (inFlight.current.center?.key === key) inFlight.current.center = null;
+            clearForAuthFailure(error, requestAccountGeneration);
+            return;
+          }
           if (
             requestGeneration === centerRequestGeneration.current &&
             isCurrent(
@@ -260,6 +307,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
               mutationGeneration,
             )
           ) {
+            if (inFlight.current.center?.key === key) inFlight.current.center = null;
             setCenter((previous) => ({ ...previous, loading: false, error, key }));
           }
         }
@@ -271,7 +319,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         if (inFlight.current.center?.promise === promise) inFlight.current.center = null;
       }
     },
-    [applySummary, isAuthenticated, ready, viewerId],
+    [applySummary, clearForAuthFailure, isAuthenticated, ready, viewerId],
   );
 
   const invalidate = useCallback(async (snapshot?: MutationSnapshot): Promise<void> => {
@@ -305,11 +353,18 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       const existing = mutationInFlight.current.get(scopedKey);
       if (existing) return existing as Promise<T>;
       const promise = (async () => {
-        const result = await operation(snapshot);
-        if (snapshot.accountGeneration !== accountGeneration.current) {
-          throw new NotificationMutationSupersededError();
+        try {
+          const result = await operation(snapshot);
+          if (snapshot.accountGeneration !== accountGeneration.current) {
+            throw new NotificationMutationSupersededError();
+          }
+          return result;
+        } catch (error) {
+          if (isNotificationAuthFailure(error)) {
+            clearForAuthFailure(error, snapshot.accountGeneration);
+          }
+          throw error;
         }
-        return result;
       })();
       mutationInFlight.current.set(scopedKey, promise);
       try {
@@ -318,7 +373,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         if (mutationInFlight.current.get(scopedKey) === promise) mutationInFlight.current.delete(scopedKey);
       }
     },
-    [viewerId],
+    [clearForAuthFailure, viewerId],
   );
 
   const markRead = useCallback(
@@ -370,6 +425,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       isReadOnly: canManage === false,
       isAuthLoading,
       isAuthenticated,
+      isAuthFailure: authFailure !== null,
       viewerId,
       refreshPreview,
       refreshCenter,
@@ -385,6 +441,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       invalidate,
       isAuthLoading,
       isAuthenticated,
+      authFailure,
       markAllRead,
       markRead,
       preview,
@@ -396,10 +453,6 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       viewerId,
     ],
   );
-
-  useEffect(() => {
-    if (ready) void refreshPreview();
-  }, [ready, refreshPreview]);
 
   useEffect(() => {
     const onVisibilityChange = () => {
@@ -428,21 +481,28 @@ export function useNotifications(): NotificationContextValue {
 }
 
 export function useNotificationPreview(): NotificationContextValue | null {
-  return useOptionalNotifications();
+  const context = useOptionalNotifications();
+  const isReady = Boolean(context?.isAuthenticated && !context.isAuthLoading && !context.isAuthFailure);
+  const refreshPreview = context?.refreshPreview;
+  useEffect(() => {
+    if (isReady && refreshPreview) void refreshPreview();
+  }, [isReady, refreshPreview]);
+  return context;
 }
 
 export function useNotificationCenter(page = 0, size = 20): NotificationContextValue | null {
   const context = useOptionalNotifications();
   const isAuthenticated = context?.isAuthenticated ?? false;
   const isAuthLoading = context?.isAuthLoading ?? false;
+  const isAuthFailure = context?.isAuthFailure ?? false;
   const refreshCenter = context?.refreshCenter;
   const setCenterActive = context?.setCenterActive;
   useEffect(() => {
-    if (!isAuthenticated || isAuthLoading || !refreshCenter || !setCenterActive) return undefined;
+    if (!isAuthenticated || isAuthLoading || isAuthFailure || !refreshCenter || !setCenterActive) return undefined;
     setCenterActive(true);
     void refreshCenter(page, size);
     return () => setCenterActive(false);
-  }, [isAuthLoading, isAuthenticated, page, refreshCenter, setCenterActive, size]);
+  }, [isAuthFailure, isAuthLoading, isAuthenticated, page, refreshCenter, setCenterActive, size]);
   return context;
 }
 

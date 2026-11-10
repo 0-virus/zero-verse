@@ -2,6 +2,7 @@ import { useMemo, useState, type KeyboardEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Pagination } from '../components/ui/Pagination';
 import {
+  isNotificationAuthFailure,
   isNotificationMutationSuperseded,
   useNotificationCenter,
   type NotificationContextValue,
@@ -11,6 +12,8 @@ import { ApiRequestError } from '../lib/apiClient';
 
 const PAGE_SIZE = 20;
 const UNAVAILABLE_MESSAGE = '더 이상 확인할 수 없는 알림입니다';
+type NotificationRetry = () => Promise<void>;
+type NoticeState = { message: string; retry?: NotificationRetry };
 
 const ICON: Record<NotificationType, { glyph: string; background: string }> = {
   COMMENT: { glyph: '💬', background: 'bg-info-bg' },
@@ -34,7 +37,7 @@ function formatTime(value: string): string {
 function errorMessage(error: unknown): string {
   if (error instanceof ApiRequestError) {
     if (error.code === 'USER_003') return '정지된 계정은 알림을 읽기 전용으로 확인할 수 있습니다.';
-    if (error.code === 'AUTH_002' || error.code === 'AUTH_004') {
+    if (error.code === 'AUTH_002' || error.code === 'AUTH_004' || error.code === 'USER_001') {
       return '로그인이 만료되었습니다. 다시 접속해 주세요.';
     }
     if (error.code === 'NOT_001') return '이 알림은 더 이상 확인할 수 없습니다.';
@@ -50,11 +53,13 @@ function displayMessage(item: NotificationItem): string {
 function NotificationRow({
   item,
   context,
-  onNotice,
+  onFailure,
+  onSuccess,
 }: {
   item: NotificationItem;
   context: NotificationContextValue;
-  onNotice: (message: string) => void;
+  onFailure: (message: string, retry?: NotificationRetry) => void;
+  onSuccess: () => void;
 }) {
   const navigate = useNavigate();
   const [busy, setBusy] = useState<'read' | 'delete' | null>(null);
@@ -67,15 +72,18 @@ function NotificationRow({
       return;
     }
     if (context.canManage !== true) {
-      onNotice('정지된 계정은 알림을 읽기 전용으로 확인할 수 있습니다.');
+      onFailure('정지된 계정은 알림을 읽기 전용으로 확인할 수 있습니다.');
       return;
     }
     setBusy('read');
     try {
       const current = await context.markRead(item.id);
+      onSuccess();
       if (current.available && current.href) navigate(current.href);
     } catch (error) {
-      if (!isNotificationMutationSuperseded(error)) onNotice(errorMessage(error));
+      if (!isNotificationMutationSuperseded(error)) {
+        onFailure(errorMessage(error), isNotificationAuthFailure(error) ? undefined : readAndNavigate);
+      }
     } finally {
       setBusy(null);
     }
@@ -88,21 +96,29 @@ function NotificationRow({
     }
   };
 
-  const remove = async (event: React.MouseEvent<HTMLButtonElement>) => {
-    event.stopPropagation();
+  const removeNotification = async () => {
     if (busy) return;
     if (context.canManage !== true) {
-      onNotice('정지된 계정은 알림을 읽기 전용으로 확인할 수 있습니다.');
+      onFailure('정지된 계정은 알림을 읽기 전용으로 확인할 수 있습니다.');
       return;
     }
     setBusy('delete');
     try {
       await context.remove(item.id);
+      onSuccess();
     } catch (error) {
-      if (!isNotificationMutationSuperseded(error)) onNotice(errorMessage(error));
+      if (!isNotificationMutationSuperseded(error)) {
+        onFailure(errorMessage(error), isNotificationAuthFailure(error) ? undefined : removeNotification);
+      }
     } finally {
       setBusy(null);
     }
+  };
+
+  const remove = async (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    if (busy) return;
+    await removeNotification();
   };
 
   return (
@@ -147,7 +163,7 @@ function NotificationRow({
 }
 export function NotificationsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<NoticeState | null>(null);
   const [readAllBusy, setReadAllBusy] = useState(false);
   const page = useMemo(() => pageFromSearch(searchParams.get('page')), [searchParams]);
   const context = useNotificationCenter(page, PAGE_SIZE);
@@ -176,8 +192,14 @@ export function NotificationsPage() {
     setReadAllBusy(true);
     try {
       await context.markAllRead();
+      setNotice(null);
     } catch (error) {
-      if (!isNotificationMutationSuperseded(error)) setNotice(errorMessage(error));
+      if (!isNotificationMutationSuperseded(error)) {
+        setNotice({
+          message: errorMessage(error),
+          retry: isNotificationAuthFailure(error) ? undefined : readAll,
+        });
+      }
     } finally {
       setReadAllBusy(false);
     }
@@ -230,18 +252,22 @@ export function NotificationsPage() {
       )}
       {notice && (
         <div role="alert" className="mb-4 border-2 border-danger bg-danger-bg px-4 py-2 text-xs text-danger">
-          {notice}
-          <button type="button" onClick={retry} className="ml-3 border-2 border-danger bg-surface px-2 py-1 font-bold">
-            다시 시도
-          </button>
+          {notice.message}
+          {notice.retry && (
+            <button type="button" onClick={() => void notice.retry?.()} className="ml-3 border-2 border-danger bg-surface px-2 py-1 font-bold">
+              다시 시도
+            </button>
+          )}
         </div>
       )}
       {Boolean(center.error) && !center.loading && (
         <div role="alert" className="mb-4 border-[3px] border-danger bg-danger-bg px-5 py-4 text-[13px] text-danger">
           {errorMessage(center.error)}
-          <button type="button" onClick={retry} className="ml-3 border-2 border-danger bg-surface px-3 py-1 text-xs font-bold">
-            다시 시도
-          </button>
+          {!context.isAuthFailure && (
+            <button type="button" onClick={retry} className="ml-3 border-2 border-danger bg-surface px-3 py-1 text-xs font-bold">
+              다시 시도
+            </button>
+          )}
         </div>
       )}
 
@@ -250,15 +276,21 @@ export function NotificationsPage() {
           알림을 불러오는 중...
         </div>
       )}
-      {!center.loading && !center.error && data && data.items.length === 0 && (
+      {!center.loading && data && data.items.length === 0 && (
         <div className="border-[3px] border-ink bg-surface px-6 py-16 text-center text-[13px] text-text-muted shadow-panel">
           {data.totalElements > 0 ? '이 페이지에는 알림이 없습니다. 다른 페이지를 선택해 주세요.' : '아직 알림이 없습니다.'}
         </div>
       )}
-      {!center.error && data && data.items.length > 0 && (
+      {data && data.items.length > 0 && (
         <div className="border-[3px] border-ink bg-surface shadow-panel">
           {data.items.map((item) => (
-            <NotificationRow key={item.id} item={item} context={context} onNotice={setNotice} />
+            <NotificationRow
+              key={item.id}
+              item={item}
+              context={context}
+              onFailure={(message, retryAction) => setNotice({ message, retry: retryAction })}
+              onSuccess={() => setNotice(null)}
+            />
           ))}
           {!data.hasNext && (
             <div className="border-t border-line px-3 py-3 text-center text-xs text-text-muted">
@@ -267,7 +299,7 @@ export function NotificationsPage() {
           )}
         </div>
       )}
-      {!center.error && data && data.totalPages > 0 && (
+      {data && data.totalPages > 0 && (
         <div className="mt-6">
           <Pagination
             page={Math.min(data.page, data.totalPages - 1)}

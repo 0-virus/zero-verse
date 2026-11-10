@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useState } from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { NotificationProvider, useNotificationCenter, useNotificationPreview } from './NotificationProvider';
 import { listNotifications } from './notificationApi';
 import { useOptionalAuth } from '../../lib/authContext';
@@ -56,6 +58,14 @@ const response = (unreadCount: number, marker: string, canManage = true) => ({
   canManage,
 });
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 function Probe() {
   const preview = useNotificationPreview();
   const center = useNotificationCenter(0, 20);
@@ -65,6 +75,27 @@ function Probe() {
       <output data-testid="center-message">{center?.center.page?.items[0]?.message ?? ''}</output>
       <output data-testid="unread">{preview?.unreadCount ?? 'none'}</output>
       <output data-testid="can-manage">{String(preview?.canManage ?? 'none')}</output>
+    </>
+  );
+}
+
+function PreviewProbe() {
+  const preview = useNotificationPreview();
+  return <output data-testid="preview-message">{preview?.preview.page?.items[0]?.message ?? ''}</output>;
+}
+
+function PreviewEntry({ visible }: { visible: boolean }) {
+  return visible ? <PreviewProbe /> : null;
+}
+
+function CenterRaceProbe() {
+  const [page, setPage] = useState(0);
+  const center = useNotificationCenter(page, 20);
+  return (
+    <>
+      <output data-testid="center-race-message">{center?.center.page?.items[0]?.message ?? ''}</output>
+      <output data-testid="center-race-unread">{center?.unreadCount ?? 'none'}</output>
+      <button type="button" onClick={() => setPage(1)}>next-query</button>
     </>
   );
 }
@@ -88,9 +119,9 @@ describe('NotificationProvider', () => {
       </NotificationProvider>,
     );
 
-    expect(await screen.findByTestId('preview-message')).toHaveTextContent('preview 알림');
+    await waitFor(() => expect(screen.getByTestId('preview-message')).toHaveTextContent('preview 알림'));
     await waitFor(() => expect(screen.getByTestId('center-message')).toHaveTextContent('center 알림'));
-    expect(screen.getByTestId('unread')).toHaveTextContent('3');
+    await waitFor(() => expect(screen.getByTestId('unread')).toHaveTextContent('2'));
     expect(listNotifications).toHaveBeenCalledWith({ read: 'all', page: 0, size: 3 });
     expect(listNotifications).toHaveBeenCalledWith({ read: 'all', page: 0, size: 20 });
   });
@@ -132,5 +163,60 @@ describe('NotificationProvider', () => {
     });
 
     expect(vi.mocked(listNotifications).mock.calls.length).toBeGreaterThan(initial);
+  });
+
+  it('메인 preview consumer 재진입은 같은 요청 dedupe를 유지하며 최신 preview를 갱신한다', async () => {
+    vi.mocked(listNotifications)
+      .mockResolvedValueOnce(response(3, 'preview'))
+      .mockResolvedValueOnce(response(8, 'reentry'));
+    const { rerender } = render(
+      <NotificationProvider>
+        <PreviewEntry visible />
+      </NotificationProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('preview-message')).toHaveTextContent('preview 알림'));
+    rerender(
+      <NotificationProvider>
+        <PreviewEntry visible={false} />
+      </NotificationProvider>,
+    );
+    rerender(
+      <NotificationProvider>
+        <PreviewEntry visible />
+      </NotificationProvider>,
+    );
+    expect(await screen.findByTestId('preview-message')).toHaveTextContent('reentry 알림');
+    expect(listNotifications).toHaveBeenCalledWith({ read: 'all', page: 0, size: 3 });
+    expect(listNotifications).toHaveBeenCalledTimes(2);
+  });
+
+  it('다른 center query의 역순 응답은 최신 query summary를 덮어쓰지 않는다', async () => {
+    const firstQuery = deferred<ReturnType<typeof response>>();
+    const secondQuery = deferred<ReturnType<typeof response>>();
+    vi.mocked(listNotifications).mockImplementation(async ({ page: queryPage, size } = {}) => {
+      if (size === 3) return response(0, 'preview');
+      return (queryPage ?? 0) === 0 ? firstQuery.promise : secondQuery.promise;
+    });
+    const view = render(
+      <NotificationProvider>
+        <CenterRaceProbe />
+      </NotificationProvider>,
+    );
+    const user = userEvent.setup();
+    await waitFor(() => expect(listNotifications).toHaveBeenCalledWith({ read: 'all', page: 0, size: 20 }));
+    await user.click(screen.getByRole('button', { name: 'next-query' }));
+    await waitFor(() => expect(listNotifications).toHaveBeenCalledWith({ read: 'all', page: 1, size: 20 }));
+
+    await act(async () => secondQuery.resolve({ ...response(9, 'query 1'), page: 1 }));
+    await waitFor(() => {
+      expect(screen.getByTestId('center-race-message')).toHaveTextContent('query 1 알림');
+      expect(screen.getByTestId('center-race-unread')).toHaveTextContent('9');
+    });
+    await act(async () => firstQuery.resolve(response(1, 'query 0')));
+    await act(async () => undefined);
+    expect(screen.getByTestId('center-race-message')).toHaveTextContent('query 1 알림');
+    expect(screen.getByTestId('center-race-unread')).toHaveTextContent('9');
+    view.unmount();
   });
 });

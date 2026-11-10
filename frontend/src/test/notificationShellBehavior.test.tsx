@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { TopBar } from '../components/layout/TopBar';
@@ -129,6 +129,36 @@ describe('notification shell UI', () => {
     await screen.findByText('알림');
     expect(screen.getByTestId('shell-location')).toHaveTextContent('/blog/retried/42');
     expect(markNotificationRead).toHaveBeenCalledTimes(2);
+  });
+
+  it('TopBar A 계정의 old retry는 B 계정 전환 시 제거된다', async () => {
+    const user = userEvent.setup();
+    const view = render(
+      <MemoryRouter>
+        <NotificationProvider>
+          <TopBar nickname="세븐별" />
+        </NotificationProvider>
+      </MemoryRouter>,
+    );
+    vi.mocked(markNotificationRead).mockRejectedValueOnce(new Error('A 읽음 실패'));
+
+    await user.click(screen.getByRole('link', { name: '알림' }));
+    await user.click(await screen.findByRole('button', { name: item.message }));
+    expect(await screen.findByRole('button', { name: '다시 시도' })).toBeInTheDocument();
+
+    vi.mocked(useOptionalAuth).mockReturnValue({
+      ...auth,
+      user: { ...auth.user, id: 8, nickname: '여덟별' },
+    });
+    view.rerender(
+      <MemoryRouter>
+        <NotificationProvider>
+          <TopBar nickname="여덟별" />
+        </NotificationProvider>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument());
+    expect(markNotificationRead).toHaveBeenCalledTimes(1);
   });
 
   it('RightPanel은 공유 unread와 preview 최신 3건·센터 링크를 표시한다', async () => {

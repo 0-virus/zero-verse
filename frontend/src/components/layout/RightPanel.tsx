@@ -72,16 +72,21 @@ function RecentNotification({
       onFailure('정지된 계정은 알림을 읽기 전용으로 확인할 수 있습니다.');
       return;
     }
+    const actionGeneration = context.retryGeneration;
     setBusy(true);
     try {
       const current = await context.markRead(item.id);
       onSuccess();
       if (current.available && current.href) navigate(current.href);
     } catch (error) {
-      if (!isNotificationMutationSuperseded(error)) {
+      if (!isNotificationMutationSuperseded(error) && context.isRetryGenerationCurrent(actionGeneration)) {
+        const retry = isNotificationAuthFailure(error)
+          ? undefined
+          : context.bindRetry(() => handleClick(), actionGeneration) ?? undefined;
+        if (!isNotificationAuthFailure(error) && !retry) return;
         onFailure(
           notificationErrorMessage(error),
-          isNotificationAuthFailure(error) ? undefined : () => handleClick(),
+          retry ?? undefined,
         );
       }
     } finally {
@@ -122,6 +127,11 @@ export function RightPanel({ blog }: { blog?: DefaultBlog | null }) {
   const generation = useRef(0);
 
   useEffect(() => {
+    setNotificationError(null);
+    setNotificationRetry(null);
+  }, [notifications?.retryGeneration]);
+
+  useEffect(() => {
     const currentGeneration = ++generation.current;
     if (authLoading || viewerId == null) {
       setStats(IDLE_STATS);
@@ -155,6 +165,14 @@ export function RightPanel({ blog }: { blog?: DefaultBlog | null }) {
   }, [authLoading, viewerId]);
 
   const visibleStats = statsViewerId === viewerId ? stats : loadingStats();
+  const retryPreview = () => {
+    if (!notifications) return;
+    const retry = notifications.bindRetry(
+      () => notifications.refreshPreview(),
+      notifications.retryGeneration,
+    );
+    if (retry) void retry().catch(() => undefined);
+  };
 
   return (
     <aside
@@ -235,7 +253,7 @@ export function RightPanel({ blog }: { blog?: DefaultBlog | null }) {
             알림을 불러오지 못했습니다.
             <button
               type="button"
-              onClick={() => void notifications.refreshPreview()}
+              onClick={retryPreview}
               className="ml-2 border-2 border-danger bg-surface px-2 py-1 font-bold"
             >
               다시 시도

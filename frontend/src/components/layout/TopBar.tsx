@@ -65,6 +65,12 @@ export function TopBar({ nickname }: { nickname?: string | null }) {
     return () => document.removeEventListener('keydown', closeOnEscape);
   }, [notificationOpen]);
 
+  useEffect(() => {
+    setNotificationError(null);
+    setNotificationRetry(null);
+    setNotificationBusyId(null);
+  }, [notifications?.retryGeneration]);
+
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
@@ -88,7 +94,13 @@ export function TopBar({ nickname }: { nickname?: string | null }) {
     setNotificationOpen(nextOpen);
     setNotificationError(null);
     setNotificationRetry(null);
-    if (nextOpen) void notifications?.refreshPreview();
+    if (nextOpen && notifications) {
+      const retry = notifications.bindRetry(
+        () => notifications.refreshPreview(),
+        notifications.retryGeneration,
+      );
+      if (retry) void retry().catch(() => undefined);
+    }
   };
 
   const openNotification = async (item: NotificationItem) => {
@@ -103,6 +115,7 @@ export function TopBar({ nickname }: { nickname?: string | null }) {
       setNotificationRetry(null);
       return;
     }
+    const actionGeneration = notifications.retryGeneration;
     setNotificationBusyId(item.id);
     setNotificationError(null);
     setNotificationRetry(null);
@@ -113,11 +126,13 @@ export function TopBar({ nickname }: { nickname?: string | null }) {
       setNotificationOpen(false);
       if (current.available && current.href) navigate(current.href);
     } catch (caught) {
-      if (!isNotificationMutationSuperseded(caught)) {
+      if (!isNotificationMutationSuperseded(caught) && notifications.isRetryGenerationCurrent(actionGeneration)) {
+        const retry = isNotificationAuthFailure(caught)
+          ? undefined
+          : notifications.bindRetry(() => openNotification(item), actionGeneration) ?? undefined;
+        if (!isNotificationAuthFailure(caught) && !retry) return;
         setNotificationError(notificationErrorMessage(caught));
-        setNotificationRetry(
-          isNotificationAuthFailure(caught) ? null : () => () => openNotification(item),
-        );
+        setNotificationRetry(retry ? () => retry : null);
       }
     } finally {
       setNotificationBusyId(null);
@@ -129,6 +144,14 @@ export function TopBar({ nickname }: { nickname?: string | null }) {
   const canRenderPreview = Boolean(
     notifications?.isAuthenticated && !notifications.isAuthLoading && !notifications.isAuthFailure,
   );
+  const retryPreview = () => {
+    if (!notifications) return;
+    const retry = notifications.bindRetry(
+      () => notifications.refreshPreview(),
+      notifications.retryGeneration,
+    );
+    if (retry) void retry().catch(() => undefined);
+  };
 
   return (
     <header
@@ -272,7 +295,7 @@ export function TopBar({ nickname }: { nickname?: string | null }) {
               알림을 불러오지 못했습니다.
               <button
                 type="button"
-                onClick={() => void notifications?.refreshPreview()}
+                onClick={retryPreview}
                 className="ml-2 border-2 border-danger bg-surface px-2 py-1 font-bold"
               >
                 다시 시도

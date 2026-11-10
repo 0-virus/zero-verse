@@ -507,3 +507,13 @@
 - 검증 명령/실측: `cd frontend && npm test -- --run src/features/notifications/notificationStore.test.tsx src/features/notifications/notificationAuthRace.test.tsx src/features/notifications/notificationMutationRace.test.tsx src/test/notificationsBehavior.test.tsx src/test/notificationShellBehavior.test.tsx --maxWorkers=1` → exit 0, 5 files/25 tests passed; `npm run lint` → exit 0; `npm run build` → exit 0 (`tsc -b`, Vite 145 modules, 기존 >500 kB chunk warning만). 기존 root full 47 files/423 tests raw는 재실행하지 않았다.
 - raw 원문: `frontend/.m8-evidence/raw/frontend-fix1-focused-green.log`, `frontend/.m8-evidence/raw/frontend-fix1-lint.log`, `frontend/.m8-evidence/raw/frontend-fix1-build.log`. 자체 요약으로 raw 출력을 대체하지 않았다.
 - 남은 게이트: 실제 backend DTO/HTTP/ACL/no-store, Chrome 1440px 시각·동작 검증은 root/QA가 수행한다. Minor ledger(TopBar/RightPanel SUSPENDED 안내 카피, >500 kB 경고)는 review-1 범위에서 보존했다.
+
+## 2026-11-10 16:25:00 KST — M8 Task4 fix2 review-2 경계 보강
+
+- 담당/경계: 부모가 지정한 review-2의 남은 2개 경계만 `frontend/**`, frontend 역할 STATE/WORKLOG 및 명시 배정 report에 반영했다. backend/QA/root docs/Git/의존성/runtime은 건드리지 않았고 다른 작업자 변경을 보존했다.
+- RED→GREEN: PUT 성공 뒤 canonical GET USER_001의 href 반환·이동 회귀, A→B old read-all retry, transient→USER_001 old preview retry를 먼저 RED로 확인했다. Page/Shell에도 A→B retry 제거와 늦은 final-auth catch retry 재생성 방지 회귀를 추가했다.
+- 구현: provider에 `sessionGeneration`, `retryGeneration`, `bindRetry`, `isRetryGenerationCurrent`를 추가했다. mutation snapshot은 account/session/viewer를 모두 검사하므로 후속 canonical GET final-auth가 invalidate를 resolve해도 mutation 결과가 superseded 된다. retry callback은 생성 시 세대를 캡처하고 실행 직전 세대/viewer를 확인해 전환·final-auth 뒤 API 호출을 거부한다.
+- UI 경계: NotificationsPage·TopBar·RightPanel은 retry generation 전환 시 실패 callback을 제거한다. 늦은 A mutation catch는 provider generation 검증 뒤 B UI에 old retry/error를 재생성하지 않는다. GET retry도 bindRetry 경계를 사용한다.
+- 검증 명령/실측: `cd frontend && npm test -- --run src/features/notifications/notificationStore.test.tsx src/features/notifications/notificationAuthRace.test.tsx src/features/notifications/notificationMutationRace.test.tsx src/test/notificationsBehavior.test.tsx src/test/notificationShellBehavior.test.tsx --maxWorkers=1` → exit 0, 5 files/31 tests passed; `npm run lint` → exit 0; `npm run build` → exit 0 (`tsc -b`, Vite 145 modules, 기존 >500 kB chunk warning만). 기존 root full 47 files/423 tests raw는 재실행하지 않았다.
+- raw 원문: `frontend/.m8-evidence/raw/frontend-fix2-focused-green.log`, `frontend/.m8-evidence/raw/frontend-fix2-lint.log`, `frontend/.m8-evidence/raw/frontend-fix2-build.log`. command stdout/stderr를 요약으로 대체하지 않았다.
+- 인계/남은 게이트: source freeze 후 독립 scoped re-review에 인계한다. 실제 backend DTO/HTTP/ACL/no-store 및 Chrome 1440px runtime·시각 검증은 root/QA 범위이며, Minor ledger는 유지한다.

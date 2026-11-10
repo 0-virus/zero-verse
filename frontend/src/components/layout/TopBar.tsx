@@ -1,6 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { normalizeSearchKeyword } from '../../features/search/searchApi';
+import {
+  isNotificationMutationSuperseded,
+  useOptionalNotifications,
+} from '../../features/notifications/NotificationProvider';
+import type { NotificationItem } from '../../features/notifications/types';
 
 /**
  * 전 화면 공통 상단바.
@@ -25,11 +30,24 @@ export function TopBar({ nickname }: { nickname?: string | null }) {
   const [searchParams] = useSearchParams();
   const [keyword, setKeyword] = useState(searchParams.get('keyword') ?? '');
   const [error, setError] = useState<string | null>(null);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notificationError, setNotificationError] = useState<string | null>(null);
+  const [notificationBusyId, setNotificationBusyId] = useState<number | null>(null);
+  const notifications = useOptionalNotifications();
 
   useEffect(() => {
     setKeyword(searchParams.get('keyword') ?? '');
     setError(null);
   }, [searchParams.toString()]);
+
+  useEffect(() => {
+    if (!notificationOpen) return undefined;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setNotificationOpen(false);
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [notificationOpen]);
 
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -47,6 +65,43 @@ export function TopBar({ nickname }: { nickname?: string | null }) {
       setError(submitError instanceof Error ? submitError.message : '검색어를 확인해 주세요.');
     }
   };
+
+  const toggleNotifications = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    const nextOpen = !notificationOpen;
+    setNotificationOpen(nextOpen);
+    setNotificationError(null);
+    if (nextOpen) void notifications?.refreshPreview();
+  };
+
+  const openNotification = async (item: NotificationItem) => {
+    if (notificationBusyId === item.id) return;
+    if (notifications?.canManage === false) {
+      setNotificationOpen(false);
+      if (item.available && item.href) navigate(item.href);
+      return;
+    }
+    if (!notifications || notifications.canManage !== true) {
+      setNotificationError('정지된 계정은 알림을 읽기 전용으로 확인할 수 있습니다.');
+      return;
+    }
+    setNotificationBusyId(item.id);
+    try {
+      const current = await notifications.markRead(item.id);
+      setNotificationOpen(false);
+      if (current.available && current.href) navigate(current.href);
+    } catch (caught) {
+      if (!isNotificationMutationSuperseded(caught)) {
+        setNotificationError(caught instanceof Error ? caught.message : '알림을 읽지 못했습니다.');
+      }
+    } finally {
+      setNotificationBusyId(null);
+    }
+  };
+
+  const preview = notifications?.preview.page;
+  const unreadCount = notifications?.unreadCount;
+  const canRenderPreview = Boolean(notifications?.isAuthenticated && !notifications.isAuthLoading);
 
   return (
     <header
@@ -111,10 +166,22 @@ export function TopBar({ nickname }: { nickname?: string | null }) {
         </Link>
         <Link
           to="/notifications"
+          aria-label="알림"
+          aria-haspopup="dialog"
+          aria-expanded={notificationOpen}
+          onClick={toggleNotifications}
           style={{ padding: '7px 14px' }}
-          className="border-[3px] border-ink bg-surface text-[13px] font-semibold text-ink shadow-btn hover:bg-surface-raise"
+          className="relative border-[3px] border-ink bg-surface text-[13px] font-semibold text-ink shadow-btn hover:bg-surface-raise"
         >
           알림
+          {unreadCount !== undefined && unreadCount !== null && unreadCount > 0 && (
+            <span
+              aria-hidden="true"
+              className="absolute -right-2 -top-2 grid h-[17px] w-[17px] place-items-center border-2 border-ink bg-accent text-[10px] font-bold text-white"
+            >
+              {unreadCount}
+            </span>
+          )}
         </Link>
         <Link
           to={isSignedIn ? '/settings' : '/signin'}
@@ -124,6 +191,69 @@ export function TopBar({ nickname }: { nickname?: string | null }) {
           {profileLabel}
         </Link>
       </nav>
+      {notificationOpen && (
+        <div
+          role="dialog"
+          aria-label="최근 알림"
+          style={{ top: 70, right: 28, width: 330 }}
+          className="absolute z-[99] border-[3px] border-ink bg-surface shadow-card"
+        >
+          <div className="flex items-center justify-between border-b-[3px] border-ink px-3.5 py-2.5">
+            <span className="text-[13px] font-bold tracking-[2px] text-ink">■ 알림</span>
+            <Link
+              to="/notifications"
+              onClick={() => setNotificationOpen(false)}
+              className="text-[11px] text-accent hover:text-accent-strong"
+            >
+              알림 센터 →
+            </Link>
+          </div>
+          {notificationError && (
+            <p role="alert" className="border-b border-line bg-danger-bg px-3.5 py-2 text-xs text-danger">
+              {notificationError}
+            </p>
+          )}
+          {!canRenderPreview && (
+            <p className="px-3.5 py-6 text-center text-xs text-text-muted">
+              로그인하면 알림을 확인할 수 있습니다.
+            </p>
+          )}
+          {canRenderPreview && notifications?.preview.loading && !preview && (
+            <p className="px-3.5 py-6 text-center text-xs text-text-muted">알림을 불러오는 중...</p>
+          )}
+          {canRenderPreview && Boolean(notifications?.preview.error) && !notifications?.preview.loading && (
+            <div className="px-3.5 py-4 text-center text-xs text-danger">
+              알림을 불러오지 못했습니다.
+              <button
+                type="button"
+                onClick={() => void notifications?.refreshPreview()}
+                className="ml-2 border-2 border-danger bg-surface px-2 py-1 font-bold"
+              >
+                다시 시도
+              </button>
+            </div>
+          )}
+          {canRenderPreview && preview && preview.items.length === 0 && !notifications?.preview.loading && (
+            <p className="px-3.5 py-6 text-center text-xs text-text-muted">아직 알림이 없습니다.</p>
+          )}
+          {canRenderPreview && preview && preview.items.length > 0 && (
+            <div>
+              {preview.items.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  disabled={notificationBusyId === item.id}
+                  onClick={() => void openNotification(item)}
+                  className="flex w-full gap-2.5 border-b border-line px-3.5 py-[11px] text-left text-[12.5px] leading-[1.5] text-text-body hover:bg-surface-soft disabled:cursor-wait disabled:opacity-60"
+                >
+                  <span aria-hidden="true" className="text-accent">{item.type === 'LIKE' ? '♥' : item.type === 'NEIGHBOR' || item.type === 'POST' ? '✦' : '💬'}</span>
+                  <span>{item.available ? item.message : '더 이상 확인할 수 없는 알림입니다'}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </header>
   );
 }

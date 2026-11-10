@@ -453,3 +453,9 @@
 - 한 일: 독립 전체 리뷰의 Minor finding에 따라 `NotificationController.delete`의 `@ApiResponses`에 `400 VALIDATION_001` JSON envelope 응답을 추가했다. 잘못된 `notificationId`가 실제 `validateId`에서 `VALIDATION_001`을 반환하는 기존 런타임 동작과 SpringDoc 문서를 일치시켰다. 다른 operation·제품 동작·DB/API payload는 변경하지 않았다.
 - 검증: 편집한 `src/main/java/com/zeroverse/domain/notification/controller/NotificationController.java`를 재독하고 `git diff`로 DELETE operation에만 신규 응답이 위치하며 기존 GET/read/read-all 응답은 보존됨을 확인했다. 기존 `NotificationControllerTest`의 `/v3/api-docs` operation 보안·응답 존재 검사와 인증/no-store 회귀가 covering 근거이며, Gradle 실행은 root 단일 runner 정책에 따라 수행하지 않았다.
 - 인계: root가 최종 JAR 재생성·실제 HTTP/Chrome 인수·독립 scoped re-review에서 OpenAPI 400 응답을 확인한다. 이 역할은 Git 조작, QA/FE 파일, 사용자 DB·환경을 변경하지 않았다.
+
+## 2026-11-10 17:41 KST — M8 backend closeout 증거 동기화
+
+- 한 일: backend `STATE.md`의 오래된 “Task3 독립 검토·전체 검증 대기” 표현을 실제 결과로 갱신했다. Task2/API·V6와 Task3 생성·원자성 구현은 각각 독립 review(`/root/m8_backend_review`, `/root/m8_generation_review`) 승인을 받았고, M8 backend 최종 독립 시각 review와 `dev` 통합은 아직 진행 전/진행 중으로 남겼다. 이전 기록은 수정하지 않았다.
+- 검증 근거: `build/m8-evidence/backend-final-2/summary.json`의 102 suites / 599 tests / failures 0 / errors 0 / skipped 0 및 `bootJar` PASS(JAR `1cc46fd46eebcbcbe1189235a19875491ee69f54c64e1fb185191095f4630a51`), `build/m8-evidence/backend-final-doc/summary.json`의 1 suite / 5 tests / failures 0 / errors 0 / skipped 0(JAR `1cab24e82cb1cf524b0184145ffa49a802db924d4a00b08afc862299014fd1c5`), `build/m8-acceptance-20261110-173900/evidence.json`의 323 PASS / 0 FAIL / 0 NOT_RUN을 반영했다. source `108e7120a07ab43ebfc550e34a2f13ca7f613d4d0388dd44781bf43cc95add47`, JAR `1cab24e82cb1cf524b0184145ffa49a802db924d4a00b08afc862299014fd1c5`, 396 files가 manifest와 일치한다.
+- 한계·인계: 운영 fanout SLA·peak memory·물리 JDBC batch 보장은 범위 밖으로 유지했다. 1001명 fan-out heap 차이는 GC 포함 값이며 peak/RSS가 아니고 logical batch는 JDBC batch 보장이 아니다. root가 최종 독립 시각 review 후 `dev` 통합만 진행하며 M9는 제외한다. 이번 closeout은 역할 기록만 편집했고 제품 소스·테스트·Gradle·Git·사용자 DB/환경은 변경하지 않았다.

@@ -1,8 +1,8 @@
-# M8 — 알림 독립 QA 인수 준비
+# M8 — 알림 독립 QA 인수 결과
 
-> **현재 상태: A-v2 APPROVED / IMPLEMENTATION IN PROGRESS / ACCEPTANCE PREP — NOT RUN**
+> **현재 상태: A-v2 APPROVED / IMPLEMENTED / ACCEPTANCE PASS / READY TO MERGE**
 >
-> 이 문서는 M8 Task 5의 독립 인수 기준과 실행 경계를 고정한다. 현재는 backend Task 2와 frontend 구현이 시작된 단계이며, 실제 HTTP·MySQL·Chrome·자동검증·소스/JAR 일치 결과가 없다. 아래의 `NOT RUN`은 실패가 아니라 아직 실행하지 않은 gate다. PASS는 immutable artifact와 독립 실측 뒤에만 기록한다.
+> 이 문서는 M8 Task 5의 독립 인수 기준과 실행 결과를 고정한다. Run3 immutable runtime에서 실제 HTTP·MySQL·Chrome·자동검증·소스/JAR 일치 gate를 충족했고, §10의 독립 최종 audit에서 Critical/Important finding 없음과 Ready to merge를 확인했다. 아래의 과거 `NOT RUN` 표기는 실행 전 이력이며 현재 판정을 대체하지 않는다. dev 통합은 root 후속 단계다.
 
 ## 1. 검토 경계와 정본
 
@@ -148,7 +148,7 @@ runner는 `owner`, `actor`, `parent`, `friend`, `blocked`, `suspended`, `deleted
 | auth | 모든 4 endpoint의 header 없음/빈 값/Basic/잘못된 bearer/서명/type/만료 | endpoint별 `401 AUTH_004` 또는 exact expired `401 AUTH_002`; deleted principal/SUSPENDED 오류와 private/no-store 포함 | NOT RUN |
 | validation/no-store | page<0,size 0/101, 잘못된 id/read | `400 VALIDATION_001`; 성공·오류 모두 `Cache-Control: private, no-store` + envelope | NOT RUN |
 | OpenAPI | `/v3/api-docs` | list/read/read-all/delete path·method 노출 | NOT RUN |
-| actual bearer query-bound | `performance_schema` app account counter, 순차 size=1→100 | `USER='zeroverse_m8'` SELECT delta, size=1 총 `<=14`, size=100 추가 delta `0`; unavailable counter는 NOT RUN | NOT RUN |
+| actual bearer query-bound | `performance_schema` app account counter, 순차 size=1→100 | `USER='zeroverse_m8'`에서 size=1·size=100 각각 `1..14`, 두 비용 차이 `0`; unavailable counter는 NOT RUN | NOT RUN |
 
 ### 5.2 생성·중복·원자성·동시성
 
@@ -207,3 +207,72 @@ runner는 `owner`, `actor`, `parent`, `friend`, `blocked`, `suspended`, `deleted
 **M8 독립 QA: NOT RUN. Merge-ready: No claim. Dev 통합: 미실행.**
 
 준비 산출물은 `qa/M8-review.md`와 `qa/m8-acceptance.mjs`이며, 현재 시점에는 제품 구현·실제 runtime·브라우저·DB·자동검증 결과를 근거로 한 PASS가 없다.
+
+## 9. 2026-11-10 KST — whole-branch review QA finding closure
+
+독립 whole-branch review가 지적한 인수 도구의 실행 오류·거짓 PASS 가능성을 `qa/m8-acceptance.mjs`에서 닫았다. 변경 범위는 QA 도구와 QA 기록뿐이며 실제 제품 코드·타 역할 테스트·runtime DB는 수정하지 않았다.
+
+- source manifest 경로 정렬을 `build/m8-runtime.py`와 같은 ordinal comparator로 맞췄다. `localeCompare`에 의한 host locale 차이로 aggregate hash가 잘못 실패하지 않으며 개별 파일/JAR hash gate는 그대로 유지한다.
+- 발행 전이 건수는 PRIVATE masking으로 `targetId`가 null이어도 보존되는 notification ID 집합의 신규 차이로 계산하고, PRIVATE 상태의 실제 masking을 별도 검사한다. SUSPENDED receiver COMMENT fixture는 post ID가 아니라 comment ID로 찾는다. 삭제된 comment의 masking은 실제 DELETE 뒤에 검사한다.
+- size=1/100 query bound는 각 요청의 독립 SELECT 비용을 기록하고 둘 다 `1..14`, 차이 `0`을 요구한다. counter 미가용·0 관측을 PASS로 완화하지 않는다.
+- Chrome 검사는 원본 Main `body` locator, 실제 센터 `role=button[tabindex=0]`/최근 알림 `<button>` 행, API 순서·표시 시각을 이용한다. 없는 `data-notification-id`, 첫 duplicate message 부모 추정, article/li 추정을 제거했다.
+- USER_001 상태 비움은 실제 센터 행·상단 unread badge를 확인한다. 계정 전환 stale 검사는 full-page reload가 아니라 React Router SPA sign-in/navigation으로 살아 있는 Provider 세대 경계를 유지한다. unavailable row는 실제 `PUT read` 미호출과 URL 불변을 확인한다.
+- wrong-type JWT는 runtime이 제공한 정상 서명 `M8_WRONG_TYPE_TOKEN`만 사용하며, expired token header 변조는 제거했다. env가 없으면 해당 endpoint들은 NOT RUN이다.
+- DB fingerprint는 `GROUP_CONCAT`/`CONCAT_WS`를 사용하지 않고 receiver의 모든 notification scalar 필드를 `HEX(JSON_ARRAY(...))` 행별로 id 정렬 조회한 뒤 Node에서 null 보존 canonical JSON SHA-256을 계산한다. SQL은 read-only다.
+
+정적 검증: `node --check qa/m8-acceptance.mjs` exit 0, QA 파일 `trailing-whitespace: clean`, `git diff --check -- qa/m8-acceptance.mjs` exit 0. 실제 HTTP/DB/Chrome acceptance는 root가 새 immutable source/JAR manifest로 이어서 실행하며, 이 수정만으로 M8 PASS를 주장하지 않는다.
+
+### 9.1 root spot-check 반영
+
+- ACTIVE 계정의 unavailable row는 `PUT read` 자체는 허용될 수 있으므로 no-read를 요구하지 않는다. 실제 row click 후 read 응답 `200`, `available=false`, `href=null`과 URL 불변을 함께 확인한다.
+- account-switch stale 검사는 owner center가 준비된 뒤 `visibilitychange`로 발생한 실제 `size=20` 응답을 hold하고, SPA sign-in으로 friend 계정으로 전환·센터 로딩을 완료한 뒤 원 응답을 release한다. hold 관측·owner row 존재·200 응답·friend 화면의 old unique row 부재를 각각 확인한다.
+
+### 9.2 Run2 브라우저 실패 원인과 final-fix handoff
+
+- Run2에서 HTTP는 통과했으나 `browser-center-width`, `browser-shared-unread-center-topbar`, `browser-right-panel-recent`, `browser-shared-unread-right-panel`이 실패했다. 원인은 제품 레이아웃이 아니라 하네스의 inner-list 폭 측정, `■` 접두어가 있는 panel 제목의 exact text locator, unread 0에서 badge가 없는 정상 상태, Main 화면에서 center unread를 읽던 scope 오류였다. outer `[data-layout="app"]` 폭, scoped `h2 hasText`, 0 fallback, right-panel scope로 교정했다.
+- stale 검사는 owner 준비 전 첫 GET을 지연시키고 SPA 계정 전환에 product logout UI를 기대해 signin timeout을 만들던 경로를 제거했다. owner 준비 후 notification `route.fetch()`의 실제 upstream status 200을 보류하고, 기존 `apiClient`에 auth `/me`·`/refresh` 401만 합성 주입해 auth-expired handler를 실행한 뒤 same-Provider SPA friend signin·center ready 후 held response를 release한다. 제품 코드·logout UI·React internals는 추가하지 않았다.
+- TopBar dropdown이 열린 상태의 `topbar-notifications.png` 캡처를 추가했다. 정적 검증은 `node --check qa/m8-acceptance.mjs` exit 0, `git diff --check` exit 0, trailing whitespace clean이다. Run3 실제 evidence 전까지 M8 독립 QA 판정은 계속 **NOT RUN**이다.
+
+## 10. 2026-11-10 KST — 독립 최종 audit / m8_final_review
+
+검토자 `m8_final_review`는 제품·QA 구현자와 다른 컨텍스트에서 whole-branch package와 두 final-fix package를 읽고, 실제 출력과 시각 증거를 대조했다. 이 절은 위의 준비 시점 NOT RUN 판정을 갱신한다. 검토 중 제품·테스트·Git 상태 변경이나 테스트 재실행은 하지 않았으며, 리더가 단독 소유권을 배정한 이 최종 기록만 append했다.
+
+### Strengths
+
+- A-v2의 snapshot 조회, hidden-before-count, 현재 접근권한에 따른 안전한 projection, 원 이벤트와 알림의 동일 트랜잭션, 정렬된 잠금·최종 후보 확인·허용된 rollback만의 새 트랜잭션 재시도 계약을 코드와 기존 통합 증거로 확인했다.
+- 프론트는 공통 unread 상태와 분리된 목록 cache, viewer/request/mutation/session 세대 검사를 사용한다. 최신 브라우저 검증은 실제 owner 200 응답을 보류하고 같은 Provider에서 friend 로그인 이후 완료시켜 이전 행이 복구되지 않는 것을 확인한다.
+- 최초 QA 도구의 7개 Important 그룹과 후속 locator·세션 전환 문제를 수정 코드와 실제 Run3 결과로 닫았다. 정렬/hash gate, null 보존 전체 행 fingerprint, 올바른 fixture·삭제 순서, 독립 SQL 비용, 정상 서명 wrong-type token, 실제 DOM/URL/응답 관측을 유지한다.
+
+### Evidence
+
+- 실제 실행: `build/m8-evidence/acceptance-run3.log`, `build/m8-acceptance-20261110-173900/evidence.json`. JSON의 checks를 독립 재집계한 결과 **323 PASS / 0 FAIL / 0 NOT RUN**, failures `[]`다.
+- 파일 396개 검증 및 source aggregate expected/actual `108e7120a07ab43ebfc550e34a2f13ca7f613d4d0388dd44781bf43cc95add47`, runtime JAR expected/actual `1cab24e82cb1cf524b0184145ffa49a802db924d4a00b08afc862299014fd1c5` 일치. JAR 경로는 `build/m8-api-data/runtime.jar`다.
+- performance_schema 실제 SELECT 비용: size 1 = 4, size 100 = 4, 차이 0. 관측값 0을 통과시키지 않는 수정된 gate다.
+- Backend full 검증은 `build/m8-evidence/backend-final-2/` XML **102 suites / 599 tests / failures 0 / errors 0 / skipped 0** 및 bootJar다. 최종 DELETE 400 문서 수정 후 별도 covering **5 tests**와 bootJar를 `backend-final-doc.log`/summary에서 확인했다.
+- Frontend full 검증은 `frontend-final-2-test.log`의 **47 files / 439 tests PASS**다. 최종 read-only 설명 추가 후 별도 covering **8 tests**(새 테스트 2개 포함), lint/build를 `frontend/.m8-evidence/raw/frontend-final-fix-readonly-*`에서 확인했다. 최종 전체 441개 실행을 주장하지 않는다.
+- 계정 전환 브라우저 probe는 `/src/lib/apiClient.ts`의 기존 apiClient 요청에 `/auth/me`·`/auth/refresh` 401을 합성 주입한 진단이다. 실제 로그아웃 버튼 검증으로 표현하지 않는다. 같은 Provider, 실제 signin form, upstream owner 200 hold/release, friend 화면의 이전 고유 행 부재를 각각 관측했다.
+
+### Visual approval
+
+1440px PNG 5장(`design-notifications.png`, `design-main-notifications.png`, `notifications-owner.png`, `topbar-notifications.png`, `main-owner-notifications.png`)을 모두 직접 열어 비교했다. `docs/design/DESIGN-SYSTEM.md` §6·8.1·8.9와 Pages 원본 395–415행, Main Feed v2 원본 44–50·146–154행을 함께 대조했다.
+
+알림 센터 outer 860px / 좌우 padding 40px / 실제 목록 780px, 크림 배경·잉크 보더·각진 모서리·하드 그림자, 미읽음 강조와 read-all/delete 배치, TopBar 330px dropdown·최신 3개·센터 링크, Main 최근 알림 3행을 승인한다. unavailable 고정 문구와 전체 이력 pagination은 승인된 A-v2 계약을 적용한다. 이 시각 승인은 M8 알림 영역이며 기존 Main 전체를 재설계 검토한 것은 아니다.
+
+### Issues
+
+- **Critical: 없음.**
+- **Important: 없음.** 기존 QA Important와 잔여 false-PASS/false-failure 지적은 종료했다.
+- **Minor:** DELETE 400 OpenAPI 누락과 TopBar/RightPanel SUSPENDED read-only 설명 누락은 수정·covering 검증으로 종료했다. 기존 500kB 초과 chunk 경고와 새 SpyBean 제거 예정 경고는 리더의 기존 비차단 보류 판정을 유지한다. M8에서 의존성 변경은 권고하지 않는다.
+
+### Declined to judge
+
+- 운영 최대 용량·SLA·peak memory: 승인된 로컬 비용/경합 검증을 넘어서는 운영 성능 보증은 하지 않는다.
+- 물리 JDBC batching 보장: 승인된 100개 logical batch와 실제 SQL 수를 확인했으며 JDBC batch 보장으로 바꾸어 주장하지 않는다.
+- commit 후 응답 유실의 idempotency key: 승인 계약에서 제외되었으며 수동 재실행은 별도 이벤트다.
+- 30일 보존·자동 purge: 사용자 전체 이력 결정이 디자인의 30일 footer를 대체한다.
+
+위 네 항목은 `.superpowers/sdd/M8-notifications/final-review-findings.md`의 리더 ruling을 유지한다. 추가로 조용히 제외한 동작은 없다.
+
+### Assessment
+
+**Ready to merge: Yes.** M8 승인 범위에 남은 제품·검증 blocking finding은 없고 실제 HTTP/DB/Chrome 및 시각 gate가 닫혔다. 이는 독립 검토 승인으로, dev 통합이 이미 실행되었다는 뜻은 아니다. 리더의 기록 정리·PR·dev 통합 단계로 진행할 수 있다. M9는 포함하지 않는다.

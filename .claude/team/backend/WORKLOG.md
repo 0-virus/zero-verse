@@ -440,3 +440,10 @@
 - fanout: 최종0/1/100/101/1001 수신자에 같은수행 생성, 전체SQL16/18/216/218/2018, 시간30.355/25.973/150.951/125.621/854.487ms, logicalbatch0/1/1/2/11, 모두lockwait0/attempt1. 1001 heap 전후차이19,417,736bytes이며 GC영향/peak아님을 보고서에 명시했다. IDENTITY 개별INSERT이므로 JDBCbatch라고 표현하지 않았다. `task3-final-order-metrics.log` 보존.
 - 기록 구조: STATE의 과거 M4~M7/Task2 다중누적 현황을 이번 현재단계/진행중/다음작업/차단/시각 구조로 갱신했다. 역사 삭제가 아니라 기존 append-only WORKLOG와 각 milestone worklog를 역사 정본으로 연결했다. 기존 WORKLOG 항목은 수정하지 않았다.
 - 미해결·인계: sourcefreeze/Gradle실행권root반환. 독립review·전체backendtest/bootJar·실제API/FE/브라우저·legacymigration/M7compat/dev통합은root/QA gate. 운영규모SLA/peakRSS는미측정. 사용자파일·DB·업로드·rootruntime/FE/QA·Git/의존성/migration은변경없음. M9확장없음.
+
+## 2026-11-10 16:56 KST — M8 Task3 independent review1 fix round1 인계
+
+- 한 일: review Important의 reject/cancel request replacement 경쟁을 실제 MySQL barrier로 각각 RED 재현하고 UniverseService의 각 조건1줄에 locked.id==requestId를 추가했다. mismatch는 UNI_004이며 교체B PENDING과 A/B의 알림 전체행 snapshot을 보존한다. 기존 accept replacement도 covering에 포함했다.
+- 산출물: `UniverseService.java`, `NotificationFanoutConcurrencyMySqlTest.java`(신규2tests+공통helper), 기존 Task3 report append 및 STATE갱신. 다른 제품·FE·QA·runtime·DB·Git 파일은 변경하지 않았다.
+- 검증: `task3-fix1-red-replacement-removal.log` exit1/2expectedfail/FAILED15s, 원문XML `task3-fix1-red-xml/`. 최소수정 후 `task3-fix1-green-covering.log` exit0/SUCCESS14s; `UniverseServiceTest`19 + `UniverseServiceMySqlTest`4 + replacement accept/reject/cancel3 =26 tests/0fail0error0skip, XML `task3-fix1-green-xml/` 보존. 정확명령은 `.superpowers/sdd/M8-notifications/task-3-report.md` append에 있다. 변경source/test재독 완료.
+- 미해결/인계: sourcefreeze/Gradle실행권root반환. 독립reviewclosure와 새최종artifact는root후속. 수정이전검토본f2db20d의root full597/102suites/bootJarPASS 보고와 이번coveringPASS를 구분한다. 전체테스트·bootJar·API재기동 반복없음. SpyBeanminor는ledger유지했다.

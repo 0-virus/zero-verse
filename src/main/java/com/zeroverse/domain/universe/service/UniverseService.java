@@ -129,7 +129,7 @@ public class UniverseService {
         Universe locked = pairRelation(pair.first().getId(), pair.second().getId(),
                 current.getFromUser().getId(), current.getToUser().getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.UNI_004));
-        if (!locked.getToUser().getId().equals(actorId)) {
+        if (!locked.getId().equals(requestId) || !locked.getToUser().getId().equals(actorId)) {
             throw new BusinessException(ErrorCode.UNI_004);
         }
         if (locked.getStatus() != UniverseStatus.PENDING) {
@@ -148,7 +148,7 @@ public class UniverseService {
         Universe locked = pairRelation(pair.first().getId(), pair.second().getId(),
                 current.getFromUser().getId(), current.getToUser().getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.UNI_004));
-        if (!locked.getFromUser().getId().equals(actorId)) {
+        if (!locked.getId().equals(requestId) || !locked.getFromUser().getId().equals(actorId)) {
             throw new BusinessException(ErrorCode.UNI_004);
         }
         if (locked.getStatus() != UniverseStatus.PENDING) {

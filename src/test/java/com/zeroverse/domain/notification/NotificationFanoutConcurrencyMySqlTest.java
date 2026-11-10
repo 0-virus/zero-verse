@@ -191,6 +191,53 @@ class NotificationFanoutConcurrencyMySqlTest extends NotificationGenerationSuppo
         assertThat(jdbc.queryForObject("SELECT message FROM notifications",String.class)).isEqualTo("유니버스 신청을 받았습니다.");
     }
 
+    @Test void rejectCannotDeleteReplacementRequestAfterOriginalCancelled() throws Exception {
+        assertRemovalCannotDeleteReplacement(true);
+    }
+
+    @Test void cancelCannotDeleteReplacementRequestAfterOriginalCancelled() throws Exception {
+        assertRemovalCannotDeleteReplacement(false);
+    }
+
+    private void assertRemovalCannotDeleteReplacement(boolean reject) throws Exception {
+        String operation = reject ? "reject" : "cancel";
+        var requester = user(operation + "-replace-requester");
+        var receiver = user(operation + "-replace-receiver");
+        long originalId = universe.request(requester.getId(), receiver.getId()).requestId();
+        var original = relations.findVisibleById(originalId).orElseThrow();
+        CountDownLatch initialRead = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        AtomicInteger reads = new AtomicInteger();
+        doAnswer(invocation -> {
+            if (reads.incrementAndGet() == 1) {
+                initialRead.countDown();
+                await(release);
+            }
+            return Optional.of(original);
+        }).when(universeRows).findVisibleById(originalId);
+        Future<?> removal = pool.submit(() -> {
+            if (reject) universe.reject(receiver.getId(), originalId);
+            else universe.cancel(requester.getId(), originalId);
+        });
+        Long replacementId;
+        List<Map<String, Object>> historyBefore;
+        try {
+            await(initialRead);
+            universe.cancel(requester.getId(), originalId);
+            replacementId = universe.request(requester.getId(), receiver.getId()).requestId();
+            historyBefore = jdbc.queryForList("SELECT * FROM notifications ORDER BY id");
+        } finally {
+            release.countDown();
+        }
+        fails(removal, ErrorCode.UNI_004);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM universes WHERE id=?", Long.class, originalId)).isZero();
+        assertThat(jdbc.queryForObject("SELECT status FROM universes WHERE id=?", String.class, replacementId)).isEqualTo("PENDING");
+        assertThat(historyBefore).hasSize(2);
+        assertThat(jdbc.queryForList("SELECT * FROM notifications ORDER BY id")).isEqualTo(historyBefore);
+        assertThat(jdbc.queryForList("SELECT target_id FROM notifications ORDER BY id", Long.class))
+                .containsExactly(originalId, replacementId);
+    }
+
     @Test void finalCandidateRecheckRunsAfterExistingPostLock() {
         var receiver=user("order-low");var owner=user("order-owner");var b=blog(owner);accepted(receiver,owner);
         var post=create(owner,b,Visibility.PRIVATE,false);

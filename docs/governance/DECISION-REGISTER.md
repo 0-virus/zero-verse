@@ -27,3 +27,11 @@
 | ADR-0006 | 2026-11-09 | M7 피드·검색·권한별 집계·파생 본문 캐시와 복구 | HIGH | ACCEPTED | 사용자 M7 A-v2 전체 승인 및 명시 재개; 회의 승인 내용을 지속 계약으로 정리 | [ADR-0006](decisions/ADR-0006-feed-search-contract.md), [M7 회의 §6](meetings/M7-20261109-feed-search.md) |
 
 M4 현재 실행 판단에는 마지막 `M4-20261003-local`을 적용한다. 이전 준비/U0 BLOCKED 행은 당시 결정·실측의 이력이며 로컬 M4 제품 구현의 현재 차단 조건이 아니다.
+
+## 2026-11-10 M8 정책·심의
+
+| ID | 날짜 | 안건 | 등급 | 상태 | 결정 근거 | 문서 |
+|---|---|---|---|---|---|---|
+| M8-20261110-policy | 2026-11-10 | 전체 이력·생성/재행동·권한상실·읽음·갱신·소급제외 9개 제품 정책 | HIGH | APPROVED | 사용자 `모두 권고안으로 진행하자`; 구체 기술 계약/실행 승인은 별도 | [회의 §2](meetings/M8-20261110-notifications.md), [M8 계획](../worklog/M8-notifications.md) |
+| M8-20261110-notifications | 2026-11-10 | A-v2 알림 API·생성 원자성·fan-out/잠금·V6인덱스·보안·화면/검증 | HIGH | APPROVED | 사용자 `A-v2 전체 승인`; 구현·독립QA·실제인수·dev통합 실행 | [회의 §9~10](meetings/M8-20261110-notifications.md#9-a-v2--구체-계약실행-승인-대상), [M8 계획](../worklog/M8-notifications.md) |
+| ADR-0007 | 2026-11-10 | M8 알림의 전체이력·동기원자성·권한표현·정렬잠금·API/DB 계약 | HIGH | ACCEPTED | 사용자 A-v2 전체 승인 내용을 지속 계약으로 보존 | [ADR-0007](decisions/ADR-0007-notifications-contract.md), [회의 §9~10](meetings/M8-20261110-notifications.md) |

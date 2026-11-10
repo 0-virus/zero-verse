@@ -22,3 +22,10 @@
 | RISK-0016 | 2026-11-09 | M7 파생 content_text 백필 실패·ON UPDATE 변경·구버전 writer 이후 stale cache | 앱 기동 실패·감사시각 변조·검색 누락; 구버전 복귀 이후에도 영향 | 중간 | 사용자 승인 A-v2 구현: V1~V3 불변, V5 전체 rollback·audit 보존·keyset100·고정 extractor·별도 V3 DB 복원/재이관 및 offline verify/rebuild 실측. README에 구버전 writer 복귀 후 쓰기 중지·재검증/재구축 절차 기록. 실제 사용자 DB repair/원문수정/복원은 별도 승인 | backend·QA·리더 | 구버전 writer 복귀 후 M7 재도입 시 운영 절차 적용 | MITIGATED(자동 검증·실제 인수·독립 QA PASS, 구버전 쓰기 후 재검증 필수) | [M7 회의 §6.4](meetings/M7-20261109-feed-search.md), [M7 계획](../worklog/M7-feed-search.md) |
 
 2026-10-03 변경: RISK-0012는 S3 후속 위험으로 유지하되 로컬 M4 구현 선행 gate에서 제외한다. RISK-0010/0011의 로컬 대응은 승인된 회의 §20.1~20.8과 M4 실행계획을 적용한다. 이미지 매요청 권한 검증, HMAC ledger/rolling24h/48h 이후 bounded 정리를 구현·실측하기 전 위험을 CLOSED로 변경하지 않는다.
+
+## 2026-11-10 M8 심의 위험
+
+| ID | 등록일 | 위험 | 영향 | 가능성 | 완화책 | 담당 | 검토 시점 | 상태 | 관련 문서 |
+|---|---|---|---|---|---|---|---|---|---|
+| RISK-0017 | 2026-11-10 | 동기 POST 알림 fan-out의 receiver/actor FK 잠금이 기존 blog/user/post 잠금과 충돌하거나 수신자 집합 확정 중 관계가 바뀜 | 원행위 deadlock·실패, 알림 누락/중복·차단 수신자 포함 | 중간(설계 검토, 미실측) | 기존 순서와 일치하는 잠금·후보 재검증·유한 재시도 계약 확정, 실제 MySQL 경쟁/후반INSERT실패 전체rollback/대량수신 인수. 무한 재시도·임의 수신자 절단·best-effort 유실 금지 | backend·QA·리더 | M8 구체 계약 및 구현 검증 | OPEN | [M8 회의](meetings/M8-20261110-notifications.md), [M8 계획](../worklog/M8-notifications.md) |
+| RISK-0018 | 2026-11-10 | 전체 알림 이력에서 권한상실·차단·탈퇴·계정전환 후 메시지/링크/미읽음 수가 과거 상태로 남음 | 개인정보·비공개 콘텐츠 정보 노출, UI 세 곳의 상태 불일치 | 중간(미구현) | 서버 batch ACL masking·block-before-page/count, no-store, viewer/요청세대 폐기, 동일세션 mutation invalidation 및 lifecycle refresh, 실제 HTTP/브라우저 stale 인수 | backend·frontend·QA | M8 API/화면 독립 인수 | OPEN | [M8 정책 §2](meetings/M8-20261110-notifications.md), [M8 계획](../worklog/M8-notifications.md) |

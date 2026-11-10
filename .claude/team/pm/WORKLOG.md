@@ -376,3 +376,35 @@
 - **정본·STATE 반영**: PM 소유 `docs/PRD.md` §9.10·§10 M7·§13 item 9/§13.3을 M7 구현·자동검증·실제 acceptance·독립 시각 QA PASS 및 PR #13 `dev` 통합 완료로 갱신했다. `.claude/team/pm/STATE.md`를 `M7 완료·dev 통합`, 차단 없음, M8 미착수 상태로 갱신했다. API18087/FE5177·전용 MySQL/Colima 정리와 사용자 환경·DB·업로드 보존은 root 기록을 근거로 반영했다.
 - **범위·검증**: 이번 턴은 `docs/PRD.md`, `.claude/team/pm/STATE.md`, `.claude/team/pm/WORKLOG.md`만 수정했다. M8은 시작하지 않았고 제품·QA·governance·마일스톤 worklog·Git은 수정하지 않았다. 변경 후 PRD/STATE/WORKLOG를 재독하고 PM 소유 tracked 파일 `git diff --check`, trailing whitespace, `/universe/summary` 의도적 잔존 문구를 검색한다.
 - **미해결**: M7 차단 요인은 없다. root의 docs-only 최종 커밋/푸시 후 사용자 다음 지시 전 M8을 착수하지 않는다.
+
+## 2026-11-10 13:12 KST — M8 사용자 정책 9개 PRD 반영·기술안 미확정 분리
+
+- **근거 대조**: `.claude/CONSTITUTION.md`→`AGENTS.md`/`CLAUDE.md`→PM 지침/STATE를 순서대로 읽고, M8 회의 `M8-20261110-notifications.md` §2·§5, `docs/worklog/M8-notifications.md`, backend/frontend/qa STATE, M7 worklog/QA 최종 기록과 실제 Git을 직접 대조했다. 사용자 `모두 권고안으로 진행하자`는 1A~6A·7번 권고·8A·9A의 제품 정책 확정으로만 해석했다.
+- **PRD 산출물**: `docs/PRD.md` 최종 개정일을 2026-11-10으로 갱신하고 §9.11을 추가했다. §5.11·§7.2·§10 M8·§13 item 10/§13.4에는 전체 이력(디자인 30일 문구 override), 답글 COMMENT/REPLY 이중수신·동일 수신자 REPLY 우선 dedupe, 실제 재행동 재알림·동일요청 비중복, eligible 발행전이, 원인 취소 이력보존, 권한상실 generic·차단 숨김, 클릭 읽음·전체 범위 read-all·공유 unread·최근 3 all, 주기 자동 갱신 없이 진입/open/복귀 갱신·소급 없음만 반영했다. 읽음·삭제 후 서버 재조회로 자체 상태를 동기화하는 동작은 유지했다.
+- **승인 경계**: 회의 §5 A-v1의 API/DTO·동기 발행·잠금/fan-out·인덱스/migration·snapshot·FE store 및 실행계획은 `권고(미확정)`으로 분리했고, 독립 심의·별도 구현 승인 전 확정 정책이나 완료 근거로 쓰지 않았다. M8 제품 코드·migration·테스트·runtime은 미착수다.
+- **M7 정정**: 실제 `HEAD=dev=b80ede08c3e54ff3f3d6742b58c401d869574331` 및 `origin/dev`를 확인해 `docs: close out M7 delivery and verification` docs-only closeout이 이미 끝난 사실을 STATE/PRD에 반영했다. M7 완료·PR #13 `dev` 통합은 유지하고 현재 상태를 docs-only closeout 완료로 정정했다.
+- **소유권**: 이번 턴은 `docs/PRD.md`, `.claude/team/pm/STATE.md`, `.claude/team/pm/WORKLOG.md`만 수정했다. REQUIREMENTS·governance·M8 마일스톤 worklog·backend/frontend/qa 산출물·제품 소스·Git은 수정하지 않았고, 다른 untracked/modified 변경은 보존했다.
+- **검증**: 변경 후 PRD·PM STATE·PM WORKLOG를 재독했고 §9.11의 정책 항목을 `policy_items=9`로 세었으며 §5.11/§7.2/§10/§13.4, `권고(미확정)`, `b80ede0`를 검색했다. `git diff --check -- docs/PRD.md .claude/team/pm/STATE.md .claude/team/pm/WORKLOG.md`는 오류 없이 통과했고, tracked 변경 범위는 PM `STATE.md`·`WORKLOG.md`로 확인했다(`docs/PRD.md`는 `.gitignore`의 `docs/*` 적용). M7 evidence 직접 재집계는 backend `91 suites/538 tests`, failures/errors/skips `0/0/0`; frontend `41 files/405 tests` passed; acceptance `259 PASS/0 FAIL/0 NOT_RUN`, `failures=[]`, viewport `1440×1000`, files `354`, source/JAR hash 각 actual 일치였다. 제품 테스트·빌드·runtime·Git 조작은 수행하지 않았다.
+- **미해결**: M8 기술 계약·실행계획의 독립 심의와 별도 구현 승인, 이후 정본 동기화·backend/frontend 구현·독립 QA·실제 인수·Git 통합이 남아 있다. M9로 자동 확장하지 않는다.
+- **추가 정합화(13:20 KST)**: root 재독에서 §5.11의 갱신 문구가 자체 읽음/삭제 후 서버 재조회까지 막는 것으로 읽히지 않도록 `주기적인 자동 갱신 없이 화면 진입·드롭다운 열기·브라우저 복귀에서 갱신`으로 좁히고, 사용자 동작 뒤 자체 서버 재조회 동기화는 유지한다고 §5.11·§7.2·§9.11·§10 및 PM STATE에 명시했다. A-v1 기술안은 계속 미확정이다.
+
+## 2026-11-10 13:29 KST — M8 A-v2 사용자 승인 대기 상태 동기화
+
+- **근거**: root가 갱신한 M8 회의 §9 A-v2와 `docs/worklog/M8-notifications.md` Task1~6 및 독립 Product/Architecture/Delivery 결과(`APPROVE_WITH_CHANGES/HIGH`)를 확인했다. 9개 제품 정책은 기존 승인 그대로 유지한다.
+- **정본·STATE 반영**: PRD §5.11·§9.11·§10 M8·§13.4 및 PM STATE의 현행 상태를 `USER_DECISION_REQUIRED`·§9 A-v2 구체 계약/실행 승인 대기로 동기화했다. §5 A-v1은 심의 입력 이력으로만 남겼다.
+- **승인 대상 요약**: 공개 API/DTO, 원행위·알림 원자성, 정렬 잠금·후보 재검증·총 3회 attempt, V6 인덱스, M8 구현·독립 QA·`dev` 통합이다. 이는 승인 대기 요약이며 확정 규범·구현 완료로 기록하지 않았다.
+- **범위**: PM 소유 `docs/PRD.md`, `.claude/team/pm/STATE.md`, `.claude/team/pm/WORKLOG.md`만 수정했다. 제품 코드·테스트·DB/runtime·Git 및 타 역할 변경은 건드리지 않았다.
+- **미해결**: 사용자 명시 기술·실행 승인 전 M8 구현은 미착수다.
+
+## 2026-11-10 13:42 KST — M8 A-v2 전체 승인·Task1~6 실행 상태 동기화
+
+- **근거**: 사용자의 원문 `A-v2 전체 승인`과 M8 회의 §10을 확인했다. §2의 제품 정책 9개 승인과 함께 §9 A-v2 구체 계약, M8 worklog Task1~6의 구현·독립 QA·실제 인수·`dev` 통합 실행이 승인됐고, root가 `b80ede0`에서 `feature/M8-notifications`를 생성했다.
+- **PRD·STATE 산출물**: `docs/PRD.md` §5.11·§7.2·§9.11·§10 M8·§13 item 10/§13.4와 PM `STATE.md`를 현재 `APPROVED`·실행 중 상태로 동기화했다. A-v2의 개별 read 현재 권한 재평가 canonical `NotificationItem`, `SUSPENDED` GET read-only, dynamic unavailable masking·권한 복구 재평가, same-transaction rollback, sorted locks·current candidate recheck·총 3회 attempt, V6 인덱스 2개를 구현 정본으로 기록했다. §5 A-v1은 심의 입력 이력으로만 보존했다.
+- **완료 경계**: 구현·자동검증·독립 QA·실제 인수·`dev` 통합은 별도 완료 gate로 남겼으며 아직 완료·PASS로 주장하지 않았다. M7 `b80ede0` docs-only 최종 closeout 완료와 M7 통합 완료는 유지했다.
+- **범위**: PM 소유 `docs/PRD.md`, `.claude/team/pm/STATE.md`, `.claude/team/pm/WORKLOG.md`만 수정했다. 제품·테스트·QA·REQUIREMENTS·governance·M8 마일스톤 worklog·runtime·Git은 수정하지 않았고 다른 역할 변경을 되돌리지 않았다.
+- **검증**: 변경 문구를 PRD §5.11/§7.2/§9.11/§10/§13.4와 PM STATE/WORKLOG에서 재독하고, 핵심 승인·실행·완료 gate 문구 및 PM 파일 범위를 `rg`로 점검한 뒤 `git diff --check`를 실행한다.
+
+## 2026-11-10 13:45 KST — M8 PM 문구 재독·diffcheck 완료
+
+- **검증 결과**: PRD §5.11·§7.2·§9.11·§10 M8·§13.3/§13.4와 PM `STATE.md`/`WORKLOG.md`를 재독했다. `A-v2 전체 승인`, `APPROVED`, canonical `NotificationItem`, `SUSPENDED` GET read-only, dynamic unavailable masking/복구, same-transaction, sorted locks/current candidate recheck/총 3회 attempt, V6 인덱스 2개 및 별도 구현·검증 gate가 일관되게 남아 있음을 `rg`로 확인했다. M7 `b80ede0` docs-only closeout 완료도 유지된다.
+- **검증 명령**: PM 3개 파일 대상 `git diff --check`는 오류 없이 통과했고, trailing whitespace 검색 결과는 0건이다. 제품 코드·테스트·runtime·Git 조작은 하지 않았다.

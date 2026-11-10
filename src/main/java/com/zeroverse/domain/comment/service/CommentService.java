@@ -1,6 +1,8 @@
 package com.zeroverse.domain.comment.service;
 
 import com.zeroverse.common.exception.BusinessException;
+import com.zeroverse.domain.notification.service.NotificationEventService;
+import com.zeroverse.domain.notification.service.NotificationTransactionExecutor;
 import com.zeroverse.common.exception.ErrorCode;
 import com.zeroverse.common.response.PageResponse;
 import com.zeroverse.domain.comment.dto.CommentDtos;
@@ -53,6 +55,8 @@ public class CommentService {
     private final UniverseRepository universeRepository;
     private final PostAccessPolicy accessPolicy;
     private final PostInteractionLockService interactionLockService;
+    private final NotificationTransactionExecutor notificationTransactions;
+    private final NotificationEventService notificationEvents;
 
     public CommentService(
             CommentRepository commentRepository,
@@ -60,13 +64,16 @@ public class CommentService {
             UserRepository userRepository,
             UniverseRepository universeRepository,
             PostAccessPolicy accessPolicy,
-            PostInteractionLockService interactionLockService) {
+            PostInteractionLockService interactionLockService, NotificationTransactionExecutor notificationTransactions,
+            NotificationEventService notificationEvents) {
         this.commentRepository = commentRepository;
         this.postRepository = postRepository;
         this.userRepository = userRepository;
         this.universeRepository = universeRepository;
         this.accessPolicy = accessPolicy;
         this.interactionLockService = interactionLockService;
+        this.notificationTransactions = notificationTransactions;
+        this.notificationEvents = notificationEvents;
     }
 
     @Transactional(readOnly = true)
@@ -103,8 +110,11 @@ public class CommentService {
                 comments.getTotalPages(), comments.hasNext(), comments.hasPrevious());
     }
 
-    @Transactional(isolation = Isolation.READ_COMMITTED)
     public CommentItem create(Long actorId, Long postId, CommentDtos.CreateCommentRequest request) {
+        return notificationTransactions.execute(() -> createInTransaction(actorId, postId, request));
+    }
+
+    private CommentItem createInTransaction(Long actorId, Long postId, CommentDtos.CreateCommentRequest request) {
         String content = normalizeContent(request == null ? null : request.content());
         Long parentId = request == null ? null : request.parentId();
         CommentRepository.Target parentTarget = null;
@@ -137,6 +147,7 @@ public class CommentService {
 
         Comment comment = Comment.create(post, actor, parent, content);
         commentRepository.saveAndFlush(comment);
+        notificationEvents.comment(comment);
         boolean activeViewer = true;
         return toItem(comment, actor, post, actorId, activeViewer, null,
                 blockedTargets(actorId, post, List.of(comment)));

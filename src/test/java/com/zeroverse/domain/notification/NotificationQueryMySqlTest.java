@@ -118,11 +118,13 @@ class NotificationQueryMySqlTest extends MySqlTestSupport {
         var comment = commentService.create(owner.getId(), privatePost.id(), new CreateCommentRequest("secret", null));
         insertNotification(receiver, actor, "COMMENT", "COMMENT", comment.id(), "비밀 본문 leak");
         insertNotification(receiver, actor, "COMMENT", "POST", privatePost.id(), "legacy title leak");
+        var publicPost = post(owner, "query-public-actorless", Visibility.PUBLIC);
+        long actorless = insertNotification(receiver, null, "LIKE", "POST", publicPost.id(), "legacy actorless leak");
 
         NotificationDtos.NotificationPage page = notificationService.list(
                 null, principal(receiver), ReadFilter.ALL, 0, 20);
 
-        assertThat(page.items()).hasSize(2);
+        assertThat(page.items()).hasSize(3);
         assertThat(page.items()).allSatisfy(item -> {
             assertThat(item.available()).isFalse();
             assertThat(item.message()).isEqualTo("더 이상 확인할 수 없는 알림입니다");
@@ -130,6 +132,13 @@ class NotificationQueryMySqlTest extends MySqlTestSupport {
             assertThat(item.targetId()).isNull();
             assertThat(item.href()).isNull();
         });
+        NotificationItem read = notificationService.read(null, principal(receiver), actorless);
+        assertThat(read.available()).isFalse();
+        assertThat(read.message()).isEqualTo("더 이상 확인할 수 없는 알림입니다");
+        assertThat(read.actor()).isNull();
+        assertThat(read.targetId()).isNull();
+        assertThat(read.href()).isNull();
+        assertThat(read.readAt()).isNotNull();
     }
 
     @Test

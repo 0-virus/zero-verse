@@ -36,11 +36,17 @@ class UniverseServiceTest {
     private final BlogRepository blogRepository = mock(BlogRepository.class);
     private final User actor = mock(User.class);
     private final User target = mock(User.class);
+    private final com.zeroverse.domain.notification.service.NotificationTransactionExecutor transactions =
+            mock(com.zeroverse.domain.notification.service.NotificationTransactionExecutor.class);
     private final UniverseService service = new UniverseService(
-            universeRepository, userRepository, blogRepository);
+            universeRepository, userRepository, blogRepository, transactions,
+            mock(com.zeroverse.domain.notification.service.NotificationEventService.class),
+            mock(jakarta.persistence.EntityManager.class));
 
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.doAnswer(i -> ((java.util.function.Supplier<?>) i.getArgument(0)).get())
+                .when(transactions).execute(any());
         when(actor.getId()).thenReturn(1L);
         when(actor.getStatus()).thenReturn(UserStatus.ACTIVE);
         when(actor.getNickname()).thenReturn("actor");
@@ -58,7 +64,7 @@ class UniverseServiceTest {
     void duplicateRequestIsRejected() {
         stubPairLocks();
         Universe existing = relation(actor, target, 11L, UniverseStatus.PENDING);
-        when(universeRepository.findPair(1L, 2L)).thenReturn(List.of(existing));
+        when(universeRepository.findPairForUpdate(1L, 2L)).thenReturn(List.of(existing));
 
         assertThatThrownBy(() -> service.request(1L, 2L))
                 .isInstanceOfSatisfying(com.zeroverse.common.exception.BusinessException.class,
@@ -71,7 +77,7 @@ class UniverseServiceTest {
     void blockedRequestTakesPriorityOverDuplicateCheck() {
         stubPairLocks();
         Universe existing = relation(target, actor, 12L, UniverseStatus.BLOCKED);
-        when(universeRepository.findPair(1L, 2L)).thenReturn(List.of(existing));
+        when(universeRepository.findPairForUpdate(1L, 2L)).thenReturn(List.of(existing));
 
         assertThatThrownBy(() -> service.request(1L, 2L))
                 .isInstanceOfSatisfying(com.zeroverse.common.exception.BusinessException.class,
@@ -110,7 +116,7 @@ class UniverseServiceTest {
         Universe request = relation(actor, target, 22L, UniverseStatus.PENDING);
         Universe accepted = relation(actor, target, 22L, UniverseStatus.ACCEPTED);
         when(universeRepository.findVisibleById(22L)).thenReturn(Optional.of(request));
-        when(universeRepository.findPair(1L, 2L)).thenReturn(List.of(accepted));
+        when(universeRepository.findPairForUpdate(1L, 2L)).thenReturn(List.of(accepted));
         stubPairLocks();
 
         assertThatThrownBy(() -> service.accept(2L, 22L))
@@ -124,7 +130,7 @@ class UniverseServiceTest {
     void deleteFollowingRereadsPairAfterLock() {
         stubPairLocks();
         Universe accepted = relation(actor, target, 24L, UniverseStatus.ACCEPTED);
-        when(universeRepository.findPair(1L, 2L)).thenReturn(List.of(accepted));
+        when(universeRepository.findPairForUpdate(1L, 2L)).thenReturn(List.of(accepted));
 
         service.deleteFollowing(1L, 2L);
 
@@ -137,7 +143,7 @@ class UniverseServiceTest {
     void deleteFollowingMapsMissingDirectionToNotFound() {
         stubPairLocks();
         Universe opposite = relation(target, actor, 28L, UniverseStatus.ACCEPTED);
-        when(universeRepository.findPair(1L, 2L)).thenReturn(List.of(opposite));
+        when(universeRepository.findPairForUpdate(1L, 2L)).thenReturn(List.of(opposite));
 
         assertThatThrownBy(() -> service.deleteFollowing(1L, 2L))
                 .isInstanceOfSatisfying(com.zeroverse.common.exception.BusinessException.class,
@@ -151,7 +157,7 @@ class UniverseServiceTest {
         Universe initial = relation(actor, target, 25L, UniverseStatus.PENDING);
         when(universeRepository.findVisibleById(25L)).thenReturn(Optional.of(initial));
         stubPairLocks();
-        when(universeRepository.findPair(1L, 2L)).thenReturn(List.of(initial));
+        when(universeRepository.findPairForUpdate(1L, 2L)).thenReturn(List.of(initial));
 
         service.reject(2L, 25L);
 
@@ -165,7 +171,7 @@ class UniverseServiceTest {
         Universe initial = relation(actor, target, 26L, UniverseStatus.PENDING);
         when(universeRepository.findVisibleById(26L)).thenReturn(Optional.of(initial));
         stubPairLocks();
-        when(universeRepository.findPair(1L, 2L)).thenReturn(List.of(initial));
+        when(universeRepository.findPairForUpdate(1L, 2L)).thenReturn(List.of(initial));
 
         service.cancel(1L, 26L);
 
@@ -178,7 +184,7 @@ class UniverseServiceTest {
     void unblockRereadsPairAfterLock() {
         stubPairLocks();
         Universe blocked = relation(actor, target, 27L, UniverseStatus.BLOCKED);
-        when(universeRepository.findPair(1L, 2L)).thenReturn(List.of(blocked));
+        when(universeRepository.findPairForUpdate(1L, 2L)).thenReturn(List.of(blocked));
 
         service.unblock(1L, 2L);
 
@@ -208,7 +214,7 @@ class UniverseServiceTest {
         stubPairLocks();
         Universe outgoing = relation(actor, target, 31L, UniverseStatus.PENDING);
         Universe incoming = relation(target, actor, 32L, UniverseStatus.ACCEPTED);
-        when(universeRepository.findPair(1L, 2L)).thenReturn(List.of(outgoing, incoming));
+        when(universeRepository.findPairForUpdate(1L, 2L)).thenReturn(List.of(outgoing, incoming));
 
         service.block(1L, 2L);
 
@@ -224,7 +230,7 @@ class UniverseServiceTest {
         stubPairLocks();
         Universe outgoing = relation(actor, target, 33L, UniverseStatus.PENDING);
         Universe oppositeBlock = relation(target, actor, 34L, UniverseStatus.BLOCKED);
-        when(universeRepository.findPair(1L, 2L)).thenReturn(List.of(outgoing, oppositeBlock));
+        when(universeRepository.findPairForUpdate(1L, 2L)).thenReturn(List.of(outgoing, oppositeBlock));
 
         service.block(1L, 2L);
 

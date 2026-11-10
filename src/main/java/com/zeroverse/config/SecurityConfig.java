@@ -3,6 +3,7 @@ package com.zeroverse.config;
 import com.zeroverse.domain.auth.config.AuthCookieProperties;
 import com.zeroverse.security.SecurityErrorResponder;
 import com.zeroverse.security.DiscoveryCacheControlFilter;
+import com.zeroverse.security.NotificationCacheControlFilter;
 import com.zeroverse.security.jwt.JwtAuthenticationFilter;
 import com.zeroverse.security.jwt.JwtProperties;
 import java.util.List;
@@ -39,16 +40,19 @@ public class SecurityConfig {
     private final CorsProperties corsProperties;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final DiscoveryCacheControlFilter discoveryCacheControlFilter;
+    private final NotificationCacheControlFilter notificationCacheControlFilter;
     private final SecurityErrorResponder securityErrorResponder;
 
     public SecurityConfig(
             CorsProperties corsProperties,
             JwtAuthenticationFilter jwtAuthenticationFilter,
             DiscoveryCacheControlFilter discoveryCacheControlFilter,
+            NotificationCacheControlFilter notificationCacheControlFilter,
             SecurityErrorResponder securityErrorResponder) {
         this.corsProperties = corsProperties;
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.discoveryCacheControlFilter = discoveryCacheControlFilter;
+        this.notificationCacheControlFilter = notificationCacheControlFilter;
         this.securityErrorResponder = securityErrorResponder;
     }
 
@@ -107,6 +111,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(notificationCacheControlFilter, JwtAuthenticationFilter.class)
                 .addFilterBefore(discoveryCacheControlFilter, JwtAuthenticationFilter.class);
 
         return http.build();

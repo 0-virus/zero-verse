@@ -79,8 +79,8 @@ class NotificationQueryBoundMySqlTest extends MySqlTestSupport {
         assertThat(hundred).isEqualTo(one);
         assertThat(one).isEqualTo(3L);
         assertThat(hundred).isEqualTo(3L);
-        assertThat(oneSql).anySatisfy(sql -> assertProjectionDoesNotLoadLongText(sql));
-        assertThat(hundredSql).anySatisfy(sql -> assertProjectionDoesNotLoadLongText(sql));
+        assertProjectionDoesNotLoadLongTextInEveryNotificationStatement(oneSql);
+        assertProjectionDoesNotLoadLongTextInEveryNotificationStatement(hundredSql);
     }
 
     @Test
@@ -102,12 +102,13 @@ class NotificationQueryBoundMySqlTest extends MySqlTestSupport {
         assertThat(statistics.getPrepareStatementCount()).isEqualTo(2L);
     }
 
-    private static void assertProjectionDoesNotLoadLongText(String sql) {
-        String normalized = sql.toLowerCase(Locale.ROOT);
-        if (!normalized.contains("from notifications")) {
-            return;
-        }
-        assertThat(normalized).doesNotContain("content_json", "content_html", "content_text");
+    private static void assertProjectionDoesNotLoadLongTextInEveryNotificationStatement(List<String> sqls) {
+        List<String> notificationStatements = sqls.stream()
+                .filter(sql -> sql.toLowerCase(Locale.ROOT).contains("from notifications"))
+                .toList();
+        assertThat(notificationStatements).isNotEmpty();
+        assertThat(notificationStatements).allSatisfy(sql -> assertThat(sql.toLowerCase(Locale.ROOT))
+                .doesNotContain("content_json", "content_html", "content_text"));
     }
 
     private User user(String key) {

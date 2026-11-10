@@ -82,3 +82,10 @@
 - TDD/검증: RED `build/m8-evidence/task2-red-controller-escalated.log`는 2 failed를 기록했다. 최종 targeted `build/m8-evidence/task2-final-targeted-migration-v6.log`는 `BUILD SUCCESSFUL in 27s`; JUnit XML 7개는 `24 tests / failures 0 / errors 0 / skipped 0`이다. query-bound는 size 1/100 각각 3 SQL, 큰 offset 2 SQL을 실제 MySQL에서 확인했다. `task2-bootjar.log`, Flyway/Security/OpenAPI 회귀 로그도 SUCCESS다.
 - Migration/인덱스 증거: V6에는 승인된 두 index만 있다. `NotificationMigrationMySqlTest`는 격리 MySQL 8.4 source/backup을 Flyway target 5로 만들고 V5 fixture를 복사한 뒤 양쪽에 V6를 재이관해 같은 ID 및 receiver/actor/type/target/message/read_at/created_at/updated_at/deleted_at 전체 snapshot, V5/V6 history success를 비교한다. 같은 테스트에서 FORCE INDEX 없는 원래 목록·미읽음 EXPLAIN의 natural key도 검증한다. 로그는 `build/m8-evidence/task2-migration-natural-explain.log`다.
 - 상태/인계: backend Task2 source freeze 가능. 최종 backend full test, 실제 HTTP/독립 QA, root review·commit·dev 통합만 남았다. 상세 파일·메서드·검증 명령은 `.superpowers/sdd/M8-notifications/task-2-report.md`에 기록했다.
+
+## 2026-11-10 14:36 KST — M8 Task2 independent review-1 fix round 1 완료
+
+- 수정: `NotificationViewerResolver`가 managed User 대신 `UserRepository.StatusTarget` scalar projection으로 viewer status를 읽도록 바꿨다. mutation receiver `FOR UPDATE`가 resolver의 stale ACTIVE entity를 재사용하지 않는다. bound SQL 검사는 실제 notification projection 존재를 요구한 뒤 모든 notification SQL을 검사한다.
+- 테스트 보강: 별도 JDBC `SUSPENDED` commit barrier 후 `read`/`read-all`/`delete`가 모두 `USER_003`을 반환하는 mutation concurrency test, count→delete commit→items RR snapshot test, 동일 `created_at` 21개 page boundary test를 추가했다.
+- 검증: 첫 fix run의 Mockito interface spy `callRealMethod` RED 원인은 `build/m8-evidence/task2-fix1-diagnose.log`에 보존했다. JDBC count stub 후 RR 단일 `BUILD SUCCESSFUL in 13s`, 최종 mutation/query-bound/query targeted 16건 `BUILD SUCCESSFUL in 15s`, XML failures/errors/skips `0/0/0`은 `task2-fix1-green-rr-2.log`/`task2-fix1-green-targeted-2.log`에 있다.
+- 상태: review-1 Important 3건 fix source freeze 가능. migration/full/HTTP/Task3 read-all 경쟁/Task5 gates는 root 후속 범위다. 상세 명령·exit/output은 task-2-report.md round1 append에 기록했다.

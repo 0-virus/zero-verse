@@ -21,6 +21,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
         java.time.LocalDateTime getDeletedAt();
     }
 
+    interface StatusTarget {
+        Long getUserId();
+
+        String getStatus();
+    }
+
     Optional<User> findByEmailAndDeletedAtIsNull(String email);
 
     Optional<User> findByIdAndDeletedAtIsNull(Long id);
@@ -29,6 +35,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query(value = "select id as userId, deleted_at as deletedAt from users where id = :id",
             nativeQuery = true)
     Optional<Target> findTargetById(@Param("id") Long id);
+
+    /** Notification viewer resolution must not seed a managed User before a later FOR UPDATE. */
+    @Query(value = "select id as userId, status as status from users "
+            + "where id = :id and deleted_at is null", nativeQuery = true)
+    Optional<StatusTarget> findStatusTargetById(@Param("id") Long id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from User u where u.id = :id and u.deletedAt is null")

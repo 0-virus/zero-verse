@@ -73,3 +73,12 @@
 
 1. M4 추가 구현 작업은 없다. 실제 머지·검증 근거는 `docs/worklog/M4-posts.md`의 최종 [리뷰]·[머지]를 따른다.
 2. M5/S3 후속은 별도 사용자 지시 전 착수하지 않는다. 이후 결함 수정은 새 RED→GREEN 증거와 함께 진행한다.
+
+## 2026-11-10 14:23 KST — M8 Task2 알림 backend 구현·검증 인계
+
+- 배정/범위: 사용자 A-v2 전체 승인에 따라 `feature/M8-notifications`에서 Task2 notification entity/repository/DTO/controller/service, strict M8 viewer/no-store, OpenAPI, V6 인덱스 및 관련 테스트를 구현했다. Post/Comment/Like/Universe 생성 연계와 기존 source entity 쓰기 경로는 수정하지 않았다. 사용자 DB·`.env`·`.local-data`·root untracked 파일·Git은 건드리지 않았다.
+- Task3 경계: `Notification.create(User, User, NotificationType, NotificationTargetType, Long, String)`, `NotificationGenerator.create(...)`, `createBatch(List<Notification>)`, `flush()`를 제공한다. batch는 100개 단위 `saveAll`+`flush`이며 수신자/ACL/중복 정책을 결정하지 않는다. `NotificationViewerResolver.resolve(HttpServletRequest, ZeroverseUserPrincipal)`와 `Viewer(userId,status,canManage)`도 보고서에 고정했다.
+- 구현 정책: 목록 RR snapshot에서 filter별 `totalElements`와 filter-independent `unreadCount`를 분리하고 큰 offset은 filtered count 기준으로 item query 없이 empty 반환한다. scalar projection은 notification 원문 LONGTEXT를 선택하지 않으며, 개별 mutation은 receiver/row lock 후 현재 ACL·block을 재평가한다. 모든 notification 경로는 `private, no-store`다.
+- TDD/검증: RED `build/m8-evidence/task2-red-controller-escalated.log`는 2 failed를 기록했다. 최종 targeted `build/m8-evidence/task2-final-targeted-migration-v6.log`는 `BUILD SUCCESSFUL in 27s`; JUnit XML 7개는 `24 tests / failures 0 / errors 0 / skipped 0`이다. query-bound는 size 1/100 각각 3 SQL, 큰 offset 2 SQL을 실제 MySQL에서 확인했다. `task2-bootjar.log`, Flyway/Security/OpenAPI 회귀 로그도 SUCCESS다.
+- Migration/인덱스 증거: V6에는 승인된 두 index만 있다. `NotificationMigrationMySqlTest`는 격리 MySQL 8.4 source/backup을 Flyway target 5로 만들고 V5 fixture를 복사한 뒤 양쪽에 V6를 재이관해 같은 ID 및 receiver/actor/type/target/message/read_at/created_at/updated_at/deleted_at 전체 snapshot, V5/V6 history success를 비교한다. 같은 테스트에서 FORCE INDEX 없는 원래 목록·미읽음 EXPLAIN의 natural key도 검증한다. 로그는 `build/m8-evidence/task2-migration-natural-explain.log`다.
+- 상태/인계: backend Task2 source freeze 가능. 최종 backend full test, 실제 HTTP/독립 QA, root review·commit·dev 통합만 남았다. 상세 파일·메서드·검증 명령은 `.superpowers/sdd/M8-notifications/task-2-report.md`에 기록했다.

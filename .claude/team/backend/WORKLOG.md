@@ -413,3 +413,11 @@
 - 산출물: PR #13 merge SHA `08863207b8385177b619091410bbbd43e52a337c`, merge tree `dc68037477c6fed6b77d537235d79093803a983e`; tested head `2b984b6a2fc3aafd6d650c6ccb1cd8213a528545`와 tree가 동일하다. 현재 branch는 `dev`다.
 - 검증: 읽기 전용 `git diff --exit-code 2b984b6 08863207b8385177b619091410bbbd43e52a337c`가 exit 0이었다. 기존 최종 backend evidence는 `91 suites / 538 tests / failures 0 / errors 0 / skipped 0`, `bootJar` SHA `0cfc53e777449a430cf2f17114113850d9d94d04a4b172a230599e7e41e5d672`이며, 실제 HTTP·Chrome acceptance는 `259 PASS / 0 FAIL / 0 NOT_RUN`이다.
 - 미해결: M7 backend/QA/merge 차단은 없다. M8은 착수하지 않으며 root가 docs-only 최종 commit과 다음 마일스톤 준비를 담당한다. 이 closeout에서 제품 소스·테스트·Gradle·Git은 변경하지 않았다.
+
+## 2026-11-10 14:23 KST — M8 Task2 notification 구현·migration 보강·source freeze
+
+- 배정/범위: `feature/M8-notifications`에서 backend Task2만 구현했다. notification entity/repository/DTO/controller/service, strict viewer/no-store, OpenAPI, V6 인덱스와 관련 테스트를 추가했다. Post/Comment/Like/Universe 생성 연계 및 기존 source entity 쓰기 경로는 수정하지 않았다.
+- TDD: 초기 controller RED는 `build/m8-evidence/task2-red-controller-escalated.log`에서 2 failed(no-store/OpenAPI)였고, 이후 구현과 query/mutation/migration/bound 테스트를 GREEN으로 전환했다. filter별 `totalElements`를 분리하고 큰 offset의 filtered-count 조기반환도 반영했다.
+- migration review 보강: 기존 V6 적용 DB insert 후 읽기만 하던 테스트를 제거하고, 별도 MySQL 8.4 source/backup을 Flyway target 5로 초기화해 V5 fixture를 복사한 뒤 양쪽에 V6를 재이관하도록 바꿨다. notification 전체 row(동일 ID, receiver/actor/type/target/message/read_at/created_at/updated_at/deleted_at) 전후·source/backup 일치를 확인한다. FORCE INDEX EXPLAIN도 제거하고 원래 목록/미읽음 SQL의 natural key와 possible_keys를 확인한다.
+- 검증: 최종 `... GradleWrapperMain --no-daemon --max-workers=1 test --tests 'com.zeroverse.domain.notification.*'`는 `build/m8-evidence/task2-final-targeted-migration-v6.log`에 `BUILD SUCCESSFUL in 27s`로 보존했다. XML 7개 직접 집계 `24 tests / failures 0 / errors 0 / skipped 0`; migration 단일 targeted도 `3/0/0/0`이다. query-bound는 3/3/2 SQL, Flyway/Security/OpenAPI 회귀와 bootJar도 SUCCESS다.
+- 인계: 상세 계약·정확 method signature·로그 경로는 `.superpowers/sdd/M8-notifications/task-2-report.md`에 기록했다. 이 역할은 source freeze, commit/merge 미수행이며 root 독립 review·최종 full/HTTP/QA·통합을 대기한다.

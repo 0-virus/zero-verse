@@ -3,9 +3,10 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { NotificationsPage } from '../pages/NotificationsPage';
-import { NotificationProvider, useNotificationCenter } from '../features/notifications/NotificationProvider';
+import { NotificationProvider, useNotificationCenter, useOptionalNotifications } from '../features/notifications/NotificationProvider';
 import { listNotifications, markAllNotificationsRead, markNotificationRead, deleteNotification } from '../features/notifications/notificationApi';
 import { useOptionalAuth } from '../lib/authContext';
+import { ApiRequestError } from '../lib/apiClient';
 
 vi.mock('../lib/authContext', () => ({ useOptionalAuth: vi.fn() }));
 vi.mock('../features/notifications/notificationApi', () => ({
@@ -85,6 +86,16 @@ function CenterRefreshProbe() {
     <button type="button" onClick={() => void context?.refreshCenter(0, 20)}>
       refresh-center
     </button>
+  );
+}
+
+function PreviewAuthFailureProbe() {
+  const context = useOptionalNotifications();
+  return (
+    <>
+      <output data-testid="preview-auth-failure">{String(context?.isAuthFailure ?? false)}</output>
+      <button type="button" onClick={() => void context?.refreshPreview()}>trigger-preview</button>
+    </>
   );
 }
 
@@ -170,6 +181,59 @@ describe('NotificationsPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('일시 오류');
     expect(screen.getByText(available.message)).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: '페이지' })).toBeInTheDocument();
+  });
+
+  it('A 계정 read-all 실패 retry는 계정 전환 시 제거되어 B API를 호출하지 않는다', async () => {
+    const user = userEvent.setup();
+    const view = renderPage();
+    vi.mocked(markAllNotificationsRead).mockRejectedValueOnce(new Error('A read-all 실패'));
+    await user.click(await screen.findByRole('button', { name: '모두 읽음 처리' }));
+    expect(await screen.findByRole('button', { name: '다시 시도' })).toBeInTheDocument();
+
+    vi.mocked(useOptionalAuth).mockReturnValue({
+      ...auth,
+      user: { ...auth.user, id: 8, nickname: '여덟별' },
+    });
+    view.rerender(
+      <MemoryRouter initialEntries={['/notifications']}>
+        <NotificationProvider>
+          <NotificationsPage />
+          <LocationProbe />
+        </NotificationProvider>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument());
+    expect(markAllNotificationsRead).toHaveBeenCalledTimes(1);
+  });
+
+  it('transient read-all 실패 뒤 USER_001이면 이전 retry를 다시 호출하지 않는다', async () => {
+    const user = userEvent.setup();
+    let centerCalls = 0;
+    vi.mocked(listNotifications).mockImplementation(async ({ size } = {}) => {
+      if (size === 3) {
+        throw new ApiRequestError(404, { code: 'USER_001', message: '사용자를 찾을 수 없습니다.', details: [] });
+      }
+      centerCalls += 1;
+      return page();
+    });
+    render(
+      <MemoryRouter initialEntries={['/notifications']}>
+        <NotificationProvider>
+          <NotificationsPage />
+          <PreviewAuthFailureProbe />
+        </NotificationProvider>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByText(available.message)).toBeInTheDocument());
+    vi.mocked(markAllNotificationsRead).mockRejectedValueOnce(new Error('일시 read-all 실패'));
+    await user.click(screen.getByRole('button', { name: '모두 읽음 처리' }));
+    expect(await screen.findByRole('button', { name: '다시 시도' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'trigger-preview' }));
+    await waitFor(() => expect(screen.getByTestId('preview-auth-failure')).toHaveTextContent('true'));
+    expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument();
+    expect(markAllNotificationsRead).toHaveBeenCalledTimes(1);
+    expect(centerCalls).toBeGreaterThan(0);
   });
 
   it('SUSPENDED canManage=false는 읽기 전용으로 관리 mutation을 호출하지 않는다', async () => {

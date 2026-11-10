@@ -1,4 +1,4 @@
-import { useMemo, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Pagination } from '../components/ui/Pagination';
 import {
@@ -76,13 +76,18 @@ function NotificationRow({
       return;
     }
     setBusy('read');
+    const actionGeneration = context.retryGeneration;
     try {
       const current = await context.markRead(item.id);
       onSuccess();
       if (current.available && current.href) navigate(current.href);
     } catch (error) {
-      if (!isNotificationMutationSuperseded(error)) {
-        onFailure(errorMessage(error), isNotificationAuthFailure(error) ? undefined : readAndNavigate);
+      if (!isNotificationMutationSuperseded(error) && context.isRetryGenerationCurrent(actionGeneration)) {
+        const retry = isNotificationAuthFailure(error)
+          ? undefined
+          : context.bindRetry(readAndNavigate, actionGeneration) ?? undefined;
+        if (!isNotificationAuthFailure(error) && !retry) return;
+        onFailure(errorMessage(error), retry);
       }
     } finally {
       setBusy(null);
@@ -103,12 +108,17 @@ function NotificationRow({
       return;
     }
     setBusy('delete');
+    const actionGeneration = context.retryGeneration;
     try {
       await context.remove(item.id);
       onSuccess();
     } catch (error) {
-      if (!isNotificationMutationSuperseded(error)) {
-        onFailure(errorMessage(error), isNotificationAuthFailure(error) ? undefined : removeNotification);
+      if (!isNotificationMutationSuperseded(error) && context.isRetryGenerationCurrent(actionGeneration)) {
+        const retry = isNotificationAuthFailure(error)
+          ? undefined
+          : context.bindRetry(removeNotification, actionGeneration) ?? undefined;
+        if (!isNotificationAuthFailure(error) && !retry) return;
+        onFailure(errorMessage(error), retry);
       }
     } finally {
       setBusy(null);
@@ -167,12 +177,18 @@ export function NotificationsPage() {
   const [readAllBusy, setReadAllBusy] = useState(false);
   const page = useMemo(() => pageFromSearch(searchParams.get('page')), [searchParams]);
   const context = useNotificationCenter(page, PAGE_SIZE);
+  const retryGeneration = context?.retryGeneration;
   const center = context?.center ?? { page: null, loading: false, error: null, key: null };
   const data = center?.page ?? null;
   const unreadCount = context?.unreadCount ?? data?.unreadCount ?? null;
   const isLoading = context?.isAuthLoading ?? true;
   const isGuest = !isLoading && !(context?.isAuthenticated ?? false);
   const canManage = context?.canManage === true;
+
+  useEffect(() => {
+    setNotice(null);
+    setReadAllBusy(false);
+  }, [retryGeneration]);
 
   const updatePage = (nextPage: number) => {
     const next = new URLSearchParams(searchParams);
@@ -182,22 +198,31 @@ export function NotificationsPage() {
   };
 
   const retry = () => {
+    if (!context) return;
+    const generation = context.retryGeneration;
+    const retryAction = context.bindRetry(() => context.refreshCenter(page, PAGE_SIZE), generation);
+    if (!retryAction) return;
     setNotice(null);
-    void context?.refreshCenter(page, PAGE_SIZE);
+    void retryAction().catch(() => undefined);
   };
 
   const readAll = async () => {
     if (!context || context.canManage !== true || context.unreadCount === 0) return;
+    const actionGeneration = context.retryGeneration;
     setNotice(null);
     setReadAllBusy(true);
     try {
       await context.markAllRead();
       setNotice(null);
     } catch (error) {
-      if (!isNotificationMutationSuperseded(error)) {
+      if (!isNotificationMutationSuperseded(error) && context.isRetryGenerationCurrent(actionGeneration)) {
+        const retry = isNotificationAuthFailure(error)
+          ? undefined
+          : context.bindRetry(readAll, actionGeneration) ?? undefined;
+        if (!isNotificationAuthFailure(error) && !retry) return;
         setNotice({
           message: errorMessage(error),
-          retry: isNotificationAuthFailure(error) ? undefined : readAll,
+          retry,
         });
       }
     } finally {

@@ -40,6 +40,7 @@ export interface NotificationContextValue {
   isAuthLoading: boolean;
   isAuthenticated: boolean;
   isAuthFailure: boolean;
+  retryGeneration: number;
   viewerId: number | null;
   refreshPreview: () => Promise<void>;
   refreshCenter: (page?: number, size?: number) => Promise<void>;
@@ -48,6 +49,8 @@ export interface NotificationContextValue {
   remove: (notificationId: number) => Promise<void>;
   invalidate: () => Promise<void>;
   setCenterActive: (active: boolean) => void;
+  bindRetry: <T>(retry: () => Promise<T>, generation: number) => (() => Promise<T>) | null;
+  isRetryGenerationCurrent: (generation: number) => boolean;
 }
 
 const NotificationContext = createContext<NotificationContextValue | null>(null);
@@ -79,6 +82,7 @@ export function isNotificationAuthFailure(error: unknown): boolean {
 
 interface MutationSnapshot {
   accountGeneration: number;
+  sessionGeneration: number;
   viewerId: number | null;
 }
 
@@ -131,9 +135,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const centerQuery = useRef<LayerQuery>({ page: 0, size: 20 });
   const centerActive = useRef(false);
   const authFailureGeneration = useRef<number | null>(null);
+  const sessionGeneration = useRef(0);
+  const viewerIdRef = useRef(viewerId);
+  viewerIdRef.current = viewerId;
 
   useLayoutEffect(() => {
     accountGeneration.current += 1;
+    sessionGeneration.current += 1;
     mutationGeneration.current += 1;
     appliedSummaryGeneration.current = 0;
     setPreview(EMPTY_LAYER);
@@ -156,6 +164,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       return;
     }
     authFailureGeneration.current = requestAccountGeneration;
+    sessionGeneration.current += 1;
     mutationGeneration.current += 1;
     appliedSummaryGeneration.current = 0;
     previewRequestGeneration.current += 1;
@@ -343,10 +352,44 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     centerActive.current = active;
   }, []);
 
+  const isRetryGenerationCurrent = useCallback((generation: number): boolean => {
+    return generation === sessionGeneration.current && authFailureGeneration.current === null;
+  }, []);
+
+  const bindRetry = useCallback(
+    <T,>(retry: () => Promise<T>, generation: number): (() => Promise<T>) | null => {
+      if (!isRetryGenerationCurrent(generation)) return null;
+      const retryAccountGeneration = accountGeneration.current;
+      const retrySessionGeneration = sessionGeneration.current;
+      const retryViewerId = viewerIdRef.current;
+      return async () => {
+        if (
+          retryAccountGeneration !== accountGeneration.current ||
+          retrySessionGeneration !== sessionGeneration.current ||
+          retryViewerId !== viewerIdRef.current ||
+          !isRetryGenerationCurrent(generation)
+        ) {
+          throw new NotificationMutationSupersededError();
+        }
+        return retry();
+      };
+    },
+    [isRetryGenerationCurrent],
+  );
+
+  const isMutationSnapshotCurrent = useCallback((snapshot: MutationSnapshot): boolean => {
+    return (
+      snapshot.accountGeneration === accountGeneration.current &&
+      snapshot.sessionGeneration === sessionGeneration.current &&
+      snapshot.viewerId === viewerIdRef.current
+    );
+  }, []);
+
   const runMutation = useCallback(
     async <T,>(key: string, operation: (snapshot: MutationSnapshot) => Promise<T>): Promise<T> => {
       const snapshot: MutationSnapshot = {
         accountGeneration: accountGeneration.current,
+        sessionGeneration: sessionGeneration.current,
         viewerId,
       };
       const scopedKey = `${snapshot.accountGeneration}:${snapshot.viewerId ?? 'guest'}:${key}`;
@@ -355,7 +398,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       const promise = (async () => {
         try {
           const result = await operation(snapshot);
-          if (snapshot.accountGeneration !== accountGeneration.current) {
+          if (!isMutationSnapshotCurrent(snapshot)) {
             throw new NotificationMutationSupersededError();
           }
           return result;
@@ -373,7 +416,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         if (mutationInFlight.current.get(scopedKey) === promise) mutationInFlight.current.delete(scopedKey);
       }
     },
-    [clearForAuthFailure, viewerId],
+    [clearForAuthFailure, isMutationSnapshotCurrent, viewerId],
   );
 
   const markRead = useCallback(
@@ -381,13 +424,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       runMutation(`read:${notificationId}`, async (snapshot) => {
         if (canManage !== true) throw canManage === false ? errorForReadOnly() : new Error('알림 관리 권한을 확인하는 중입니다.');
         const item = await markNotificationRead(notificationId);
-        if (snapshot.accountGeneration !== accountGeneration.current) {
+        if (!isMutationSnapshotCurrent(snapshot)) {
           throw new NotificationMutationSupersededError();
         }
         await invalidate(snapshot);
         return item;
       }),
-    [canManage, invalidate, runMutation],
+    [canManage, invalidate, isMutationSnapshotCurrent, runMutation],
   );
 
   const markAllRead = useCallback(
@@ -395,12 +438,12 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       runMutation('read-all', async (snapshot) => {
         if (canManage !== true) throw canManage === false ? errorForReadOnly() : new Error('알림 관리 권한을 확인하는 중입니다.');
         await markAllNotificationsRead();
-        if (snapshot.accountGeneration !== accountGeneration.current) {
+        if (!isMutationSnapshotCurrent(snapshot)) {
           throw new NotificationMutationSupersededError();
         }
         await invalidate(snapshot);
       }),
-    [canManage, invalidate, runMutation],
+    [canManage, invalidate, isMutationSnapshotCurrent, runMutation],
   );
 
   const removeById = useCallback(
@@ -408,14 +451,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       runMutation(`delete:${notificationId}`, async (snapshot) => {
         if (canManage !== true) throw canManage === false ? errorForReadOnly() : new Error('알림 관리 권한을 확인하는 중입니다.');
         await deleteNotification(notificationId);
-        if (snapshot.accountGeneration !== accountGeneration.current) {
+        if (!isMutationSnapshotCurrent(snapshot)) {
           throw new NotificationMutationSupersededError();
         }
         await invalidate(snapshot);
       }),
-    [canManage, invalidate, runMutation],
+    [canManage, invalidate, isMutationSnapshotCurrent, runMutation],
   );
 
+  const currentRetryGeneration = sessionGeneration.current;
   const value = useMemo<NotificationContextValue>(
     () => ({
       preview,
@@ -426,6 +470,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       isAuthLoading,
       isAuthenticated,
       isAuthFailure: authFailure !== null,
+      retryGeneration: currentRetryGeneration,
       viewerId,
       refreshPreview,
       refreshCenter,
@@ -434,6 +479,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       remove: removeById,
       invalidate,
       setCenterActive,
+      bindRetry,
+      isRetryGenerationCurrent,
     }),
     [
       canManage,
@@ -442,13 +489,16 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       isAuthLoading,
       isAuthenticated,
       authFailure,
+      bindRetry,
       markAllRead,
       markRead,
       preview,
       refreshCenter,
       refreshPreview,
       removeById,
+      isRetryGenerationCurrent,
       setCenterActive,
+      currentRetryGeneration,
       unreadCount,
       viewerId,
     ],

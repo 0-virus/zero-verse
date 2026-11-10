@@ -100,6 +100,50 @@ function Probe() {
   );
 }
 
+function RetryBindingProbe() {
+  const context = useNotificationPreview();
+  const [retry, setRetry] = useState<(() => Promise<unknown>) | null>(null);
+  const [message, setMessage] = useState('');
+  const captureReadAllRetry = async () => {
+    if (!context) return;
+    const generation = context.retryGeneration;
+    try {
+      await context.markAllRead();
+    } catch {
+      const bound = context.bindRetry(() => context.markAllRead(), generation);
+      if (bound) setRetry(() => bound);
+      setMessage('retry-ready');
+    }
+  };
+  const capturePreviewRetry = async () => {
+    if (!context) return;
+    const generation = context.retryGeneration;
+    await context.refreshPreview();
+    const bound = context.bindRetry(() => context.refreshPreview(), generation);
+    if (bound) {
+      setRetry(() => bound);
+      setMessage('retry-ready');
+    }
+  };
+  return (
+    <>
+      <output data-testid="can-manage">{String(context?.canManage ?? 'none')}</output>
+      <output data-testid="retry-message">{message}</output>
+      <output data-testid="retry-auth-failure">{String(context?.isAuthFailure ?? false)}</output>
+      <button type="button" onClick={() => void captureReadAllRetry()}>capture-read-all</button>
+      <button type="button" onClick={() => void capturePreviewRetry()}>capture-preview</button>
+      <button
+        type="button"
+        onClick={() => {
+          void retry?.().catch(() => undefined);
+        }}
+      >
+        invoke-old-retry
+      </button>
+    </>
+  );
+}
+
 function PreviewRaceProbe() {
   const context = useNotificationPreview();
   return (
@@ -295,5 +339,88 @@ describe('NotificationProvider mutation account generation', () => {
       expect(screen.getByTestId('race-unread')).toHaveTextContent('1');
       expect(screen.getByTestId('race-message')).toHaveTextContent('새 알림');
     });
+  });
+
+  it('read PUT 성공 뒤 canonical GET USER_001이면 href를 반환하지 않고 이동을 막는다', async () => {
+    const user = userEvent.setup();
+    let listCalls = 0;
+    vi.mocked(listNotifications).mockImplementation(async () => {
+      listCalls += 1;
+      if (listCalls === 1) return page(1, '기존 알림');
+      throw new ApiRequestError(404, { code: 'USER_001', message: '사용자를 찾을 수 없습니다.', details: [] });
+    });
+    vi.mocked(markNotificationRead).mockResolvedValue({
+      id: 7,
+      type: 'LIKE',
+      message: '읽음 결과',
+      actor: null,
+      targetType: 'POST',
+      targetId: 7,
+      href: '/blog/final-auth-must-not-navigate',
+      available: true,
+      readAt: '2026-11-10T01:00:00Z',
+      createdAt: '2026-11-10T00:00:00Z',
+    });
+    render(
+      <NotificationProvider>
+        <Probe />
+      </NotificationProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('can-manage')).toHaveTextContent('true'));
+    await user.click(screen.getByRole('button', { name: 'read' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('can-manage')).toHaveTextContent('none');
+      expect(screen.getByTestId('result')).toBeEmptyDOMElement();
+    });
+    expect(markNotificationRead).toHaveBeenCalledTimes(1);
+    expect(listCalls).toBe(2);
+  });
+
+  it('A 계정에서 만든 read-all retry는 B 계정 전환 뒤 API를 호출하지 않는다', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <NotificationProvider>
+        <RetryBindingProbe />
+      </NotificationProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('can-manage')).toHaveTextContent('true'));
+    vi.mocked(markAllNotificationsRead).mockRejectedValueOnce(new Error('A read-all 실패'));
+    await user.click(screen.getByRole('button', { name: 'capture-read-all' }));
+    expect(await screen.findByTestId('retry-message')).toHaveTextContent('retry-ready');
+
+    vi.mocked(useOptionalAuth).mockReturnValue(authFor(8));
+    rerender(
+      <NotificationProvider>
+        <RetryBindingProbe />
+      </NotificationProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('retry-auth-failure')).toHaveTextContent('false'));
+    await user.click(screen.getByRole('button', { name: 'invoke-old-retry' }));
+    expect(markAllNotificationsRead).toHaveBeenCalledTimes(1);
+  });
+
+  it('transient preview 실패 뒤 USER_001 final auth가 오면 old retry는 API를 호출하지 않는다', async () => {
+    const user = userEvent.setup();
+    let listCalls = 0;
+    vi.mocked(listNotifications).mockImplementation(async () => {
+      listCalls += 1;
+      if (listCalls === 1) return page(1, '기존 알림');
+      if (listCalls === 2) throw new Error('일시 오류');
+      throw new ApiRequestError(404, { code: 'USER_001', message: '사용자를 찾을 수 없습니다.', details: [] });
+    });
+    render(
+      <NotificationProvider>
+        <RetryBindingProbe />
+      </NotificationProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('can-manage')).toHaveTextContent('true'));
+    await user.click(screen.getByRole('button', { name: 'capture-preview' }));
+    expect(await screen.findByTestId('retry-message')).toHaveTextContent('retry-ready');
+    await user.click(screen.getByRole('button', { name: 'capture-preview' }));
+    await waitFor(() => expect(screen.getByTestId('retry-auth-failure')).toHaveTextContent('true'));
+
+    await user.click(screen.getByRole('button', { name: 'invoke-old-retry' }));
+    expect(listCalls).toBe(3);
   });
 });

@@ -495,3 +495,28 @@
 - backend/frontend/QA/PM 소유자에게 역할 기록과 PRD의 완료 동기화만 배정했다. root는 최종 기록 커밋과 M7 전용 runtime 종료를 담당한다. 사용자 미추적 4파일·기존 영속 데이터는 보존하고 M8 구현은 배정하지 않는다.
 
 - 23:48 KST runtime 정리: 실행 경로를 확인한 M7 Vite 5177/API 18087 프로세스를 TERM으로 종료했고 listener가 없음을 확인했다. 전용 `zeroverse-m7-mysql84`를 삭제 없이 stop한 뒤 전용 Colima VM 정지 exit 0을 확인했다. 합성 DB/검증 증거는 보존했으며 사용자 Docker Desktop·기존 DB/업로드는 조작하지 않았다.
+
+## 2026-11-10 KST — M8 제품 정책 선택·독립 심의
+
+- 사용자 `m8 구현 가능 여부 탐색해줘`에 brief로 dev/M7 PR13 실제 merge·정본/역할/검증 증거를 대조했다. M8 선행 M4/M5/M6는 완료, M8 서버 미구현·FE골격·V1 notifications 존재를 확인했다. 이 탐색은 읽기 전용이었다.
+- 후속 `구현 전 정리할 사항을 자세히 질문해줘`에 9개 정책을 질문했고 `모두 권고안으로 진행하자`로 1A~6A, 7권고, 8A, 9A를 확정했다. 제품정책과 미승인 기술상세를 분리하며 정책 자체를 재승인 요청하지 않는다.
+- root가 `docs/governance/meetings/M8-20261110-notifications.md` A-v1 및 `docs/worklog/M8-notifications.md`를 작성했다. 해당 두 파일/레지스터/JOURNAL은 root 단독 소유, PM PRD/상태는 별도 소유자에 배정했다.
+- 독립 read-only `/root/m8_product_review`, `/root/m8_architecture_review`, `/root/m8_delivery_review`는 같은 A-v1/정본을 검토하며 서로 중간 의견을 공유하지 않는다. `/root/m8_pm_policy`는 확정된 9개만 PRD/PM상태에 반영한다. 제품코드·테스트·DB·Git mutation은 배정하지 않았다.
+- user FK와 기존 blog→sorted users→post 잠금이 결합되는 POST fan-out, masking/차단집계, read-all 경쟁/현재권한, rollback·이관·실제인수 경계를 심의한다. 런타임은 기동하지 않고 사용자4미추적파일·환경·DB·업로드를 보존한다.
+
+### 2026-11-10 KST — M8 A-v2 심의 보완·승인 대상 확정
+
+- 독립 Product90/Architecture89/Delivery92 모두 APPROVE_WITH_CHANGES/HIGH를제출했다. 서로의중간결과를공유하지않았고 root가소스/정본으로필수보완을대조했다.
+- 회의§9 A-v2: 기존정책유지, 개별read응답canonical Item, 현재권한masking/복구표, 정지read-only, 동기source+알림transaction, scalarblog→sortedusers→post, current후보재검증·새ID발견rollback·총3attempt, 확정지점명시, batch100/1001수신자인수, V6index2개·원문보존·복구, GETquerybound14, store세대/동일세션invalidate를구체화했다.
+- 구체계약·M8 Task1~6/독립QA/dev통합은USER_DECISION_REQUIRED. 제품정책9개는APPROVED를유지한다. PM은PRD의사용자결정만확정하고기술안상태를동기화한다.
+- 문서작업만수행했다. 제품/테스트/DB/runtime/branch/commit/push/merge 미착수. 사용자root4파일과환경·영속데이터보존.
+
+- root 최종 문서 검증: 회의 A-v2·M8 실행계획·PRD·PM STATE/WORKLOG를 재독했다. 사용자 정책은 9개이며, 문서 상대 링크의 누락과 trailing whitespace가 없고 `git diff --check`도 통과했다. `git diff --name-only -- src frontend build.gradle settings.gradle README.md AGENTS.md CLAUDE.md`는 빈 출력이었다. 현재 branch는 dev이며 승인된 정책과 USER_DECISION_REQUIRED 기술 계약을 구분했다. 테스트·빌드·runtime은 이번 문서 작업에서 실행하지 않았다.
+
+## 2026-11-10 KST — M8 A-v2 전체 승인·구현 배정
+
+- 사용자 `A-v2 전체 승인`으로 공개 API/DB/권한/잠금·Task1~6·독립QA·dev통합까지 승인했다. dev b80ede0에서 feature/M8-notifications를 생성했다. .git sandbox 제약은 승인된 branch 작업 escalation으로 해결했다.
+- 역할: `/root/m8_backend_api` Task2(notification/API/V6/targeted 검증), `/root/m8_frontend_impl` Task4(frontend 전체), `/root/m8_qa_acceptance` Task5(harness/matrix 준비), `/root/m8_pm_policy` 승인 PRD/PM기록. root는 REQUIREMENTS6.11-A/ADR-0007/governance/마일스톤기록/Git/runtime 단독 소유다. backend Task3는 Task2 인터페이스와 독립리뷰 후 별도 배정한다.
+- 승인된 shared checkout·feature branch와 역할별 병렬 작업을 유지한다. 사용자 root4미추적파일은 읽기/실행/편집/stage하지 않는다. runtime은 별도 Colima/MySQL13318/API18088/FE5178로 분리하며 DB/업로드는 synthetic 전용이다.
+- Colima 기동 exit0, zeroverse-m8-mysql84 생성 및 127.0.0.1:13318 분리 확인. root ignored build/m8-runtime.py는 M7 helper에서 별도 생성했으며 기존 M7 helper/데이터와 사용자 DB는 변경하지 않았다. 테스트는 Task2 backend 단일 Gradle 실행자와 frontend 실행자로 분리했다.
+- SDD ledger/brief는 `.superpowers/sdd/M8-notifications/`, 정본 계획은 기존 M8 worklog다. 동일 M7 baseline source가 검증됐으므로 중복 전체 baseline은 반복하지 않고 M8 RED/GREEN·최종 full·실제인수로 진행한다.

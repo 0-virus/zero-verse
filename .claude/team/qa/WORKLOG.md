@@ -803,3 +803,51 @@
 - root 보고의 PR #13(`https://github.com/0-virus/zero-verse/pull/13`) merge를 read-only 대조했다. merge SHA는 `08863207b8385177b619091410bbbd43e52a337c`, tested head는 `2b984b6a2fc3aafd6d650c6ccb1cd8213a528545`, 현재 브랜치는 `dev`다.
 - 현재 `dev` tree `dc68037477c6fed6b77d537235d79093803a983e`와 tested head tree가 동일함을 확인했다. 기존 backend 538 tests, frontend 405 tests/lint/build, 실제 HTTP+Chrome `259 PASS / 0 FAIL / 0 NOT_RUN`, 독립 1440px 시각 PASS 및 owner draft 증거 경계는 유지된다.
 - `qa/M7-review.md` 상태를 **DEV INTEGRATED**로 갱신하고 PR/tree 정보를 §9에 기록했다. QA는 추가 테스트·제품 수정·Git 조작을 하지 않았으며 M8은 착수하지 않는다.
+
+## 2026-11-10 KST — M8 Task5 acceptance matrix·HTTP/Chrome harness 준비
+
+### 한 일
+
+- `.claude/CONSTITUTION.md` → `AGENTS.md`/`CLAUDE.md` → QA `CLAUDE.md`/`STATE.md` → `qa/AGENTS.md` 순서로 읽고, M8 Task5 brief, `docs/worklog/M8-notifications.md` 인수 매트릭스, 회의 `M8-20261110-notifications.md` §2/§5/§9/§10, `REQUIREMENTS` §6.11/§6.11-A, `PRD` §5.11/§7/§9.11/§10~§12, 디자인 알림 원본, `ADR-0007-notifications-contract.md`를 직접 대조했다.
+- `qa/M8-review.md`를 추가해 A-v2 승인·구현 진행·실제 인수 미실행 경계를 명시했다. FR-NOT-01~05, 전체 이력/40일 초과/21+ paging/read/read-all/delete, 5 type·재행동·발행 전이·masking/block/restore/suspend/deleted, auth/error/no-store/OpenAPI, FE 3 surface/stale/failure/1440px 디자인, rollback/fan-out/lock/query-bound/source-JAR gate를 모두 초기 `NOT RUN`으로 매트릭스화했다.
+- `qa/m8-acceptance.mjs`를 추가했다. 8개 합성 계정과 관계·게시글·댓글·좋아요를 HTTP로 생성하고, 5 type 생성·동일 reply dedupe·self 제외·like retry/unlike/re-like·request cancel/re-request/accept·eligible POST 전이·21+ 목록을 준비한다. 실제 실행 시 API envelope/no-store/error/auth/ACL/read/delete/read-all/masking/block 복구와 MySQL read-only fingerprint, M7 discovery no-notification, Chrome 1440px center/330px dropdown/right-panel/recent3/shared unread/stale/guest guard/삭제 실패 보존/원본 디자인 캡처를 검증한다.
+- root 소유 `build/m8-runtime.py`와의 handoff를 고정했다. seed는 합성 ID만 포함하고 `accounts.<label>.userId`, top-level `suspendedUserId/deletedUserId/suspendedPostId/deletedPostId/ownerUserId/oldNotificationIds`, `statusTargets`를 쓴다. root는 동일 receiver의 `oldNotificationIds`에 41일 timestamp와 두 user 상태를 한 transaction으로 적용하고 `status-ready.json`의 `ready`, 동일 IDs, `oldNotificationUpdatedCount`를 검증한 뒤 작성한다. runner는 이 ready가 없으면 계속하지 않는다.
+
+### 산출물
+
+- `qa/M8-review.md`
+- `qa/m8-acceptance.mjs`
+
+### 검증·경계
+
+- `node --check qa/m8-acceptance.mjs` 성공.
+- `rg -n '[[:blank:]]+$' qa/M8-review.md qa/m8-acceptance.mjs .claude/team/qa/STATE.md .claude/team/qa/WORKLOG.md` 결과 `trailing-whitespace: clean`.
+- 실제 backend/FE/API/MySQL/SQL helper/Chrome, Gradle/FE 자동검증, source manifest/JAR hash, screenshot, acceptance runner는 root의 실행 지시와 immutable artifact 전까지 **실행하지 않았다**. PASS/merge-ready/dev 통합을 주장하지 않는다.
+- 제품 `src/**`, `frontend/**` 및 타 역할 테스트, governance/worklog 원본, Git은 수정하지 않았다.
+
+## 2026-11-10 KST — root runtime seed handoff 반영 확인
+
+- root가 `seed.statusTargets`/top-level 상태 키, 8개 합성 계정 ID의 positive·unique 검증, owner receiver guard, SUSPENDED/deleted/41일 timestamp의 단일 transaction 적용, `oldNotificationUpdatedCount`를 포함한 `status-ready.json` 검증을 runtime helper에 반영했다고 인계했다.
+- QA harness와 acceptance matrix는 변경 없이 유지한다. root 실행 지시와 immutable artifact가 오기 전 실제 HTTP·DB·Chrome·자동검증은 시작하지 않으며, M8 판정은 계속 **NOT RUN**이다.
+
+## 2026-11-10 KST — M8 Task5 focused black-box coverage audit
+
+### 한 일
+
+- 기존 harness를 A-v2 §9.1/§9.3 및 Task2 독립 리뷰의 남은 actual gate와 대조했다. 차단해제·ACL복구·deleted actor/null masking·41일 보존은 기존 검증을 유지하고 직접 read assertion만 보강했다.
+- `actor→parent` ACCEPTED 관계를 hard-delete한 뒤 NEIGHBOR 이력의 unavailable projection과 read를 확인하도록 fixture/HTTP probe를 추가했다.
+- list/read/read-all/delete 네 endpoint 각각에 missing·empty·Basic/bad bearer·expired·wrong JWT type·deleted principal·SUSPENDED 행렬과 `private, no-store` 검사를 추가했다.
+- FE fix1 대응 black-box 조건으로 route re-entry refresh, read 500→retry/navigation, transient list 500 보존·retry, USER_001 state clear, same-account stale preview summary 보호를 추가했다.
+- `performance_schema.events_statements_summary_by_account_by_event_name`의 `USER='zeroverse_m8'` SELECT counter를 read-only helper로 관측해 actual bearer size=1→size=100 query-bound를 측정하도록 추가했다. root가 격리 DB에서 counter 가용성을 확인했지만 실행 전이므로 결과는 없다.
+
+### 산출물·검증·미해결
+
+- 변경: `qa/m8-acceptance.mjs`, `qa/M8-review.md`; QA 상태/이력과 root 지정 prep report도 append했다.
+- 실제 HTTP/DB/Chrome/Playwright/performance_schema/Gradle/FE 명령은 실행하지 않는다. `node --check qa/m8-acceptance.mjs`만 후속 수행한다.
+- query-bound delta, runtime V6/restart/M7 compatibility 및 실제 acceptance evidence는 root 실행·artifact 이후 독립 재집계 대상이다. PASS/merge-ready는 주장하지 않는다.
+
+## 2026-11-10 KST — focused audit 정적 검증
+
+- `node --check qa/m8-acceptance.mjs` 통과.
+- `rg -n '[[:blank:]]+$'`로 `qa/M8-review.md`, `qa/m8-acceptance.mjs`, QA STATE/WORKLOG 및 prep report를 검사했고 `trailing-whitespace: clean`이다.
+- 실제 runtime/API/DB/Chrome/performance_schema 측정은 실행하지 않았으며 M8 판정은 계속 **NOT RUN**이다.

@@ -79,3 +79,7 @@ docs/design/*
 !docs/governance/**
 !docs/에이전트-팀-운영-가이드.md
 !docs/Codex-에이전트-팀-운영-가이드.md
+
+### 로컬 실행 파일 ###
+run-backend.sh
+run-frontend.sh

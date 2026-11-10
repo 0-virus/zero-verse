@@ -27,3 +27,10 @@
 - 완료 전 관련 테스트와 빌드를 실행하고 실제 출력으로 보고한다.
 
 턴 종료 전 `STATE.md`를 갱신하고 의미 있는 작업을 `WORKLOG.md`에 append한다.
+
+## M8 알림 생성 경계
+
+`NotificationTransactionExecutor`는 원행위 5종의 확정 rollback만 새 transaction 총 3회까지 재시도한다.
+`NotificationPublicationLock`은 scalar blog→정렬 users를 수행하고 PostService가 기존 post를 잠근 뒤
+원본 변경 직전에 relation-only current 재검증을 호출한다. `NotificationEventService`는 수신자/self/REPLY 우선/종류별 안전 메시지를 담당한다.
+근거는 REQUIREMENTS §6.11-A와 승인 M8 회의 §9.2이며 실제 검증 수치는 backend WORKLOG·Task3 보고서를 따른다.

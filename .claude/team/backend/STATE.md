@@ -1,91 +1,28 @@
 # backend 현재 상태
 
-## 2026-11-09 23:46 KST — M7 backend 최종 검증·dev 통합 완료
-
-- 현재 단계: M7 backend Task1(immutable text extractor, V4/V5 backfill·rollback·backup/restore, offline maintenance/readiness)과 Task2 통합 후 최종 backend 검증이 완료됐다. Task1은 이 역할이 작성했고, Task2 feed/search/QueryDSL/ACL/OpenAPI 소스는 `/root/m7_discovery_impl`, 추가 HTTP/RR 계약 테스트는 `/root/m7_discovery_contract_tests`가 작성했다. 이 역할이 Task2 저자였다고 기록하지 않는다.
-- 구현 사실: Task1의 canonical V1 extractor, `Post.contentText`/content service 연계, V4 nullable cache, V5 keyset 100·단일 DML transaction·전체 rollback·원래 `updated_at` 보존·ID-only 오류, strict full-input JSON parse, offline verify/rebuild guard와 startup NULL readiness가 유지된다. 독립 review에서 발견한 malformed token 비노출, 후반 invalid 전체 rollback, 실제 격리 V3 backup/history 복원, FK session, `DEFAULT_GENERATED` audit timestamp 복사, 정확 202 insert−1 gap=201(100+100+1) 보강 이력은 WORKLOG에 모두 append되어 있다.
-- 최종 backend 실측: `build/m7-evidence/backend-final-1.log`의 root 실행 `test bootJar`는 `BUILD SUCCESSFUL in 2m 16s`였다. `build/m7-evidence/backend-final-1/test-results/` XML 직접 집계는 `91 suites / 538 tests / failures 0 / errors 0 / skipped 0`; `build/m7-evidence/backend-final-1/summary.json`의 bootJar SHA-256은 `0cfc53e777449a430cf2f17114113850d9d94d04a4b172a230599e7e41e5d672`이다.
-- 실제 인수 실측: `build/m7-acceptance-20261109-232636/evidence.json`은 `259 PASS / 0 FAIL / 0 NOT_RUN`, `filesChecked=354`이며 source SHA `974f5174a5c6c181bbd228c5c29215450da0413a7ce9a9f8036daec9d0164e6c`와 JAR SHA `0cfc53e777449a430cf2f17114113850d9d94d04a4b172a230599e7e41e5d672`의 manifest/actual 값이 각각 일치한다. 제품 구현 commit은 Task1 `5d7ede2`, Task2 `059ceed`, FE `0b3008a`로 저자를 분리해 기록한다.
-- 진행 중: 없음. 독립 QA 시각 검토를 포함한 M7 최종 판정은 PASS다. root가 PR #13을 `dev`에 merge했고 현재 로컬 branch도 `dev`다. merge SHA `08863207b8385177b619091410bbbd43e52a337c`의 tree `dc68037477c6fed6b77d537235d79093803a983e`가 tested head `2b984b6a2fc3aafd6d650c6ccb1cd8213a528545`와 동일하며 `git diff` exit 0이다.
-- 다음 작업: M7 backend 작업은 종료한다. M8은 별도 명시 배정·승인 전 착수하지 않으며, root가 docs-only 최종 commit과 다음 마일스톤 준비를 수행한다.
-- 차단 요인: M7 backend 및 전체 M7 merge gate에 남은 차단 요인은 없다. 이 갱신에서 제품 소스·테스트·Gradle·Git은 변경하지 않았다.
-- 갱신 시각: 2026-11-09 23:46 KST
-
-## 2026-11-09 — M6 backend 구현·dev 통합 완료
-
-- 현재 단계: 사용자 `A-v2 전체 승인` 후 `feature/M6-comments-likes`에서 Task1 댓글 CRUD/paging/soft-delete와 Task2 likes/interactions를 구현했고, PR #12가 `dev`에 통합됐다. 구현 commit `55aedea966a45dc0e88a6b0d8926e709b366050`, merge commit `4399f73acf19d66d96fafd2c4784c6a03fcfa282`, 통합 tree `7dd390ace316a1d548e4755dfc84c21f9e7bcdce`는 root가 실제 Git 대조를 완료했다. M6 이후 backend 후속 마일스톤은 별도 범위이며 아직 착수하지 않았다.
-- 구현 사실: V1 `comments`/`post_likes`와 `(post_id,user_id)` unique를 유지한다. 댓글은 plain text trim/UTF-16 1~2000, root/reply PageResponse, 삭제 placeholder, 1단계 reply, COM 오류·ACTIVE/ACL/block 정책을 적용한다. root page의 최초 replies는 MySQL `ROW_NUMBER()` batch(최대 root100×reply20)와 author ID batch이며 큰 offset은 page-zero count 후 empty PageResponse다.
-- 구현 사실: 좋아요는 멱등 POST/DELETE, hard delete, 대상 Like row current locking과 READ_COMMITTED post-scoped aggregate count, `InteractionState(postId,commentCount,likeCount,liked,canComment,canLike,canUnlike)`, PUBLIC/UNIVERSE ACL·양방향 BLOCKED·SUSPENDED/보존 like 규칙을 적용한다. interactions/comment GET은 optional auth, malformed Bearer 거부, `private,no-store`다.
-- 잠금/snapshot: user join 없는 scalar blog lock → 관련 user ID 오름차순 lock → post → comment/like 순서를 공통 helper로 사용한다. M6 mutation과 `PostService.get`은 `READ_COMMITTED` 및 lock 후 current ACL/pair read를 사용해 RR stale snapshot을 줄였다. `PostService.get`의 기존 view/ACL 의미는 유지한다.
-- Swagger/security: 숫자 postId comments/interactions GET query-string 공개 matcher를 추가했고, M6 7 operation의 개별 성공·400/401/403/404 응답 및 bearer/optional security를 OpenAPI 테스트로 고정했다.
-- TDD/검증: RED에서 미구현 댓글 3건이 `3 tests completed, 3 failed`였고 이후 최소 구현 GREEN으로 전환했다. 최신 본체 targeted는 `CommentBatch 1 + CommentBehavior 9 + CommentController 3 + LikeController 10 + LikeConcurrency 1 + OpenApiConfig 5 = 29 tests`, 모두 failures/errors/skips `0/0/0`; 기존 `PostServiceIntegrationTest` 8건도 별도 재실행해 `0/0/0`이다. CommentBatch는 guest와 ACTIVE viewer 모두에서 1 root 대비 100 roots의 Hibernate prepare-statement 상한과 100×21→20 bounded replies를 실제 MySQL에서 고정하고, 댓글/좋아요 no-notification count도 검증한다. 최신 표준 full은 두 helper 포함 `77 XML files / 490 tests / failures-errors-skips 0/0/0`, `BUILD SUCCESSFUL`이다.
-- 경쟁 검증: `M6InteractionConcurrencyMySqlTest` 3건과 `M6InteractionCrossRaceMySqlTest` 5건이 모두 통과했다. 첫 helper 실행의 SpringData spy latch timeout은 helper 소유자가 실제 service 호출·performance_schema transaction wait 관측으로 수정했고, 재실행에서 `8/8` PASS로 해소됐다. CrossRace는 block↔comment/like, root-delete↔reply, post-delete↔comment/like를 고정했다.
-- 실행 환경: JDK `/private/tmp/zeroverse-jdk21/jdk-21.0.13+9/Contents/Home`, Gradle cache `/private/tmp/zeroverse-gradle-user-home`, MySQL 8.4 Testcontainers Colima socket `unix:///private/tmp/zeroverse-colima/default/docker.sock`, `TESTCONTAINERS_RYUK_DISABLED=true`, `JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=/private/tmp/zeroverse-junit-tmp`.
-- 남은 단계/위험: M6 backend source/full/bootJar, FE, 실제 HTTP, 독립 QA 및 dev 통합이 모두 PASS/완료됐다. 현재 backend 차단은 없으며 후속 마일스톤은 별도 승인·배정 범위다.
-- 갱신 시각: 2026-11-09 KST
-
-## 2026-10-04 — M4 로컬 인수·Git 통합 완료
-
-- root가 최종 D2B5 artifact로 runtime/OpenAPI를 독립 확인했다: `POST /api/v1/posts` 201, `POST /api/v1/uploads` 201, public `content` GET, 기존 image 200 재조회 및 동일 hash, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`가 모두 통과했다.
-- whole independent review는 Ready to merge `Yes`, 잔여 `0`, 최종 QA는 로컬 M4 PASS다. 구현 커밋 `4404f1e`를 푸시했고 PR #10이 `dev`에 머지됐다(`c34ff4e979bd6efffc3a2aea28c2be307ccac3b5`).
-- 사용자 승인으로 리더가 상태 문구만 갱신했다. 제품 코드·요구사항·기존 역할 WORKLOG는 변경하지 않았다.
-
-## 2026-10-03 18:13 KST — M4 Task1~3 최종 backend 증거
-
-- `feature/M4-posts`의 Task1~3 구현·통합과 root/독립 QA source closure를 완료했다. upload 병렬 담당자의 변경도 통합된 현재 소스 기준으로 backend 기록을 갱신한다.
-- `PostRepository` 목록·인접글 SQL predicate는 soft-delete 부모, publish/visibility, owner/accepted Universe, category/tag를 먼저 필터하고 `Pageable`로 bounded 조회한다. JPA int offset을 넘는 범위는 DB total 확인 후 정상 empty page를 반환한다.
-- `PostService`는 CRUD/권한/태그/image snapshot/URL dedupe/24시간 view ledger/48시간 bounded cleanup/ACL 후 previous-next를 적용한다. `PostContentService`는 root `doc`, UTF-8 JSON·HTML 1MiB, depth32/node10000, TipTap node/attrs/mark allowlist, ordered-list/table span 보존, canonical local image URL, OWASP sanitizer를 적용한다.
-- `UserSettingsService`는 managed canonical profile URL의 최초 binding·clear·재연결을 binding service로 검증하고 unchanged legacy external URL만 호환한다. 신규 external/blob/data/malformed 변경은 `UPLOAD_004`다.
-- R3/R8 targeted 로그 `build/m4-post-r3-r8-targeted-20261003-1810.log` 및 혼합 ACL pagination `build/m4-post-pagination-acl-green-20261003-1820.log`가 `BUILD SUCCESSFUL`이다. upload/profile/V3 targeted는 `build/m4-upload-profile-v3-targeted-20261003-1840.log`로 통과했다.
-- 최종 full `build/m4-final-backend-full-20261003-1900.log`: `BUILD SUCCESSFUL`, 13m49s, exit 0. 보존 XML `build/m4-final-junit-20261003-1915/test-results`: 66 suites, 426 tests, failures/errors/skips `0/0/0`.
-- 최종 bootJar `build/m4-final-bootjar-20261003-1920.log`: `build/libs/zeroverse-server-0.0.1-SNAPSHOT.jar`, 66,354,802 bytes, SHA-256 `D2B5FBB8A659D707F1A4039FB062D1768113D9AD53946F7A1D6AAA983783E2EF`.
-- root의 최종 artifact OpenAPI 및 HTTP/image/browser smoke gate는 해소됐다. Windows 8080 예약 포트는 제품 변경 없이 root가 18080 runtime으로 우회했다. Git 통합 결과는 위 최종 상태를 따른다.
-
-마지막 갱신: 2026-10-04 KST
-
 ## 현재 단계
 
-- 브랜치 `feature/M4-posts`에서 M4 Task1(글 CRUD/권한/목록/태그/조회수), Task2(JSON 원본·HTML sanitizer), Task3 로컬 업로드 연동을 구현했다.
-- 업로드 전용 구현 경로는 병렬 담당자의 변경을 통합했으며 현재 backend 통합·검증 기록과 root 인계를 이 역할이 관리한다.
-- 공유 경계는 `PostService.bindPostImages`, `UploadService.bindProfileImage`, `UploadService.read`와 `zeroverse.upload.viewer-hmac-secret`, `zeroverse.upload.directory`이다.
+- 2026-11-10 사용자 A-v2 전체 승인 M8 Task3 생성·원자성·경쟁 구현의 자체검증과 source freeze를 완료했다. 구현자 `/root/m8_generation_impl`; Task2 API/entity/V6 구현자는 `/root/m8_backend_api`로 분리한다. 최종 독립 QA/M8 완료 판정은 아직 아니다.
+- 생성 경로는 Post create/update, Comment create, Like add, Universe request/accept이며 원본과 알림을 같은 READ_COMMITTED/REQUIRES_NEW transaction에서 저장한다. 확정 rollback1213/1205/후보충돌만 총3attempt, commit 불명확·업무/권한/validation 오류 재시도 없음.
+- POST는 scalar blog→전체 users 정렬→기존 post→원본 변경 직전 current relation-only 재검증 순서다. 새 생존 후보 발견 시 전체 rollback, 삭제 후보 제외, SUSPENDED 수신자 포함. Task2 DTO/API/V6/Generator 저장 인터페이스는 유지한다.
 
-## 구현 사실
+## 진행 중
 
-- `PostService`는 blog→user→post 잠금, ACTIVE 쓰기 재검증, PUBLIC/UNIVERSE/PRIVATE/draft ACL, publish 필터, tag 정규화, image snapshot 검증/중복 URL dedupe, 24시간 ledger와 48시간 bounded cleanup, HMAC anonymous key, ACL 후 previous/next 선택을 적용한다.
-- `PostContentService`는 JSON root `doc`, UTF-8 JSON/HTML 1MiB, depth32/node10000, TipTap toolbar attrs allowlist, canonical local image URL, deterministic HTML 및 OWASP sanitizer를 적용한다. client HTML은 저장 원본이 아니다.
-- `UserSettingsService`는 managed canonical profile URL을 `UploadService.bindProfileImage`로 최초 binding/재연결 검증하고, 기존 외부 profile URL은 호환 유지하며 managed URL detach/clear를 처리한다.
-- V3 migration은 post image active unique key, view ledger, local image metadata를 추가한다. V1/V2는 수정하지 않았다.
-- 공통 multipart 설정은 `max-file-size: 5MB`, `max-request-size: 6MB`이며 초과는 `UPLOAD_002` envelope으로 변환한다. `UPLOAD_003/004` 계약도 반영했다.
-
-## 검증 사실
-
-- `& .\gradlew.bat --no-daemon --max-workers=1 compileJava --gradle-user-home .gradle-home2`: `BUILD SUCCESSFUL in 47s` (UserSettingsController/OpenAPI 설정 포함).
-- 16:40 snapshot bootJar 기록은 과거 증거로 보존한다. 최종 artifact는 위 18:13 증거 항목의 `build/m4-final-bootjar-20261003-1920.log`와 SHA-256을 따른다.
-- 최종 full과 targeted 테스트의 현재 수치·로그·JUnit 보존 경로는 위 18:13 증거 항목을 따른다.
-
-## 현재 차단·위험
-
-- 과거 `LocalImageStoreTest` 누락 import 오류는 upload 담당자의 통합 변경으로 해소됐으며 최종 full에서 compile/test가 통과했다.
-- 제품 backend·runtime·독립 QA·Git 통합 gate는 모두 해소됐다. 로컬 M4 완료를 막는 미해결 항목은 없다.
-- 8080 예약 포트 문제는 검증용 18080 사용으로 대응했다. S3/U0·운영 배포는 별도 후속 범위다.
+- 제품/테스트는 freeze했고 단일 Gradle 실행권을 root에 반환했다. 독립 reviewer가 검토할 상세 파일·실측·한계는 `.superpowers/sdd/M8-notifications/task-3-report.md`에 있다.
+- 마지막 영향 테스트 `task3-final-recheck-order-green.log`는 exit0/BUILD SUCCESSFUL, XML3suites/29tests/실패오류skip0(Generation6/Rollback6/FanoutConcurrency17)이다. 직전 최종 executor4/Universeunit19/actor-null legacy1까지 distinct53건이 통과했다. 전체 backend test/bootJar는 root 후속이다.
+- 실제 MySQL1213→2attempt,1205→3attempt 소진0건, candidateadded→2attempt1건, 101번째 INSERT 실패전체rollback, mutual publish/read-all 양방향/read-delete/postdelete 경쟁과 data_lock_waits를 검증했다. M6 경쟁/M7 GET 무부작용 회귀 명령도 SUCCESS다.
+- 마지막1001 수신자=1001 notification/11logicalbatch/2018SQL/854.487ms/heap 전후차이19,417,736bytes/lockwait0/attempt1이다. heap 값은 GC 포함 차이로 peak/RSS가 아니며 JDBC batch 또는 운영SLA로 과장하지 않는다.
 
 ## 다음 작업
 
-1. M4 추가 구현 작업은 없다. 실제 머지·검증 근거는 `docs/worklog/M4-posts.md`의 최종 [리뷰]·[머지]를 따른다.
-2. M5/S3 후속은 별도 사용자 지시 전 착수하지 않는다. 이후 결함 수정은 새 RED→GREEN 증거와 함께 진행한다.
+- root/독립 QA가 최종 source review·전체 test bootJar·실제 API/브라우저·합성 V5 migration/compatibility·dev 통합 gate를 진행한다. finding이 나오면 원작성자가 재현·수정하고 독립 재검토한다.
+- M9/S3/사용자 DB 적용은 현재 범위에 없다. 이전 M4~M7 역사와 Task2 경과는 기존 backend WORKLOG 및 각 마일스톤 worklog가 정본이다.
 
-## 2026-11-10 14:23 KST — M8 Task2 알림 backend 구현·검증 인계
+## 차단 요인
 
-- 배정/범위: 사용자 A-v2 전체 승인에 따라 `feature/M8-notifications`에서 Task2 notification entity/repository/DTO/controller/service, strict M8 viewer/no-store, OpenAPI, V6 인덱스 및 관련 테스트를 구현했다. Post/Comment/Like/Universe 생성 연계와 기존 source entity 쓰기 경로는 수정하지 않았다. 사용자 DB·`.env`·`.local-data`·root untracked 파일·Git은 건드리지 않았다.
-- Task3 경계: `Notification.create(User, User, NotificationType, NotificationTargetType, Long, String)`, `NotificationGenerator.create(...)`, `createBatch(List<Notification>)`, `flush()`를 제공한다. batch는 100개 단위 `saveAll`+`flush`이며 수신자/ACL/중복 정책을 결정하지 않는다. `NotificationViewerResolver.resolve(HttpServletRequest, ZeroverseUserPrincipal)`와 `Viewer(userId,status,canManage)`도 보고서에 고정했다.
-- 구현 정책: 목록 RR snapshot에서 filter별 `totalElements`와 filter-independent `unreadCount`를 분리하고 큰 offset은 filtered count 기준으로 item query 없이 empty 반환한다. scalar projection은 notification 원문 LONGTEXT를 선택하지 않으며, 개별 mutation은 receiver/row lock 후 현재 ACL·block을 재평가한다. 모든 notification 경로는 `private, no-store`다.
-- TDD/검증: RED `build/m8-evidence/task2-red-controller-escalated.log`는 2 failed를 기록했다. 최종 targeted `build/m8-evidence/task2-final-targeted-migration-v6.log`는 `BUILD SUCCESSFUL in 27s`; JUnit XML 7개는 `24 tests / failures 0 / errors 0 / skipped 0`이다. query-bound는 size 1/100 각각 3 SQL, 큰 offset 2 SQL을 실제 MySQL에서 확인했다. `task2-bootjar.log`, Flyway/Security/OpenAPI 회귀 로그도 SUCCESS다.
-- Migration/인덱스 증거: V6에는 승인된 두 index만 있다. `NotificationMigrationMySqlTest`는 격리 MySQL 8.4 source/backup을 Flyway target 5로 만들고 V5 fixture를 복사한 뒤 양쪽에 V6를 재이관해 같은 ID 및 receiver/actor/type/target/message/read_at/created_at/updated_at/deleted_at 전체 snapshot, V5/V6 history success를 비교한다. 같은 테스트에서 FORCE INDEX 없는 원래 목록·미읽음 EXPLAIN의 natural key도 검증한다. 로그는 `build/m8-evidence/task2-migration-natural-explain.log`다.
-- 상태/인계: backend Task2 source freeze 가능. 최종 backend full test, 실제 HTTP/독립 QA, root review·commit·dev 통합만 남았다. 상세 파일·메서드·검증 명령은 `.superpowers/sdd/M8-notifications/task-2-report.md`에 기록했다.
+- Task3 자체검증에 미해결 실패는 없다. 별도 root 전체검증/독립승인 gate와 운영 fanout SLA·peak memory 미측정 한계가 남는다.
+- 사용자 root 미추적4파일/.env.local/.local-data/DB13307/runtime13318은 보존했다. Git·PR·의존성·migration·공개 DTO 변경을 수행하지 않았다.
 
-## 2026-11-10 14:36 KST — M8 Task2 independent review-1 fix round 1 완료
+## 갱신 시각
 
-- 수정: `NotificationViewerResolver`가 managed User 대신 `UserRepository.StatusTarget` scalar projection으로 viewer status를 읽도록 바꿨다. mutation receiver `FOR UPDATE`가 resolver의 stale ACTIVE entity를 재사용하지 않는다. bound SQL 검사는 실제 notification projection 존재를 요구한 뒤 모든 notification SQL을 검사한다.
-- 테스트 보강: 별도 JDBC `SUSPENDED` commit barrier 후 `read`/`read-all`/`delete`가 모두 `USER_003`을 반환하는 mutation concurrency test, count→delete commit→items RR snapshot test, 동일 `created_at` 21개 page boundary test를 추가했다.
-- 검증: 첫 fix run의 Mockito interface spy `callRealMethod` RED 원인은 `build/m8-evidence/task2-fix1-diagnose.log`에 보존했다. JDBC count stub 후 RR 단일 `BUILD SUCCESSFUL in 13s`, 최종 mutation/query-bound/query targeted 16건 `BUILD SUCCESSFUL in 15s`, XML failures/errors/skips `0/0/0`은 `task2-fix1-green-rr-2.log`/`task2-fix1-green-targeted-2.log`에 있다.
-- 상태: review-1 Important 3건 fix source freeze 가능. migration/full/HTTP/Task3 read-all 경쟁/Task5 gates는 root 후속 범위다. 상세 명령·exit/output은 task-2-report.md round1 append에 기록했다.
+2026-11-10 16:44 KST · `/root/m8_generation_impl`

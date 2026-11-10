@@ -100,7 +100,7 @@ class LikeControllerTest extends MySqlTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.likeCount").value(0));
         assertThat(jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM notifications", Integer.class)).isZero();
+                "SELECT COUNT(*) FROM notifications", Integer.class)).isEqualTo(1);
     }
 
     @Test

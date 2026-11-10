@@ -1,6 +1,9 @@
 package com.zeroverse.domain.post.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.zeroverse.domain.notification.service.NotificationEventService;
+import com.zeroverse.domain.notification.service.NotificationTransactionExecutor;
+import com.zeroverse.domain.notification.service.NotificationPublicationLock;
 import com.zeroverse.common.exception.BusinessException;
 import com.zeroverse.common.exception.ErrorCode;
 import com.zeroverse.common.response.PageResponse;
@@ -87,6 +90,9 @@ public class PostService {
     private final UploadService uploadService;
     private final PostInteractionLockService interactionLockService;
     private final String viewerHmacSecret;
+    private final NotificationTransactionExecutor notificationTransactions;
+    private final NotificationPublicationLock publicationLock;
+    private final NotificationEventService notificationEvents;
 
     public PostService(
             BlogRepository blogRepository,
@@ -104,6 +110,9 @@ public class PostService {
             Clock clock,
             UploadService uploadService,
             PostInteractionLockService interactionLockService,
+            NotificationTransactionExecutor notificationTransactions,
+            NotificationPublicationLock publicationLock,
+            NotificationEventService notificationEvents,
             @Value("${zeroverse.upload.viewer-hmac-secret}")
                     String viewerHmacSecret) {
         this.blogRepository = blogRepository;
@@ -121,15 +130,22 @@ public class PostService {
         this.clock = clock;
         this.uploadService = uploadService;
         this.interactionLockService = interactionLockService;
+        this.notificationTransactions = notificationTransactions;
+        this.publicationLock = publicationLock;
+        this.notificationEvents = notificationEvents;
         if (viewerHmacSecret == null || viewerHmacSecret.getBytes(StandardCharsets.UTF_8).length < 32) {
             throw new IllegalStateException("zeroverse.upload.viewer-hmac-secret must be at least 32 UTF-8 bytes");
         }
         this.viewerHmacSecret = viewerHmacSecret;
     }
 
-    @Transactional
     public PostDetail create(Long userId, CreatePostRequest request) {
-        Blog blog = lockBlogForWrite(request.blogId(), userId);
+        return notificationTransactions.execute(() -> createInTransaction(userId, request));
+    }
+
+    private PostDetail createInTransaction(Long userId, CreatePostRequest request) {
+        var publication = publicationLock.lock(request.blogId(), userId);
+        Blog blog = publication.blog();
         Category category = resolveCategory(blog, request.categoryId());
         validateTitle(request.title(), Boolean.TRUE.equals(request.publish()));
         PostDtos.Visibility dtoVisibility = requiredVisibility(request.visibility());
@@ -138,6 +154,7 @@ public class PostService {
         List<PostImageInput> images = normalizeImages(request.images());
         validateImageSnapshot(content.imageUrls(), images);
 
+        List<User> receivers = publicationLock.confirmReceivers(publication);
         LocalDateTime now = now();
         Post post = Post.create(
                 blog.getUser(), blog, category, request.title().trim(), content.json(), content.html(),
@@ -147,15 +164,20 @@ public class PostService {
         syncImages(post, images);
         uploadService.bindPostImages(userId, post, content.imageUrls(), post.getThumbnailUrl());
         syncTags(post, request.tagNames());
+        if (NotificationEventService.eligible(post)) notificationEvents.published(post, receivers);
         entityManager.flush();
         return toDetail(post, userId);
     }
 
-    @Transactional
     public PostDetail update(Long userId, Long postId, UpdatePostRequest request) {
-        Post current = postRepository.findByIdAndDeletedAtIsNull(postId)
+        return notificationTransactions.execute(() -> updateInTransaction(userId, postId, request));
+    }
+
+    private PostDetail updateInTransaction(Long userId, Long postId, UpdatePostRequest request) {
+        var current = postRepository.findLockTargetById(postId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.POST_001));
-        Blog blog = lockBlogForWrite(current.getBlog().getId(), userId);
+        var publication = publicationLock.lock(current.getBlogId(), userId);
+        Blog blog = publication.blog();
         Post post = postRepository.findByIdAndDeletedAtIsNullForUpdate(postId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.POST_001));
         assertPostOwner(post, userId);
@@ -166,12 +188,15 @@ public class PostService {
         List<PostImageInput> images = normalizeImages(request.images());
         validateImageSnapshot(content.imageUrls(), images);
 
+        List<User> receivers = publicationLock.confirmReceivers(publication);
+        boolean beforeEligible = NotificationEventService.eligible(post);
         post.update(category, request.title().trim(), content.json(), content.html(),
                 cleanNullable(request.thumbnailUrl()), toEntityVisibility(requiredVisibility(request.visibility())),
                 Boolean.TRUE.equals(request.publish()), now());
         syncImages(post, images);
         uploadService.bindPostImages(userId, post, content.imageUrls(), post.getThumbnailUrl());
         syncTags(post, request.tagNames());
+        if (!beforeEligible && NotificationEventService.eligible(post)) notificationEvents.published(post, receivers);
         entityManager.flush();
         return toDetail(post, userId);
     }

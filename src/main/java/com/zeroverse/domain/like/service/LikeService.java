@@ -1,6 +1,8 @@
 package com.zeroverse.domain.like.service;
 
 import com.zeroverse.common.exception.BusinessException;
+import com.zeroverse.domain.notification.service.NotificationEventService;
+import com.zeroverse.domain.notification.service.NotificationTransactionExecutor;
 import com.zeroverse.common.exception.ErrorCode;
 import com.zeroverse.domain.comment.repository.CommentRepository;
 import com.zeroverse.domain.like.dto.LikeDtos.InteractionState;
@@ -31,6 +33,8 @@ public class LikeService {
     private final UniverseRepository universeRepository;
     private final PostAccessPolicy accessPolicy;
     private final PostInteractionLockService interactionLockService;
+    private final NotificationTransactionExecutor notificationTransactions;
+    private final NotificationEventService notificationEvents;
 
     public LikeService(
             LikeRepository likeRepository,
@@ -39,7 +43,8 @@ public class LikeService {
             UserRepository userRepository,
             UniverseRepository universeRepository,
             PostAccessPolicy accessPolicy,
-            PostInteractionLockService interactionLockService) {
+            PostInteractionLockService interactionLockService, NotificationTransactionExecutor notificationTransactions,
+            NotificationEventService notificationEvents) {
         this.likeRepository = likeRepository;
         this.commentRepository = commentRepository;
         this.postRepository = postRepository;
@@ -47,6 +52,8 @@ public class LikeService {
         this.universeRepository = universeRepository;
         this.accessPolicy = accessPolicy;
         this.interactionLockService = interactionLockService;
+        this.notificationTransactions = notificationTransactions;
+        this.notificationEvents = notificationEvents;
     }
 
     @Transactional(readOnly = true)
@@ -57,8 +64,11 @@ public class LikeService {
         return state(post, viewerId, false);
     }
 
-    @Transactional(isolation = Isolation.READ_COMMITTED)
     public InteractionState like(Long actorId, Long postId) {
+        return notificationTransactions.execute(() -> likeInTransaction(actorId, postId));
+    }
+
+    private InteractionState likeInTransaction(Long actorId, Long postId) {
         PostInteractionLockService.LockedPost locked = interactionLockService.lockPost(postId, List.of(actorId));
         User actor = locked.user(actorId);
         assertActive(actor);
@@ -67,6 +77,7 @@ public class LikeService {
         assertNotBlocked(actorId, post.getUser().getId());
         if (likeRepository.findByPostIdAndUserIdForUpdate(postId, actorId).isEmpty()) {
             likeRepository.saveAndFlush(Like.create(post, actor));
+            notificationEvents.like(post, actor);
         }
         return state(post, actorId, true);
     }

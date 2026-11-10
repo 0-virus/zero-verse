@@ -190,7 +190,7 @@ class UniverseServiceMySqlTest extends MySqlTestSupport {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code").value("POST_002"));
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM notifications", Integer.class))
-                .isZero();
+                .isEqualTo(4);
     }
 
     private User createUser(String email, String nickname) {

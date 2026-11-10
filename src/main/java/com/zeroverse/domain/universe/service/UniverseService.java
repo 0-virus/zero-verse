@@ -1,6 +1,9 @@
 package com.zeroverse.domain.universe.service;
 
 import com.zeroverse.common.exception.BusinessException;
+import com.zeroverse.domain.notification.service.NotificationEventService;
+import com.zeroverse.domain.notification.service.NotificationTransactionExecutor;
+import jakarta.persistence.EntityManager;
 import com.zeroverse.common.exception.ErrorCode;
 import com.zeroverse.common.response.PageResponse;
 import com.zeroverse.domain.blog.entity.Blog;
@@ -41,20 +44,30 @@ public class UniverseService {
     private final UniverseRepository universeRepository;
     private final UserRepository userRepository;
     private final BlogRepository blogRepository;
+    private final NotificationTransactionExecutor notificationTransactions;
+    private final NotificationEventService notificationEvents;
+    private final EntityManager entityManager;
 
     public UniverseService(UniverseRepository universeRepository, UserRepository userRepository,
-            BlogRepository blogRepository) {
+            BlogRepository blogRepository, NotificationTransactionExecutor notificationTransactions,
+            NotificationEventService notificationEvents, EntityManager entityManager) {
         this.universeRepository = universeRepository;
         this.userRepository = userRepository;
         this.blogRepository = blogRepository;
+        this.notificationTransactions = notificationTransactions;
+        this.notificationEvents = notificationEvents;
+        this.entityManager = entityManager;
     }
 
-    @Transactional
     public UniverseRequestResponse request(Long actorId, Long targetId) {
+        return notificationTransactions.execute(() -> requestInTransaction(actorId, targetId));
+    }
+
+    private UniverseRequestResponse requestInTransaction(Long actorId, Long targetId) {
         PairUsers pair = lockPair(actorId, targetId);
         requireActive(pair.actor());
 
-        List<Universe> rows = universeRepository.findPair(pair.first().getId(), pair.second().getId());
+        List<Universe> rows = universeRepository.findPairForUpdate(pair.first().getId(), pair.second().getId());
         if (rows.stream().anyMatch(row -> row.getStatus() == UniverseStatus.BLOCKED)) {
             throw new BusinessException(ErrorCode.UNI_003);
         }
@@ -71,12 +84,16 @@ public class UniverseService {
             // DB unique가 마지막 동시성 방어선이다. 외부에는 중복 신청으로만 노출한다.
             throw new BusinessException(ErrorCode.UNI_002);
         }
+        notificationEvents.neighbor(pair.target(), pair.actor(), saved.getId(), false);
         return new UniverseRequestResponse(saved.getId(), summary(saved.getToUser()),
                 saved.getStatus(), saved.getCreatedAt());
     }
 
-    @Transactional
     public UniverseRelationshipSnapshot accept(Long actorId, Long requestId) {
+        return notificationTransactions.execute(() -> acceptInTransaction(actorId, requestId));
+    }
+
+    private UniverseRelationshipSnapshot acceptInTransaction(Long actorId, Long requestId) {
         Universe request = universeRepository.findVisibleById(requestId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.UNI_004));
         if (!request.getToUser().getId().equals(actorId)) {
@@ -87,10 +104,10 @@ public class UniverseService {
         Universe current = pairRelation(pair.first().getId(), pair.second().getId(),
                 request.getFromUser().getId(), request.getToUser().getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.UNI_004));
-        if (!current.getToUser().getId().equals(actorId)) {
+        if (!current.getId().equals(requestId) || !current.getToUser().getId().equals(actorId)) {
             throw new BusinessException(ErrorCode.UNI_004);
         }
-        if (universeRepository.findPair(pair.first().getId(), pair.second().getId()).stream()
+        if (universeRepository.findPairForUpdate(pair.first().getId(), pair.second().getId()).stream()
                 .anyMatch(row -> row.getStatus() == UniverseStatus.BLOCKED)) {
             throw new BusinessException(ErrorCode.UNI_003);
         }
@@ -99,6 +116,7 @@ public class UniverseService {
         }
         current.accept();
         universeRepository.saveAndFlush(current);
+        notificationEvents.neighbor(pair.target(), pair.actor(), current.getId(), true);
         return snapshot(actorId, request.getFromUser().getId());
     }
 
@@ -157,7 +175,7 @@ public class UniverseService {
     public void block(Long actorId, Long targetId) {
         PairUsers pair = lockPair(actorId, targetId);
         requireActive(pair.actor());
-        List<Universe> rows = universeRepository.findPair(pair.first().getId(), pair.second().getId());
+        List<Universe> rows = universeRepository.findPairForUpdate(pair.first().getId(), pair.second().getId());
         Universe mine = rows.stream().filter(row -> row.getFromUser().getId().equals(actorId)).findFirst()
                 .orElse(null);
         for (Universe row : rows) {
@@ -265,6 +283,7 @@ public class UniverseService {
     }
 
     private PairUsers lockPair(Long actorId, Long targetId) {
+        entityManager.clear();
         if (Objects.equals(actorId, targetId)) {
             throw new BusinessException(ErrorCode.UNI_001);
         }
@@ -287,7 +306,7 @@ public class UniverseService {
     /** 사용자 pair lock 이후 동일 pair의 최신 두 방향 row를 다시 읽고 정확한 방향만 선택한다. */
     private java.util.Optional<Universe> pairRelation(Long firstId, Long secondId,
             Long fromUserId, Long toUserId) {
-        return universeRepository.findPair(firstId, secondId).stream()
+        return universeRepository.findPairForUpdate(firstId, secondId).stream()
                 .filter(row -> row.getFromUser().getId().equals(fromUserId)
                         && row.getToUser().getId().equals(toUserId))
                 .findFirst();

@@ -67,7 +67,7 @@ class CommentBehaviorTest extends MySqlTestSupport {
                 .andExpect(jsonPath("$.data.content").value("actor comment"))
                 .andExpect(jsonPath("$.data.author.nickname").value(fixture.actor().getNickname()));
         assertThat(jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM notifications", Integer.class)).isZero();
+                "SELECT COUNT(*) FROM notifications", Integer.class)).isEqualTo(1);
     }
 
     @Test

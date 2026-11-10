@@ -533,3 +533,10 @@
 - 독립 검토 정합화: `m8_frontend_review` Task4 독립 검토는 Approved이고, `m8_final_review` whole-branch minor finding도 Approved로 반영됐다. 제품 frontend에 남은 새 blocking finding은 없다.
 - 실제 인수 정합화: `build/m8-acceptance-20261110-173900/evidence.json`의 root 실제 HTTP/Chrome acceptance는 **323 PASS / 0 FAIL / 0 NOT RUN**, 1440px viewport, source/JAR hash match로 기록됐다. `design-notifications.png`, `design-main-notifications.png`, `notifications-owner.png`, `topbar-notifications.png`, `main-owner-notifications.png` 다섯 PNG가 보존돼 있다.
 - 남은 게이트: final independent visual audit가 진행 중이며 `feature/M8-notifications`의 dev PR/merge는 root 통합 게이트다. frontend 역할은 이 동기화에서 재테스트하지 않았고 M9는 범위에 포함하지 않는다.
+
+## 2026-11-10 17:47:26 KST — M8 frontend 최종 통합 기록
+
+- 담당/경계: 부모가 전달한 PR·QA 통합 결과를 frontend 역할 `STATE.md`와 이 `WORKLOG.md`에만 반영했다. 제품 소스·테스트·의존성·Git은 수정하지 않았고 재테스트하지 않았다.
+- 통합: PR #14가 `dev`에 merge됐다(merge SHA `b9fcb0469f42077447ce8a8842ce22f24bc94af5`). local `dev` fast-forward 후 tested head `201cd181ec8332e85f2cc985c9560d947b2833f4`와 merge tree `9da6077a89a4528df3cb55c13556ed28300cfd28`가 동일하다.
+- 최종 증거: root 전체 frontend는 47 files/439 tests PASS, final readonly 변경은 별도 1 file/8 tests PASS·lint/build PASS이며 전체 441건은 실행하지 않았다. 실제 M8 acceptance는 323 PASS/0 FAIL/0 NOT RUN, 1440px·source/JAR 일치·PNG 5개이고, `qa/M8-review.md` §10 최종 독립 판정은 Ready Yes다.
+- 상태: M8 frontend 역할은 완료됐고 현재 진행 중 작업은 없다. M9는 이번 실행 범위가 아니며 사용자의 다음 마일스톤 지시를 기다린다.

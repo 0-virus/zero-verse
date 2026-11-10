@@ -431,3 +431,12 @@
 - **정본/STATE 반영**: PRD M8 status/§13.4와 PM STATE를 Task1~5 구현·자동검증·실제 인수 PASS 및 최종 독립 리뷰·Task6 `dev` 통합 대기 상태로 갱신했다. 최종 merge-ready·`dev` 통합 완료는 주장하지 않는다.
 - **소유권·미해결**: 이번 갱신은 `docs/PRD.md`, `.claude/team/pm/STATE.md`, `.claude/team/pm/WORKLOG.md`만 수정했다. 남은 gate는 독립 최종 scoped re-review와 root의 명시 파일 PR/`dev` merge이며 M9는 범위에서 제외한다.
 - **검증**: 편집한 PRD·STATE·WORKLOG를 재독하고 핵심 PASS/hash/대기 문자열을 검색한다. PM 소유 파일 `git diff --check`를 실행한다.
+
+## 2026-11-10 17:47:12 KST — M8 최종 PASS·PR #14 `dev` 통합 정합화
+
+- **근거 대조**: root가 전달한 PR #14, `qa/M8-review.md` §10, run3 evidence 및 실제 Git 통합 결과를 대조했다. 독립 QA는 5개 실제 PNG를 확인하고 `Ready to merge: Yes`로 판정했다.
+- **실제 인수·artifact 사실**: run3 `build/m8-acceptance-20261110-173900/evidence.json`은 `323 PASS / 0 FAIL / 0 NOT_RUN`, `failures=[]`다. source hash `108e7120a07ab43ebfc550e34a2f13ca7f613d4d0388dd44781bf43cc95add47`, immutable JAR hash `1cab24e82cb1cf524b0184145ffa49a802db924d4a00b08afc862299014fd1c5`가 일치하고 SQL bound는 size1=4,size100=4,차이0이다.
+- **Git 통합 사실**: PR #14(`https://github.com/0-virus/zero-verse/pull/14`)가 merge SHA `b9fcb0469f42077447ce8a8842ce22f24bc94af5`로 `dev`에 merge됐다. tested head `201cd181ec8332e85f2cc985c9560d947b2833f4`와 통합 tree `9da6077a89a4528df3cb55c13556ed28300cfd28`가 일치하고 local `dev` fast-forward도 확인됐다.
+- **정본/STATE 반영**: PRD M8 상태·§13.4와 PM STATE를 Task1~6 완료·최종 PASS/merge-ready·`dev` 통합 완료로 갱신했다. M9는 별도 사용자 지시 전 대기한다.
+- **소유권·후속**: 이번 갱신은 `docs/PRD.md`, `.claude/team/pm/STATE.md`, `.claude/team/pm/WORKLOG.md`만 수정했다. root가 post-merge docs-only closeout을 기록할 예정이다. 제품 코드·QA·governance·runtime·기타 역할 파일은 수정하지 않았다.
+- **검증**: 편집한 PRD·STATE·WORKLOG를 재독하고 최종 PASS/PR #14/tree/hash 문자열을 검색한 뒤 PM 소유 파일 `git diff --check`를 실행한다.

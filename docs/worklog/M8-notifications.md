@@ -204,3 +204,11 @@
 - 독립 `m8_final_review`가 `qa/M8-review.md` §10에 Ready to merge: Yes를 기록했다. Critical/Important 0, QA 도구7묶음·후속locator/session probe 지적모두CLOSED, 실제5PNG디자인대조PASS다. root가판정본문과실측323PASS/source/JAR/SQL비용을직접재확인했다.
 - RISK-0017은실제경쟁·원자성·1001명검증으로MITIGATED(운영용량/SLA/peak별도), RISK-0018은승인권한·상태행렬과실제stale인수로CLOSED했다. 기존chunk/SpyBean경고는비차단한계로남긴다.
 - 사용자승인에포함된dev대상PR·머지를진행한다. 원격dev는기준b80ede0그대로이며제품manifest는최종인수와동일하다. 이기록시점에는아직PR/merge미실행이다. M9로확장하지않는다.
+
+## [머지·완료] 2026-11-10 17:49 KST — M8 dev 통합
+
+- PR #14 https://github.com/0-virus/zero-verse/pull/14 merged=true; merge b9fcb0469f42077447ce8a8842ce22f24bc94af5, tested head 201cd181ec8332e85f2cc985c9560d947b2833f4.
+- Tested head/merge diff empty (exit 0), tree 9da6077a89a4528df3cb55c13556ed28300cfd28 identical; local dev fast-forward done. All 396 product files and runtime JAR match the final manifest: build/m8-evidence/integration.json. Registered remote CI checks: 0; local tests, runtime acceptance and independent review supply the verification evidence.
+- Task 1-6 complete: BE full 599 + final covering 5; FE full 439 + final covering 8; HTTP/Chrome 323 PASS. No claim that the final full 441 FE suite was executed. Identical product tree does not require duplicate full testing.
+- Stopped this run API18088 PID32743, Vite5178 PID24738 and zeroverse-m8-mysql84. Synthetic database/uploads/evidence/screenshots preserved. User DB13307, environment, uploads and four untracked root files preserved.
+- Role STATE/WORKLOG and PRD are synchronized to M8 completion. M9 remains excluded. Execution state: WAITING FOR USER after M8 completion; no new scope under project-lead.

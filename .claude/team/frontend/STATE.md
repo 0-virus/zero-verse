@@ -2,10 +2,11 @@
 
 > 덮어쓰기 스냅샷. 시간순 이력은 `WORKLOG.md`, 마일스톤 이력은 `docs/worklog/**`를 본다.
 
-마지막 갱신: 2026-11-10 17:42:06 KST
+마지막 갱신: 2026-11-10 17:47:26 KST
 
 ## 현재 단계
 
+- M8 frontend 역할 완료. PR #14가 `dev`에 통합됐고 QA §10 최종 독립 판정은 Ready Yes다. 현재 진행 중인 frontend 작업은 없다.
 - M8 Task4 frontend 구현을 완료하고 자동 검증을 통과했다. 사용자 승인 A-v2의 §9 계약에 맞춰 notifications API/types/provider, 센터, TopBar dropdown/badge, Main Feed RightPanel preview를 연결했다.
 - preview(page 0,size 3)와 center(page,size 20) cache를 분리하고, unreadCount/canManage를 공유한다. viewer account·mutation·request 세대와 account-scoped mutation dedupe/stale completion guard를 적용했다.
 - ACTIVE는 read/read-all/delete 후 canonical 재조회, SUSPENDED는 관리 mutation을 막고 서버가 반환한 안전한 href 열람만 허용한다. unavailable은 고정 문구와 민감 필드 masking을 유지한다.
@@ -13,7 +14,7 @@
 - mutation retry callback은 state-updater 오호출 없이 동일 read/delete/read-all 작업을 재호출하며, auth 최종 실패에는 retry를 숨긴다. TopBar도 `useNotificationPreview` entry effect를 사용해 provider 유지 상태에서 재진입 preview를 갱신한다.
 - fix2 review 경계: session/retry generation을 mutation snapshot과 retry callback에 함께 묶었다. PUT 후 canonical GET USER_001이면 mutation 결과/href 반환을 supersede하고, 계정·최종 auth 전환 뒤 old retry는 UI에서 제거되며 provider가 API 호출 전 거부한다. 늦은 A catch가 B UI retry를 다시 만들지 않도록 generation 검사를 적용했다.
 - final review minor 반영: TopBar dropdown과 Main Feed RightPanel preview에서 `canManage=false` 응답을 받은 정지 계정에 `정지된 계정은 알림을 읽기 전용으로 확인할 수 있습니다.` 안내를 warning token으로 표시한다. 기존 safe href 열람과 관리 mutation 비활성화는 유지한다.
-- closeout evidence 동기화: root의 `frontend-final-2-test.log`는 47 files/439 tests PASS, final readonly 안내 변경은 별도 1 file/8 tests PASS이다. 두 결과를 합산한 441 tests로 보고하지 않는다. Task4 독립 검토는 Approved이고 whole-branch minor도 Approved다.
+- closeout evidence 동기화: root의 `frontend-final-2-test.log`는 47 files/439 tests PASS, final readonly 안내 변경은 별도 1 file/8 tests PASS이다. 두 결과를 합산한 441 tests로 보고하지 않는다. Task4 독립 검토는 Approved이고 whole-branch minor도 Approved다. PR #14 merge SHA는 `b9fcb0469f42077447ce8a8842ce22f24bc94af5`다.
 
 ## 구현 범위
 
@@ -37,7 +38,7 @@
 - fix1 raw 원문: `frontend/.m8-evidence/raw/frontend-fix1-focused-green.log`(5 files/25 tests), `frontend/.m8-evidence/raw/frontend-fix1-lint.log`(oxlint), `frontend/.m8-evidence/raw/frontend-fix1-build.log`(tsc+Vite; 기존 >500 kB warning만).
 - fix2 raw 원문: `frontend/.m8-evidence/raw/frontend-fix2-focused-green.log`(5 files/31 tests), `frontend/.m8-evidence/raw/frontend-fix2-lint.log`(oxlint), `frontend/.m8-evidence/raw/frontend-fix2-build.log`(tsc+Vite; 기존 >500 kB warning만).
 - final review raw 원문: `frontend/.m8-evidence/raw/frontend-final-fix-readonly-focused.log`(1 file/8 tests), `frontend/.m8-evidence/raw/frontend-final-fix-readonly-lint.log`(oxlint), `frontend/.m8-evidence/raw/frontend-final-fix-readonly-build.log`(tsc+Vite; 기존 >500 kB warning만).
-- root actual acceptance: `build/m8-acceptance-20261110-173900/evidence.json` → 323 PASS / 0 FAIL / 0 NOT RUN, 1440px viewport, source/JAR hash match, five PNG evidence (`design-notifications.png`, `design-main-notifications.png`, `notifications-owner.png`, `topbar-notifications.png`, `main-owner-notifications.png`).
+- root actual acceptance: `build/m8-acceptance-20261110-173900/evidence.json` → 323 PASS / 0 FAIL / 0 NOT RUN, 1440px viewport, source/JAR hash match, five PNG evidence (`design-notifications.png`, `design-main-notifications.png`, `notifications-owner.png`, `topbar-notifications.png`, `main-owner-notifications.png`). QA `qa/M8-review.md` §10 final independent verdict is Ready Yes.
 
 ## 증거·변경 경계
 
@@ -47,10 +48,9 @@
 
 ## 남은 게이트·우려
 
-- backend DTO/OpenAPI/HTTP·MySQL 권한 projection과 실제 1440px HTTP/Chrome 인수는 root evidence로 PASS했다. frontend 역할은 브라우저 runtime을 직접 실행하지 않았으며, 제출된 다섯 PNG의 독립 시각 audit은 진행 중이다.
-- `feature/M8-notifications`의 dev PR/merge는 root 통합 게이트로 남아 있다. M9는 이번 실행 범위가 아니다.
+- backend DTO/OpenAPI/HTTP·MySQL 권한 projection과 실제 1440px HTTP/Chrome 인수는 root evidence로 PASS했다. frontend 역할은 브라우저 runtime을 직접 실행하지 않았지만, 제출된 다섯 PNG와 QA §10 독립 시각 판정으로 M8 gate가 닫혔다.
+- `feature/M8-notifications`의 tested head `201cd181ec8332e85f2cc985c9560d947b2833f4`와 `dev` merge tree `9da6077a89a4528df3cb55c13556ed28300cfd28`는 동일하다. 추가 frontend 차단 요인은 없다.
 
 ## 다음 작업
 
-- root에 final frontend evidence와 역할 기록을 인계하고 독립 시각 audit·dev 통합 결과를 기다린다.
-- 추가 frontend 결함이 실제 audit에서 발견될 때만 소유 경로에서 재현·수정·재검증한다. M9 작업은 시작하지 않는다.
+- 사용자 다음 마일스톤 지시를 기다린다. M9는 이번 실행에 포함하지 않는다.

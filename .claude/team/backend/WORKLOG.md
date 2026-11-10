@@ -459,3 +459,9 @@
 - 한 일: backend `STATE.md`의 오래된 “Task3 독립 검토·전체 검증 대기” 표현을 실제 결과로 갱신했다. Task2/API·V6와 Task3 생성·원자성 구현은 각각 독립 review(`/root/m8_backend_review`, `/root/m8_generation_review`) 승인을 받았고, M8 backend 최종 독립 시각 review와 `dev` 통합은 아직 진행 전/진행 중으로 남겼다. 이전 기록은 수정하지 않았다.
 - 검증 근거: `build/m8-evidence/backend-final-2/summary.json`의 102 suites / 599 tests / failures 0 / errors 0 / skipped 0 및 `bootJar` PASS(JAR `1cc46fd46eebcbcbe1189235a19875491ee69f54c64e1fb185191095f4630a51`), `build/m8-evidence/backend-final-doc/summary.json`의 1 suite / 5 tests / failures 0 / errors 0 / skipped 0(JAR `1cab24e82cb1cf524b0184145ffa49a802db924d4a00b08afc862299014fd1c5`), `build/m8-acceptance-20261110-173900/evidence.json`의 323 PASS / 0 FAIL / 0 NOT_RUN을 반영했다. source `108e7120a07ab43ebfc550e34a2f13ca7f613d4d0388dd44781bf43cc95add47`, JAR `1cab24e82cb1cf524b0184145ffa49a802db924d4a00b08afc862299014fd1c5`, 396 files가 manifest와 일치한다.
 - 한계·인계: 운영 fanout SLA·peak memory·물리 JDBC batch 보장은 범위 밖으로 유지했다. 1001명 fan-out heap 차이는 GC 포함 값이며 peak/RSS가 아니고 logical batch는 JDBC batch 보장이 아니다. root가 최종 독립 시각 review 후 `dev` 통합만 진행하며 M9는 제외한다. 이번 closeout은 역할 기록만 편집했고 제품 소스·테스트·Gradle·Git·사용자 DB/환경은 변경하지 않았다.
+
+## 2026-11-10 17:48 KST — M8 backend 최종 완료·dev 통합 기록
+
+- root가 PR #14를 `dev`에 merge했다. merge SHA `b9fcb0469f42077447ce8a8842ce22f24bc94af5`, local `dev` fast-forward tested head `201cd181ec8332e85f2cc985c9560d947b2833f4`, merge tree `9da6077a89a4528df3cb55c13556ed28300cfd28`가 일치함을 확인했다.
+- `qa/M8-review.md` §10의 최종 독립 audit은 Ready to merge Yes, 1440px PNG 5장 시각 승인, 실제 HTTP/DB/Chrome 323 PASS를 기록했다. backend-final-2의 102 suites/599 tests와 backend-final-doc의 5 tests는 모두 failures/errors/skips `0/0/0`, bootJar PASS를 유지한다.
+- M8 backend 역할은 완료 상태다. 운영 fanout SLA·peak memory·물리 JDBC batch 보장 한계는 기존 기록대로 유지하며, M9/S3/사용자 DB 적용은 범위 밖이다. 이후 backend는 사용자 지시를 기다린다. 제품 소스·테스트·Gradle·Git은 이 역할 기록 동기화에서 변경하지 않았다.

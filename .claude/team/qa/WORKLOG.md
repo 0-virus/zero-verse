@@ -914,3 +914,9 @@
 
 - QA STATE를 **M8 독립 QA PASS / merge-ready Yes (dev 통합 pending)**으로 갱신했다.
 - 남은 단계는 root의 dev 통합·PR/merge 기록뿐이다. QA는 dev 통합 완료를 주장하지 않으며, 통합 후 회귀나 새 finding이 생길 때만 재검토한다.
+
+## 2026-11-10 KST — PR14 dev 통합·M8 closeout
+
+- PR14(`https://github.com/0-virus/zero-verse/pull/14`)가 `dev`에 병합됐다. merge commit은 `b9fcb0469f42077447ce8a8842ce22f24bc94af5`이며 local `dev`는 ff 상태다.
+- tested head `201cd181ec8332e85f2cc985c9560d947b2833f4`와 merge tree `9da6077a89a4528df3cb55c13556ed28300cfd28` 동일 증거를 반영했다. M8은 독립 QA PASS·Ready to merge를 거쳐 **DEV INTEGRATED / 완료**로 기록했다.
+- `qa/M8-review.md` 현재 header와 §11 merge proof, QA STATE를 갱신했다. 독립 §10 review와 `qa/m8-acceptance.mjs`는 수정하지 않았다. M9는 범위 밖이며 사용자 지시 대기다.

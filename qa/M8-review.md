@@ -1,8 +1,8 @@
 # M8 — 알림 독립 QA 인수 결과
 
-> **현재 상태: A-v2 APPROVED / IMPLEMENTED / ACCEPTANCE PASS / READY TO MERGE**
+> **현재 상태: A-v2 APPROVED / IMPLEMENTED / ACCEPTANCE PASS / DEV INTEGRATED**
 >
-> 이 문서는 M8 Task 5의 독립 인수 기준과 실행 결과를 고정한다. Run3 immutable runtime에서 실제 HTTP·MySQL·Chrome·자동검증·소스/JAR 일치 gate를 충족했고, §10의 독립 최종 audit에서 Critical/Important finding 없음과 Ready to merge를 확인했다. 아래의 과거 `NOT RUN` 표기는 실행 전 이력이며 현재 판정을 대체하지 않는다. dev 통합은 root 후속 단계다.
+> 이 문서는 M8 Task 5의 독립 인수 기준과 실행 결과를 고정한다. Run3 immutable runtime에서 실제 HTTP·MySQL·Chrome·자동검증·소스/JAR 일치 gate를 충족했고, §10의 독립 최종 audit에서 Critical/Important finding 없음과 Ready to merge를 확인했다. PR14가 `dev`에 병합되어 현재 M8은 **DEV INTEGRATED**다. 아래의 과거 `NOT RUN` 표기는 실행 전 이력이며 현재 판정을 대체하지 않는다.
 
 ## 1. 검토 경계와 정본
 
@@ -276,3 +276,9 @@ runner는 `owner`, `actor`, `parent`, `friend`, `blocked`, `suspended`, `deleted
 ### Assessment
 
 **Ready to merge: Yes.** M8 승인 범위에 남은 제품·검증 blocking finding은 없고 실제 HTTP/DB/Chrome 및 시각 gate가 닫혔다. 이는 독립 검토 승인으로, dev 통합이 이미 실행되었다는 뜻은 아니다. 리더의 기록 정리·PR·dev 통합 단계로 진행할 수 있다. M9는 포함하지 않는다.
+
+## 11. 2026-11-10 KST — PR14 dev 통합 증거
+
+- PR14가 `dev`에 병합됐다: `https://github.com/0-virus/zero-verse/pull/14`, merge commit `b9fcb0469f42077447ce8a8842ce22f24bc94af5`.
+- 병합 후 local `dev`는 `ff` 상태이며, tested head `201cd181ec8332e85f2cc985c9560d947b2833f4`와 merge tree `9da6077a89a4528df3cb55c13556ed28300cfd28`가 동일하다.
+- 이 증거로 M8은 독립 QA PASS·Ready to merge를 거쳐 **DEV INTEGRATED**로 갱신한다. M9는 이번 기록과 범위에 포함하지 않으며 사용자 지시를 기다린다.

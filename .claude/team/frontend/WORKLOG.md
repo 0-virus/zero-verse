@@ -485,3 +485,16 @@
 - 최종 게이트: BE `538 tests`(91 suites, failures/errors/skipped 0), FE `405 tests`(failures 0), 실제 HTTP+Chrome `259 PASS / 0 FAIL / 0 NOT_RUN`이다. full fresh review와 제품/QA fix blocking, 독립 시각 QA가 모두 PASS이며 merge-ready다.
 - 상태: 구현 브랜치 작업 결과는 현재 `dev`에 통합됐다. M7은 통합 완료로 기록하고, M8은 착수하지 않는다. 추가 docs-only 최종 커밋은 root가 수행한다.
 - 범위: 이번 closeout도 frontend `STATE.md`/`WORKLOG.md`만 갱신했다. 제품 소스·테스트·Git·타 역할 파일은 수정하지 않았다.
+
+## 2026-11-10 14:16:00 KST — M8 Task4 알림 frontend 구현·계정 mutation race 보강
+
+- 담당/경계: 사용자 `A-v2 전체 승인`과 부모의 M8 Task4 배정에 따라 `frontend/**` 및 frontend 역할 `STATE.md`/`WORKLOG.md`만 수정했다. backend·root docs·QA·Git·의존성·runtime 파일은 건드리지 않았고, 공유 체크아웃의 기존 타 역할 변경은 보존했다.
+- 선행 확인: 헌법·AGENTS·frontend CLAUDE/STATE, `DESIGN-SYSTEM.md`, Pages/Main Feed 원본, PRD §9.11, 회의 `M8-20261110-notifications.md` §9.1/§9.3/§9.5/§10을 직접 대조했다. 디자인의 `지난 30일`은 사용자 전체 이력 결정에 따라 footer에서 제거했다.
+- TDD RED: API/store/UI 테스트를 먼저 추가해 구현 전 import resolution 실패를 확인했다. root 중간검토에서 지적한 A→B 계정 전환 중 지연 read/read-all mutation 공유도 별도 `notificationMutationRace.test.tsx`로 먼저 재현해 1 file/2 tests 실패를 확인했다.
+- 구현: `features/notifications`에 DTO/API/provider를 추가했다. preview(page0,size3)와 center(page,size20)를 별도 cache로 유지하고 shared unread/canManage를 제공한다. guest/auth-loading no-call, visibility visible 복귀, entry/open refresh, in-flight dedupe, account/mutation/request 세대, mutation 후 canonical 재조회를 적용했다.
+- 구현: 센터는 860px 전체 이력·offset paging·loading/error/retry/empty/out-of-range·read-all·삭제를 제공한다. 개별 read 성공 시 PUT 응답의 현재 `href`만 이동하고 실패 시 이동하지 않으며, delete 실패 시 행을 보존한다. unavailable은 고정 문구와 민감 필드 masking을 유지한다. SUSPENDED는 mutation을 비활성화하고 안전한 서버 href만 읽음 mutation 없이 연다.
+- 구현: TopBar 330px dropdown/badge, RightPanel 최근 3건·shared unread·센터 링크를 연결했다. SettingsUniverse block/unblock 성공 시 알림 store를 invalidate한다. `App.tsx`에서 AuthProvider 아래 NotificationProvider를 공통 배치했다.
+- race 보강: mutation dedupe key에 account generation/viewer를 포함하고 시작 snapshot을 캡처했다. 계정 전환으로 낡은 mutation이 완료되면 superseded error로 결과·href 이동·old invalidate를 폐기하며, UI는 해당 superseded error를 사용자 오류로 표시하지 않는다. mutation race 2 tests GREEN을 확인했다.
+- 검증: targeted 알림 5 files/16 tests, 추가 shell/page 2 files/8 tests, 전체 `npm test -- --run --maxWorkers=1` 47 files/423 tests passed(실패·오류·skip 0), `npm run lint` exit 0, `npm run build` exit 0(Vite 145 modules; 기존 >500 kB chunk warning만), `git diff --check -- frontend .claude/team/frontend` exit 0.
+- 증거: `frontend/.m8-evidence/task4-targeted.txt`, `task4-full.txt`, `task4-lint-build.txt`, `task4-static.txt`에 명령·결과 요약을 남겼다. 실제 Chrome 1440px runtime·backend HTTP/DTO/ACL은 root/QA 게이트이며 이 역할은 실행하지 않았다.
+- 인계: root가 `.superpowers/sdd/M8-notifications/task-4-report.md`를 보고용으로 작성하고, 독립 API/Chrome 검증 후 발견된 frontend 소유 결함만 재배정한다. 이 역할은 Git commit을 수행하지 않는다.

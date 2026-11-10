@@ -1,12 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Panel } from '../ui/Panel';
 import type { DefaultBlog } from '../../types/auth';
 import { useOptionalAuth } from '../../lib/authContext';
 import { listUniverse } from '../../features/universe/universeApi';
 import type { UniverseListKind } from '../../features/universe/types';
+import {
+  isNotificationMutationSuperseded,
+  useNotificationPreview,
+  type NotificationContextValue,
+} from '../../features/notifications/NotificationProvider';
+import type { NotificationItem } from '../../features/notifications/types';
 
-/** `/` 오른쪽 레일의 서버 관계 현황. 알림 row는 M8 범위라 기존 빈 상태를 유지한다. */
+/** `/` 오른쪽 레일의 서버 관계 현황과 M8 공유 알림 preview. */
 type StatKey = 'friends' | 'following' | 'followers';
 type StatState = Record<StatKey, { value: number | null; loading: boolean; error: boolean }>;
 
@@ -22,6 +28,59 @@ const IDLE_STATS: StatState = {
   followers: { value: null, loading: false, error: false },
 };
 
+function notificationGlyph(item: NotificationItem): string {
+  if (item.type === 'LIKE') return '♥';
+  if (item.type === 'NEIGHBOR' || item.type === 'POST') return '✦';
+  return '💬';
+}
+
+function RecentNotification({
+  item,
+  context,
+  onError,
+}: {
+  item: NotificationItem;
+  context: NotificationContextValue;
+  onError: (message: string) => void;
+}) {
+  const navigate = useNavigate();
+  const [busy, setBusy] = useState(false);
+  const handleClick = async () => {
+    if (busy) return;
+    if (context.canManage === false) {
+      if (item.available && item.href) navigate(item.href);
+      return;
+    }
+    if (context.canManage !== true) {
+      onError('정지된 계정은 알림을 읽기 전용으로 확인할 수 있습니다.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const current = await context.markRead(item.id);
+      if (current.available && current.href) navigate(current.href);
+    } catch (error) {
+      if (!isNotificationMutationSuperseded(error)) {
+        onError(error instanceof Error ? error.message : '알림을 읽지 못했습니다.');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={() => void handleClick()}
+      disabled={busy}
+      className="flex w-full gap-2.5 border-b border-line px-3.5 py-[11px] text-left text-[12.5px] leading-[1.5] text-text-body hover:bg-surface-soft disabled:cursor-wait disabled:opacity-60"
+    >
+      <span aria-hidden="true" className="text-accent">{notificationGlyph(item)}</span>
+      <span>{item.available ? item.message : '더 이상 확인할 수 없는 알림입니다'}</span>
+    </button>
+  );
+}
+
 function loadingStats(): StatState {
   return {
     friends: { value: null, loading: true, error: false },
@@ -32,10 +91,12 @@ function loadingStats(): StatState {
 
 export function RightPanel({ blog }: { blog?: DefaultBlog | null }) {
   const auth = useOptionalAuth();
+  const notifications = useNotificationPreview();
   const viewerId = auth?.user?.id ?? null;
   const authLoading = auth?.isLoading ?? false;
   const [stats, setStats] = useState<StatState>(IDLE_STATS);
   const [statsViewerId, setStatsViewerId] = useState<number | null>(null);
+  const [notificationError, setNotificationError] = useState<string | null>(null);
   const generation = useRef(0);
 
   useEffect(() => {
@@ -106,8 +167,63 @@ export function RightPanel({ blog }: { blog?: DefaultBlog | null }) {
         )}
       </Panel>
 
-      <Panel title="최근 알림">
-        <p className="px-5 py-8 text-center text-[13px] text-text-muted">아직 알림이 없습니다.</p>
+      <Panel
+        title="최근 알림"
+        actions={
+          notifications?.unreadCount !== null && notifications?.unreadCount !== undefined ? (
+            <span className="text-[11px] font-bold text-accent">읽지 않음 {notifications.unreadCount}</span>
+          ) : undefined
+        }
+      >
+        {notificationError && (
+          <p role="alert" className="border-b border-line bg-danger-bg px-3.5 py-2 text-xs text-danger">
+            {notificationError}
+          </p>
+        )}
+        {notifications?.isAuthLoading && (
+          <p className="px-5 py-8 text-center text-[13px] text-text-muted">인증 상태를 확인하는 중...</p>
+        )}
+        {!notifications?.isAuthLoading && (!notifications || !notifications.isAuthenticated) && (
+          <p className="px-5 py-8 text-center text-[13px] text-text-muted">아직 알림이 없습니다.</p>
+        )}
+        {notifications?.isAuthenticated && notifications.preview.loading && !notifications.preview.page && (
+          <p className="px-5 py-8 text-center text-[13px] text-text-muted">알림을 불러오는 중...</p>
+        )}
+        {notifications?.isAuthenticated && Boolean(notifications.preview.error) && !notifications.preview.loading && (
+          <div className="px-3.5 py-5 text-center text-xs text-danger">
+            알림을 불러오지 못했습니다.
+            <button
+              type="button"
+              onClick={() => void notifications.refreshPreview()}
+              className="ml-2 border-2 border-danger bg-surface px-2 py-1 font-bold"
+            >
+              다시 시도
+            </button>
+          </div>
+        )}
+        {notifications?.isAuthenticated && notifications.preview.page && notifications.preview.page.items.length === 0 && !notifications.preview.loading && (
+          <p className="px-5 py-8 text-center text-[13px] text-text-muted">아직 알림이 없습니다.</p>
+        )}
+        {notifications?.isAuthenticated && notifications.preview.page && notifications.preview.page.items.length > 0 && (
+          <div>
+            {notifications.preview.page.items.slice(0, 3).map((item) => (
+              <RecentNotification
+                key={item.id}
+                item={item}
+                context={notifications}
+                onError={setNotificationError}
+              />
+            ))}
+          </div>
+        )}
+        {notifications?.isAuthenticated && notifications.preview.page && !notifications.preview.loading && !notifications.preview.error && (
+          <Link
+            to="/notifications"
+            className="block px-3.5 py-2.5 text-center text-xs text-text-muted hover:text-accent"
+          >
+            알림 센터 열기 →
+          </Link>
+        )}
       </Panel>
 
       <Panel title="유니버스 현황">

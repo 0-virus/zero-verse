@@ -17,6 +17,7 @@ import type {
   UniverseRelationItem,
   UniverseRequestItem,
 } from '../features/universe/types';
+import { useOptionalNotificationActions } from '../features/notifications/NotificationProvider';
 
 type UniverseItem = UniverseRequestItem | UniverseRelationItem;
 
@@ -110,6 +111,7 @@ function actionButton(
  */
 export function SettingsUniversePage() {
   const auth = useOptionalAuth();
+  const notifications = useOptionalNotificationActions();
   const userId = auth?.user?.id ?? null;
   const [states, setStates] = useState<Record<UniverseListKind, ListState>>(() =>
     Object.fromEntries(KINDS.map((kind) => [kind, emptyState()])) as Record<UniverseListKind, ListState>,
@@ -201,6 +203,9 @@ export function SettingsUniversePage() {
       setNotice(null);
       try {
         await action();
+        if (key.startsWith('block:') || key.startsWith('unblock:')) {
+          await notifications?.invalidate();
+        }
         await reloadAll();
         setNotice('관계 상태를 반영했습니다.');
       } catch (error) {
@@ -214,7 +219,7 @@ export function SettingsUniversePage() {
         setMutationKey(null);
       }
     },
-    [mutationKey, reloadAll],
+    [mutationKey, notifications, reloadAll],
   );
 
   const listActions = (kind: UniverseListKind, item: UniverseItem): ReactNode => {

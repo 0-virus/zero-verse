@@ -3,3 +3,6 @@
 
 # Local M7 verification stdout; do not commit evidence artifacts.
 .m7-evidence/
+
+# Local M8 Task4 verification stdout; root/QA may inspect the evidence path.
+.m8-evidence/

@@ -121,6 +121,9 @@ public class NotificationController {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200", description = "성공", useReturnTypeSchema = true),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "400", description = "VALIDATION_001",
+                content = @Content(schema = @Schema(implementation = ApiResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "401", description = "AUTH_002 또는 AUTH_004",
                 content = @Content(schema = @Schema(implementation = ApiResponse.class))),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(

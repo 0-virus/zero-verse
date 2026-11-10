@@ -517,3 +517,11 @@
 - 검증 명령/실측: `cd frontend && npm test -- --run src/features/notifications/notificationStore.test.tsx src/features/notifications/notificationAuthRace.test.tsx src/features/notifications/notificationMutationRace.test.tsx src/test/notificationsBehavior.test.tsx src/test/notificationShellBehavior.test.tsx --maxWorkers=1` → exit 0, 5 files/31 tests passed; `npm run lint` → exit 0; `npm run build` → exit 0 (`tsc -b`, Vite 145 modules, 기존 >500 kB chunk warning만). 기존 root full 47 files/423 tests raw는 재실행하지 않았다.
 - raw 원문: `frontend/.m8-evidence/raw/frontend-fix2-focused-green.log`, `frontend/.m8-evidence/raw/frontend-fix2-lint.log`, `frontend/.m8-evidence/raw/frontend-fix2-build.log`. command stdout/stderr를 요약으로 대체하지 않았다.
 - 인계/남은 게이트: source freeze 후 독립 scoped re-review에 인계한다. 실제 backend DTO/HTTP/ACL/no-store 및 Chrome 1440px runtime·시각 검증은 root/QA 범위이며, Minor ledger는 유지한다.
+
+## 2026-11-10 17:16:20 KST — M8 final review minor — SUSPENDED 읽기 전용 안내
+
+- 담당/경계: 부모가 지정한 final review minor fix를 반영해 `frontend/src/components/layout/TopBar.tsx`, `frontend/src/components/layout/RightPanel.tsx`, 기존 `frontend/src/test/notificationShellBehavior.test.tsx`, frontend 역할 `STATE.md`/`WORKLOG.md`만 수정했다. backend/QA/root docs/Git/의존성/runtime은 건드리지 않았고 다른 작업자의 변경을 되돌리지 않았다.
+- 구현: 공통 warning token(`bg-warning-bg`, `text-warning`)을 사용해 `canManage=false` preview가 도착한 TopBar dropdown과 RightPanel에 `정지된 계정은 알림을 읽기 전용으로 확인할 수 있습니다.` 상태 안내를 추가했다. 기존 unavailable masking, safe href 열람, 관리 mutation 비활성화 및 auth/error 흐름은 유지했다.
+- 회귀: `notificationShellBehavior.test.tsx`에 TopBar dropdown과 RightPanel 각각의 SUSPENDED `role=status` 안내를 추가해 실제 `canManage=false` 응답을 소비하는 경로를 검증했다.
+- 검증: `npm test -- --run src/test/notificationShellBehavior.test.tsx --maxWorkers=1` → 1 file/8 tests passed, exit 0. `npm run lint` → oxlint exit 0. `npm run build` → `tsc -b` + Vite exit 0, 145 modules; 기존 500 kB 초과 chunk warning만 남았다. `git diff --check -- frontend .claude/team/frontend` exit 0.
+- 증거/인계: raw 출력은 `frontend/.m8-evidence/raw/frontend-final-fix-readonly-focused.log`, `frontend-final-fix-readonly-lint.log`, `frontend-final-fix-readonly-build.log`에 보존했다. 실제 HTTP·Chrome 1440px 및 독립 scoped re-review는 root/QA 게이트이며 이 역할은 수행하지 않았다.

@@ -447,3 +447,9 @@
 - 산출물: `UniverseService.java`, `NotificationFanoutConcurrencyMySqlTest.java`(신규2tests+공통helper), 기존 Task3 report append 및 STATE갱신. 다른 제품·FE·QA·runtime·DB·Git 파일은 변경하지 않았다.
 - 검증: `task3-fix1-red-replacement-removal.log` exit1/2expectedfail/FAILED15s, 원문XML `task3-fix1-red-xml/`. 최소수정 후 `task3-fix1-green-covering.log` exit0/SUCCESS14s; `UniverseServiceTest`19 + `UniverseServiceMySqlTest`4 + replacement accept/reject/cancel3 =26 tests/0fail0error0skip, XML `task3-fix1-green-xml/` 보존. 정확명령은 `.superpowers/sdd/M8-notifications/task-3-report.md` append에 있다. 변경source/test재독 완료.
 - 미해결/인계: sourcefreeze/Gradle실행권root반환. 독립reviewclosure와 새최종artifact는root후속. 수정이전검토본f2db20d의root full597/102suites/bootJarPASS 보고와 이번coveringPASS를 구분한다. 전체테스트·bootJar·API재기동 반복없음. SpyBeanminor는ledger유지했다.
+
+## 2026-11-10 17:15 KST — M8 최종 review DELETE OpenAPI 400 문서 보완
+
+- 한 일: 독립 전체 리뷰의 Minor finding에 따라 `NotificationController.delete`의 `@ApiResponses`에 `400 VALIDATION_001` JSON envelope 응답을 추가했다. 잘못된 `notificationId`가 실제 `validateId`에서 `VALIDATION_001`을 반환하는 기존 런타임 동작과 SpringDoc 문서를 일치시켰다. 다른 operation·제품 동작·DB/API payload는 변경하지 않았다.
+- 검증: 편집한 `src/main/java/com/zeroverse/domain/notification/controller/NotificationController.java`를 재독하고 `git diff`로 DELETE operation에만 신규 응답이 위치하며 기존 GET/read/read-all 응답은 보존됨을 확인했다. 기존 `NotificationControllerTest`의 `/v3/api-docs` operation 보안·응답 존재 검사와 인증/no-store 회귀가 covering 근거이며, Gradle 실행은 root 단일 runner 정책에 따라 수행하지 않았다.
+- 인계: root가 최종 JAR 재생성·실제 HTTP/Chrome 인수·독립 scoped re-review에서 OpenAPI 400 응답을 확인한다. 이 역할은 Git 조작, QA/FE 파일, 사용자 DB·환경을 변경하지 않았다.

@@ -525,3 +525,11 @@
 - 회귀: `notificationShellBehavior.test.tsx`에 TopBar dropdown과 RightPanel 각각의 SUSPENDED `role=status` 안내를 추가해 실제 `canManage=false` 응답을 소비하는 경로를 검증했다.
 - 검증: `npm test -- --run src/test/notificationShellBehavior.test.tsx --maxWorkers=1` → 1 file/8 tests passed, exit 0. `npm run lint` → oxlint exit 0. `npm run build` → `tsc -b` + Vite exit 0, 145 modules; 기존 500 kB 초과 chunk warning만 남았다. `git diff --check -- frontend .claude/team/frontend` exit 0.
 - 증거/인계: raw 출력은 `frontend/.m8-evidence/raw/frontend-final-fix-readonly-focused.log`, `frontend-final-fix-readonly-lint.log`, `frontend-final-fix-readonly-build.log`에 보존했다. 실제 HTTP·Chrome 1440px 및 독립 scoped re-review는 root/QA 게이트이며 이 역할은 수행하지 않았다.
+
+## 2026-11-10 17:42:06 KST — M8 frontend closeout evidence 동기화
+
+- 담당/경계: 부모가 전달한 root 최종 증거만 `frontend` 역할 `STATE.md`와 이 `WORKLOG.md`에 반영했다. 제품 코드·테스트·의존성·Git은 수정하지 않았고, 사용자 파일과 기존 runtime도 건드리지 않았다.
+- 자동 검증 정합화: root `build/m8-evidence/frontend-final-2-test.log`의 최종 동결 범위는 **47 files / 439 tests PASS**, failures/errors/skipped 0이다. 이후 final readonly 안내 변경의 별도 focused 결과는 **1 file / 8 tests PASS**, lint/build PASS이며, 새 2개 테스트를 포함한 전체 441건은 실행하지 않았다고 명시한다.
+- 독립 검토 정합화: `m8_frontend_review` Task4 독립 검토는 Approved이고, `m8_final_review` whole-branch minor finding도 Approved로 반영됐다. 제품 frontend에 남은 새 blocking finding은 없다.
+- 실제 인수 정합화: `build/m8-acceptance-20261110-173900/evidence.json`의 root 실제 HTTP/Chrome acceptance는 **323 PASS / 0 FAIL / 0 NOT RUN**, 1440px viewport, source/JAR hash match로 기록됐다. `design-notifications.png`, `design-main-notifications.png`, `notifications-owner.png`, `topbar-notifications.png`, `main-owner-notifications.png` 다섯 PNG가 보존돼 있다.
+- 남은 게이트: final independent visual audit가 진행 중이며 `feature/M8-notifications`의 dev PR/merge는 root 통합 게이트다. frontend 역할은 이 동기화에서 재테스트하지 않았고 M9는 범위에 포함하지 않는다.

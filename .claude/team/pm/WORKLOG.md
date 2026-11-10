@@ -408,3 +408,26 @@
 
 - **검증 결과**: PRD §5.11·§7.2·§9.11·§10 M8·§13.3/§13.4와 PM `STATE.md`/`WORKLOG.md`를 재독했다. `A-v2 전체 승인`, `APPROVED`, canonical `NotificationItem`, `SUSPENDED` GET read-only, dynamic unavailable masking/복구, same-transaction, sorted locks/current candidate recheck/총 3회 attempt, V6 인덱스 2개 및 별도 구현·검증 gate가 일관되게 남아 있음을 `rg`로 확인했다. M7 `b80ede0` docs-only closeout 완료도 유지된다.
 - **검증 명령**: PM 3개 파일 대상 `git diff --check`는 오류 없이 통과했고, trailing whitespace 검색 결과는 0건이다. 제품 코드·테스트·runtime·Git 조작은 하지 않았다.
+
+## 2026-11-10 18:00 KST — M8 Task1~4 중간 closeout·실제 인수 run2 정합화
+
+- **근거 대조**: 승인된 회의 §9~10·ADR-0007·PRD §9.11/§10/§13.4와 backend/frontend/qa STATE·WORKLOG, `docs/worklog/M8-notifications.md`, 실제 Git feature branch를 재독했다. M8 제품 정책 9개와 A-v2 승인 상태는 유지하며 M9는 범위에서 제외했다.
+- **제품/자동검증 사실**: backend 최신 전체는 `102 suites / 599 tests / failures 0 / errors 0 / skipped 0`, `bootJar BUILD SUCCESSFUL`; frontend 최신 전체는 `47 files / 439 tests PASS`, lint/build exit 0이다. 최종 리뷰의 DELETE `400 VALIDATION_001` OpenAPI 문서와 SUSPENDED preview 읽기 전용 안내는 backend controller 5 tests/bootJar 및 frontend shell 8 tests/lint/build를 추가 통과했고 커밋 `12d7ab5`에 보존됐다.
+- **독립 리뷰·인수 사실**: 독립 전체 리뷰는 신규 제품 Critical/Important 차단 결함 없이 `With fixes`를 판정했다. QA 도구 수정은 manifest 정렬, fixture/삭제 순서, query bound, 실제 DOM locator, SPA stale, 정상 서명 wrong-type JWT, null 보존 fingerprint까지 반영했다. 실제 run2 `build/m8-acceptance-20261110-172852/evidence.json`은 `310 PASS / 4 FAIL` 뒤 로그인 상태 `/signin` 접근이 GuestOnlyRoute에 막힌 검사 절차 timeout으로 종료됐다. HTTP·DB·인증·fingerprint와 SELECT bound(size1=4,size100=4,차이=0)은 통과했으나 브라우저 선택자·외곽 폭·0 unread badge·same-Provider 계정 전환 검사는 재실행 전 보완 대상이다.
+- **정본/STATE 반영**: PRD M8 상태와 §13.4를 Task1~4 구현·자동검증 완료, Task5 인수 보완·재실행 및 Task6 통합 대기로 갱신했다. PM STATE를 같은 근거로 덮어썼고 최종 PASS·merge-ready·`dev` 통합 완료는 기록하지 않았다.
+- **소유권·미해결**: 이번 작업은 `docs/PRD.md`, `.claude/team/pm/STATE.md`, `.claude/team/pm/WORKLOG.md`만 수정했다. 제품 코드·QA harness·governance·M8 milestone worklog·Git은 수정하지 않았다. QA 도구 수정 및 최종 acceptance evidence, 독립 scoped re-review, root PR/merge가 남아 있다.
+- **검증**: 편집한 PRD·STATE·WORKLOG를 재독하고 핵심 상태 문자열·수치를 검색한다. PM 소유 파일에 `git diff --check`와 trailing whitespace 검사를 실행한다.
+
+## 2026-11-10 17:37 KST — 중간 closeout 시각 정정
+
+- 앞선 `2026-11-10 18:00 KST` closeout 항목의 표기 시각은 root가 확인한 실제 실행 시각보다 늦어 정정한다. 해당 항목의 상태·수치·미해결 gate 내용은 유지하고, 현재 PM STATE의 마지막 갱신 시각을 `17:37 KST`로 맞췄다.
+- run3 실제 인수·최종 독립 판정·PR/`dev` 통합 대기 상태와 M9 제외 범위에는 변경이 없다.
+- 검증: PM STATE/WORKLOG를 재독하고 PM 소유 파일 `git diff --check`를 다시 실행한다. 제품 코드·QA harness·runtime·Git은 수정하지 않는다.
+
+## 2026-11-10 17:40:26 KST — M8 실제 인수 run3 PASS 정합화
+
+- **근거 대조**: root가 제공한 `build/m8-acceptance-20261110-173900/evidence.json`과 실제 manifest를 대조했다. run3는 `323 PASS / 0 FAIL / 0 NOT_RUN`, `failures=[]`로 종료됐고 1440×1000 screenshot 5개를 생성했다.
+- **artifact·성능 근거**: source hash `108e7120a07ab43ebfc550e34a2f13ca7f613d4d0388dd44781bf43cc95add47`, immutable JAR hash `1cab24e82cb1cf524b0184145ffa49a802db924d4a00b08afc862299014fd1c5`가 tested manifest와 일치한다. SQL bound는 size1 SELECT 4, size100 SELECT 4, 차이 0이다.
+- **정본/STATE 반영**: PRD M8 status/§13.4와 PM STATE를 Task1~5 구현·자동검증·실제 인수 PASS 및 최종 독립 리뷰·Task6 `dev` 통합 대기 상태로 갱신했다. 최종 merge-ready·`dev` 통합 완료는 주장하지 않는다.
+- **소유권·미해결**: 이번 갱신은 `docs/PRD.md`, `.claude/team/pm/STATE.md`, `.claude/team/pm/WORKLOG.md`만 수정했다. 남은 gate는 독립 최종 scoped re-review와 root의 명시 파일 PR/`dev` merge이며 M9는 범위에서 제외한다.
+- **검증**: 편집한 PRD·STATE·WORKLOG를 재독하고 핵심 PASS/hash/대기 문자열을 검색한다. PM 소유 파일 `git diff --check`를 실행한다.

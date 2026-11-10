@@ -47,6 +47,12 @@ java -classpath gradle/wrapper/gradle-wrapper.jar org.gradle.wrapper.GradleWrapp
 
 구버전 서버는 `content_text`를 갱신하지 않으므로 구버전으로 돌아가 글을 수정한 뒤에는 쓰기를 다시 중지하고 위 검증·재구축을 거쳐야 합니다. V5 실패 원문 수정·Flyway repair·백업 복원은 실제 DB에 대한 별도 승인과 원인 확인 후 수행합니다. 실패 행을 삭제하거나 HTML로 대체해 이관을 우회하지 않습니다. 상세 계약과 합성 DB 검증 결과는 [ADR-0006](docs/governance/decisions/ADR-0006-feed-search-contract.md) 및 [M7 기록](docs/worklog/M7-feed-search.md)을 확인하세요.
 
+### M8 알림 인덱스와 이력
+
+M8 서버는 시작할 때 Flyway V6로 `notifications`의 수신자·삭제 여부·최신순 및 읽음 조회 인덱스 두 개를 추가합니다. 기존 알림 행과 작성·수정 시각은 유지하며, 과거 활동의 알림을 새로 만들지는 않습니다. 새 댓글·답글·좋아요·유니버스 신청/수락·게시글 발행의 알림은 원래 활동과 같은 트랜잭션에서 저장합니다.
+
+알림 센터는 `/notifications`입니다. 센터와 최근 알림을 여는 것만으로 읽음 처리하지 않으며, 알림 클릭 또는 전체 읽음으로 처리합니다. 현재 권한으로 읽을 수 없는 대상은 세부 정보를 숨깁니다. 계약과 검증 상태는 [ADR-0007](docs/governance/decisions/ADR-0007-notifications-contract.md) 및 [M8 기록](docs/worklog/M8-notifications.md)을 확인하세요.
+
 ### M4 로컬 이미지 저장
 
 2026-10-03 승인된 M4는 LocalStack 없이 서버 로컬 파일 업로드를 사용합니다. 글·이미지 권한과 최대 5MB(5,242,880바이트)를 유지하며 S3 연동은 후속 범위입니다. 구현·인수 결과는 [M4 기록](docs/worklog/M4-posts.md)을 확인하세요. 아래 U0 설명은 과거 별도 검증 환경이며 현재 M4 실행에 필요하지 않습니다.
@@ -287,6 +293,7 @@ API 주소에는 `/api/v1`을 붙이지 않습니다. 클라이언트가 각 요
 | --- | --- |
 | 회원가입 / 로그인 | http://localhost:5173/signup / http://localhost:5173/signin |
 | 프로필·블로그 설정 / 카테고리 관리 | http://localhost:5173/settings / http://localhost:5173/settings/posts |
+| 알림 센터 | http://localhost:5173/notifications |
 | Swagger UI | http://localhost:18080/swagger-ui.html |
 | OpenAPI JSON | http://localhost:18080/v3/api-docs |
 

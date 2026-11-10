@@ -851,3 +851,66 @@
 - `node --check qa/m8-acceptance.mjs` 통과.
 - `rg -n '[[:blank:]]+$'`로 `qa/M8-review.md`, `qa/m8-acceptance.mjs`, QA STATE/WORKLOG 및 prep report를 검사했고 `trailing-whitespace: clean`이다.
 - 실제 runtime/API/DB/Chrome/performance_schema 측정은 실행하지 않았으며 M8 판정은 계속 **NOT RUN**이다.
+
+## 2026-11-10 KST — whole-branch review QA final-fix wave
+
+### 한 일
+
+- 독립 whole-branch review의 QA Important 7개를 `qa/m8-acceptance.mjs`에서 수정했다. manifest는 ordinal path sort를 사용하고, POST transition은 PRIVATE masking에도 안정적인 notification ID 집합으로 계산하며, suspended receiver fixture는 comment ID를 참조한다.
+- query-bound는 size=1·size=100의 독립 SELECT 비용을 각각 기록하고 양쪽 `1..14` 및 비용 차이 `0`을 요구한다. wrong-type auth는 root runtime이 주입하는 정상 서명 `M8_WRONG_TYPE_TOKEN`만 사용한다.
+- Chrome locator는 실제 center role row/recent button과 API 순서·표시 시각을 조합해 duplicate message를 구분한다. USER_001 state clear, SPA account switch stale response, unavailable no-read/no-navigation을 실제 DOM/URL로 판정한다.
+- DB fingerprint는 `HEX(JSON_ARRAY(...))` 행별 read-only SQL로 모든 notification scalar/NULL/audit fields를 보존한 뒤 Node SHA-256을 계산한다. `GROUP_CONCAT`/`CONCAT_WS` truncation/null-loss 경로를 제거했다.
+- `qa/M8-review.md`의 query-bound 기대값과 final-fix closure를 갱신하고 `.superpowers/sdd/M8-notifications/qa-final-fix.md`를 기록했다.
+
+### 검증·경계
+
+- `node --check qa/m8-acceptance.mjs` exit 0.
+- QA harness trailing whitespace clean, `git diff --check -- qa/m8-acceptance.mjs` exit 0.
+- 제품 코드·타 역할 테스트·runtime DB·사용자 DB·Git은 수정하지 않았다.
+- 실제 HTTP/DB/Chrome acceptance는 root가 새 immutable source/JAR manifest로 실행할 다음 gate이며, 이번 파동에서는 실행하지 않았다. M8 PASS·merge-ready는 주장하지 않는다.
+
+## 2026-11-10 KST — root spot-check correction
+
+- ACTIVE 계정의 unavailable 알림은 read mutation 자체를 거부하지 않을 수 있다는 제품 동작을 확인해, harness를 `PUT read` 완료 후 `200 + available=false + href=null + URL 불변` 검증으로 교정했다.
+- stale account 검사는 초기 navigation을 지연시키지 않는다. owner center가 준비된 뒤 `visibilitychange`가 만든 실제 size=20 응답을 hold하고 SPA sign-in으로 friend 계정 전환·friend center 로딩을 끝낸 뒤 response를 release한다. hold 관측, owner unique row 존재, 실제 200 응답, friend 화면의 old row 부재를 각각 확인한다.
+- `node --check qa/m8-acceptance.mjs`, trailing whitespace, `git diff --check`를 다시 통과했다. 실제 acceptance는 여전히 root 실행 전이며 M8 PASS를 주장하지 않는다.
+
+## 2026-11-10 KST — Run2 browser-failure final harness handoff
+
+### 한 일
+
+- root Run2의 `browser-center-width`, `browser-shared-unread-center-topbar`, `browser-right-panel-recent`, `browser-shared-unread-right-panel` 실패를 실제 DOM/source와 대조했다. center 폭은 내부 목록이 아니라 `[data-layout="app"]` 외곽(설계상 860px)을 측정하고, `■ 최근 알림` h2를 scoped locator로 찾으며, zero unread에서 의도적으로 없는 badge를 0으로 비교하고, Main right panel unread를 해당 panel 범위로 한정했다.
+- stale 계정 시나리오는 owner 화면 준비 후 `route.fetch()`로 실제 `size=20` 응답을 upstream 200 확인과 함께 보류한다. 제품 logout UI를 추가하지 않고, 기존 Vite `apiClient` 모듈의 `/api/v1/auth/me`·`/refresh`에만 401을 주입해 기존 auth-expired handler를 통과시킨 뒤 same-Provider SPA friend signin·센터 ready 후 held response를 release하도록 교정했다.
+- 열린 TopBar notification dropdown 상태에서 `topbar-notifications.png` 캡처를 추가해 center/Main recent와 함께 세 표면의 독립 시각 증거를 남기도록 했다.
+
+### 검증·미해결
+
+- `node --check qa/m8-acceptance.mjs` exit 0.
+- `git diff --check -- qa/m8-acceptance.mjs` exit 0; QA harness trailing whitespace clean.
+- 실제 HTTP/DB/Chrome acceptance는 root의 Run3가 수행할 단계다. Run2의 310 PASS/4 browser FAIL과 stale timeout은 재현 원인·하네스 수정까지 확인했지만, Run3 evidence 전에는 M8 PASS를 주장하지 않는다.
+
+## 2026-11-10 KST — Run3 actual acceptance evidence handoff
+
+### 한 일
+
+- root가 실행한 `build/m8-acceptance-20261110-173900/evidence.json`과 `build/m8-evidence/acceptance-run3.log`를 read-only 대조했다. 결과는 `323 PASS / 0 FAIL / 0 NOT_RUN`, `failures=[]`, runner exit 0이다.
+- evidence에 source/JAR identity 일치, status fixture ready, 실제 bearer query-bound `sizeOneSelectDelta=4`, `size100SelectDelta=4`, cost difference `0`, HTTP/DB/Chrome checks와 5개 screenshot(`topbar-notifications.png` 포함)이 있음을 확인했다. source/JAR 및 runner provenance는 root 보고대로 unchanged다.
+- 이 결과를 **실제 runtime acceptance PASS**로 QA STATE에 반영했다. 단, `qa/m8-acceptance.mjs`와 `qa/M8-review.md`는 freeze하고, `qa/M8-review.md` 최종 audit는 `m8_final_review` 단독 작성으로 이관했다.
+
+### 검증·미해결
+
+- 본 항목은 Run3 execution evidence의 독립 read-only 확인이다. 독립 최종 visual/audit, merge-ready 및 dev 통합은 아직 판정하지 않았다.
+- 새 finding이 나오면 해당 소유자 수정 후 재검토한다. 현재 evidence만으로 M8 최종 PASS나 merge-ready를 주장하지 않는다.
+
+## 2026-11-10 KST — 독립 최종 audit 완료·merge-ready handoff
+
+### 한 일
+
+- `m8_final_review`가 `qa/M8-review.md` §10에 독립 최종 audit을 append했고, Run3 evidence·source/JAR provenance·backend/frontend covering 검증·1440px screenshot 5장을 구현자와 다른 컨텍스트에서 대조했다.
+- 최종 review 결과 Critical 0, Important 0, 기존 QA finding 종료, **Ready to merge Yes**다. DELETE 400 OpenAPI와 SUSPENDED read-only 설명 누락은 covering 검증으로 종료됐다. 운영 SLA·최대 용량과 물리 JDBC batching은 판단 범위 밖으로 명시됐다.
+- `qa/M8-review.md`의 현재 header/status를 `IMPLEMENTED / ACCEPTANCE PASS / READY TO MERGE`로 갱신했다. 과거 섹션의 `NOT RUN`은 실행 전 이력으로 보존했고, `qa/m8-acceptance.mjs`는 freeze했다.
+
+### 검증·미해결
+
+- QA STATE를 **M8 독립 QA PASS / merge-ready Yes (dev 통합 pending)**으로 갱신했다.
+- 남은 단계는 root의 dev 통합·PR/merge 기록뿐이다. QA는 dev 통합 완료를 주장하지 않으며, 통합 후 회귀나 새 finding이 생길 때만 재검토한다.

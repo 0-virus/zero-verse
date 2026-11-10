@@ -27,10 +27,10 @@
 ### 실행 체크포인트
 
 - [x] 사용자 A-v2 승인, feature 브랜치 생성, scope/preflight 확인.
-- [ ] Task1 정본/API 계약 동기화 완료.
-- [ ] Task2 API/DB 자체 검증 및 독립 task review.
-- [ ] Task3 생성/경쟁 자체 검증 및 독립 task review.
-- [ ] Task4 FE 자체 검증 및 독립 task review.
+- [x] Task1 정본/API 계약 동기화 완료(020ab1f, ignored PRD/REQUIREMENTS 동기화 별도 확인).
+- [x] Task2 API/DB 자체 검증 및 독립 task review(최초24 tests+fix16 tests, 독립 Important3건 closure; 최종통합gate는별도).
+- [x] Task3 생성/경쟁 자체 검증 및 독립 task review(fix1 replacement reject/cancel closure, 최종통합gate는별도).
+- [x] Task4 FE 자체 검증 및 독립 task review(fix2까지 모든 blocking closure, 실제브라우저/통합gate는별도).
 - [ ] Task5 전체 리뷰·실제 인수·독립 QA PASS.
 - [ ] Task6 dev 통합·tree 대조·기록·runtime 정리.
 
@@ -147,3 +147,60 @@
 - root가 REQUIREMENTS §6.11-A, ADR-0007, 루트 AGENTS/CLAUDE에 승인된 M8 실행 경계를 연결했다. PM은 PRD를 동일 계약으로 반영한다.
 - backend Task2는 m8_backend_api, frontend Task4는 m8_frontend_impl, QA 준비는 m8_qa_acceptance, PM은 m8_pm_policy다. Task3는 Task2 후 단일 backend 소유자가 이어받고 독립 검토자는 별도 컨텍스트다.
 - root: 전용 Colima 재기동과 합성 MySQL13318 생성 완료. 사용자DB·환경·업로드·미추적4파일보존. API18088/FE5178은 최종검증artifact 준비뒤기동한다.
+
+## [개발 기록] 2026-11-10 14:08 KST — 구현 중간 점검·QA 준비
+
+- 독립 QA m8_qa_acceptance가 `qa/M8-review.md` 인수 매트릭스와 `qa/m8-acceptance.mjs`를 작성했다. root의 `node --check` exit0. 실제 API/DB/Chrome 인수는 NOT RUN이며 준비 완료를 제품 PASS로 취급하지 않는다.
+- root가 ignored M8 runtime helper를 합성 account/status/old-history seed와 맞췄다. 정확한 owner 수신 알림만 41일 전으로 변경하며, transaction 성공·수정 건수 확인 뒤 ready를 기록한다. 실제 fixture 변경은 최종 artifact 이후에만 수행한다.
+- root 중간 검토로 필터별 totalElements와 전체 unreadCount 분리를 요청했고 backend가 반영했다. 최신 targeted run `task2-green-all-targeted-3.log` BUILD SUCCESSFUL을 확인했으나 전체 Task2 완료·독립 리뷰는 아직 아니다.
+- Task2 migration의 기존 검사로는 V5→V6 보존을 증명할 수 없어 실제 업그레이드·audit 비교·별도 DB 복원 검증을 요청했다. FE에는 계정 전환 중 지연 mutation의 상태 갱신·이동 방지를 보강 요청했다. 각 소유자만 수정한다.
+
+## [리뷰] 2026-11-10 14:25 KST — Task2/4 자체검증·독립 검토
+
+- frontend Task4 저자 m8_frontend_impl 인계 후 root가 실제 전체 test/lint/build를 실행했다. `build/m8-evidence/frontend-final-test.log`:47 files/423 tests PASS, lint/build exit0. 기존500kB bundle warning은 남아 있으며 오류 없는 경고제로를 주장하지 않는다. 검토본을 6b443de로 보존했다.
+- 독립 m8_frontend_review는 4 Important(메인 재진입 preview 갱신, USER_001 최종실패 cache 제거, 읽음 실패 실제 재시도, transient 조회실패 기존목록 표시)와 같은계정 stale GET 회귀 부족을 보고했다. 원 저자에게 fix round1을 배정했다. 아직 Task4 최종승인 아님.
+- backend가 실제 V5 source/별도 backup→V6 migration 및 전체 notification ID/audit 비교를 추가했다. `task2-final-targeted-migration-v6.log` SUCCESS27s, root XML집계7 suites/24tests/failures0/errors0/skipped0, `build/m8-evidence/task2-final-xml/`에 보존. 원문 source/로그를 대조했으며 최종 whole backend는 Task3후 수행한다.
+- 독립 m8_backend_review가 고정 Task2 diff를 검토 중이다. Task3 생성 연계는 해당 저장인터페이스 검토 후 이어간다. QA 실제 인수는 여전히 NOT RUN.
+
+## [개발 기록] 2026-11-10 14:40 KST — Task2 독립 closure·Task3 착수
+
+- Task2 review Important3건은 원작성자가수정하고 독립 m8_backend_review가모두ADDRESSED로재검토했다. resolver scalar조회로staleACTIVE를제거하고 실제정지commitbarrier, LONGTEXT전수assertion, RRcount→동시delete→items, 동일시각21행paging를검증했다. covering16tests/실패오류skip0, 수정commit a1a48dd.
+- backend Task3를 새컨텍스트 m8_generation_impl에배정했다. 단일backend작성자/Gradlerunner를이전하며 원행위5경로·전체rollback·sortedlock/currentcandidate·총3attempt·fanout/실제경쟁을담당한다. Task2author는freeze상태다.
+- Task2minor DELETEOpenAPI400 및후속 Task3경쟁/Task5인수gate는ledger에유지한다. FEfix1/QA실제인수준비는별도소유로계속한다. M8완료판정은아직아니다.
+
+## [리뷰] 2026-11-10 16:59 KST — 구현 단계 closure와 전체 검증
+
+- Task4 fix2의 session generation·오래된 retry 무효화는 독립 m8_frontend_review가 승인했다. root 최종 전체 FE는47files/439tests PASS(`frontend-final-2-test.log`), covering31tests/lint/build도PASS다. 최종FE수정commit b8964b7.
+- Task3는 원행위와알림 동시저장, 정렬잠금과기존post잠금이후current후보재검증, 확정rollback 총3attempt를구현했다. 독립review가53distinct검증/0failerrorSkip과1001명=1001행/11logicalbatches/2018SQL/854.487ms를확인했다. logicalbatch는JDBCbatch수가아니며heapdelta는peak측정이아니다.
+- root 전체BE1은102suites/597tests/0failures/errors/skips,bootJar SUCCESS2m45s(`backend-final-1/summary.json`,JAR d11a75d4...)였다. 리뷰에서 reject/cancel의oldID가replacement신청을삭제하는1건을발견했고, 원작성자수정2줄+actualbarrier RED2→GREEN26을독립review가ADDRESSED로확인했다. 수정commit713822c, 전체BE2+새JAR는실행중이다.
+- 실제합성DB13318에서M7보존JAR로V5legacy240행을만든뒤M8V6적용,전체ID/내용/audit지문불변을확인했다. 같은실제count/list SQL계획은V6인덱스를선택하며M7JAR재기동/docs/feed/search200을확인했다. `v5-runtime-baseline.json`, `v6-runtime-comparison.json` 보존;호환성M7프로세스는종료했다.
+- Task5실제M8HTTP/Chrome는새JAR이후실행한다. Whole-branch독립리뷰에DELETEOpenAPI400,preview읽기전용안내,기존chunkwarning/새SpyBeanremovalwarning ledger를전달한다. M8최종QA/dev통합은아직완료아니다.
+
+## [리뷰] 2026-11-10 KST — 전체 리뷰와 실제 인수 도구 보완
+
+- root 최종 BE2는 102 suites/599 tests/실패·오류·skip 0, bootJar 성공이다. `build/m8-evidence/backend-final-2/summary.json`과 원본 XML을 보존했다. FE 전체 439 tests PASS와 함께 제품 테스트 gate를 통과했다.
+- 독립 m8_final_review는 신규 제품 차단 결함 없이 With fixes를 판정했다. QA 도구의 fixture ID/삭제 순서, SQL 비용 계산, DOM locator/SPA 경쟁/무이동 검증, 잘못된 type JWT, 전체 행 fingerprint를 보완해야 한다. 미측정 운영 최대규모·SLA·peak memory와 JDBC batch 보장을 완료 범위로 주장하지 않는다.
+- 실제 인수 run1(`build/m8-acceptance-20261110-170212`)은 OpenAPI 2개 확인 후 source manifest 정렬 불일치로 중단했다. 396개 개별 파일과 JAR 해시는 일치했지만 Node localeCompare와 Python ordinal 순서가 달랐다. 계정 fixture 생성 이전 실패이며 HTTP/Chrome 인수 PASS가 아니다.
+- 최종 보완은 소유권에 따라 QA m8_qa_final_fix(위 도구 7개 묶음), backend m8_backend_final_doc(DELETE 400 문서), frontend m8_frontend_final_copy(최근 알림 정지계정 안내)에 분리했다. 동일 파일 중복 작성 없이 수정 후 하나의 독립 재검토를 진행한다. root는 합성 runtime의 정상 서명 REFRESH token을 메모리로만 공급하며 ACCESS 200/REFRESH 401 AUTH_004 대조를 보존했다.
+- 이후 수정 영향 범위 검증·새 artifact/source manifest·실제 인수·증거 감사가 남아 있다. dev 통합은 아직 수행하지 않았다.
+
+## [리뷰] 2026-11-10 KST — 실제 인수 run2와 최종 보완
+
+- API 문서·preview 읽기 전용 안내는12d7ab5로 보존했다. 기존 BE599/FE439 전체 통과 이후 변경 범위 검증은 BE controller5 tests/bootJar PASS, FE shell8 tests/lint/build PASS다. 새 runtime JAR1cab24e82cb1cf524b0184145ffa49a802db924d4a00b08afc862299014fd1c5, source108e7120a07ab43ebfc550e34a2f13ca7f613d4d0388dd44781bf43cc95add47를manifest에연결했다.
+- QA 도구 수정본 run2(`build/m8-acceptance-20261110-172852/evidence.json`)는310PASS/4FAIL 뒤 SPA signin timeout으로exit1했다. 실제 HTTP의생성·권한·전체이력·인증·no-store 검사는통과했고 SELECT계측은size1=4,size100=4,차이0이다.
+- 실패4개는center외곽폭측정,dropdown을연뒤alarm선택자,최근알림제목의장식문자,0건badge생략처리를잘못검사한도구문제다. root가원본/제품PNG를직접확인했으며center목록780px와외곽860px는디자인과일치한다. 로그인중signin접근은GuestOnlyRoute가막으므로같은Provider의인증만료경로를주입한뒤실제signin하는검사로보완한다.
+- QA m8_qa_final_fix가도구를수정하고독립m8_final_review가잔여finding을재검토한다. 실제인수최종PASS와dev통합은아직아니다. 앞선실패evidence를삭제하거나PASS로재기록하지않는다.
+
+## [리뷰] 2026-11-10 17:40 KST — 실제 인수 run3 PASS
+
+- `build/m8-acceptance-20261110-173900/evidence.json`: 실제 HTTP/MySQL/Chrome1440px 323 PASS, 0 FAIL, 0 NOT_RUN, failures=[]; runner exit0. root가 JSON·stdout과 provenance를 직접 대조했다.
+- 396파일 source108e7120a07ab43ebfc550e34a2f13ca7f613d4d0388dd44781bf43cc95add47, runtime JAR1cab24e82cb1cf524b0184145ffa49a802db924d4a00b08afc862299014fd1c5가모두일치했다. QA도구/runtime helper/manifest/JAR도실행전provenance와실행후동일하다.
+- 인증된실제GET의SELECT4/4(1개/100개), 증가량0. 생성·보존·mask/복구·차단·정지/탈퇴·인증오류·no-store·페이징·전체읽음·관리실패보존·retry·USER001clear·동일계정staleGET·계정전환후지연응답·unavailable읽음후무이동·guestguard가PASS다.
+- 계정전환browser probe는실제owner200응답을hold하고기존apiClient의/me401→refresh401을주입해인증만료를발생시킨뒤같은Provider에서friend로그인·지연응답release를검증했다. 존재하지않는logoutUI를사용했다고주장하지않는다.
+- 디자인원본2/제품3 PNG(센터·상단dropdown·Main최근알림)를보존했다. 독립m8_final_review가잔여finding및실제5PNG를판정중이며dev통합은아직아니다. 이전run1/2실패는도구보완이력으로보존한다.
+
+## [리뷰] 2026-11-10 17:44 KST — 독립 최종 승인·통합 준비
+
+- 독립 `m8_final_review`가 `qa/M8-review.md` §10에 Ready to merge: Yes를 기록했다. Critical/Important 0, QA 도구7묶음·후속locator/session probe 지적모두CLOSED, 실제5PNG디자인대조PASS다. root가판정본문과실측323PASS/source/JAR/SQL비용을직접재확인했다.
+- RISK-0017은실제경쟁·원자성·1001명검증으로MITIGATED(운영용량/SLA/peak별도), RISK-0018은승인권한·상태행렬과실제stale인수로CLOSED했다. 기존chunk/SpyBean경고는비차단한계로남긴다.
+- 사용자승인에포함된dev대상PR·머지를진행한다. 원격dev는기준b80ede0그대로이며제품manifest는최종인수와동일하다. 이기록시점에는아직PR/merge미실행이다. M9로확장하지않는다.

@@ -1,6 +1,8 @@
 package com.zeroverse.domain.notification;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zeroverse.domain.blog.entity.Blog;
@@ -12,6 +14,7 @@ import com.zeroverse.domain.comment.service.CommentService;
 import com.zeroverse.domain.notification.dto.NotificationDtos;
 import com.zeroverse.domain.notification.dto.NotificationDtos.NotificationItem;
 import com.zeroverse.domain.notification.dto.NotificationDtos.ReadFilter;
+import com.zeroverse.domain.notification.repository.NotificationRepository;
 import com.zeroverse.domain.notification.service.NotificationService;
 import com.zeroverse.domain.post.dto.PostDtos.CreatePostRequest;
 import com.zeroverse.domain.post.dto.PostDtos.Visibility;
@@ -24,11 +27,20 @@ import com.zeroverse.security.ZeroverseUserPrincipal;
 import com.zeroverse.support.MySqlTestSupport;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -45,6 +57,16 @@ class NotificationQueryMySqlTest extends MySqlTestSupport {
     @Autowired private UniverseRepository universeRepository;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private JdbcTemplate jdbcTemplate;
+    @SpyBean private NotificationRepository notificationRepository;
+
+    private ExecutorService executor;
+
+    @AfterEach
+    void shutdownExecutor() {
+        if (executor != null) {
+            executor.shutdownNow();
+        }
+    }
 
     @Test
     @DisplayName("정상 POST 알림은 현재 actor·canonical href·전체 미읽음 수를 반환한다")
@@ -152,30 +174,102 @@ class NotificationQueryMySqlTest extends MySqlTestSupport {
     }
 
     @Test
-    @DisplayName("같은 created_at이면 id 내림차순과 read 필터를 유지한다")
+    @DisplayName("RR 목록은 count 뒤 concurrent delete commit에도 items와 같은 snapshot을 유지한다")
+    void countAndItemsUseOneRepeatableReadSnapshot() throws Exception {
+        User receiver = user("query-rr-receiver");
+        User actor = user("query-rr-actor");
+        var post = post(user("query-rr-owner"), "query-rr-post", Visibility.PUBLIC);
+        long notificationId = insertNotification(receiver, actor, "LIKE", "POST", post.id(), "rr");
+
+        CountDownLatch countRead = new CountDownLatch(1);
+        CountDownLatch releaseItems = new CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicBoolean firstCount = new java.util.concurrent.atomic.AtomicBoolean();
+        doAnswer(invocation -> {
+            Long receiverId = invocation.getArgument(0, Long.class);
+            Map<String, Object> countRow = jdbcTemplate.queryForMap("""
+                    SELECT COUNT(*) AS totalElements,
+                           COALESCE(SUM(CASE WHEN read_at IS NULL THEN 1 ELSE 0 END), 0) AS unreadCount
+                    FROM notifications
+                    WHERE receiver_user_id = ? AND deleted_at IS NULL
+                    """, receiverId);
+            if (firstCount.compareAndSet(false, true)) {
+                countRead.countDown();
+                if (!releaseItems.await(10, TimeUnit.SECONDS)) {
+                    throw new AssertionError("items barrier timed out");
+                }
+            }
+            return new NotificationRepository.VisibleCount() {
+                @Override
+                public Long getTotalElements() {
+                    return ((Number) countRow.get("totalElements")).longValue();
+                }
+
+                @Override
+                public Long getUnreadCount() {
+                    return ((Number) countRow.get("unreadCount")).longValue();
+                }
+            };
+        }).when(notificationRepository).countVisible(any(), any());
+
+        executor = Executors.newSingleThreadExecutor();
+        Future<NotificationDtos.NotificationPage> future = executor.submit(() -> notificationService.list(
+                null, principal(receiver), ReadFilter.ALL, 0, 20));
+        if (!countRead.await(10, TimeUnit.SECONDS)) {
+            if (future.isDone()) {
+                future.get(1, TimeUnit.SECONDS);
+            }
+            throw new AssertionError("count barrier was not reached; futureDone=" + future.isDone());
+        }
+        jdbcTemplate.update("UPDATE notifications SET deleted_at = ? WHERE id = ?",
+                LocalDateTime.of(2026, 11, 10, 4, 5, 6), notificationId);
+        releaseItems.countDown();
+
+        NotificationDtos.NotificationPage snapshot = future.get(30, TimeUnit.SECONDS);
+        assertThat(snapshot.totalElements()).isEqualTo(1L);
+        assertThat(snapshot.items()).extracting(NotificationItem::id).containsExactly(notificationId);
+
+        NotificationDtos.NotificationPage afterCommit = notificationService.list(
+                null, principal(receiver), ReadFilter.ALL, 0, 20);
+        assertThat(afterCommit.totalElements()).isZero();
+        assertThat(afterCommit.items()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("21개 이상 같은 created_at도 page 경계에서 id 내림차순과 read 필터를 유지한다")
     void sortsByCreatedAtThenIdAndFiltersReadState() throws Exception {
         User receiver = user("query-order-receiver");
         User actor = user("query-order-actor");
         var post = post(user("query-order-owner"), "query-order-post", Visibility.PUBLIC);
         LocalDateTime createdAt = LocalDateTime.of(2026, 11, 10, 1, 2, 3);
-        long first = insertNotification(receiver, actor, "LIKE", "POST", post.id(), "first", createdAt, null);
-        long second = insertNotification(receiver, actor, "POST", "POST", post.id(), "second", createdAt, createdAt);
+        List<Long> inserted = new ArrayList<>();
+        for (int index = 0; index < 21; index++) {
+            inserted.add(insertNotification(receiver, actor, "LIKE", "POST", post.id(), "same-" + index,
+                    createdAt, index == 0 ? createdAt : null));
+        }
+        List<Long> expectedDescending = inserted.reversed();
 
         NotificationDtos.NotificationPage all = notificationService.list(
                 null, principal(receiver), ReadFilter.ALL, 0, 20);
+        NotificationDtos.NotificationPage allSecondPage = notificationService.list(
+                null, principal(receiver), ReadFilter.ALL, 1, 20);
         NotificationDtos.NotificationPage unread = notificationService.list(
                 null, principal(receiver), ReadFilter.UNREAD, 0, 20);
         NotificationDtos.NotificationPage read = notificationService.list(
                 null, principal(receiver), ReadFilter.READ, 0, 20);
 
-        assertThat(all.items()).extracting(NotificationItem::id).containsExactly(second, first);
-        assertThat(all.totalElements()).isEqualTo(2L);
-        assertThat(unread.items()).extracting(NotificationItem::id).containsExactly(first);
-        assertThat(unread.totalElements()).isEqualTo(1L);
-        assertThat(read.items()).extracting(NotificationItem::id).containsExactly(second);
+        assertThat(all.items()).extracting(NotificationItem::id)
+                .containsExactlyElementsOf(expectedDescending.subList(0, 20));
+        assertThat(allSecondPage.items()).extracting(NotificationItem::id)
+                .containsExactly(expectedDescending.get(20));
+        assertThat(all.totalElements()).isEqualTo(21L);
+        assertThat(allSecondPage.totalElements()).isEqualTo(21L);
+        assertThat(unread.items()).extracting(NotificationItem::id)
+                .containsExactlyElementsOf(expectedDescending.subList(0, 20));
+        assertThat(unread.totalElements()).isEqualTo(20L);
+        assertThat(read.items()).extracting(NotificationItem::id).containsExactly(inserted.getFirst());
         assertThat(read.totalElements()).isEqualTo(1L);
-        assertThat(unread.unreadCount()).isEqualTo(1L);
-        assertThat(read.unreadCount()).isEqualTo(1L);
+        assertThat(unread.unreadCount()).isEqualTo(20L);
+        assertThat(read.unreadCount()).isEqualTo(20L);
     }
 
     private User user(String key) {

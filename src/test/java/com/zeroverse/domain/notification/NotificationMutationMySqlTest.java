@@ -1,6 +1,9 @@
 package com.zeroverse.domain.notification;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.reset;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -16,6 +19,7 @@ import com.zeroverse.domain.category.entity.Category;
 import com.zeroverse.domain.category.repository.CategoryRepository;
 import com.zeroverse.domain.notification.dto.NotificationDtos.NotificationItem;
 import com.zeroverse.domain.notification.entity.NotificationType;
+import com.zeroverse.domain.notification.service.NotificationService;
 import com.zeroverse.domain.post.dto.PostDtos.CreatePostRequest;
 import com.zeroverse.domain.post.dto.PostDtos.PostDetail;
 import com.zeroverse.domain.post.dto.PostDtos.Visibility;
@@ -25,16 +29,26 @@ import com.zeroverse.domain.universe.repository.UniverseRepository;
 import com.zeroverse.domain.user.entity.User;
 import com.zeroverse.domain.user.entity.UserRole;
 import com.zeroverse.domain.user.repository.UserRepository;
+import com.zeroverse.common.exception.BusinessException;
+import com.zeroverse.common.exception.ErrorCode;
+import com.zeroverse.security.NotificationViewerResolver;
 import com.zeroverse.security.ZeroverseUserPrincipal;
 import com.zeroverse.support.MySqlTestSupport;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.ActiveProfiles;
@@ -53,6 +67,8 @@ class NotificationMutationMySqlTest extends MySqlTestSupport {
     @Autowired private UniverseRepository universeRepository;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private JdbcTemplate jdbcTemplate;
+    @Autowired private NotificationService notificationService;
+    @SpyBean private NotificationViewerResolver viewerResolver;
 
     @Test
     @DisplayName("개별 read는 canonical item을 반환하고 최초 readAt을 보존한다")
@@ -162,6 +178,14 @@ class NotificationMutationMySqlTest extends MySqlTestSupport {
     }
 
     @Test
+    @DisplayName("resolver read 뒤 SUSPENDED commit이 receiver lock에 반영되어 read/read-all/delete를 거부한다")
+    void suspendedCommitBetweenResolverAndReceiverLockIsRejected() throws Exception {
+        assertSuspendedAfterResolverRead("read");
+        assertSuspendedAfterResolverRead("read-all");
+        assertSuspendedAfterResolverRead("delete");
+    }
+
+    @Test
     @DisplayName("잘못된 read query는 no-store VALIDATION_001이다")
     void invalidQueryIsNoStoreValidationError() throws Exception {
         User receiver = user("mutation-invalid-query-receiver");
@@ -201,5 +225,53 @@ class NotificationMutationMySqlTest extends MySqlTestSupport {
     private static UsernamePasswordAuthenticationToken auth(User user) {
         ZeroverseUserPrincipal principal = new ZeroverseUserPrincipal(user.getId(), UserRole.USER);
         return new UsernamePasswordAuthenticationToken(principal, null, principal.authorities());
+    }
+
+    private void assertSuspendedAfterResolverRead(String operation) throws Exception {
+        String key = "mutation-race-" + operation.replace('-', '_');
+        User receiver = user(key + "-receiver");
+        User actor = user(key + "-actor");
+        PostDetail post = post(user(key + "-owner"), key + "-post", Visibility.PUBLIC);
+        long notificationId = insert(receiver, actor, "LIKE", "POST", post.id(), key);
+        CountDownLatch resolverRead = new CountDownLatch(1);
+        CountDownLatch releaseLock = new CountDownLatch(1);
+        doAnswer(invocation -> {
+            Object result = invocation.callRealMethod();
+            resolverRead.countDown();
+            if (!releaseLock.await(10, TimeUnit.SECONDS)) {
+                throw new AssertionError("receiver lock barrier timed out for " + operation);
+            }
+            return result;
+        }).when(viewerResolver).resolve(any(), any());
+
+        ExecutorService pool = Executors.newSingleThreadExecutor();
+        try {
+            Future<?> future = pool.submit(() -> {
+                ZeroverseUserPrincipal principal = ZeroverseUserPrincipal.from(receiver);
+                switch (operation) {
+                    case "read" -> notificationService.read(null, principal, notificationId);
+                    case "read-all" -> notificationService.readAll(null, principal);
+                    case "delete" -> notificationService.delete(null, principal, notificationId);
+                    default -> throw new IllegalArgumentException(operation);
+                }
+            });
+            assertThat(resolverRead.await(10, TimeUnit.SECONDS)).isTrue();
+            jdbcTemplate.update("UPDATE users SET status = 'SUSPENDED' WHERE id = ?", receiver.getId());
+            releaseLock.countDown();
+
+            ExecutionException failure = null;
+            try {
+                future.get(30, TimeUnit.SECONDS);
+            } catch (ExecutionException expected) {
+                failure = expected;
+            }
+            assertThat(failure).as("operation=%s", operation).isNotNull();
+            assertThat(failure.getCause()).isInstanceOf(BusinessException.class);
+            assertThat(((BusinessException) failure.getCause()).getErrorCode()).isEqualTo(ErrorCode.USER_003);
+        } finally {
+            releaseLock.countDown();
+            pool.shutdownNow();
+            reset(viewerResolver);
+        }
     }
 }

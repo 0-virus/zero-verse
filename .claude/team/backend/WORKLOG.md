@@ -421,3 +421,10 @@
 - migration review 보강: 기존 V6 적용 DB insert 후 읽기만 하던 테스트를 제거하고, 별도 MySQL 8.4 source/backup을 Flyway target 5로 초기화해 V5 fixture를 복사한 뒤 양쪽에 V6를 재이관하도록 바꿨다. notification 전체 row(동일 ID, receiver/actor/type/target/message/read_at/created_at/updated_at/deleted_at) 전후·source/backup 일치를 확인한다. FORCE INDEX EXPLAIN도 제거하고 원래 목록/미읽음 SQL의 natural key와 possible_keys를 확인한다.
 - 검증: 최종 `... GradleWrapperMain --no-daemon --max-workers=1 test --tests 'com.zeroverse.domain.notification.*'`는 `build/m8-evidence/task2-final-targeted-migration-v6.log`에 `BUILD SUCCESSFUL in 27s`로 보존했다. XML 7개 직접 집계 `24 tests / failures 0 / errors 0 / skipped 0`; migration 단일 targeted도 `3/0/0/0`이다. query-bound는 3/3/2 SQL, Flyway/Security/OpenAPI 회귀와 bootJar도 SUCCESS다.
 - 인계: 상세 계약·정확 method signature·로그 경로는 `.superpowers/sdd/M8-notifications/task-2-report.md`에 기록했다. 이 역할은 source freeze, commit/merge 미수행이며 root 독립 review·최종 full/HTTP/QA·통합을 대기한다.
+
+## 2026-11-10 14:36 KST — M8 Task2 independent review-1 fix round 1
+
+- 한 일: review Important 3건을 backend 소유 범위에서 수정했다. viewer resolver는 managed `User` 선행 로드를 제거하고 scalar status projection으로 바꿨다. query-bound는 notification projection이 실제 캡처됐는지 확인한 뒤 모든 해당 SQL의 LONGTEXT 금지를 검사한다. QueryMySql은 RR count→동시 delete commit→items barrier 및 동일 created_at 21개 page 경계를 추가했다.
+- RED 원인: 첫 16건 fix 실행은 RR 테스트 barrier 직전 Spring Data interface spy의 `callRealMethod()`가 추상 메서드라 실패했다(`task2-fix1-green-targeted.log`, exit 1). 단일 진단(`task2-fix1-diagnose.log`, exit 1)으로 Mockito wiring 원인을 확인했다.
+- GREEN: 동일 transaction `JdbcTemplate` count stub으로 최소 수정 후 RR 단일 테스트 `task2-fix1-green-rr-2.log`, exit 0, `BUILD SUCCESSFUL in 13s`. mutation/query-bound/query 최종 16건 `task2-fix1-green-targeted-2.log`, exit 0, `BUILD SUCCESSFUL in 15s`; XML `7+2+7=16`, failures/errors/skips `0/0/0`.
+- 인계: report round1 append, STATE 갱신 및 source 재독을 완료했다. Task3 생성 연계와 migration/full/HTTP/QA/Task5 후속은 건드리지 않았고 root 독립 review로 freeze 인계한다.

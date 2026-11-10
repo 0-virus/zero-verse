@@ -53,8 +53,8 @@ public class NotificationViewerResolver {
         if (principal == null || principal.userId() == null) {
             throw new BusinessException(ErrorCode.AUTH_004);
         }
-        return userRepository.findByIdAndDeletedAtIsNull(principal.userId())
-                .map(user -> new Viewer(user.getId(), user.getStatus()))
+        return userRepository.findStatusTargetById(principal.userId())
+                .map(target -> new Viewer(target.getUserId(), UserStatus.valueOf(target.getStatus())))
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_001));
     }
 

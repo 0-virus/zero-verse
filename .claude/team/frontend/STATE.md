@@ -2,13 +2,15 @@
 
 > 덮어쓰기 스냅샷. 시간순 이력은 `WORKLOG.md`, 마일스톤 이력은 `docs/worklog/**`를 본다.
 
-마지막 갱신: 2026-11-10 14:19:00 KST
+마지막 갱신: 2026-11-10 16:10:00 KST
 
 ## 현재 단계
 
 - M8 Task4 frontend 구현을 완료하고 자동 검증을 통과했다. 사용자 승인 A-v2의 §9 계약에 맞춰 notifications API/types/provider, 센터, TopBar dropdown/badge, Main Feed RightPanel preview를 연결했다.
 - preview(page 0,size 3)와 center(page,size 20) cache를 분리하고, unreadCount/canManage를 공유한다. viewer account·mutation·request 세대와 account-scoped mutation dedupe/stale completion guard를 적용했다.
 - ACTIVE는 read/read-all/delete 후 canonical 재조회, SUSPENDED는 관리 mutation을 막고 서버가 반환한 안전한 href 열람만 허용한다. unavailable은 고정 문구와 민감 필드 masking을 유지한다.
+- fix1 review 반영: main preview consumer 재진입 effect와 in-flight 완료 시점 정리, USER_001/AUTH 최종 실패의 양쪽 cache·summary·진행 요청 무효화, 센터/TopBar/RightPanel mutation retry 및 canonical 이동, transient center error 중 기존 행·paging 보존을 추가했다.
+- mutation retry callback은 state-updater 오호출 없이 동일 read/delete/read-all 작업을 재호출하며, auth 최종 실패에는 retry를 숨긴다. TopBar도 `useNotificationPreview` entry effect를 사용해 provider 유지 상태에서 재진입 preview를 갱신한다.
 
 ## 구현 범위
 
@@ -21,12 +23,14 @@
 
 ## TDD·검증
 
-- API/store/UI 초기 RED 후 GREEN: notification targeted 5 files/16 tests, post-fix shell/page targeted 2 files/8 tests.
+- API/store/UI 초기 RED 후 GREEN: notification targeted 5 files/16 tests, post-fix shell/page targeted 2 files/8 tests. fix1 focused는 5 files/25 tests passed.
 - mutation account-generation RED: guard 전 A→B read/read-all race 1 file/2 tests 실패. account-scoped key, 시작 account 세대 캡처, stale completion rejection 및 superseded UI 무시 후 1 file/2 tests 통과.
+- fix1 필수 회귀: 동일계정 pre-read 지연 응답, read-all 후 신규 unread, 다른 center query 역순 summary, USER_001 조회·mutation cache clear, preview re-entry, transient center 보존, TopBar/RightPanel/center retry가 모두 GREEN이다.
 - 전체 frontend: `npm test -- --run --maxWorkers=1` → 47 files/423 tests passed, failures 0, errors 0, skipped 0, exit 0.
 - lint: `npm run lint` → oxlint exit 0.
 - build: `npm run build` → `tsc -b` + Vite exit 0, 145 modules. 기존 500 kB 초과 chunk warning만 남고 build 오류는 없다.
 - 정적: `git diff --check -- frontend .claude/team/frontend` exit 0. notification 구현에서 debug log, polling, 폐기 다크 토큰, radius 선언을 찾지 못했다. `지난 30일`은 부재를 검증하는 테스트 assertion에만 남아 있다.
+- fix1 raw 원문: `frontend/.m8-evidence/raw/frontend-fix1-focused-green.log`(5 files/25 tests), `frontend/.m8-evidence/raw/frontend-fix1-lint.log`(oxlint), `frontend/.m8-evidence/raw/frontend-fix1-build.log`(tsc+Vite; 기존 >500 kB warning만).
 
 ## 증거·변경 경계
 

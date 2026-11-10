@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { NotificationProvider, useNotificationPreview } from './NotificationProvider';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { NotificationProvider, useNotificationCenter, useNotificationPreview } from './NotificationProvider';
 import { listNotifications } from './notificationApi';
 import { useOptionalAuth } from '../../lib/authContext';
+import { ApiRequestError } from '../../lib/apiClient';
 
 vi.mock('../../lib/authContext', () => ({ useOptionalAuth: vi.fn() }));
 vi.mock('./notificationApi', () => ({
@@ -67,6 +69,20 @@ function Probe() {
   return <output data-testid="message">{context?.preview.page?.items[0]?.message ?? ''}</output>;
 }
 
+function AuthFailureProbe() {
+  const preview = useNotificationPreview();
+  const center = useNotificationCenter(0, 20);
+  return (
+    <>
+      <output data-testid="preview-message">{preview?.preview.page?.items[0]?.message ?? ''}</output>
+      <output data-testid="center-message">{center?.center.page?.items[0]?.message ?? ''}</output>
+      <output data-testid="unread">{preview?.unreadCount ?? 'none'}</output>
+      <output data-testid="can-manage">{String(preview?.canManage ?? 'none')}</output>
+      <button type="button" onClick={() => void preview?.refreshPreview()}>refresh-preview</button>
+    </>
+  );
+}
+
 describe('notification account generation', () => {
   beforeEach(() => vi.mocked(useOptionalAuth).mockReturnValue(baseAuth));
   afterEach(() => vi.clearAllMocks());
@@ -98,5 +114,29 @@ describe('notification account generation', () => {
     oldRequest.resolve(page(7));
     await Promise.resolve();
     expect(screen.getByTestId('message')).toHaveTextContent('계정 8');
+  });
+
+  it('USER_001 조회 실패는 preview·center·unread·canManage를 함께 비우고 진행 요청을 폐기한다', async () => {
+    const user = userEvent.setup();
+    vi.mocked(listNotifications).mockResolvedValue(page(7));
+    render(
+      <NotificationProvider>
+        <AuthFailureProbe />
+      </NotificationProvider>,
+    );
+    expect(await screen.findByTestId('preview-message')).toHaveTextContent('계정 7');
+    await waitFor(() => expect(screen.getByTestId('center-message')).toHaveTextContent('계정 7'));
+
+    vi.mocked(listNotifications).mockRejectedValueOnce(
+      new ApiRequestError(404, { code: 'USER_001', message: '사용자를 찾을 수 없습니다.', details: [] }),
+    );
+    await user.click(screen.getByRole('button', { name: 'refresh-preview' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('preview-message')).toBeEmptyDOMElement();
+      expect(screen.getByTestId('center-message')).toBeEmptyDOMElement();
+      expect(screen.getByTestId('unread')).toHaveTextContent('none');
+      expect(screen.getByTestId('can-manage')).toHaveTextContent('none');
+    });
   });
 });

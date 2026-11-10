@@ -107,6 +107,30 @@ describe('notification shell UI', () => {
     expect(screen.getByTestId('shell-location')).toHaveTextContent('/blog/current/42');
   });
 
+  it('TopBar read 실패는 dropdown에서 같은 mutation을 다시 시도한다', async () => {
+    const user = userEvent.setup();
+    vi.mocked(markNotificationRead)
+      .mockRejectedValueOnce(new Error('읽음 실패'))
+      .mockResolvedValueOnce({ ...item, href: '/blog/retried/42', readAt: '2026-11-10T01:00:00Z' });
+    render(
+      <MemoryRouter>
+        <NotificationProvider>
+          <TopBar nickname="세븐별" />
+          <LocationProbe />
+        </NotificationProvider>
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole('link', { name: '알림' }));
+    await user.click(await screen.findByRole('button', { name: item.message }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('읽음 실패');
+    await user.click(screen.getByRole('button', { name: '다시 시도' }));
+
+    await screen.findByText('알림');
+    expect(screen.getByTestId('shell-location')).toHaveTextContent('/blog/retried/42');
+    expect(markNotificationRead).toHaveBeenCalledTimes(2);
+  });
+
   it('RightPanel은 공유 unread와 preview 최신 3건·센터 링크를 표시한다', async () => {
     render(
       <MemoryRouter>
@@ -119,6 +143,28 @@ describe('notification shell UI', () => {
     expect(await screen.findByText(item.message)).toBeInTheDocument();
     expect(screen.getByText('읽지 않음 1')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '알림 센터 열기 →' })).toHaveAttribute('href', '/notifications');
+  });
+
+  it('RightPanel read 실패는 같은 mutation을 다시 시도한다', async () => {
+    const user = userEvent.setup();
+    vi.mocked(markNotificationRead)
+      .mockRejectedValueOnce(new Error('읽음 실패'))
+      .mockResolvedValueOnce({ ...item, href: '/blog/retried/42', readAt: '2026-11-10T01:00:00Z' });
+    render(
+      <MemoryRouter>
+        <NotificationProvider>
+          <RightPanel />
+          <LocationProbe />
+        </NotificationProvider>
+      </MemoryRouter>,
+    );
+
+    await user.click(await screen.findByRole('button', { name: item.message }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('읽음 실패');
+    await user.click(screen.getByRole('button', { name: '다시 시도' }));
+
+    expect(screen.getByTestId('shell-location')).toHaveTextContent('/blog/retried/42');
+    expect(markNotificationRead).toHaveBeenCalledTimes(2);
   });
 });
 

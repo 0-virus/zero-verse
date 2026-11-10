@@ -498,3 +498,12 @@
 - 검증: targeted 알림 5 files/16 tests, 추가 shell/page 2 files/8 tests, 전체 `npm test -- --run --maxWorkers=1` 47 files/423 tests passed(실패·오류·skip 0), `npm run lint` exit 0, `npm run build` exit 0(Vite 145 modules; 기존 >500 kB chunk warning만), `git diff --check -- frontend .claude/team/frontend` exit 0.
 - 증거: `frontend/.m8-evidence/task4-targeted.txt`, `task4-full.txt`, `task4-lint-build.txt`, `task4-static.txt`에 명령·결과 요약을 남겼다. 실제 Chrome 1440px runtime·backend HTTP/DTO/ACL은 root/QA 게이트이며 이 역할은 실행하지 않았다.
 - 인계: root가 `.superpowers/sdd/M8-notifications/task-4-report.md`를 보고용으로 작성하고, 독립 API/Chrome 검증 후 발견된 frontend 소유 결함만 재배정한다. 이 역할은 Git commit을 수행하지 않는다.
+
+## 2026-11-10 16:10:00 KST — M8 Task4 fix1 review-1 반영
+
+- 담당/경계: 부모가 지정한 독립 review-1의 Important 4건과 verification gap만 `frontend/**`, frontend 역할 STATE/WORKLOG 및 명시 배정된 `.superpowers/sdd/M8-notifications/task-4-report.md`에 반영했다. backend/root docs/QA/Git/의존성/runtime은 건드리지 않았다.
+- RED→GREEN: 재진입 preview, USER_001 조회·mutation clear, center/TopBar/RightPanel 동일 mutation retry, transient center 행·paging 보존 테스트를 RED로 확인한 뒤 구현했다. 추가 회귀로 동일계정 pre-read 지연 GET, read-all 후 신규 unread, 다른 center query 역순 summary를 고정했다.
+- 구현: `useNotificationPreview` entry effect를 TopBar/RightPanel 공유 상태에 적용하고 완료된 in-flight를 state commit 전에 해제해 재진입 refresh를 보장했다. USER_001/AUTH_002/AUTH_004 최종 실패는 preview·center·unread·canManage·진행 요청을 함께 폐기하고 retry를 숨긴다. mutation 실패 retry는 state updater로 즉시 실행되지 않도록 동일 read/delete/read-all closure를 보존한다. transient center GET은 기존 page/items/pagination을 오류와 함께 유지한다.
+- 검증 명령/실측: `cd frontend && npm test -- --run src/features/notifications/notificationStore.test.tsx src/features/notifications/notificationAuthRace.test.tsx src/features/notifications/notificationMutationRace.test.tsx src/test/notificationsBehavior.test.tsx src/test/notificationShellBehavior.test.tsx --maxWorkers=1` → exit 0, 5 files/25 tests passed; `npm run lint` → exit 0; `npm run build` → exit 0 (`tsc -b`, Vite 145 modules, 기존 >500 kB chunk warning만). 기존 root full 47 files/423 tests raw는 재실행하지 않았다.
+- raw 원문: `frontend/.m8-evidence/raw/frontend-fix1-focused-green.log`, `frontend/.m8-evidence/raw/frontend-fix1-lint.log`, `frontend/.m8-evidence/raw/frontend-fix1-build.log`. 자체 요약으로 raw 출력을 대체하지 않았다.
+- 남은 게이트: 실제 backend DTO/HTTP/ACL/no-store, Chrome 1440px 시각·동작 검증은 root/QA가 수행한다. Minor ledger(TopBar/RightPanel SUSPENDED 안내 카피, >500 kB 경고)는 review-1 범위에서 보존했다.

@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { NotificationsPage } from '../pages/NotificationsPage';
-import { NotificationProvider } from '../features/notifications/NotificationProvider';
+import { NotificationProvider, useNotificationCenter } from '../features/notifications/NotificationProvider';
 import { listNotifications, markAllNotificationsRead, markNotificationRead, deleteNotification } from '../features/notifications/notificationApi';
 import { useOptionalAuth } from '../lib/authContext';
 
@@ -79,6 +79,15 @@ function LocationProbe() {
   return <output data-testid="location">{location.pathname}</output>;
 }
 
+function CenterRefreshProbe() {
+  const context = useNotificationCenter(0, 20);
+  return (
+    <button type="button" onClick={() => void context?.refreshCenter(0, 20)}>
+      refresh-center
+    </button>
+  );
+}
+
 function renderPage(canManage = true) {
   vi.mocked(listNotifications).mockResolvedValue(page(canManage));
   return render(
@@ -117,6 +126,50 @@ describe('NotificationsPage', () => {
     await user.click(screen.getAllByRole('button', { name: '알림 삭제' })[0]);
     expect(await screen.findByRole('alert')).toHaveTextContent('삭제');
     expect(screen.getByText(available.message)).toBeInTheDocument();
+  });
+
+  it('읽음 실패의 다시 시도는 같은 read mutation을 재호출하고 canonical href로 이동한다', async () => {
+    const user = userEvent.setup();
+    vi.mocked(markNotificationRead)
+      .mockRejectedValueOnce(new Error('읽음 실패'))
+      .mockResolvedValueOnce({ ...available, href: '/blog/retried/42', readAt: '2026-11-10T01:00:00Z' });
+    renderPage();
+
+    await user.click(await screen.findByText(available.message));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('읽음 실패');
+    await user.click(screen.getByRole('button', { name: '다시 시도' }));
+
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/blog/retried/42'));
+    expect(markNotificationRead).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('동일 center query의 transient GET 실패는 기존 행과 pagination을 보존한다', async () => {
+    const user = userEvent.setup();
+    const centerPage = { ...page(), totalElements: 41, totalPages: 3, hasNext: true };
+    let centerRequests = 0;
+    vi.mocked(listNotifications).mockImplementation(async ({ size } = {}) => {
+      if (size === 3) return { ...centerPage, size: 3 };
+      centerRequests += 1;
+      if (centerRequests === 1) return centerPage;
+      throw new Error('일시 오류');
+    });
+    render(
+      <MemoryRouter initialEntries={['/notifications']}>
+        <NotificationProvider>
+          <NotificationsPage />
+          <CenterRefreshProbe />
+        </NotificationProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText(available.message)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'refresh-center' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('일시 오류');
+    expect(screen.getByText(available.message)).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: '페이지' })).toBeInTheDocument();
   });
 
   it('SUSPENDED canManage=false는 읽기 전용으로 관리 mutation을 호출하지 않는다', async () => {

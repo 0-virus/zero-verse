@@ -2,10 +2,25 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { normalizeSearchKeyword } from '../../features/search/searchApi';
 import {
+  isNotificationAuthFailure,
   isNotificationMutationSuperseded,
-  useOptionalNotifications,
+  useNotificationPreview,
 } from '../../features/notifications/NotificationProvider';
 import type { NotificationItem } from '../../features/notifications/types';
+import { ApiRequestError } from '../../lib/apiClient';
+
+type NotificationRetry = () => Promise<void>;
+
+function notificationErrorMessage(error: unknown): string {
+  if (error instanceof ApiRequestError) {
+    if (error.code === 'USER_003') return '정지된 계정은 알림을 읽기 전용으로 확인할 수 있습니다.';
+    if (error.code === 'USER_001' || error.code === 'AUTH_002' || error.code === 'AUTH_004') {
+      return '로그인이 만료되었습니다. 다시 접속해 주세요.';
+    }
+    return error.message || '알림 요청을 처리하지 못했습니다.';
+  }
+  return error instanceof Error && error.message ? error.message : '알림을 읽지 못했습니다.';
+}
 
 /**
  * 전 화면 공통 상단바.
@@ -32,8 +47,9 @@ export function TopBar({ nickname }: { nickname?: string | null }) {
   const [error, setError] = useState<string | null>(null);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notificationError, setNotificationError] = useState<string | null>(null);
+  const [notificationRetry, setNotificationRetry] = useState<NotificationRetry | null>(null);
   const [notificationBusyId, setNotificationBusyId] = useState<number | null>(null);
-  const notifications = useOptionalNotifications();
+  const notifications = useNotificationPreview();
 
   useEffect(() => {
     setKeyword(searchParams.get('keyword') ?? '');
@@ -71,6 +87,7 @@ export function TopBar({ nickname }: { nickname?: string | null }) {
     const nextOpen = !notificationOpen;
     setNotificationOpen(nextOpen);
     setNotificationError(null);
+    setNotificationRetry(null);
     if (nextOpen) void notifications?.refreshPreview();
   };
 
@@ -83,16 +100,24 @@ export function TopBar({ nickname }: { nickname?: string | null }) {
     }
     if (!notifications || notifications.canManage !== true) {
       setNotificationError('정지된 계정은 알림을 읽기 전용으로 확인할 수 있습니다.');
+      setNotificationRetry(null);
       return;
     }
     setNotificationBusyId(item.id);
+    setNotificationError(null);
+    setNotificationRetry(null);
     try {
       const current = await notifications.markRead(item.id);
+      setNotificationError(null);
+      setNotificationRetry(null);
       setNotificationOpen(false);
       if (current.available && current.href) navigate(current.href);
     } catch (caught) {
       if (!isNotificationMutationSuperseded(caught)) {
-        setNotificationError(caught instanceof Error ? caught.message : '알림을 읽지 못했습니다.');
+        setNotificationError(notificationErrorMessage(caught));
+        setNotificationRetry(
+          isNotificationAuthFailure(caught) ? null : () => () => openNotification(item),
+        );
       }
     } finally {
       setNotificationBusyId(null);
@@ -101,7 +126,9 @@ export function TopBar({ nickname }: { nickname?: string | null }) {
 
   const preview = notifications?.preview.page;
   const unreadCount = notifications?.unreadCount;
-  const canRenderPreview = Boolean(notifications?.isAuthenticated && !notifications.isAuthLoading);
+  const canRenderPreview = Boolean(
+    notifications?.isAuthenticated && !notifications.isAuthLoading && !notifications.isAuthFailure,
+  );
 
   return (
     <header
@@ -209,11 +236,30 @@ export function TopBar({ nickname }: { nickname?: string | null }) {
             </Link>
           </div>
           {notificationError && (
-            <p role="alert" className="border-b border-line bg-danger-bg px-3.5 py-2 text-xs text-danger">
+            <div role="alert" className="border-b border-line bg-danger-bg px-3.5 py-2 text-xs text-danger">
               {notificationError}
+              {notificationRetry && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const retry = notificationRetry;
+                    setNotificationError(null);
+                    setNotificationRetry(null);
+                    void retry();
+                  }}
+                  className="ml-2 border-2 border-danger bg-surface px-2 py-1 font-bold"
+                >
+                  다시 시도
+                </button>
+              )}
+            </div>
+          )}
+          {notifications?.isAuthFailure && (
+            <p className="px-3.5 py-6 text-center text-xs text-danger">
+              로그인이 만료되었습니다. 다시 접속해 주세요.
             </p>
           )}
-          {!canRenderPreview && (
+          {!canRenderPreview && !notifications?.isAuthFailure && (
             <p className="px-3.5 py-6 text-center text-xs text-text-muted">
               로그인하면 알림을 확인할 수 있습니다.
             </p>

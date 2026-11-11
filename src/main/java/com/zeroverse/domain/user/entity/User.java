@@ -138,6 +138,22 @@ public class User extends BaseSoftDeleteEntity {
         return status == UserStatus.ACTIVE && !isDeleted();
     }
 
+    /** 관리자 역할 변경. 동일 값에 대한 audit 갱신은 service가 호출하지 않아 보존한다. */
+    public void changeRole(UserRole role) {
+        if (role == null) {
+            throw new IllegalArgumentException("role must not be null");
+        }
+        this.role = role;
+    }
+
+    /** 관리자 상태 변경. 동일 값에 대한 audit 갱신은 service가 호출하지 않아 보존한다. */
+    public void changeStatus(UserStatus status) {
+        if (status == null) {
+            throw new IllegalArgumentException("status must not be null");
+        }
+        this.status = status;
+    }
+
     /**
      * 사용자 프로필을 업데이트한다(FR-SETTINGS-01).
      *

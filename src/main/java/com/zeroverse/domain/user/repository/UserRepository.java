@@ -15,6 +15,16 @@ import org.springframework.data.repository.query.Param;
  */
 public interface UserRepository extends JpaRepository<User, Long> {
 
+    interface AccessTarget {
+        Long getUserId();
+
+        String getRole();
+
+        String getStatus();
+
+        java.time.LocalDateTime getDeletedAt();
+    }
+
     interface Target {
         Long getUserId();
 
@@ -41,9 +51,19 @@ public interface UserRepository extends JpaRepository<User, Long> {
             + "where id = :id and deleted_at is null", nativeQuery = true)
     Optional<StatusTarget> findStatusTargetById(@Param("id") Long id);
 
+    /** Admin API current-privilege check. Sensitive columns are intentionally not selected. */
+    @Query(value = "select id as userId, role as role, status as status, deleted_at as deletedAt "
+            + "from users where id = :id", nativeQuery = true)
+    Optional<AccessTarget> findAccessTargetById(@Param("id") Long id);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from User u where u.id = :id and u.deletedAt is null")
     Optional<User> findByIdAndDeletedAtIsNullForUpdate(@Param("id") Long id);
+
+    /** Admin mutation lock. Deleted rows remain lockable so repeated DELETE is USER_001. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from User u where u.id = :id")
+    Optional<User> findByIdForUpdateIncludingDeleted(@Param("id") Long id);
 
     boolean existsByEmailAndDeletedAtIsNull(String email);
 

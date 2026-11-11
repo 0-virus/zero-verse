@@ -70,8 +70,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private static UsernamePasswordAuthenticationToken toAuthentication(Claims claims) {
-        Long userId = Long.valueOf(claims.getSubject());
-        UserRole role = UserRole.valueOf(claims.get(JwtProvider.CLAIM_ROLE, String.class));
+        String subject = claims.getSubject();
+        String rawRole = claims.get(JwtProvider.CLAIM_ROLE, String.class);
+        if (subject == null || subject.isBlank() || rawRole == null || rawRole.isBlank()) {
+            throw new IllegalArgumentException("ACCESS claim is incomplete");
+        }
+        Long userId = Long.valueOf(subject);
+        if (userId < 1) {
+            throw new IllegalArgumentException("ACCESS subject must be a positive user ID");
+        }
+        UserRole role = UserRole.valueOf(rawRole);
         ZeroverseUserPrincipal principal = new ZeroverseUserPrincipal(userId, role);
         return new UsernamePasswordAuthenticationToken(principal, null, principal.authorities());
     }

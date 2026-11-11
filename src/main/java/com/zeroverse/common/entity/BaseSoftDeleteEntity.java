@@ -28,6 +28,18 @@ public abstract class BaseSoftDeleteEntity extends BaseEntity {
         this.deletedAt = LocalDateTime.now();
     }
 
+    /**
+     * A caller that owns an explicit clock can persist a deterministic soft-delete instant.
+     * This keeps audit timestamps aligned with the service's clock without changing the legacy
+     * no-argument behavior used by existing domains.
+     */
+    public void softDeleteAt(LocalDateTime deletedAt) {
+        if (deletedAt == null) {
+            throw new IllegalArgumentException("deletedAt must not be null");
+        }
+        this.deletedAt = deletedAt;
+    }
+
     public void restore() {
         this.deletedAt = null;
     }

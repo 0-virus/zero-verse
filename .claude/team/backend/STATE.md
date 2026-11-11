@@ -2,26 +2,28 @@
 
 ## 현재 단계
 
-- 2026-11-10 사용자 A-v2 전체 승인 M8 backend 구현·독립 review·QA·실제 인수를 완료했다. `qa/M8-review.md` §10은 최종 독립 audit에서 **Ready to merge: Yes**, 5개 1440px PNG 시각 승인, 실제 인수 323 PASS를 기록했다.
-- M8 PR #14가 `dev`에 merge되었다. merge SHA `b9fcb0469f42077447ce8a8842ce22f24bc94af5`, local `dev` fast-forward tested head `201cd181ec8332e85f2cc985c9560d947b2833f4`, merge tree `9da6077a89a4528df3cb55c13556ed28300cfd28`가 확인되었고 tested head와 merge tree가 동일하다.
-- root 전체 backend 검증 `backend-final-2`: 102 suites / 599 tests / failures 0 / errors 0 / skipped 0, `bootJar` PASS. DELETE OpenAPI 400 보완 뒤 `backend-final-doc`: 1 suite / 5 tests / failures 0 / errors 0 / skipped 0, `bootJar` PASS. 실제 M8 HTTP/Chrome 인수 `build/m8-acceptance-20261110-173900/evidence.json`: 323 PASS / 0 FAIL / 0 NOT_RUN, source `108e7120a07ab43ebfc550e34a2f13ca7f613d4d0388dd44781bf43cc95add47`와 JAR `1cab24e82cb1cf524b0184145ffa49a802db924d4a00b08afc862299014fd1c5`가 396 files manifest와 일치한다.
+- 2026-11-11 M9 A-v2 사용자 승인 backend Task2 구현·자체 targeted 검증을 완료하고 source/test를 동결했다. 선행 backend 산출물을 `/root/m9_backend_recovery`가 이어받았고 실제 MySQL 경쟁·query-bound/RR 두 테스트는 `/root/m9_backend_tests`가 작성했다. 독립 최종 QA 승인은 아직 아니다.
+- M9 관리자 5 API, current DB ACTIVE ADMIN 권한, sorted deleted-inclusive User lock와 lock후 refresh, user-only soft delete/하위행 보존, scalar RR 통계·KST주/UTC변환, strict validation·malformedACCESS/no-store를 구현했다. 신규 의존성·migration·운영 bootstrap·접속추적은 없다.
+- 선행 M8은 PR #14로 dev 통합 완료 상태이며 기존 WORKLOG와 M8 worklog/QA가 역사 정본이다. 이번 STATE의 오래된 M9 승인 대기 문구를 현재 실행 상태로 갱신했다.
 
 ## 진행 중
 
-- 진행 중인 backend 작업은 없다. M8 변경은 `dev`에 통합되었고, 역할 기록과 보존 증거만 유지한다.
-- V6/기존 row 보존·생성 원자성·정렬 잠금·후보 재검증·총 3회 retry 계약과 1001명 fan-out 경쟁 증거는 `backend-final-2` 및 기존 Task3 기록에 연결되어 있다.
+- 자체 최종 `recovery-admin-final-1`: 5 suites/33 tests/failures0/errors0/skipped0, bootJar PASS(22s). 별도 `recovery-security-bootjar-1`: 4 suites/62 tests/0fail0error0skip, bootJar PASS(31s). 두 run의 distinct test 합계95이며 반복 run을 합산하지 않았다.
+- 인증 포함 SELECT 실측 list size1=4/size100=4/증가0/detail=2, source LONGTEXT 미적재. 실제 users wait7·refresh_tokens wait2, 상호role/status/delete·delete↔like·refresh 선점 양방향·목록/상세 RR writer barrier가 모두 GREEN이다.
+- 증거는 `build/m9-evidence/task2/` raw log/exit/XML, 정확 명령·상태×endpoint·잠금 공유·한계는 `.superpowers/sdd/M9-admin/task-2-report.md`와 helper 보고서에 있다. source manifest는 `recovery-source-manifest.json`이다.
 
 ## 다음 작업
 
-- 사용자 지시를 기다린다. M9, S3, 사용자 DB 적용은 이번 M8 범위에 포함하지 않는다.
-- 이전 M4~M7 역사와 M8 세부 구현 경과는 기존 backend WORKLOG 및 각 마일스톤 worklog가 정본이다.
+- root 단일 full backend 검증, 독립 backend task 리뷰·QA·실제 격리 API/Chrome 인수, source/JAR manifest 확인 및 승인된 dev 통합을 진행한다. 구현자가 자체 최종 승인을 하지 않는다.
+- root의 구체 finding이 있을 때 소유 source/test만 수정하고 새 targeted 증거를 남긴다. 현재 Gradle runner 실행권은 root에 반환한다.
 
 ## 차단 요인
 
-- M8 backend 기능·테스트·실제 인수·독립 시각 review·`dev` 통합의 미해결 차단은 없다.
-- 운영 fanout SLA·peak memory와 물리 JDBC batch 보장은 이번 승인 증거 범위 밖이다. 1001명 fan-out 수치의 heap 차이는 GC 포함 값이며 peak/RSS로 해석하지 않고, logical batch는 JDBC batch 보장으로 주장하지 않는다.
-- 사용자 root 미추적4파일/.env.local/.local-data/DB13307/runtime13318은 보존했다. Git·PR·의존성·migration·공개 DTO 변경을 수행하지 않았다.
+- backend Task2 자체 targeted의 미해결 실패는 없다. root full/독립 QA/실제 인수/dev통합은 아직 수행 대기이며 이 자체 결과로 완료 처리하지 않는다.
+- 최초 복구 run은 sandbox Gradle 로컬 socket bind 제한으로 테스트 미실행됐고, 승인된 escalation으로 격리 Testcontainers run을 수행했다. 자동 승인 거부는 없었다.
+- User lock 비공유 설정/최초 multipart upload의 진행중 요청 즉시취소·전역 세션폐기·운영 bootstrap/SLA는 범위 밖이다. 기존 전역 audit 시간대 정책도 변경하지 않았다.
+- 사용자 DB13307·환경·업로드·기존 데이터·FE/QA/정본/Git은 보존했다. 추가 M10·배포 작업은 없다.
 
 ## 갱신 시각
 
-2026-11-10 17:48 KST · `/root/m8_backend_final_doc`
+2026-11-11 15:09 KST · `/root/m9_backend_recovery` (Task2 source frozen, 독립 검토 인계)

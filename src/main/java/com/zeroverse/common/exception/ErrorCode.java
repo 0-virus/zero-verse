@@ -79,7 +79,8 @@ public enum ErrorCode {
 
     // --- ADMIN ---
     ADMIN_001("ADMIN_001", HttpStatus.FORBIDDEN, "관리자 권한이 필요합니다."),
-    ADMIN_002("ADMIN_002", HttpStatus.BAD_REQUEST, "자기 자신의 권한은 변경할 수 없습니다."),
+    ADMIN_002("ADMIN_002", HttpStatus.BAD_REQUEST,
+            "자기 자신의 관리자 권한 회수, 계정 정지 또는 삭제는 할 수 없습니다."),
 
     // --- UPLOAD ---
     UPLOAD_001("UPLOAD_001", HttpStatus.BAD_REQUEST, "지원하지 않는 파일 형식입니다."),

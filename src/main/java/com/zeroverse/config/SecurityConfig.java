@@ -2,6 +2,7 @@ package com.zeroverse.config;
 
 import com.zeroverse.domain.auth.config.AuthCookieProperties;
 import com.zeroverse.security.SecurityErrorResponder;
+import com.zeroverse.security.AdminCacheControlFilter;
 import com.zeroverse.security.DiscoveryCacheControlFilter;
 import com.zeroverse.security.NotificationCacheControlFilter;
 import com.zeroverse.security.jwt.JwtAuthenticationFilter;
@@ -41,6 +42,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final DiscoveryCacheControlFilter discoveryCacheControlFilter;
     private final NotificationCacheControlFilter notificationCacheControlFilter;
+    private final AdminCacheControlFilter adminCacheControlFilter;
     private final SecurityErrorResponder securityErrorResponder;
 
     public SecurityConfig(
@@ -48,11 +50,13 @@ public class SecurityConfig {
             JwtAuthenticationFilter jwtAuthenticationFilter,
             DiscoveryCacheControlFilter discoveryCacheControlFilter,
             NotificationCacheControlFilter notificationCacheControlFilter,
+            AdminCacheControlFilter adminCacheControlFilter,
             SecurityErrorResponder securityErrorResponder) {
         this.corsProperties = corsProperties;
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.discoveryCacheControlFilter = discoveryCacheControlFilter;
         this.notificationCacheControlFilter = notificationCacheControlFilter;
+        this.adminCacheControlFilter = adminCacheControlFilter;
         this.securityErrorResponder = securityErrorResponder;
     }
 
@@ -108,10 +112,14 @@ public class SecurityConfig {
                                 "/v3/api-docs",
                                 "/v3/api-docs/**").permitAll()
 
-                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                        // AdminService rechecks the current DB role/status. A claim-only
+                        // hasRole gate would reject a user promoted after token issuance and
+                        // would allow a stale ADMIN claim to reach no current-role guard.
+                        .requestMatchers("/api/v1/admin/**").authenticated()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(notificationCacheControlFilter, JwtAuthenticationFilter.class)
+                .addFilterBefore(adminCacheControlFilter, JwtAuthenticationFilter.class)
                 .addFilterBefore(discoveryCacheControlFilter, JwtAuthenticationFilter.class);
 
         return http.build();

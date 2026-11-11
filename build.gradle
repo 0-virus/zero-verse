@@ -56,6 +56,11 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    systemProperty 'user.timezone', 'UTC'
+}
+
+tasks.named('bootRun') {
+    systemProperty 'user.timezone', 'UTC'
 }
 
 tasks.register('verifyPostSearchText', JavaExec) {

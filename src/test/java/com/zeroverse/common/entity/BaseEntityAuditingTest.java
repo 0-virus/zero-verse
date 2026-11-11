@@ -6,6 +6,13 @@ import com.zeroverse.ZeroverseServerApplication;
 import com.zeroverse.support.MySqlTestSupport;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
+import org.junit.jupiter.api.AfterEach;
+import org.springframework.data.auditing.AuditingHandler;
+import org.springframework.data.auditing.DateTimeProvider;
+import com.zeroverse.domain.user.entity.User;
+import com.zeroverse.domain.user.repository.UserRepository;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +37,15 @@ import zeroverse.testsupport.auditing.AuditingProbe;
 class BaseEntityAuditingTest extends MySqlTestSupport {
 
     @Autowired private EntityManager entityManager;
+    @Autowired private AuditingHandler auditingHandler;
+    @Autowired private DateTimeProvider auditDateTimeProvider;
+    @Autowired private UserRepository users;
+    @Autowired private JdbcTemplate jdbc;
+
+    @AfterEach
+    void restoreProductionAuditProvider() {
+        auditingHandler.setDateTimeProvider(auditDateTimeProvider);
+    }
 
     /**
      * 프로브 엔티티를 추가로 등록한다.
@@ -64,7 +80,9 @@ class BaseEntityAuditingTest extends MySqlTestSupport {
     @Test
     @DisplayName("수정 시 updatedAt만 갱신되고 createdAt은 유지된다")
     @Transactional
-    void updatedAtChangesOnUpdateWhileCreatedAtStays() throws InterruptedException {
+    void updatedAtChangesOnUpdateWhileCreatedAtStays() {
+        LocalDateTime firstTime = LocalDateTime.of(2026, 11, 11, 1, 2, 3, 999_999_999);
+        auditingHandler.setDateTimeProvider(new SecondPrecisionAuditTimeProvider(() -> firstTime));
         AuditingProbe probe = new AuditingProbe("수정 전");
         entityManager.persist(probe);
         entityManager.flush();
@@ -72,13 +90,41 @@ class BaseEntityAuditingTest extends MySqlTestSupport {
         LocalDateTime createdAt = probe.getCreatedAt();
         LocalDateTime firstUpdatedAt = probe.getUpdatedAt();
 
-        Thread.sleep(20);
+        auditingHandler.setDateTimeProvider(new SecondPrecisionAuditTimeProvider(() -> firstTime.plusSeconds(1)));
         probe.rename("수정 후");
         entityManager.flush();
 
         assertThat(probe.getCreatedAt()).isEqualTo(createdAt);
         assertThat(probe.getUpdatedAt()).isAfter(firstUpdatedAt);
         assertThat(probe.getName()).isEqualTo("수정 후");
+    }
+
+    @Test
+    @DisplayName(".999999999 audit는 실제 DATETIME(0) 저장 전에 초를 내림해 미래 반올림을 막는다")
+    void fractionalAuditIsFlooredBeforeProductionDatetimeZeroInsertAndUpdate() {
+        LocalDateTime first = LocalDateTime.of(2026, 11, 11, 1, 2, 3, 999_999_999);
+        auditingHandler.setDateTimeProvider(new SecondPrecisionAuditTimeProvider(() -> first));
+        User user = users.saveAndFlush(User.register("precision@zeroverse.test", "hash", "Precision", "precision",
+                LocalDate.of(1990, 1, 1)));
+        LocalDateTime expectedCreation = LocalDateTime.of(2026, 11, 11, 1, 2, 3);
+        assertThat(user.getCreatedAt()).isEqualTo(expectedCreation);
+        assertThat(user.getUpdatedAt()).isEqualTo(expectedCreation);
+        assertThat(dbAudit(user.getId(), "created_at")).isEqualTo(expectedCreation);
+        assertThat(dbAudit(user.getId(), "updated_at")).isEqualTo(expectedCreation);
+
+        LocalDateTime second = LocalDateTime.of(2026, 11, 11, 1, 2, 5, 999_999_999);
+        auditingHandler.setDateTimeProvider(new SecondPrecisionAuditTimeProvider(() -> second));
+        user.changePassword("new-hash");
+        User changed = users.saveAndFlush(user);
+        assertThat(changed.getCreatedAt()).isEqualTo(expectedCreation);
+        assertThat(dbAudit(user.getId(), "created_at")).isEqualTo(expectedCreation);
+        assertThat(changed.getUpdatedAt()).isEqualTo(LocalDateTime.of(2026, 11, 11, 1, 2, 5));
+        assertThat(dbAudit(user.getId(), "updated_at")).isEqualTo(LocalDateTime.of(2026, 11, 11, 1, 2, 5));
+    }
+
+    private LocalDateTime dbAudit(Long userId, String column) {
+        return jdbc.queryForObject("SELECT " + column + " FROM users WHERE id=?",
+                (row, index) -> row.getObject(1, LocalDateTime.class), userId);
     }
 
     @Test

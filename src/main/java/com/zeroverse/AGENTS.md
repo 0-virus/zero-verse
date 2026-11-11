@@ -24,6 +24,12 @@ com/zeroverse/
 
 ## 규칙
 
+- 지원 JVM 시간대는 UTC다. `bootRun`·Gradle test는 UTC를 명시하고 JAR main은 non-UTC를
+  Spring/DB 시작 전에 거부한다. `-Duser.timezone=UTC`로 실행하며 시간대를 자동 변경하지 않는다.
+- 기존 DATETIME의 시간대 provenance는 자동 판별/보정하지 않는다. 기존 사용자 DB의 시간대
+  전환·과거 행 재해석은 별도 조사/결정 전까지 수행하지 않는다.
+- `SecondPrecisionAuditTimeProvider`는 현재 JVM local audit 시각의 소수 초만 버려 기존
+  DATETIME(0)의 미래 반올림을 방지한다. 시간대·기존 행·수동 도메인 시각은 바꾸지 않는다.
 - **공통 응답**: 모든 API는 `ApiResponse`로 감싼다. `success`/`data`/`error`/`timestamp` 네 키는 성공·실패 모두 직렬화한다 — `NON_NULL` 금지(PRD §4.1).
 - **페이징**: offset 페이징은 `PageResponse.from(Page<T>)`(PRD §4.2).
 - **에러 코드**: `ErrorCode` enum에만 정의한다. 도메인 오류는 도메인 prefix, 비도메인은 `VALIDATION_001`(400) / `COMMON_404` / `COMMON_500`(ADR-0002). **여기에 없는 코드를 임의로 만들지 말고 REQUIREMENTS NFR-04를 먼저 개정한다.**

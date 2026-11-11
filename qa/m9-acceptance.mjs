@@ -27,7 +27,7 @@
 import { createRequire } from 'node:module';
 import { createHash, randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 import { isDeepStrictEqual } from 'node:util';
@@ -196,6 +196,7 @@ check('fixture-credentials-unique', uniqueFixtureValues('email') && uniqueFixtur
 
 let apiContext;
 let browser;
+let evidenceWriteQueue = Promise.resolve();
 
 try {
   await mkdir(outputDir, { recursive: true });
@@ -229,9 +230,12 @@ try {
   evidence.fixture.statusReady = statusReady;
   if (!statusReady && requireStatusFixtures) throw new Error('synthetic M9 status fixtures are not ready');
   await refreshAdminClaims(accounts);
+  await checkpointEvidence('fixtures-ready');
 
   await runHttpAcceptance(accounts, posts);
+  await checkpointEvidence('http-complete');
   await runBrowserAcceptance(accounts, posts);
+  await checkpointEvidence('browser-complete');
   await verifyPhysicalConcurrencyEvidence();
 
   await finishEvidence();
@@ -1491,8 +1495,9 @@ async function runBrowserAcceptance(accounts, posts) {
       && await exactCount(adminUserRow(page, accounts.adminKeeper.me.email)) === 0,
     'list pending state does not expose fixture rows before the actual HTTP 200 is released');
     pendingListHolder.release();
-    await withTimeout(pendingListHolder.released, STALE_PROBE_TIMEOUT_MS, 'admin list pending release');
-    await pendingListHolder.dispose();
+    const pendingDelivery = await withTimeout(pendingListHolder.released, STALE_PROBE_TIMEOUT_MS, 'admin list pending release');
+    const pendingDisposed = await pendingListHolder.dispose();
+    if (!pendingDelivery.ok || !pendingDisposed.ok) throw new Error('admin list pending response delivery failed');
     const listResponse = await listReady.catch(() => null);
     const listBody = listResponse ? await listResponse.json().catch(() => null) : null;
     check('browser-admin-list-http-ready', listResponse?.status() === 200
@@ -1503,7 +1508,9 @@ async function runBrowserAcceptance(accounts, posts) {
     check('browser-admin-role-label', await exactCount(page.getByText('ROLE: ADMIN', { exact: true })) === 1, 'admin list renders canonical role label once');
     check('browser-admin-list-width', await contentWidth(page, 'list') >= 1080 && await contentWidth(page, 'list') <= 1120, 'admin list content is approximately 1100px at 1440px');
     await runBrowserListTransientAcceptance(page, accounts);
+    await checkpointEvidence('browser-transient-complete');
     await runBrowserSearchPagingHistory(page, accounts);
+    await checkpointEvidence('browser-paging-complete');
     await runBrowserRevalidationBoundaryProbes(accounts);
 
     const search = page.getByRole('searchbox', { name: '관리자 사용자 검색', exact: true });
@@ -1540,7 +1547,9 @@ async function runBrowserAcceptance(accounts, posts) {
     '1440px list and detail screenshots are captured as evidence');
 
     await runBrowserTarget404Probe(page, accounts.target.me.id, accounts.adminKeeper.me.id);
+    await checkpointEvidence('browser-target-404-complete');
     await runBrowserMutationAcceptance(page, accounts);
+    await checkpointEvidence('browser-mutations-complete');
     await runBrowserStaleProbe(adminContext, accounts);
     await verifyDesignReference(adminContext);
   } finally {
@@ -1649,8 +1658,17 @@ async function runBrowserSearchPagingHistory(page, accounts) {
   const expectedPageZero = bulkAccounts.slice(0, 20);
   const expectedPageOne = bulkAccounts.slice(20);
   const table = adminUserTable(page);
+  const pagingResponse = (pageNumber) => page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return response.request().method() === 'GET' && url.pathname === '/api/v1/admin/users'
+      && url.searchParams.get('keyword') === fixture.bulkSearchLiteral && url.searchParams.get('size') === '20'
+      && Number(url.searchParams.get('page') ?? 0) === pageNumber && response.status() === 200;
+  }, { timeout: 15_000 }).catch(() => null);
+  const pageZeroPending = pagingResponse(0);
   await search.fill(fixture.bulkSearchLiteral);
   await search.press('Enter');
+  const pageZeroResponse = await pageZeroPending;
+  const pageZeroBody = pageZeroResponse ? await pageZeroResponse.json().catch(() => null) : null;
   await page.getByRole('button', { name: '2 페이지', exact: true }).waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
   await adminUserRow(page, expectedPageZero[0].email).first().waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
   let pageZeroExpected = true;
@@ -1658,29 +1676,37 @@ async function runBrowserSearchPagingHistory(page, accounts) {
   let pageOneAbsent = true;
   for (const account of expectedPageOne) pageOneAbsent = pageOneAbsent && await exactCount(adminUserRow(page, account.email)) === 0;
   const pageZeroRows = await table.getByRole('row').count();
+  const pageZeroUrl = page.url();
   const next = page.getByRole('button', { name: '다음 페이지', exact: true });
   let pageOneResponse = null;
   if (await exactCount(next) === 1) {
-    const responsePromise = page.waitForResponse((response) => response.request().method() === 'GET'
-      && new URL(response.url()).pathname === '/api/v1/admin/users'
-      && new URL(response.url()).searchParams.get('page') === '1' && response.status() === 200, { timeout: 15_000 });
+    const responsePromise = pagingResponse(1);
     await next.click();
     pageOneResponse = await responsePromise.catch(() => null);
   }
   const pageOne = new URL(page.url()).searchParams.get('page') === '1';
+  const pageOneBody = pageOneResponse ? await pageOneResponse.json().catch(() => null) : null;
+  const pageOneUrl = page.url();
   await adminUserRow(page, expectedPageOne[0].email).first().waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
   let pageOneExpected = true;
   for (const account of expectedPageOne) pageOneExpected = pageOneExpected && await exactCount(adminUserRow(page, account.email)) === 1;
   let pageZeroAbsent = true;
   for (const account of expectedPageZero) pageZeroAbsent = pageZeroAbsent && await exactCount(adminUserRow(page, account.email)) === 0;
   const pageOneRows = await table.getByRole('row').count();
+  const backPending = pagingResponse(0);
   await page.goBack({ waitUntil: 'domcontentloaded' }).catch(() => undefined);
+  const backResponse = await backPending;
+  const backBody = backResponse ? await backResponse.json().catch(() => null) : null;
   await waitForAdminReady(page).catch(() => undefined);
-  const backToPageZero = !new URL(page.url()).searchParams.get('page');
+  const backToPageZero = Number(new URL(page.url()).searchParams.get('page') ?? 0) === 0;
+  const backUrl = page.url();
   await adminUserRow(page, expectedPageZero[0].email).first().waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
   let backPageZeroExpected = true;
   for (const account of expectedPageZero) backPageZeroExpected = backPageZeroExpected && await exactCount(adminUserRow(page, account.email)) === 1;
+  const reloadPending = pagingResponse(0);
   await page.reload({ waitUntil: 'domcontentloaded' });
+  const reloadResponse = await reloadPending;
+  const reloadBody = reloadResponse ? await reloadResponse.json().catch(() => null) : null;
   await waitForAdminReady(page).catch(() => undefined);
   await adminUserRow(page, expectedPageZero[0].email).first().waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
   const reloadedKeyword = new URL(page.url()).searchParams.get('keyword') === fixture.bulkSearchLiteral;
@@ -1690,12 +1716,29 @@ async function runBrowserSearchPagingHistory(page, accounts) {
   let reloadedPageOneAbsent = true;
   for (const account of expectedPageOne) reloadedPageOneAbsent = reloadedPageOneAbsent && await exactCount(adminUserRow(page, account.email)) === 0;
   const reloadedRows = await table.getByRole('row').count();
-  check('browser-search-paging-history', pageOneResponse?.status() === 200 && pageOne && backToPageZero
+  const responseIds = (body) => body?.data?.users?.items?.map((item) => Number(item.id)) ?? [];
+  const zeroIds = expectedPageZero.map((account) => Number(account.me.id));
+  const oneIds = expectedPageOne.map((account) => Number(account.me.id));
+  const canonicalSlices = isDeepStrictEqual(responseIds(pageZeroBody), zeroIds)
+    && isDeepStrictEqual(responseIds(pageOneBody), oneIds)
+    && isDeepStrictEqual(responseIds(backBody), zeroIds) && isDeepStrictEqual(responseIds(reloadBody), zeroIds);
+  const pagingOk = canonicalSlices && pageZeroResponse?.status() === 200
+    && backResponse?.status() === 200 && reloadResponse?.status() === 200
+    && pageOneResponse?.status() === 200 && pageOne && backToPageZero
     && pageZeroExpected && pageOneAbsent && pageZeroRows === 21
     && pageOneExpected && pageZeroAbsent && pageOneRows === 2
     && backPageZeroExpected && reloadedKeyword && reloadedSize
-    && reloadedPageZeroExpected && reloadedPageOneAbsent && reloadedRows === 21,
-  'size=20 search paging matches the exact DESC ID slices (20+1), and keyword/page state survives next-page navigation, browser back, and reload');
+    && reloadedPageZeroExpected && reloadedPageOneAbsent && reloadedRows === 21;
+  const pagingDiagnostic = pagingOk ? '' : `: ${JSON.stringify({ canonicalSlices,
+    pageZeroStatus: pageZeroResponse?.status() ?? null, pageOneStatus: pageOneResponse?.status() ?? null,
+    backStatus: backResponse?.status() ?? null, reloadStatus: reloadResponse?.status() ?? null,
+    pageOne, backToPageZero, pageZeroExpected, pageOneAbsent, pageZeroRows, pageOneExpected, pageZeroAbsent, pageOneRows,
+    backPageZeroExpected, reloadedKeyword, reloadedSize, reloadedPageZeroExpected, reloadedPageOneAbsent, reloadedRows,
+    urls: [pageZeroUrl, pageOneUrl, backUrl, page.url()],
+    ids: [pageZeroBody, pageOneBody, backBody, reloadBody].map(responseIds),
+  })}`;
+  check('browser-search-paging-history', pagingOk,
+  `size=20 search paging matches exact DESC ID slices (20+1) across next/back/reload${pagingDiagnostic}`);
   await search.fill('');
   await search.press('Enter');
   await waitForAdminReady(page).catch(() => undefined);
@@ -1765,8 +1808,11 @@ async function runBrowserTarget404Probe(page, targetId, expectedKeeperId) {
   const body = response ? await response.json().catch(() => null) : null;
   check('browser-target-404', response?.status() === 404 && body?.error?.code === 'USER_001', 'deleted target is shown as target-not-found, not actor session failure');
   const listResponsePromise = page.waitForResponse((candidate) => candidate.request().method() === 'GET'
-    && new URL(candidate.url()).pathname === '/api/v1/admin/users');
-  await page.goto(`${frontendUrl}/admin`, { waitUntil: 'domcontentloaded' });
+    && new URL(candidate.url()).pathname === '/api/v1/admin/users'
+    && new URL(candidate.url()).searchParams.get('size') === '100'
+    && Number(new URL(candidate.url()).searchParams.get('page') ?? 0) === 0
+    && !new URL(candidate.url()).searchParams.get('keyword'), { timeout: 15_000 });
+  await page.goto(`${frontendUrl}/admin?page=0&size=100`, { waitUntil: 'domcontentloaded' });
   const listResponse = await listResponsePromise.catch(() => null);
   const listBody = listResponse ? await listResponse.json().catch(() => null) : null;
   check('browser-current-actor-list-after-target-404', listResponse?.status() === 200
@@ -1826,8 +1872,9 @@ async function runBrowserMutationAcceptance(page, accounts) {
   await retryRoleDialog.getByRole('button', { name: '변경 확인', exact: true }).click();
   const retryNotice = page.getByRole('alert').filter({ hasText: 'synthetic retry' });
   await retryNotice.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => undefined);
-  const retryButton = page.getByRole('button', { name: '다시 시도', exact: true });
-  const rowStillVisible = await page.getByText(accounts.user.me.nickname, { exact: true }).count() === 1;
+  const retryButton = retryNotice.getByRole('button', { name: '다시 시도', exact: true });
+  const retryTargetHeader = page.locator('section[aria-label="사용자 상세"] header');
+  const rowStillVisible = await exactCount(retryTargetHeader.getByText(accounts.user.email, { exact: false })) === 1;
   await page.unroute(roleRoutePattern);
   let retryResponse = null;
   let retryDetailResponse = null;
@@ -1839,9 +1886,17 @@ async function runBrowserMutationAcceptance(page, accounts) {
     await retryButton.click();
     [retryResponse, retryDetailResponse] = await Promise.all([retryMutation, retryCanonical]);
   }
-  check('browser-mutation-error-retry', failedRoleRequest && rowStillVisible && await exactCount(retryButton) === 0
-    && retryResponse?.status() === 200 && retryDetailResponse?.status() === 200 && await role.inputValue() === 'USER',
-  'failed role mutation preserves the row and retry restores canonical state');
+  const retryDetailBody = retryDetailResponse ? await retryDetailResponse.json().catch(() => null) : null;
+  await page.waitForFunction(() => document.querySelector('select[aria-label="역할"]')?.value === 'USER', undefined, { timeout: 15_000 }).catch(() => undefined);
+  const retryMetadata = { injected: failedRoleRequest, rowPreserved: rowStillVisible,
+    retryAbsent: await exactCount(retryButton) === 0, mutationStatus: retryResponse?.status() ?? null,
+    canonicalStatus: retryDetailResponse?.status() ?? null, canonicalId: retryDetailBody?.data?.id ?? null,
+    canonicalRole: retryDetailBody?.data?.role ?? null, renderedRole: await role.inputValue() };
+  check('browser-mutation-error-retry', retryMetadata.injected && retryMetadata.rowPreserved && retryMetadata.retryAbsent
+    && retryMetadata.mutationStatus === 200 && retryMetadata.canonicalStatus === 200
+    && Number(retryMetadata.canonicalId) === Number(targetId) && retryMetadata.canonicalRole === 'USER'
+    && retryMetadata.renderedRole === 'USER',
+  `failed role mutation preserves the row and retry restores canonical state: ${JSON.stringify(retryMetadata)}`);
 
   const suspendButton = page.getByRole('button', { name: '일시 정지', exact: true });
   await suspendButton.click();
@@ -1882,22 +1937,30 @@ async function runBrowserMutationAcceptance(page, accounts) {
   await page.waitForURL((url) => url.pathname === '/admin', { timeout: 15_000 });
   const deletedSearch = page.getByRole('searchbox', { name: '관리자 사용자 검색', exact: true });
   const deleteListResponsePromise = page.waitForResponse((response) => response.request().method() === 'GET'
-    && new URL(response.url()).pathname === '/api/v1/admin/users' && response.status() === 200, { timeout: 15_000 });
+    && new URL(response.url()).pathname === '/api/v1/admin/users'
+    && new URL(response.url()).searchParams.get('keyword') === accounts.weekAfter.me.nickname
+    && Number(new URL(response.url()).searchParams.get('page') ?? 0) === 0 && response.status() === 200, { timeout: 15_000 });
   await deletedSearch.fill(accounts.weekAfter.me.nickname);
   await deletedSearch.press('Enter');
   const deleteListResponse = await deleteListResponsePromise.catch(() => null);
-  await page.waitForTimeout(250);
-  check('browser-delete-confirm-canonical', [200, 204].includes(deleteResponse.status()) && page.url().endsWith('/admin')
+  const deleteListBody = deleteListResponse ? await deleteListResponse.json().catch(() => null) : null;
+  await page.getByText('검색 결과가 없습니다.', { exact: true }).waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
+  check('browser-delete-confirm-canonical', [200, 204].includes(deleteResponse.status()) && new URL(page.url()).pathname === '/admin'
+    && new URL(page.url()).searchParams.get('keyword') === accounts.weekAfter.me.nickname
     && deleteListResponse?.status() === 200
-    && await page.getByText(accounts.weekAfter.me.nickname, { exact: true }).count() === 0,
+    && deleteListBody?.data?.users?.totalElements === 0 && deleteListBody?.data?.users?.items?.length === 0
+    && await exactCount(adminUserRow(page, accounts.weekAfter.email)) === 0,
   'delete confirmation returns to canonical list and exact search proves the deleted row is absent');
 }
 
 async function runBrowserStaleProbe(context, accounts) {
   void context;
   const listOk = await runBrowserStaleListProbe(accounts);
+  await checkpointEvidence('browser-stale-list-complete');
   const detailOk = await runBrowserStaleDetailProbe(accounts);
+  await checkpointEvidence('browser-stale-detail-complete');
   const mutationOk = await runBrowserStaleMutationProbe(accounts);
+  await checkpointEvidence('browser-stale-mutation-complete');
   check('browser-account-switch-stale', listOk && detailOk && mutationOk,
     'all independent same-Provider list/detail/mutation stale probes reject the prior account response');
 }
@@ -1945,12 +2008,13 @@ async function runBrowserStaleListProbe(accounts) {
     const sameDocument = await sameProviderDocument(page, providerMarker);
     check('browser-stale-list-b-session-stable', bStable && sameDocument, 'B is stably authenticated on the same SPA Provider/document before A release');
     holder.release();
-    await withTimeout(holder.released, STALE_PROBE_TIMEOUT_MS, 'stale list release');
+    const delivery = await withTimeout(holder.released, STALE_PROBE_TIMEOUT_MS, 'stale list release');
+    const disposed = await holder.dispose();
     await page.waitForTimeout(300);
-    const ok = bStable && sameDocument && new URL(page.url()).pathname === '/'
+    const ok = delivery.ok && disposed.ok && bStable && sameDocument && new URL(page.url()).pathname === '/'
       && await exactCount(adminUserRow(page, accounts.adminKeeper.email)) === 0;
     check('browser-stale-list', ok,
-    'late A list 200 cannot repopulate the same SPA Provider after B is ready');
+    `late A list 200 cannot repopulate the same SPA Provider after B is ready: ${JSON.stringify({ delivery, disposed })}`);
     return ok;
   } catch (error) {
     check('browser-stale-list', false, scrubSecrets(error instanceof Error ? error.message : String(error)));
@@ -1991,15 +2055,16 @@ async function runBrowserStaleDetailProbe(accounts) {
     const sameDocument = await sameProviderDocument(page, providerMarker);
     check('browser-stale-detail-b-session-stable', bStable && sameDocument, 'B is stably authenticated on the same SPA Provider/document before A release');
     holder.release();
-    await withTimeout(holder.released, STALE_PROBE_TIMEOUT_MS, 'stale detail release');
+    const delivery = await withTimeout(holder.released, STALE_PROBE_TIMEOUT_MS, 'stale detail release');
+    const disposed = await holder.dispose();
     await page.waitForTimeout(300);
-    const ok = bStable && sameDocument && new URL(page.url()).pathname === '/'
+    const ok = delivery.ok && disposed.ok && bStable && sameDocument && new URL(page.url()).pathname === '/'
       && await page.locator('section[aria-label="사용자 상세"]').count() === 0
       && await page.getByText(accounts.user.me.email, { exact: false }).count() === 0
       && await page.getByText(`UID #${String(accounts.user.me.id).padStart(4, '0')}`, { exact: true }).count() === 0
       && await page.getByRole('button', { name: '다시 시도', exact: true }).count() === 0;
     check('browser-stale-detail', ok,
-    'late A detail 200 cannot repopulate the same SPA Provider after B is ready');
+    `late A detail 200 cannot repopulate the same SPA Provider after B is ready: ${JSON.stringify({ delivery, disposed })}`);
     return ok;
   } catch (error) {
     check('browser-stale-detail', false, scrubSecrets(error instanceof Error ? error.message : String(error)));
@@ -2038,15 +2103,16 @@ async function runBrowserStaleMutationProbe(accounts) {
     const sameDocument = await sameProviderDocument(page, providerMarker);
     check('browser-stale-mutation-b-session-stable', bStable && sameDocument, 'B is stably authenticated on the same SPA Provider/document before A release');
     holder.release();
-    await withTimeout(holder.released, STALE_PROBE_TIMEOUT_MS, 'stale mutation release');
+    const delivery = await withTimeout(holder.released, STALE_PROBE_TIMEOUT_MS, 'stale mutation release');
+    const disposed = await holder.dispose();
     await page.waitForTimeout(300);
-    const ok = bStable && sameDocument && new URL(page.url()).pathname === '/'
+    const ok = delivery.ok && disposed.ok && bStable && sameDocument && new URL(page.url()).pathname === '/'
       && await page.locator('section[aria-label="사용자 상세"]').count() === 0
       && await page.getByText(accounts.user.me.email, { exact: false }).count() === 0
       && await page.getByText(`UID #${String(accounts.user.me.id).padStart(4, '0')}`, { exact: true }).count() === 0
       && await page.getByRole('button', { name: '다시 시도', exact: true }).count() === 0;
     check('browser-stale-mutation', ok,
-    'late A mutation 200 cannot navigate or restore detail after B is ready');
+    `late A mutation 200 cannot navigate or restore detail after B is ready: ${JSON.stringify({ delivery, disposed })}`);
     return ok;
   } catch (error) {
     check('browser-stale-mutation', false, scrubSecrets(error instanceof Error ? error.message : String(error)));
@@ -2060,66 +2126,170 @@ async function runBrowserStaleMutationProbe(accounts) {
 }
 
 async function holdAdminResponse(page, predicate) {
-  let held = null;
-  let expireNext = false;
-  let expiryConsumed = false;
-  let released = false;
+  let heldAuthorization = null;
+  let expiryActive = false;
+  let expiryDeliveries = 0;
+  let releaseRequested = false;
+  let disposed = false;
+  let disposePromise;
+  let pendingHeld = 0;
   let resolveReady;
   let releaseResolve;
   let resolveReleased;
+  const deliveries = [];
+  const failures = [];
+  const tasks = new Set();
   const readyPromise = new Promise((resolvePromise) => { resolveReady = resolvePromise; });
   const releasePromise = new Promise((resolvePromise) => { releaseResolve = resolvePromise; });
   const releasedPromise = new Promise((resolvePromise) => { resolveReleased = resolvePromise; });
-  const pattern = ADMIN_USERS_ROUTE_PATTERN;
-  await page.route(pattern, async (route) => {
-    const url = new URL(route.request().url());
-    if (expireNext && !expiryConsumed && route.request().method() === 'GET' && url.searchParams.get('size') === '1') {
-      expiryConsumed = true;
-      await route.fulfill({ status: 401, contentType: 'application/json', headers: { 'cache-control': 'private, no-store' },
-        body: JSON.stringify({ success: false, data: null, error: { code: 'AUTH_004', message: 'expired synthetic access' }, timestamp: new Date().toISOString() }) });
-      return;
-    }
-    if (held || !predicate(route.request())) {
-      await route.continue();
-      return;
-    }
-    const upstream = await route.fetch();
-    const body = await upstream.body();
-    held = {
-      status: upstream.status(),
-      headers: upstream.headers(),
-      body,
-      bodyBytes: body.length,
-      readyPromise,
-      release() { releaseResolve(); },
-    };
-    resolveReady({ status: upstream.status(), bodyBytes: body.length });
-    await releasePromise;
-    await route.fulfill({ status: held.status, headers: held.headers, body: held.body });
-    if (!released) {
-      released = true;
-      resolveReleased();
-    }
+  const snapshot = () => ({
+    ok: failures.length === 0 && deliveries.length > 0 && deliveries.every((item) => item.delivered && item.status === 200),
+    count: deliveries.length,
+    delivered: deliveries.filter((item) => item.delivered).length,
+    failures: failures.length,
   });
+  const finishRelease = () => {
+    if (releaseRequested && pendingHeld === 0) resolveReleased(snapshot());
+  };
+  const handle = async (route) => {
+    let entry;
+    let stage = 'dispatch';
+    try {
+      const request = route.request();
+      const authorization = request.headers().authorization ?? '';
+      if (expiryActive && heldAuthorization && authorization === heldAuthorization) {
+        stage = 'expire-A';
+        await route.fulfill({ status: 401, contentType: 'application/json', headers: { 'cache-control': 'private, no-store' },
+          body: JSON.stringify({ success: false, data: null, error: { code: 'AUTH_004', message: 'expired synthetic access' }, timestamp: new Date().toISOString() }) });
+        expiryDeliveries += 1;
+        return;
+      }
+      if (disposed || releaseRequested || !predicate(request) || (heldAuthorization && authorization !== heldAuthorization)) {
+        stage = 'continue';
+        await route.continue();
+        return;
+      }
+      if (!authorization) throw new Error('held admin request has no authorization');
+      // Reserve synchronously before fetch. Every duplicate A request owns its body and completion.
+      heldAuthorization ??= authorization;
+      entry = { delivered: false, status: null };
+      deliveries.push(entry);
+      pendingHeld += 1;
+      stage = 'upstream';
+      const upstream = await route.fetch({ timeout: STALE_PROBE_TIMEOUT_MS });
+      const body = await withTimeout(upstream.body(), STALE_PROBE_TIMEOUT_MS, 'held upstream body');
+      const status = upstream.status();
+      const headers = upstream.headers();
+      entry.status = status;
+      resolveReady({ status, bodyBytes: body.length });
+      stage = 'hold';
+      await releasePromise;
+      stage = 'deliver';
+      // Observe this exact browser request, including body completion, before stale can pass.
+      const observed = page.waitForResponse((response) => response.request() === request,
+        { timeout: STALE_PROBE_TIMEOUT_MS }).then((response) => ({ response }), (error) => ({ error }));
+      await route.fulfill({ status, headers, body });
+      const result = await observed;
+      if (result.error) throw result.error;
+      const finished = await withTimeout(result.response.finished(), STALE_PROBE_TIMEOUT_MS, 'held browser response finish');
+      if (finished) throw finished;
+      const deliveredBody = await withTimeout(result.response.body(), STALE_PROBE_TIMEOUT_MS, 'held browser response body');
+      if (result.response.status() !== status || !deliveredBody.equals(body)) throw new Error('held response delivery mismatch');
+      entry.delivered = true;
+    } catch (error) {
+      failures.push(stage);
+      resolveReady({ status: null, bodyBytes: 0, failed: true });
+      await recordRouteFailure(stage, error);
+      await route.abort().catch(() => undefined);
+    } finally {
+      if (entry) pendingHeld -= 1;
+      finishRelease();
+    }
+  };
+  const handler = async (route) => {
+    const task = handle(route);
+    tasks.add(task);
+    try { await task; } finally { tasks.delete(task); }
+  };
+  await page.route(ADMIN_USERS_ROUTE_PATTERN, handler);
+  const release = () => {
+    releaseRequested = true;
+    releaseResolve();
+    finishRelease();
+  };
   return {
-    get readyPromise() { return readyPromise; },
-    get released() { return releasedPromise; },
-    release() { releaseResolve(); },
-    expireOnce() { expireNext = true; },
-    async dispose() { await page.unroute(pattern).catch(() => undefined); },
+    readyPromise,
+    released: releasedPromise,
+    release,
+    startExpiry() {
+      if (!heldAuthorization) throw new Error('cannot expire A before an authenticated response is held');
+      expiryActive = true;
+    },
+    get expiryDeliveries() { return expiryDeliveries; },
+    dispose() {
+      if (disposePromise) return disposePromise;
+      disposed = true;
+      release();
+      disposePromise = (async () => {
+        try {
+          await withTimeout(page.unroute(ADMIN_USERS_ROUTE_PATTERN, handler), STALE_PROBE_TIMEOUT_MS, 'held route removal');
+          await withTimeout(Promise.all([...tasks]), STALE_PROBE_TIMEOUT_MS, 'held route disposal');
+        } catch (error) {
+          failures.push('dispose');
+          await recordRouteFailure('dispose', error);
+        }
+        return snapshot();
+      })();
+      return disposePromise;
+    },
   };
 }
 
+async function recordRouteFailure(stage, error) {
+  check('browser-route-protocol', false, `route ${stage}: ${scrubSecrets(error instanceof Error ? error.message : String(error))}`);
+  try {
+    await checkpointEvidence('route-protocol-failure');
+  } catch {
+    evidence.failures.push('route-protocol checkpoint write failed');
+    evidence.status = 'NOT RUN';
+  }
+}
+
 async function triggerAuthExpiry(page, holder) {
-  await page.route('**/api/v1/auth/refresh', async (route) => {
-    await route.fulfill({ status: 401, contentType: 'application/json', headers: { 'cache-control': 'private, no-store' },
-      body: JSON.stringify({ success: false, data: null, error: { code: 'AUTH_003', message: 'expired synthetic refresh' }, timestamp: new Date().toISOString() }) });
-  });
-  holder.expireOnce();
-  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
-  await page.waitForURL((url) => url.pathname.endsWith('/signin'), { timeout: 15_000 }).catch(() => undefined);
-  check('browser-auth-final-failure-boundary', page.url().endsWith('/signin'), 'same SPA auth-expiry path reaches signin after access and refresh fail');
-  await page.unroute('**/api/v1/auth/refresh');
+  const pattern = '**/api/v1/auth/refresh';
+  const tasks = new Set();
+  let refreshDeliveries = 0;
+  let refreshFailed = false;
+  const handler = async (route) => {
+    const task = (async () => {
+      try {
+        await route.fulfill({ status: 401, contentType: 'application/json', headers: { 'cache-control': 'private, no-store' },
+          body: JSON.stringify({ success: false, data: null, error: { code: 'AUTH_003', message: 'expired synthetic refresh' }, timestamp: new Date().toISOString() }) });
+        refreshDeliveries += 1;
+      } catch (error) {
+        refreshFailed = true;
+        await recordRouteFailure('refresh-expiry', error);
+        await route.abort().catch(() => undefined);
+      }
+    })();
+    tasks.add(task);
+    try { await task; } finally { tasks.delete(task); }
+  };
+  await page.route(pattern, handler);
+  try {
+    holder.startExpiry();
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await page.waitForURL((url) => url.pathname === '/signin', { timeout: STALE_PROBE_TIMEOUT_MS }).catch(() => undefined);
+    const expired = new URL(page.url()).pathname === '/signin' && holder.expiryDeliveries > 0
+      && refreshDeliveries > 0 && !refreshFailed;
+    check('browser-auth-final-failure-boundary', expired,
+      `same SPA reaches signin after A access/refresh failure: ${JSON.stringify({ signin: new URL(page.url()).pathname === '/signin', accessFailures: holder.expiryDeliveries, refreshFailures: refreshDeliveries, routeError: refreshFailed })}`);
+    if (!expired) throw new Error('A auth expiry boundary did not complete');
+  } finally {
+    // Remove refresh injection before B signs in; access injection matches only captured A authorization.
+    await withTimeout(page.unroute(pattern, handler), STALE_PROBE_TIMEOUT_MS, 'refresh expiry route removal');
+    await withTimeout(Promise.all([...tasks]), STALE_PROBE_TIMEOUT_MS, 'refresh expiry disposal');
+  }
 }
 
 async function markProviderDocument(page) {
@@ -2637,7 +2807,21 @@ function ensureRequiredEvidenceChecks() {
 }
 
 async function writeEvidence() {
-  await writeFile(resolve(outputDir, 'evidence.json'), scrubSecrets(JSON.stringify(evidence, null, 2)), 'utf8');
+  const snapshot = scrubSecrets(JSON.stringify(evidence, null, 2));
+  const pending = evidenceWriteQueue.then(async () => {
+    const temporary = resolve(outputDir, 'evidence.json.tmp');
+    await writeFile(temporary, snapshot, 'utf8');
+    await rename(temporary, resolve(outputDir, 'evidence.json'));
+  });
+  evidenceWriteQueue = pending.catch(() => undefined);
+  await pending;
+}
+
+async function checkpointEvidence(stage) {
+  evidence.status = 'NOT RUN';
+  evidence.checkpoint = { stage, at: new Date().toISOString() };
+  evidence.requiredNotRun = REQUIRED_EVIDENCE_IDS.filter((id) => !evidence.checks.some((item) => item.name === id));
+  await writeEvidence();
 }
 
 function scrubSecrets(value) {

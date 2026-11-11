@@ -7,8 +7,8 @@
 - M8 알림은 독립 QA PASS·DEV INTEGRATED로 완료됐다. Run3는 323 PASS / 0 FAIL / 0 NOT_RUN, backend 102 suites/599 tests, frontend 47 files/439 tests 증거를 보존한다.
 - M9 관리자 A-v2가 사용자 전체 승인됐다. 현재 계약은 회의 §5·§10·§10.1·§11, REQUIREMENTS §6.13-A, ADR-0008이다.
 - `qa/M9-review.md`는 A-v2 승인 계약 기준으로 갱신됐고, `qa/m9-acceptance.mjs`는 합성 HTTP/Chrome 인수 harness로 준비됐다.
-- 현재 판정은 **NOT RUN / A-v2 APPROVED / audit-2 fix2 HARNESS STATIC-FROZEN / 격리 RUNTIME·live provenance 대기**다. final BE/FE artifact의 구조 parser와 focused test는 독립 정적 확인했지만 immutable manifest/JAR live identity·status/native·실제 API·DB·Chrome은 아직 QA가 실행·독립 확인하지 않았다.
-- audit-2 F1~F9에 맞춰 `qa/m9-acceptance.mjs`를 보완하고, 구조화 artifact parser `qa/m9-test-evidence.mjs` 및 focused test를 연결했다. mapped-only helper PASS는 전체 acceptance PASS가 아니며 direct uncovered rows는 실제 harness evidence로 닫아야 한다.
+- 현재 판정은 **NOT RUN / A-v2 APPROVED / audit-3 R1~R5 FIX3 HARNESS STATIC-FROZEN / 격리 RUNTIME·live provenance 대기**다. final BE/FE artifact의 구조 parser와 focused test는 독립 정적 확인했지만 immutable manifest/JAR live identity·status/native·실제 API·DB·Chrome은 아직 QA가 실행·독립 확인하지 않았다.
+- audit-2 F1~F9와 audit-3 R1~R5에 맞춰 `qa/m9-acceptance.mjs`를 보완하고, 구조화 artifact parser `qa/m9-test-evidence.mjs` 및 focused test를 연결했다. mapped-only helper PASS는 전체 acceptance PASS가 아니며 direct uncovered rows는 실제 harness evidence로 닫아야 한다.
 
 ## 진행 중
 
@@ -37,7 +37,7 @@
 
 ## 갱신 시각
 
-2026-11-11 KST — A-v2 승인 계약·audit-2 F1~F9 fix2 harness 및 구조화 artifact helper handoff 기준 갱신. 세 파일 `node --check`, helper `node --test` 13/13, `git diff --check`, trailing-whitespace 검사를 통과했으며 실제 인수는 NOT RUN.
+2026-11-11 KST — A-v2 승인 계약·audit-3 R1~R5 fix3 harness 및 구조화 artifact helper handoff 기준 갱신. main `node --check`와 `git diff --check`를 통과했으며 실제 인수는 NOT RUN.
 
 ## 소유권 준수
 

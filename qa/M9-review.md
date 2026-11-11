@@ -1,6 +1,6 @@
 # M9 — 관리자 독립 QA 준비 및 인수 기준
 
-> **현재 상태: A-v2 APPROVED / audit-2 FIX2 HARNESS UPDATED / ACCEPTANCE NOT RUN**
+> **현재 상태: A-v2 APPROVED / audit-3 R1~R5 FIX3 HARNESS STATIC-FROZEN / ACCEPTANCE NOT RUN**
 >
 > 사용자의 `A-v2 전체 승인`으로 회의 §5·§10·§10.1·§11, REQUIREMENTS §6.13-A, ADR-0008이 현재 계약이 됐다. 승인은 제품 PASS가 아니며, 구현 freeze·격리 runtime·실제 HTTP/Chrome/DB 증거 전에는 인수 완료를 주장하지 않는다.
 
@@ -252,3 +252,22 @@ Fix1 범위의 정적 검증은 `node --check qa/m9-acceptance.mjs`와 whitespac
 ### 13.2 Fix2 정적 검증과 경계
 
 검증 명령은 `node --check qa/m9-acceptance.mjs` exit 0, `node --check qa/m9-test-evidence.mjs` exit 0, `node --check qa/m9-test-evidence.test.mjs` exit 0, `node --test qa/m9-test-evidence.test.mjs` exit 0 (13/13), `git diff --check -- qa/m9-acceptance.mjs qa/m9-test-evidence.mjs qa/m9-test-evidence.test.mjs` exit 0이다. 이 명령들은 저장된 artifact parser와 JavaScript syntax만 검사한다. signup/signin, API, MySQL 13319, fingerprint/query-count, backend final runtime, Playwright/Chrome, source/JAR live provenance는 실행하지 않았으므로 현재 M9 판정은 **NOT RUN / A-v2 APPROVED / HARNESS UPDATED**이며 PASS·완료·merge-ready를 주장하지 않는다.
+
+## 14. Audit-3 R1~R5 fix3 정적 보완 — 실제 인수 미실행
+
+`acceptance-audit-3.md`의 Important R1~R5만 현재 harness와 대조해 수정했다. 새 matrix나 helper 파일은 만들거나 고치지 않았고, 제품/API/DB/브라우저/Git은 실행·수정하지 않았다.
+
+| finding | fix3 보완 | 현재 판정 |
+|---|---|---|
+| R1 | 기존 정지 경계의 동일 boolean 결과를 필수 `mutation-suspended-signin-and-writes` ID에도 연결하고 기존 `mutation-suspend-boundary` coverage는 유지 | STATIC FIXED / HTTP NOT RUN |
+| R2 | `관리자 사용자 목록` table의 row locator로 pending/empty/denied/re-entry/재시도/stale 행 검사를 scope하고 `waitForAdminReady`의 expected row도 table 안으로 제한해 TopBar nickname을 행으로 세지 않음 | STATIC FIXED / Chrome NOT RUN |
+| R3 | transient 500→retry keyword를 실제 `adminKeeper.email`로 바꿔 canonical 200에서 keeper row를 정확히 요구하고 empty query는 별도 no-match로 유지 | STATIC FIXED / Chrome NOT RUN |
+| R4 | stale list hold predicate를 실제 기본 `size=20`으로 맞추고, paging 복귀 URL을 `size=20`으로 고정해 bulk 21개를 ID DESC 20+1 slice로 page0/page1/back/reload에서 검증 | STATIC FIXED / Chrome NOT RUN |
+| R5 | 공개 deleted signin은 기존 인증 계약인 `AUTH_001/401`로 검증하고 authenticated deleted post/comment/like/universe는 기존 `USER_001/404` 경계를 유지 | STATIC FIXED / HTTP NOT RUN |
+
+### 14.1 검증·경계
+
+- `node --check qa/m9-acceptance.mjs` exit 0.
+- `git diff --check -- qa/m9-acceptance.mjs` exit 0; 대상 harness trailing whitespace clean.
+- 실제 signup/signin·API `18089`·FE `5179`·MySQL `13319`·status/fingerprint/query-count·backend barrier·Chrome/1440px는 실행하지 않았다. R1~R5는 **정적 보완 완료 / ACCEPTANCE NOT RUN**이며 PASS·merge-ready를 주장하지 않는다.
+- helper `qa/m9-test-evidence.mjs` 및 `qa/m9-test-evidence.test.mjs`는 audit-3에서 수정하지 않고 동결 보존했다. root가 명시 QA 파일을 커밋하고 scoped re-review 후 실제 harness를 실행한다.

@@ -1031,3 +1031,20 @@
 - QA harness 및 구조화 helper는 fix2 정적 동결 상태다. helper의 mapped-only PASS는 전체 인수 PASS가 아니며 uncovered direct rows와 required matrix는 실제 실행 전까지 닫지 않는다.
 - 실제 signup/signin·API `18089`·FE `5179`·MySQL `13319`·status/fingerprint/query-count·backend barrier·Chrome/1440px는 실행하지 않았다. M9 판정은 계속 **A-v2 APPROVED / HARNESS STATIC-FROZEN / ACCEPTANCE NOT RUN**이다.
 - root가 명시 QA 6개 파일을 커밋하고 동일 독립 auditor의 scoped re-review를 거친 뒤, immutable source/JAR/live runtime provenance가 준비되면 단일 실제 acceptance를 실행한다. 제품·DB·runtime·Git은 이 확인에서 수정하지 않았다.
+
+## 2026-11-11 KST — M9 audit-3 R1~R5 fix3 정적 보완·동결 인계
+
+### 변경
+
+- R1: 기존 SUSPENDED signin/write/read 경계의 동일 boolean을 필수 `mutation-suspended-signin-and-writes` evidence ID에도 연결하고 기존 `mutation-suspend-boundary` 결과는 보존했다.
+- R2: 관리자 사용자 table의 row locator를 추가해 pending/empty/denied/re-entry/transient/stale 행 검사를 scoped로 바꿨고, `waitForAdminReady`의 expected row도 table 내부로 제한했다. TopBar nickname은 행 결과로 세지 않는다.
+- R3: transient 500→retry 검색어를 실제 `adminKeeper.email`로 변경해 canonical retry 결과를 실제 keeper row로 검증하고, 별도 no-match 검색은 empty 상태로 검증한다.
+- R4: stale list hold를 실제 기본 `size=20`으로 맞췄다. transient helper 복귀·paging을 `size=20`으로 고정하고 bulk 21개를 API ID DESC 기준 page0 20개/page1 1개로 back/reload까지 비교한다. keeper가 첫 기본 페이지에 없을 수 있는 경로의 불필요한 readiness 기대도 제거했다.
+- R5: deleted signin은 `AUTH_001/401`, authenticated deleted post/comment/like/universe writes는 기존 `USER_001/404`로 분리했다. generic signin boundary가 401을 캡처하도록 허용 범위만 넓혔다.
+
+### 검증·경계
+
+- `node --check qa/m9-acceptance.mjs` exit 0.
+- `git diff --check -- qa/m9-acceptance.mjs qa/M9-review.md .claude/team/qa/STATE.md .claude/team/qa/WORKLOG.md` exit 0; harness/기록 trailing whitespace clean.
+- helper 두 파일은 audit-3에서 수정하지 않았다. 실제 signup/signin·API·DB·runtime·Chrome/Playwright·Git 실행은 하지 않았고, M9 판정은 **A-v2 APPROVED / audit-3 R1~R5 FIX3 STATIC-FROZEN / ACCEPTANCE NOT RUN**이다.
+- root가 이 보정 뒤 명시 QA 파일을 커밋하고 동일 독립 auditor의 scoped re-review를 수행한다. 제품 코드·타 역할 테스트·DB·runtime·Git은 수정하지 않았다.

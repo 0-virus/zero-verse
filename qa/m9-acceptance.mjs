@@ -378,7 +378,7 @@ async function signinAttempt(account, label) {
     email: account.email,
     password: account.password,
   });
-  check(`fixture-${label}-signin-attempt`, response.status === 200 || response.status === 403 || response.status === 404,
+  check(`fixture-${label}-signin-attempt`, [200, 401, 403, 404].includes(response.status),
     'signin boundary response is captured without retaining a token');
   return response;
 }
@@ -1113,15 +1113,18 @@ async function runMutationMatrix(accounts, posts) {
   const suspendedNotificationRead = Number.isInteger(Number(suspendedNotificationId))
     ? await apiCall('PUT', `/api/v1/notifications/${suspendedNotificationId}/read`, accounts.target.userToken)
     : null;
-  check('mutation-suspend-boundary', suspended.status === 200 && suspendedAccess.status === 403 && suspendedAccess.errorCode === 'USER_003'
+  const suspendedSigninAndWritesOk = suspended.status === 200 && suspendedAccess.status === 403 && suspendedAccess.errorCode === 'USER_003'
     && suspendedPublic.status === 200 && suspendedWrite.status === 403 && suspendedWrite.errorCode === 'USER_003'
     && suspendedCommentWrite.status === 403 && suspendedCommentWrite.errorCode === 'USER_003'
     && suspendedLikeWrite.status === 403 && suspendedLikeWrite.errorCode === 'USER_003'
     && suspendedUniverseWrite.status === 403 && suspendedUniverseWrite.errorCode === 'USER_003'
     && suspendedSignin.status === 403 && suspendedSignin.errorCode === 'USER_003'
     && suspendedNotifications.status === 200 && suspendedNotifications.data?.canManage === false
-    && suspendedNotificationRead != null && suspendedNotificationRead.status === 403 && suspendedNotificationRead.errorCode === 'USER_003',
-  'SUSPENDED blocks admin/write/read mutation access but preserves PUBLIC and notification read-only view');
+    && suspendedNotificationRead != null && suspendedNotificationRead.status === 403 && suspendedNotificationRead.errorCode === 'USER_003';
+  check('mutation-suspend-boundary', suspendedSigninAndWritesOk,
+    'SUSPENDED blocks admin/write/read mutation access but preserves PUBLIC and notification read-only view');
+  check('mutation-suspended-signin-and-writes', suspendedSigninAndWritesOk,
+    'SUSPENDED signin and post/comment/like/universe writes remain denied with the exact state error');
   const suspendedRefresh = suspendedRefreshProbe ? await refreshFromProbe(suspendedRefreshProbe) : null;
   const suspendedRefreshAgain = suspendedRefreshProbe ? await refreshFromProbe(suspendedRefreshProbe) : null;
   check('refresh-suspended-rejected', suspendedRefresh?.status === 401 && suspendedRefresh.errorCode === 'AUTH_003'
@@ -1201,12 +1204,12 @@ async function runMutationMatrix(accounts, posts) {
   });
   const deletedLikeWrite = await apiCall('POST', `/api/v1/posts/${posts.adminPublic.id}/likes`, accounts.target.userToken);
   const deletedUniverseWrite = await apiCall('POST', `/api/v1/universe/requests/${accounts.special.me.id}`, accounts.target.userToken);
-  check('mutation-deleted-signin-and-writes', deletedSignin.status === 404 && deletedSignin.errorCode === 'USER_001'
+  check('mutation-deleted-signin-and-writes', deletedSignin.status === 401 && deletedSignin.errorCode === 'AUTH_001'
     && deletedPostWrite.status === 404 && deletedPostWrite.errorCode === 'USER_001'
     && deletedCommentWrite.status === 404 && deletedCommentWrite.errorCode === 'USER_001'
     && deletedLikeWrite.status === 404 && deletedLikeWrite.errorCode === 'USER_001'
     && deletedUniverseWrite.status === 404 && deletedUniverseWrite.errorCode === 'USER_001',
-  'soft-deleted actor cannot sign in or create comment/like/universe mutations, all with USER_001');
+  'soft-deleted actor signin is AUTH_001/401 while authenticated mutations remain USER_001/404');
 
   const afterDeleteFingerprint = await runtimeFingerprint(accounts.target.me.id, 'after-target-delete');
   evidence.fixture.fingerprint.afterDelete = {
@@ -1404,7 +1407,7 @@ async function runBrowserAcceptance(accounts, posts) {
     await userPage.getByRole('heading', { name: '관리자 화면에 접근할 수 없습니다', exact: true }).waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
     check('browser-user-admin-guard', userPage.url().endsWith('/admin')
       && await userPage.getByRole('heading', { name: '관리자 화면에 접근할 수 없습니다', exact: true }).count() === 1
-      && await userPage.getByText(accounts.adminKeeper.me.nickname, { exact: true }).count() === 0,
+      && await exactCount(adminUserRow(userPage, accounts.adminKeeper.me.nickname)) === 0,
     'authenticated USER direct entry renders denied guard without admin data');
   } finally {
     await userContext.close();
@@ -1433,8 +1436,7 @@ async function runBrowserAcceptance(accounts, posts) {
     await page.goto(`${frontendUrl}/admin?page=0&size=100`, { waitUntil: 'domcontentloaded' });
     const pendingListUpstream = await withTimeout(pendingListHolder.readyPromise, STALE_PROBE_TIMEOUT_MS, 'admin list pending response');
     check('browser-admin-list-pending-sensitive', pendingListUpstream.status === 200
-      && await page.getByText(accounts.adminKeeper.me.email, { exact: true }).count() === 0
-      && await page.getByText(accounts.adminKeeper.me.nickname, { exact: true }).count() === 0,
+      && await exactCount(adminUserRow(page, accounts.adminKeeper.me.email)) === 0,
     'list pending state does not expose fixture rows before the actual HTTP 200 is released');
     pendingListHolder.release();
     await withTimeout(pendingListHolder.released, STALE_PROBE_TIMEOUT_MS, 'admin list pending release');
@@ -1492,8 +1494,9 @@ async function runBrowserAcceptance(accounts, posts) {
 
 async function runBrowserListTransientAcceptance(page, accounts) {
   const search = page.getByRole('searchbox', { name: '관리자 사용자 검색', exact: true });
-  const transientKeyword = `${fixture.runId}-transient`;
+  const transientKeyword = accounts.adminKeeper.email;
   const emptyKeyword = `${fixture.runId}-empty`;
+  const keeperRow = adminUserRow(page, accounts.adminKeeper.email);
   let listFailed = false;
   const listPattern = /\/api\/v1\/admin\/users(?:\?|$)/;
   await page.route(listPattern, async (route) => {
@@ -1515,7 +1518,7 @@ async function runBrowserListTransientAcceptance(page, accounts) {
   const listRetryNotice = page.getByRole('alert').filter({ hasText: 'synthetic list retry' });
   await listRetryNotice.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => undefined);
   const listRetryButton = page.getByRole('button', { name: '다시 시도', exact: true }).first();
-  const priorRowVisible = await page.getByText(accounts.adminKeeper.me.nickname, { exact: true }).count() === 1;
+  const priorRowVisible = await exactCount(keeperRow) === 1;
   check('browser-list-transient-retry', listFailed && priorRowVisible && await exactCount(listRetryButton) === 1,
     'transient list failure preserves the prior fixture row and exposes a single retry action');
   await page.unroute(listPattern);
@@ -1527,18 +1530,18 @@ async function runBrowserListTransientAcceptance(page, accounts) {
     listRetryResponse = await responsePromise.catch(() => null);
   }
   check('browser-list-transient-retry-result', listRetryResponse?.status() === 200
-    && await page.getByText(accounts.adminKeeper.me.nickname, { exact: true }).count() === 1,
+    && await exactCount(keeperRow) === 1,
   'list retry restores a canonical HTTP 200 result and the prior fixture row');
 
   await search.fill(emptyKeyword);
   await search.press('Enter');
   await page.getByText('검색 결과가 없습니다.', { exact: true }).waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
   check('browser-list-empty-state', await page.getByText('검색 결과가 없습니다.', { exact: true }).count() === 1
-    && await page.getByText(accounts.adminKeeper.me.nickname, { exact: true }).count() === 0,
+    && await exactCount(keeperRow) === 0,
   'a real successful empty response renders the empty state without stale rows');
   await search.fill('');
   await search.press('Enter');
-  await page.getByText(accounts.adminKeeper.me.nickname, { exact: true }).first().waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
+  await waitForAdminReady(page).catch(() => undefined);
 
   const detailPattern = new RegExp(`/api/v1/admin/users/${accounts.user.me.id}$`);
   let detailFailed = false;
@@ -1572,15 +1575,26 @@ async function runBrowserListTransientAcceptance(page, accounts) {
   check('browser-detail-transient-retry-result', detailRetryResponse?.status() === 200
     && await page.getByText(accounts.user.me.nickname, { exact: true }).count() === 1,
   'detail retry restores the requested canonical target');
-  await page.goto(`${frontendUrl}/admin?page=0&size=100`, { waitUntil: 'domcontentloaded' });
-  await waitForAdminReady(page, accounts.adminKeeper.me.nickname);
+  await page.goto(`${frontendUrl}/admin?page=0&size=20`, { waitUntil: 'domcontentloaded' });
+  await waitForAdminReady(page);
 }
 
 async function runBrowserSearchPagingHistory(page, accounts) {
   const search = page.getByRole('searchbox', { name: '관리자 사용자 검색', exact: true });
+  const bulkAccounts = Array.from({ length: 21 }, (_, index) => accounts[`bulk${String(index + 1).padStart(2, '0')}`])
+    .sort((left, right) => Number(right.me.id) - Number(left.me.id));
+  const expectedPageZero = bulkAccounts.slice(0, 20);
+  const expectedPageOne = bulkAccounts.slice(20);
+  const table = adminUserTable(page);
   await search.fill(fixture.bulkSearchLiteral);
   await search.press('Enter');
   await page.getByRole('button', { name: '2 페이지', exact: true }).waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
+  await adminUserRow(page, expectedPageZero[0].email).first().waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
+  let pageZeroExpected = true;
+  for (const account of expectedPageZero) pageZeroExpected = pageZeroExpected && await exactCount(adminUserRow(page, account.email)) === 1;
+  let pageOneAbsent = true;
+  for (const account of expectedPageOne) pageOneAbsent = pageOneAbsent && await exactCount(adminUserRow(page, account.email)) === 0;
+  const pageZeroRows = await table.getByRole('row').count();
   const next = page.getByRole('button', { name: '다음 페이지', exact: true });
   let pageOneResponse = null;
   if (await exactCount(next) === 1) {
@@ -1591,19 +1605,37 @@ async function runBrowserSearchPagingHistory(page, accounts) {
     pageOneResponse = await responsePromise.catch(() => null);
   }
   const pageOne = new URL(page.url()).searchParams.get('page') === '1';
+  await adminUserRow(page, expectedPageOne[0].email).first().waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
+  let pageOneExpected = true;
+  for (const account of expectedPageOne) pageOneExpected = pageOneExpected && await exactCount(adminUserRow(page, account.email)) === 1;
+  let pageZeroAbsent = true;
+  for (const account of expectedPageZero) pageZeroAbsent = pageZeroAbsent && await exactCount(adminUserRow(page, account.email)) === 0;
+  const pageOneRows = await table.getByRole('row').count();
   await page.goBack({ waitUntil: 'domcontentloaded' }).catch(() => undefined);
   await waitForAdminReady(page).catch(() => undefined);
   const backToPageZero = !new URL(page.url()).searchParams.get('page');
+  await adminUserRow(page, expectedPageZero[0].email).first().waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
+  let backPageZeroExpected = true;
+  for (const account of expectedPageZero) backPageZeroExpected = backPageZeroExpected && await exactCount(adminUserRow(page, account.email)) === 1;
   await page.reload({ waitUntil: 'domcontentloaded' });
   await waitForAdminReady(page).catch(() => undefined);
+  await adminUserRow(page, expectedPageZero[0].email).first().waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
   const reloadedKeyword = new URL(page.url()).searchParams.get('keyword') === fixture.bulkSearchLiteral;
-  const reloadedRows = await page.getByText(accounts.bulk01.me.nickname, { exact: true }).count();
+  const reloadedSize = new URL(page.url()).searchParams.get('size') === '20';
+  let reloadedPageZeroExpected = true;
+  for (const account of expectedPageZero) reloadedPageZeroExpected = reloadedPageZeroExpected && await exactCount(adminUserRow(page, account.email)) === 1;
+  let reloadedPageOneAbsent = true;
+  for (const account of expectedPageOne) reloadedPageOneAbsent = reloadedPageOneAbsent && await exactCount(adminUserRow(page, account.email)) === 0;
+  const reloadedRows = await table.getByRole('row').count();
   check('browser-search-paging-history', pageOneResponse?.status() === 200 && pageOne && backToPageZero
-    && reloadedKeyword && reloadedRows === 1,
-  'search keyword/page state survives next-page navigation, browser back, and reload without losing URL state');
+    && pageZeroExpected && pageOneAbsent && pageZeroRows === 21
+    && pageOneExpected && pageZeroAbsent && pageOneRows === 2
+    && backPageZeroExpected && reloadedKeyword && reloadedSize
+    && reloadedPageZeroExpected && reloadedPageOneAbsent && reloadedRows === 21,
+  'size=20 search paging matches the exact DESC ID slices (20+1), and keyword/page state survives next-page navigation, browser back, and reload');
   await search.fill('');
   await search.press('Enter');
-  await page.getByText(accounts.adminKeeper.me.nickname, { exact: true }).first().waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
+  await waitForAdminReady(page).catch(() => undefined);
 }
 
 async function runBrowserRevalidationBoundaryProbes(accounts) {
@@ -1631,7 +1663,7 @@ async function runBrowserRevalidationBoundaryProbes(accounts) {
         await route.continue();
       });
       await signInInSpa(page, accounts.adminKeeper);
-      await page.goto(`${frontendUrl}/admin`, { waitUntil: 'domcontentloaded' });
+      await page.goto(`${frontendUrl}/admin?page=0&size=100`, { waitUntil: 'domcontentloaded' });
       await waitForAdminReady(page, accounts.adminKeeper.me.nickname);
       phase = 'boundary';
       await page.evaluate((eventName) => {
@@ -1645,13 +1677,13 @@ async function runBrowserRevalidationBoundaryProbes(accounts) {
       const denied = page.getByRole('heading', { name: '관리자 화면에 접근할 수 없습니다', exact: true });
       await denied.waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
       const deniedOk = await exactCount(denied) === 1
-        && await page.getByText(accounts.adminKeeper.me.nickname, { exact: true }).count() === 0;
+        && await exactCount(adminUserRow(page, accounts.adminKeeper.me.email)) === 0;
       check(probe.check, deniedOk, `${probe.event} revalidation renders ${probe.code} denied state without stale admin rows`);
       phase = 'allow';
-      await page.goto(`${frontendUrl}/admin`, { waitUntil: 'domcontentloaded' });
+      await page.goto(`${frontendUrl}/admin?page=0&size=100`, { waitUntil: 'domcontentloaded' });
       await waitForAdminReady(page, accounts.adminKeeper.me.nickname).catch(() => undefined);
       const reentryOk = await exactCount(page.getByText('ADMIN CONSOLE', { exact: true })) === 1
-        && await page.getByText(accounts.adminKeeper.me.nickname, { exact: true }).count() === 1;
+        && await exactCount(adminUserRow(page, accounts.adminKeeper.me.email)) === 1;
       check('browser-admin-denied-reentry', reentryOk, 'denied state can re-enter after a fresh current probe succeeds');
     } catch (error) {
       check(probe.check, false, scrubSecrets(error instanceof Error ? error.message : String(error)));
@@ -1825,22 +1857,22 @@ async function runBrowserStaleListProbe(accounts) {
   try {
     holder = await holdAdminResponse(page, (request) => request.method() === 'GET'
       && new URL(request.url()).pathname === '/api/v1/admin/users'
-      && new URL(request.url()).searchParams.get('size') === '100'
+      && new URL(request.url()).searchParams.get('size') === '20'
       && armed);
     await signInInSpa(page, accounts.adminKeeper);
     await enterAdminViaProfileMenu(page, accounts.adminKeeper);
-    await waitForAdminReady(page, accounts.adminKeeper.me.nickname);
+    await waitForAdminReady(page);
     const search = page.getByRole('searchbox', { name: '관리자 사용자 검색', exact: true });
     await search.fill(fixture.searchLiteral);
     await search.press('Enter');
-    await page.getByText(accounts.special.me.nickname, { exact: true }).first().waitFor({ state: 'visible', timeout: 15_000 });
+    await adminUserRow(page, accounts.special.me.email).first().waitFor({ state: 'visible', timeout: 15_000 });
     const providerMarker = await markProviderDocument(page);
     armed = true;
     await search.fill(fixture.bulkSearchLiteral);
     await search.press('Enter');
     const upstream = await withTimeout(holder.readyPromise, STALE_PROBE_TIMEOUT_MS, 'stale list upstream response');
     check('browser-stale-list-upstream-200', upstream.status === 200 && upstream.bodyBytes > 0, 'held list response is fetched from the real upstream before account expiry');
-    check('browser-stale-list-pending-sensitive', await page.getByText(accounts.adminKeeper.email, { exact: true }).count() === 0,
+    check('browser-stale-list-pending-sensitive', await exactCount(adminUserRow(page, accounts.adminKeeper.email)) === 0,
       'held list response does not expose the sensitive A row before release');
     await triggerAuthExpiry(page, holder);
     await signInExistingSpa(page, accounts.special);
@@ -1853,8 +1885,7 @@ async function runBrowserStaleListProbe(accounts) {
     await withTimeout(holder.released, STALE_PROBE_TIMEOUT_MS, 'stale list release');
     await page.waitForTimeout(300);
     const ok = bStable && sameDocument && new URL(page.url()).pathname === '/'
-      && await page.getByText(accounts.adminKeeper.me.nickname, { exact: true }).count() === 0
-      && await page.getByText(accounts.adminKeeper.email, { exact: true }).count() === 0;
+      && await exactCount(adminUserRow(page, accounts.adminKeeper.email)) === 0;
     check('browser-stale-list', ok,
     'late A list 200 cannot repopulate the same SPA Provider after B is ready');
     return ok;
@@ -1879,6 +1910,7 @@ async function runBrowserStaleDetailProbe(accounts) {
       && armed);
     await signInInSpa(page, accounts.adminKeeper);
     await enterAdminViaProfileMenu(page, accounts.adminKeeper);
+    await page.goto(`${frontendUrl}/admin?page=0&size=100`, { waitUntil: 'domcontentloaded' });
     await waitForAdminReady(page, accounts.adminKeeper.me.nickname);
     const providerMarker = await markProviderDocument(page);
     armed = true;
@@ -1899,7 +1931,7 @@ async function runBrowserStaleDetailProbe(accounts) {
     await withTimeout(holder.released, STALE_PROBE_TIMEOUT_MS, 'stale detail release');
     await page.waitForTimeout(300);
     const ok = bStable && sameDocument && new URL(page.url()).pathname === '/'
-      && await page.getByText(accounts.user.me.nickname, { exact: true }).count() === 0;
+      && await exactCount(adminUserRow(page, accounts.user.me.email)) === 0;
     check('browser-stale-detail', ok,
     'late A detail 200 cannot repopulate the same SPA Provider after B is ready');
     return ok;
@@ -1943,7 +1975,7 @@ async function runBrowserStaleMutationProbe(accounts) {
     await withTimeout(holder.released, STALE_PROBE_TIMEOUT_MS, 'stale mutation release');
     await page.waitForTimeout(300);
     const ok = bStable && sameDocument && new URL(page.url()).pathname === '/'
-      && await page.getByText(accounts.user.me.nickname, { exact: true }).count() === 0;
+      && await exactCount(adminUserRow(page, accounts.user.me.email)) === 0;
     check('browser-stale-mutation', ok,
     'late A mutation 200 cannot navigate or restore detail after B is ready');
     return ok;
@@ -2081,6 +2113,14 @@ async function waitForUserReady(page, account) {
     .waitFor({ state: 'visible', timeout: 15_000 });
 }
 
+function adminUserTable(page) {
+  return page.getByRole('table', { name: '관리자 사용자 목록', exact: true });
+}
+
+function adminUserRow(page, marker) {
+  return adminUserTable(page).getByRole('row').filter({ hasText: marker });
+}
+
 async function waitForAdminReady(page, expectedNickname) {
   const section = page.locator('section[aria-label="관리자 콘솔"]');
   await section.waitFor({ state: 'visible', timeout: 15_000 });
@@ -2088,7 +2128,7 @@ async function waitForAdminReady(page, expectedNickname) {
   const search = page.getByRole('searchbox', { name: '관리자 사용자 검색', exact: true });
   await search.waitFor({ state: 'visible', timeout: 15_000 });
   if (expectedNickname) {
-    await page.getByText(expectedNickname, { exact: true }).first().waitFor({ state: 'visible', timeout: 15_000 });
+    await adminUserRow(page, expectedNickname).first().waitFor({ state: 'visible', timeout: 15_000 });
   }
   const busy = page.locator('[aria-busy="true"]');
   if (await busy.count() > 0) await busy.first().waitFor({ state: 'hidden', timeout: 15_000 }).catch(() => undefined);

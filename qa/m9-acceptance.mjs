@@ -565,8 +565,12 @@ async function uploadSyntheticImage(account) {
   const json = await safeJson(response);
   const url = json?.data?.imageUrl;
   const match = typeof url === 'string' ? url.match(/^\/api\/v1\/uploads\/([0-9a-f-]{36})\/content$/i) : null;
-  check('fixture-image-upload', response.status() === 201 && match != null, 'authenticated synthetic multipart image uploaded');
-  if (response.status() !== 201 || !match) throw new Error('fixture image upload failed');
+  const uploadResult = JSON.stringify({
+    status: response.status(),
+    errorCode: typeof json?.error?.code === 'string' && /^[A-Z][A-Z0-9]*_\d{3}$/.test(json.error.code) ? json.error.code : null,
+  });
+  check('fixture-image-upload', response.status() === 201 && match != null, `authenticated synthetic multipart image upload: ${uploadResult}`);
+  if (response.status() !== 201 || !match) throw new Error(`fixture image upload failed: ${uploadResult}`);
   return { id: match[1], url, bytes: png, sha256: createHash('sha256').update(png).digest('hex') };
 }
 
@@ -1931,7 +1935,10 @@ async function runBrowserStaleDetailProbe(accounts) {
     await withTimeout(holder.released, STALE_PROBE_TIMEOUT_MS, 'stale detail release');
     await page.waitForTimeout(300);
     const ok = bStable && sameDocument && new URL(page.url()).pathname === '/'
-      && await exactCount(adminUserRow(page, accounts.user.me.email)) === 0;
+      && await page.locator('section[aria-label="사용자 상세"]').count() === 0
+      && await page.getByText(accounts.user.me.email, { exact: false }).count() === 0
+      && await page.getByText(`UID #${String(accounts.user.me.id).padStart(4, '0')}`, { exact: true }).count() === 0
+      && await page.getByRole('button', { name: '다시 시도', exact: true }).count() === 0;
     check('browser-stale-detail', ok,
     'late A detail 200 cannot repopulate the same SPA Provider after B is ready');
     return ok;
@@ -1975,7 +1982,10 @@ async function runBrowserStaleMutationProbe(accounts) {
     await withTimeout(holder.released, STALE_PROBE_TIMEOUT_MS, 'stale mutation release');
     await page.waitForTimeout(300);
     const ok = bStable && sameDocument && new URL(page.url()).pathname === '/'
-      && await exactCount(adminUserRow(page, accounts.user.me.email)) === 0;
+      && await page.locator('section[aria-label="사용자 상세"]').count() === 0
+      && await page.getByText(accounts.user.me.email, { exact: false }).count() === 0
+      && await page.getByText(`UID #${String(accounts.user.me.id).padStart(4, '0')}`, { exact: true }).count() === 0
+      && await page.getByRole('button', { name: '다시 시도', exact: true }).count() === 0;
     check('browser-stale-mutation', ok,
     'late A mutation 200 cannot navigate or restore detail after B is ready');
     return ok;

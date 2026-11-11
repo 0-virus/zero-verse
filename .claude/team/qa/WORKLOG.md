@@ -1048,3 +1048,11 @@
 - `git diff --check -- qa/m9-acceptance.mjs qa/M9-review.md .claude/team/qa/STATE.md .claude/team/qa/WORKLOG.md` exit 0; harness/기록 trailing whitespace clean.
 - helper 두 파일은 audit-3에서 수정하지 않았다. 실제 signup/signin·API·DB·runtime·Chrome/Playwright·Git 실행은 하지 않았고, M9 판정은 **A-v2 APPROVED / audit-3 R1~R5 FIX3 STATIC-FROZEN / ACCEPTANCE NOT RUN**이다.
 - root가 이 보정 뒤 명시 QA 파일을 커밋하고 동일 독립 auditor의 scoped re-review를 수행한다. 제품 코드·타 역할 테스트·DB·runtime·Git은 수정하지 않았다.
+
+## 2026-11-11 KST — M9 audit-4 N1 fix4 정적 보완·동결
+
+- 한 일: 새 QA 컨텍스트 `/root/m9_qa_fix4`가 N1만 보정했다. 상세/mutation stale 최종 부재 검사를 목록 row에서 실제 사용자 상세 section·target email/표시 UID·retry 버튼으로 복원했다. 목록 table helper와 B stable session/home/document/held release/navigation 검사는 유지했다. upload 진단에는 HTTP status와 제한된 error code만 기록한다.
+- 산출물: `qa/m9-acceptance.mjs`, `qa/M9-review.md`, QA STATE 및 기존 Task4 report append. helper 두 파일·제품·타 역할 파일·Git·runtime·사용자 데이터는 변경하지 않았다.
+- 검증: `node --check qa/m9-acceptance.mjs` exit 0; scoped `git diff --check` exit 0; 수정 파일 재독. helper suite·HTTP/API/DB/Gradle/브라우저는 이번 라운드에서 실행하지 않았다.
+- 실제 상태: root 진단1 `build/m9-acceptance-20261111-163214/evidence.json`의 fixture-image-upload FAIL/runner 중단을 읽었다. root는 404 원인을 로컬/test profile 누락으로 진단하고 runtime만 보정했다고 인계했다. 환경 원인을 제품 결함으로 판정하거나 required check를 완화하지 않는다.
+- 미해결: **진단1 RUN FAILED / 미도달 matrix NOT RUN**. fix4 정적 동결 후 root commit·scoped re-review·실제 진단2 및 최종 provenance/인수 gate가 남아 있으며 PASS·merge-ready를 주장하지 않는다.

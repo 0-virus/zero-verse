@@ -7,37 +7,37 @@
 - M8 알림은 독립 QA PASS·DEV INTEGRATED로 완료됐다. Run3는 323 PASS / 0 FAIL / 0 NOT_RUN, backend 102 suites/599 tests, frontend 47 files/439 tests 증거를 보존한다.
 - M9 관리자 A-v2가 사용자 전체 승인됐다. 현재 계약은 회의 §5·§10·§10.1·§11, REQUIREMENTS §6.13-A, ADR-0008이다.
 - `qa/M9-review.md`는 A-v2 승인 계약 기준으로 갱신됐고, `qa/m9-acceptance.mjs`는 합성 HTTP/Chrome 인수 harness로 준비됐다.
-- 현재 판정은 **NOT RUN / A-v2 APPROVED / audit-3 R1~R5 FIX3 HARNESS STATIC-FROZEN / 격리 RUNTIME·live provenance 대기**다. final BE/FE artifact의 구조 parser와 focused test는 독립 정적 확인했지만 immutable manifest/JAR live identity·status/native·실제 API·DB·Chrome은 아직 QA가 실행·독립 확인하지 않았다.
+- 현재 판정은 **A-v2 APPROVED / 실제 진단1 RUN FAILED (fixture-image-upload) / audit-4 N1 FIX4 STATIC-FROZEN / 최종 인수 미완료**다. `build/m9-acceptance-20261111-163214/evidence.json`의 upload FAIL·runner 중단을 읽었다. root는 HTTP 404 원인을 로컬/test profile 누락으로 진단하고 자기 runtime만 test profile로 보정했다고 인계했다. 이를 제품 결함이나 PASS로 판정하지 않는다.
 - audit-2 F1~F9와 audit-3 R1~R5에 맞춰 `qa/m9-acceptance.mjs`를 보완하고, 구조화 artifact parser `qa/m9-test-evidence.mjs` 및 focused test를 연결했다. mapped-only helper PASS는 전체 acceptance PASS가 아니며 direct uncovered rows는 실제 harness evidence로 닫아야 한다.
 
 ## 진행 중
 
-- root가 immutable source/JAR manifest, API `18089`, FE `5179`, synthetic MySQL `13319`, native/status-ready handshake와 backend barrier XML을 인계한다. `6a8763d..HEAD`의 제품 소스 변경 경로가 없다는 점은 read-only로 확인했지만, live source/JAR/FE freeze hash는 root provenance로 재대조해야 한다. final BE/FE artifact는 QA helper의 구조 parser와 direct matrix 결과를 함께 확인한다.
+- audit-4 N1의 상세/mutation stale 최종 검사를 실제 사용자 상세 section·target email/표시 UID·이전 retry 부재로 보정했다. 목록 table helper와 B stable session/home/same-document/held release 검사는 유지했다. upload 실패 진단에는 status와 형식 제한된 error code만 남긴다.
+- root의 source/JAR manifest, API `18089`, FE `5179`, synthetic MySQL `13319`, native/status-ready handshake 및 backend barrier XML을 실제 진단2와 대조해야 한다. final BE/FE artifact는 동결된 QA helper의 구조 parser와 direct matrix 결과를 함께 확인한다.
 - QA는 fixture seed/status, root fingerprint, performance_schema query-count, current DB auth, soft-delete 하위 fingerprint, 실제 image bytes/`UPLOAD_003`, SPA stale와 1440px evidence를 독립 대조한다.
 - 사용자 DB `13307`, `.env.local`, 기존 업로드·파일, 제품 코드·타 역할 테스트는 접근·수정하지 않는다.
 
 ## 다음 작업
 
-1. root source freeze와 runtime readiness 후 `qa/m9-acceptance.mjs`를 합성 계정으로 단일 실행한다.
+1. root가 fix4를 커밋·scoped re-review하고 runtime readiness를 확인한 뒤 합성 계정으로 실제 진단2를 단일 실행한다.
 2. 실제 evidence JSON·raw log·source/JAR manifest·BE/FE 결과와 helper/direct uncovered rows를 `qa/M9-review.md` 매트릭스 각 행에 연결하고, 실패는 원 소유자 수정 후 scoped re-review한다.
 3. 독립 whole-branch/시각 검토와 dev 통합 후 M9 회귀를 수행한다.
 
 ## 차단 요인
 
-- immutable live manifest/JAR provenance·격리 runtime/status-ready/native fixture·backend barrier XML의 QA 실제 실행 대조가 아직 남아 있다. 저장 artifact parser focused 검증만 완료됐다.
-- 실제 acceptance를 실행할 때까지 모든 M9 행은 `NOT RUN`이다. A-v2 승인이나 구현자 자체 테스트를 QA PASS로 완화하지 않는다.
-- root가 `build/m9-runtime.py`의 `apply_seed`에 `time`, `summaryExpectations`, KST `weekBoundaryLabels`를 보완해 exact handshake를 재인계했다. 현재 추가 handoff는 `nativeFixtureRequest`에 대한 `nativeFixtures`/`targetDetailExpectations`, backend `AdminConcurrencyMySqlTest` XML barrier 증거, source/JAR·FE freeze provenance다. 이 증거와 격리 runtime 전에는 주경계/native aggregate/실제 acceptance를 실행하지 않는다.
+- 진단1은 fixture image upload에서 중단됐고 미도달 required matrix는 NOT RUN이다. 환경 보정 후 실제 재실행 결과, immutable live manifest/JAR provenance, status/native fixture, backend barrier 및 HTTP/Chrome/1440px 대조가 남아 있다.
+- A-v2 승인·정적 보완·helper focused test 또는 runtime 환경 보정을 M9 PASS로 완화하지 않는다. helper 두 파일은 이번 fix4에서 수정·재실행하지 않았다.
 
 ## 산출물
 
-- `qa/M9-review.md` (audit-2 fix2 정적 보완·NOT RUN 경계 포함)
-- `qa/m9-acceptance.mjs` (F1~F9 보완 HTTP/Chrome harness)
+- `qa/M9-review.md` (audit-4 N1 정적 보완·진단1 RUN FAILED 경계 포함)
+- `qa/m9-acceptance.mjs` (N1 상세/mutation stale 부재 보완 HTTP/Chrome harness)
 - `qa/m9-test-evidence.mjs`, `qa/m9-test-evidence.test.mjs` (구조화 final artifact parser/focused tests; 별도 QA helper 소유)
 - 기존 M8 산출물: `qa/M8-review.md`, `qa/m8-acceptance.mjs`
 
 ## 갱신 시각
 
-2026-11-11 KST — A-v2 승인 계약·audit-3 R1~R5 fix3 harness 및 구조화 artifact helper handoff 기준 갱신. main `node --check`와 `git diff --check`를 통과했으며 실제 인수는 NOT RUN.
+2026-11-11 KST — audit-4 N1 fix4 동결. main `node --check`와 scoped `git diff --check` exit 0. 실제 진단1은 RUN FAILED이며 진단2·최종 gate는 남아 있다.
 
 ## 소유권 준수
 

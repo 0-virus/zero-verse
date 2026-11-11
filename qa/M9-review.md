@@ -271,3 +271,11 @@ Fix1 범위의 정적 검증은 `node --check qa/m9-acceptance.mjs`와 whitespac
 - `git diff --check -- qa/m9-acceptance.mjs` exit 0; 대상 harness trailing whitespace clean.
 - 실제 signup/signin·API `18089`·FE `5179`·MySQL `13319`·status/fingerprint/query-count·backend barrier·Chrome/1440px는 실행하지 않았다. R1~R5는 **정적 보완 완료 / ACCEPTANCE NOT RUN**이며 PASS·merge-ready를 주장하지 않는다.
 - helper `qa/m9-test-evidence.mjs` 및 `qa/m9-test-evidence.test.mjs`는 audit-3에서 수정하지 않고 동결 보존했다. root가 명시 QA 파일을 커밋하고 scoped re-review 후 실제 harness를 실행한다.
+
+## 15. Audit-4 N1 fix4 — 상세/mutation stale 검사 복원
+
+- 근거: `acceptance-audit-4.md` N1, REQUIREMENTS §6.13-A의 계정/request/mutation stale 폐기·retry 제거, PRD §7 관리자 상세의 늦은 응답·retry·이동 폐기.
+- 상세와 mutation 최종 검사는 실제 `section[aria-label="사용자 상세"]`, 대상 email(실제 DOM의 가입일과 결합된 텍스트 포함), `UID #NNNN`, `다시 시도` 버튼이 모두 없는지 확인한다. 목록은 기존 table/row helper를 유지하며 B stable session/home/same-document/held response release 검사는 변경하지 않았다.
+- upload 실패 진단에는 HTTP status와 형식이 제한된 domain error code만 기록한다. 응답 body·token·credentials는 기록하지 않으며 upload 성공 조건은 201과 실제 content URL로 유지한다.
+- `node --check qa/m9-acceptance.mjs` exit 0, scoped `git diff --check` exit 0. helper 두 파일·제품·Git·runtime·DB·브라우저는 변경/실행하지 않았다. 새 matrix·refactor·광역 재검토는 하지 않았다.
+- 현재 실제 판정: `build/m9-acceptance-20261111-163214/evidence.json`에서 진단1의 `fixture-image-upload` FAIL 및 runner 중단을 확인했다. root 인계에 따르면 404는 로컬/test profile 누락이며 root가 runtime만 보정했다. 제품 결함 판정이나 요구 검사 완화 근거로 삼지 않는다. **RUN FAILED / 미도달 required matrix NOT RUN / fix4 STATIC-FROZEN**이며 root commit·scoped 재검토·진단2·live provenance·HTTP/DB/Chrome/시각 최종 대조 전 PASS·merge-ready를 주장하지 않는다.

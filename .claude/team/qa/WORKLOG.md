@@ -920,3 +920,45 @@
 - PR14(`https://github.com/0-virus/zero-verse/pull/14`)가 `dev`에 병합됐다. merge commit은 `b9fcb0469f42077447ce8a8842ce22f24bc94af5`이며 local `dev`는 ff 상태다.
 - tested head `201cd181ec8332e85f2cc985c9560d947b2833f4`와 merge tree `9da6077a89a4528df3cb55c13556ed28300cfd28` 동일 증거를 반영했다. M8은 독립 QA PASS·Ready to merge를 거쳐 **DEV INTEGRATED / 완료**로 기록했다.
 - `qa/M8-review.md` 현재 header와 §11 merge proof, QA STATE를 갱신했다. 독립 §10 review와 `qa/m8-acceptance.mjs`는 수정하지 않았다. M9는 범위 밖이며 사용자 지시 대기다.
+
+## 2026-11-11 KST — M9 독립 QA 준비
+
+### 한 일
+
+- `.claude/CONSTITUTION.md` → `AGENTS.md`/`CLAUDE.md` → QA `CLAUDE.md`/`STATE.md` → `qa/AGENTS.md` 순서로 읽고, M9 `docs/worklog/M9-admin.md`, `docs/governance/meetings/M9-20261111-admin.md` §5 A-v1, REQUIREMENTS §6.13 FR-ADMIN-01~05/NFR-01·04·09, PRD §5.13/§7/§8.3/§9/§10~§12, 디자인 관리자 원본을 대조했다.
+- `qa/M9-review.md`를 작성했다. A-v1을 승인 계약으로 취급하지 않고 API·공통 응답·인증/현재 권한·목록/summary/상세·role/status/delete·soft delete·동시성·FE AdminRoute/stale·1440px·DB/회귀·source/JAR gate를 모두 초기 `NOT RUN`으로 고정했다.
+- 디자인의 “블로그·게시글·댓글이 모두 삭제됩니다. 복구 불가.”와 FR-ADMIN-05의 `deleted_at` soft delete가 충돌하고, `lastAccessAt` 저장 필드가 현재 없다. self SUSPENDED, summary 기준, 통계 범위, bootstrap도 사용자 결정 또는 구체 계약이 필요하다고 기록했다.
+
+### 산출물·검증·미해결
+
+- 산출물: `qa/M9-review.md`, QA `STATE.md` 갱신.
+- 검증: 편집 파일 재독 및 `rg`/`git diff --check`는 부모가 최종 확인할 수 있도록 남겼다. 제품 자동검증·DB·runtime·Chrome은 실행하지 않았다.
+- 판정: **NOT RUN / BLOCKED ON CONTRACT APPROVAL**. 사용자 승인 전에는 A-v1의 제안값을 제품 구현·QA PASS로 올리지 않는다.
+
+## 2026-11-11 KST — M9 A-v2 승인 계약·acceptance harness 준비
+
+### 한 일
+
+- M9 회의 §11, REQUIREMENTS §6.13-A, ADR-0008, worklog Task4를 재독하고 A-v2를 현재 승인 정본으로 반영했다. A-v1의 미확정 표시는 과거 심의 이력으로 남기고 QA 기준은 user-only soft delete/하위 이력 보존, DB current ACTIVE ADMIN, self 보호, `lastAccessAt=null`, 승인 삭제 카피, RR/query-bound, FE probe/stale, 1440px로 갱신했다.
+- `qa/m9-acceptance.mjs`를 새로 준비했다. API `18089`, FE `5179`, synthetic MySQL `13319`만 대상으로 signup/signin API 합성 계정, 실제 multipart POST_IMAGE 업로드·bind, fixture seed/status handshake, root fingerprint JSON, performance_schema scalar query-count, HTTP auth/status/role/delete/ACL/notification/image, Playwright Chrome 1440px와 SPA account-switch stale probe를 포함한다.
+- raw email/password/access/refresh/wrong-claim token은 memory/env에만 두고 evidence에는 합성 ID·hash·status·count·screenshot 이름만 남긴다. SQL은 고정 scalar SELECT 또는 root `fingerprint --json` helper만 사용하며 사용자 입력을 SQL에 조합하지 않는다. 사용자 DB `13307`·`.env.local`·기존 업로드에는 접근하지 않는다.
+- target deleted-actor notification ID는 soft delete 전에 캡처하고, 삭제 후 actor/target/href null masking을 ID 기준으로 확인하도록 했다. image ID는 UUID 문자열이며 실제 `/api/v1/uploads/{uuid}/content` byte hash와 삭제 후 `404 UPLOAD_003`를 확인하도록 했다.
+
+### 산출물·검증·미해결
+
+- 산출물: `qa/M9-review.md`, `qa/m9-acceptance.mjs`, QA `STATE.md` 갱신.
+- 정적 검증: `node --check qa/m9-acceptance.mjs` exit 0; `git diff --check -- qa/M9-review.md qa/m9-acceptance.mjs` exit 0; 대상 파일 trailing whitespace 없음(`rg` exit 1, no matches).
+- 실제 backend/frontend test·bootJar·HTTP·MySQL·fingerprint/query-count·Chrome·1440px acceptance는 실행하지 않았다. 현재 판정은 **NOT RUN / A-v2 APPROVED / HARNESS PREPARED / SOURCE FREEZE·격리 RUNTIME 대기**다.
+- root handoff: `fixture-seed.v1`/`status-ready.v1`의 runId·account IDs·baseline role/status/deleted·bulk 21 IDs·KST week-boundary 3 IDs·summary 기대값·preserved image UUID, `fingerprint.v1`의 child/uploadFiles/preservedSha256, 실제 HTTP 200 전후 query count 1~14·delta0 및 env claim tokens를 exact contract로 문서화했다. root helper의 status-ready가 `time`/`summaryExpectations`를 제공하지 않으면 KST summary gate는 PASS로 완화하지 않는다.
+
+### 2026-11-11 KST — 정적 source/helper 대조 및 harness 보정
+
+- `build/m9-runtime.py`를 읽기 전용으로 대조한 결과 `fingerprint.v1`/synthetic `sql`은 인계 계약과 맞지만, 현재 `apply_seed` source는 `weekBoundaryLabels`를 적용하지 않고 status-ready에 `time`·`summaryExpectations`를 쓰지 않는다. 이 차이는 root가 보완해야 하며 QA가 제품/런타임 helper를 수정하지 않는다.
+- `qa/m9-acceptance.mjs`의 삭제 actor 알림 검사는 실제 수신자인 `accounts.admin` 토큰으로 조회하도록 보정했다. 승인된 keyword 100자 허용/101자 `VALIDATION_001`, role/status invalid body와 private/no-store 검사도 추가했다.
+- 후속 정적 검증 전까지 실제 API/DB/Chrome 실행은 계속 `NOT RUN`이며, 사용자 DB `13307`·업로드·Git은 접근/변경하지 않았다.
+
+### 2026-11-11 KST — 후속 정적 검증
+
+- `node --check qa/m9-acceptance.mjs` exit 0.
+- tracked QA 상태/이력은 `git diff --check` exit 0, 신규 QA 문서·harness는 no-index whitespace check에 whitespace 출력이 없었고 `rg -n '[[:blank:]]+$'` 결과 `trailing-whitespace: clean`이다.
+- 현재 QA 소유 변경은 `qa/M9-review.md`, `qa/m9-acceptance.mjs`, `.claude/team/qa/STATE.md`, `.claude/team/qa/WORKLOG.md`뿐이다. 실제 backend/frontend/API/MySQL/Chrome 및 M9 acceptance는 실행하지 않았다.

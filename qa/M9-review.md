@@ -279,3 +279,13 @@ Fix1 범위의 정적 검증은 `node --check qa/m9-acceptance.mjs`와 whitespac
 - upload 실패 진단에는 HTTP status와 형식이 제한된 domain error code만 기록한다. 응답 body·token·credentials는 기록하지 않으며 upload 성공 조건은 201과 실제 content URL로 유지한다.
 - `node --check qa/m9-acceptance.mjs` exit 0, scoped `git diff --check` exit 0. helper 두 파일·제품·Git·runtime·DB·브라우저는 변경/실행하지 않았다. 새 matrix·refactor·광역 재검토는 하지 않았다.
 - 현재 실제 판정: `build/m9-acceptance-20261111-163214/evidence.json`에서 진단1의 `fixture-image-upload` FAIL 및 runner 중단을 확인했다. root 인계에 따르면 404는 로컬/test profile 누락이며 root가 runtime만 보정했다. 제품 결함 판정이나 요구 검사 완화 근거로 삼지 않는다. **RUN FAILED / 미도달 required matrix NOT RUN / fix4 STATIC-FROZEN**이며 root commit·scoped 재검토·진단2·live provenance·HTTP/DB/Chrome/시각 최종 대조 전 PASS·merge-ready를 주장하지 않는다.
+
+
+## 2026-11-11 KST — Task4 fixround5 image fixture 계약 보완·소스 동결
+
+- 담당: 새 QA 구현 컨텍스트 `/root/m9_qa_fix5`, 기준 HEAD `d409d28`. 범위는 실제 `fixture-target-image-bind` 실패 하나다.
+- RED: `build/m9-acceptance-20261111-163859/evidence.json`의 upload PASS(201)/bind FAIL/runner 중단, root exact 재현 `build/m9-evidence/image-bind-diagnostic-response.json`의 HTTP400 `UPLOAD_004`(본문 이미지와 이미지 목록 불일치). 진단2 top-level은 NOT RUN이며 미도달 matrix를 PASS로 바꾸지 않는다.
+- 근거: REQUIREMENTS FR-POST-02/NFR-02, PRD §5.5·§9.7, PostDtos.UpdatePostRequest, PostController.update, PostService.updateInTransaction/updateImages/validateImageSnapshot을 대조했다. FE PostEditor.test.tsx의 draft/image 저장 사례와 BE PostServiceIntegrationTest의 image node/snapshot 검증, PostContentService image attrs 및 UploadService.bindPostImages의 owner/purpose/최초 binding을 읽었다. images-only API는 기존 본문 image URL 집합과 일치해야 하므로 plain-text 글에 snapshot만 추가한 harness가 계약을 위반했다.
+- 변경: full PUT /posts/{id}에 기존 canonical title/category/thumbnail/tag 2개·marker 문단을 보존하고 image node·동일 images snapshot·PUBLIC·publish:true를 함께 전송한다. canonical 응답의 동일 id/PUBLIC/기존 publishedAt/tag 2개/본문 deep equality/image URL·alt·order를 확인하고 target snapshot을 갱신한다. node:util의 deep equality로 JSON object key 순서에는 의존하지 않는다. bind 진단은 status와 제한된 errorCode만 남기며 body/token/credentials를 출력하지 않는다. 기존 child row/file preservation 및 stats 검사는 보존했다.
+- 검증: `node --check qa/m9-acceptance.mjs` exit 0, `git diff --check -- qa/m9-acceptance.mjs qa/M9-review.md .claude/team/qa/STATE.md .claude/team/qa/WORKLOG.md .superpowers/sdd/M9-admin/task-4-fix1-report.md` exit 0; 수정 파일 재독·scoped diff 확인. API/DB/Chrome/Gradle 및 동결 helper suite는 실행하지 않았다. Git mutation·제품 코드·제품 source/JAR·사용자 데이터 변경은 없다.
+- 미해결: **FIX5 STATIC-FROZEN / 실제 진단2 RUN FAILED / 최종 인수 미완료**. root만 실패 run 보존·fresh 격리 runtime 재실행을 수행한다. 실제 GREEN·최종 PASS·merge-ready는 재실행 및 독립 최종 gate 전 주장하지 않는다.

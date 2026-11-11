@@ -30,6 +30,7 @@ import { fileURLToPath } from 'node:url';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { spawn } from 'node:child_process';
+import { isDeepStrictEqual } from 'node:util';
 import { collectTestEvidence } from './m9-test-evidence.mjs';
 
 const require = createRequire(import.meta.url);
@@ -435,11 +436,37 @@ async function createFixturePosts(accounts) {
   };
   const image = await uploadSyntheticImage(accounts.target);
   if (image?.id && image?.url) {
-    const bound = await apiCall('PUT', `/api/v1/posts/${posts.targetPublic.id}/images`, accounts.target.token, {
+    const target = posts.targetPublic;
+    const contentJson = {
+      ...target.contentJson,
+      content: [...target.contentJson.content, { type: 'image', attrs: { src: image.url, alt: 'M9 synthetic image' } }],
+    };
+    // The body image URLs and image snapshot must be saved together (NFR-02 / FR-POST-02).
+    const bound = await apiCall('PUT', `/api/v1/posts/${target.id}`, accounts.target.token, {
+      title: target.title,
+      contentJson,
+      contentHtml: null,
+      categoryId: target.category.id,
+      visibility: 'PUBLIC',
+      publish: true,
+      thumbnailUrl: target.thumbnailUrl,
+      tagNames: target.tags,
       images: [{ imageUrl: image.url, altText: 'M9 synthetic image', displayOrder: 0 }],
     });
-    check('fixture-target-image-bind', bound.status === 200, 'synthetic POST_IMAGE is bound to target post');
-    if (bound.status !== 200) throw new Error('fixture image binding failed');
+    const bindResult = JSON.stringify({
+      status: bound.status,
+      errorCode: typeof bound.errorCode === 'string' && /^[A-Z][A-Z0-9]*_\d{3}$/.test(bound.errorCode) ? bound.errorCode : null,
+    });
+    const boundOk = bound.status === 200 && bound.data?.id === target.id
+      && bound.data.visibility === 'PUBLIC' && bound.data.publishedAt === target.publishedAt
+      && target.publishedAt != null && bound.data.tags?.length === 2
+      && target.tags.every((tag) => bound.data.tags.includes(tag))
+      && isDeepStrictEqual(bound.data.contentJson, contentJson)
+      && bound.data.images?.length === 1 && bound.data.images[0].imageUrl === image.url
+      && bound.data.images[0].altText === 'M9 synthetic image' && bound.data.images[0].displayOrder === 0;
+    check('fixture-target-image-bind', boundOk, `synthetic POST_IMAGE body/snapshot saved with two tags and published PUBLIC state preserved: ${bindResult}`);
+    if (!boundOk) throw new Error(`fixture image binding failed: ${bindResult}`);
+    posts.targetPublic = bound.data;
     posts.targetImage = image;
     evidence.fixture.imageIds = { target: image.id };
   }

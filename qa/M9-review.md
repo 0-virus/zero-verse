@@ -1,6 +1,6 @@
 # M9 — 관리자 독립 QA 준비 및 인수 기준
 
-> **현재 상태: A-v2 APPROVED / HARNESS PREPARED / ACCEPTANCE NOT RUN**
+> **현재 상태: A-v2 APPROVED / I1~I9 FIX1 STATICALLY CLOSED / ACCEPTANCE NOT RUN**
 >
 > 사용자의 `A-v2 전체 승인`으로 회의 §5·§10·§10.1·§11, REQUIREMENTS §6.13-A, ADR-0008이 현재 계약이 됐다. 승인은 제품 PASS가 아니며, 구현 freeze·격리 runtime·실제 HTTP/Chrome/DB 증거 전에는 인수 완료를 주장하지 않는다.
 
@@ -164,11 +164,14 @@
   "bulkLabels": ["bulk01", "...", "bulk21"],
   "weekBoundaryLabels": ["weekBefore", "weekStart", "weekAfter"],
   "preservedImageIds": ["<UUID>"],
+  "nativeFixtureRequest": {"extraBlogs": true, "softDeletedPost": true},
   "requiredStatusFixture": {"baseline": {"admin": {"role": "ADMIN", "status": "ACTIVE"}, "suspended": {"role": "USER", "status": "SUSPENDED"}, "deleted": {"role": "USER", "deletedAt": "non-null"}}}
 }
 ```
 
-root helper `apply_seed`는 **사용자 DB가 아닌 MySQL `127.0.0.1:13319`**에서만 seed IDs를 사용해 baseline 상태·동일 `created_at` 21행·`weekBoundaryLabels`의 KST 월요일 직전/시작/직후 시각·선택적 image fixture를 적용하고, `M9_STATUS_READY_FILE`에 `zeroverse.m9.status-ready.v1` JSON을 원자적으로 쓴다. ready에는 `runId`, `phase=baseline`, 각 필수 계정의 id/role/status/deletedAt, `sameCreatedAt.ids` 21개, seed의 `preservedImageIds`, `time.{requestNowUtc,weekStartUtc,weekEndUtc}`, `summaryExpectations.{totalUsers,joinedThisWeek,suspendedUsers}`를 포함한다.
+root helper `apply_seed`는 **사용자 DB가 아닌 MySQL `127.0.0.1:13319`**에서만 seed IDs를 사용해 baseline 상태·동일 `created_at` 21행·`weekBoundaryLabels`의 KST 월요일 직전/시작/직후 시각·선택적 image fixture를 적용하고, `nativeFixtureRequest:{extraBlogs:true,softDeletedPost:true}`가 있을 때 target의 추가 활성 blog 1개·삭제 blog 1개·삭제 blog post 1개·기본 blog 삭제 post 1개를 기존 스키마로 생성한다. `M9_STATUS_READY_FILE`에는 `zeroverse.m9.status-ready.v1` JSON을 원자적으로 쓴다. ready에는 `runId`, `phase=baseline`, 각 필수 계정의 id/role/status/deletedAt, `sameCreatedAt.ids` 21개, seed의 `preservedImageIds`, `time.{requestNowUtc,weekStartUtc,weekEndUtc}`, `summaryExpectations.{totalUsers,joinedThisWeek,suspendedUsers}`, `nativeFixtures.{activeBlogId,deletedBlogId,deletedBlogPostId,deletedPostId}`, `targetDetailExpectations.{defaultBlogId,blogCount,postCount,postStats:{total,published,draft},commentCount,universeStats:{outgoingCount,incomingCount,connectionCount}}`를 포함한다. 누락·불일치 시 harness는 fail-closed한다.
+
+comments/reply, target actor comment notification, accepted universe directions (target→user, user→target, target→special, adminKeeper→target), post like와 target post tags는 root SQL seed가 아니라 harness가 인증된 실제 API로 생성한다. 해당 합성 ID는 seed `commentIds`/evidence memory에만 보관하며 raw credential/token은 쓰지 않는다. target의 기대 detail은 root SQL ground truth와 API fixture가 합쳐진 정확한 수치 `{blogCount:2,postCount:4,postStats:{total:4,published:3,draft:1},commentCount:3,universeStats:{outgoingCount:2,incomingCount:2,connectionCount:1}}`와 일치해야 한다.
 
 `runId`·각 ID·필수 role/status/deleted 상태·21개 bulk ID·UUID image ID가 맞지 않으면 harness는 실행을 계속하지 않고 `NOT RUN`/실패로 종료한다. helper는 기존 사용자 DB·업로드를 조회하거나 수정하지 않는다.
 
@@ -209,3 +212,19 @@ node qa/m9-acceptance.mjs
 ```
 
 현재 준비 명령은 `node --check qa/m9-acceptance.mjs`뿐이다. 실제 HTTP·DB·Chrome·source/JAR acceptance는 아직 실행하지 않았고, 본 문서의 모든 매트릭스 행은 `NOT RUN`이다.
+
+## 12. Audit-1 I1~I9 fix1 closure (정적 보완, 실제 인수 미실행)
+
+| Audit finding | 정적 보완 근거 | 현재 상태 |
+|---|---|---|
+| I1 | label별 20자 이내 고유 nickname, email/nickname/blogSlug 사전 unique check, seed 전 중복 fail | STATIC CLOSED / RUNTIME NOT RUN |
+| I2 | `registerAndSetup` 반환 account에 email/password를 memory-only로 연결하고 SPA signin helper가 사용 | STATIC CLOSED / RUNTIME NOT RUN |
+| I3 | 실제 DOM의 `ADMIN CONSOLE` span·`searchbox/관리자 사용자 검색`·`[data-layout="app"]` 외곽 폭, HTTP 200+fixture-row readiness로 수정 | STATIC CLOSED / FE freeze 후 runtime 재대조 필요 |
+| I4 | 동일 SPA Provider에서 list/detail/mutation 실제 upstream 200/body hold → access/refresh 401 → B signin ready → release; logout/goto fallback 제거 | STATIC CLOSED / Chrome NOT RUN |
+| I5 | race의 정확 허용 status/error·최종 detail state·복구를 검사하고, HTTP race와 별도로 `AdminConcurrencyMySqlTest` XML marker를 물리 barrier 증거로 요구 | STATIC CLOSED / BE XML·runtime NOT RUN |
+| I6 | root `nativeFixtureRequest`/`nativeFixtures`/`targetDetailExpectations` 계약, API comments/reply/actor notification/universe/like/tags, non-empty fingerprint child counts·정확 detail·masking checks | STATIC CLOSED / root helper handoff·runtime NOT RUN |
+| I7 | role/status/literal/summary exact ID 집합, 21개 page0/page1 union/intersection/metadata, large offset empty metadata와 envelope/status 검사 | STATIC CLOSED / HTTP NOT RUN |
+| I8 | seed 후 admin/adminPeer/adminKeeper와 target promotion 후 별도 signin으로 실제 ADMIN ACCESS claim 발급, pre-seed USER claim 보존, 강등/정지/삭제 후 5-method 재검증 | STATIC CLOSED / HTTP NOT RUN |
+| I9 | 고정 `REQUIRED_EVIDENCE_IDS`와 `ensureRequiredEvidenceChecks()` fail-closed, auth/bad-signature/refresh/read-only/write/UI confirm/canonical/retry/guard/stale evidence IDs 추가 | STATIC CLOSED / 전체 acceptance NOT RUN |
+
+Fix1 범위의 정적 검증은 `node --check qa/m9-acceptance.mjs`와 whitespace/diff 점검뿐이다. 실제 합성 signup/signin, API, isolated MySQL, fingerprint/query-count, backend XML, Playwright/Chrome 1440px, source/JAR provenance는 실행하지 않았으므로 이 closure는 M9 PASS가 아니다. root가 source/JAR freeze와 위 native/status/BE XML handoff를 마친 뒤 동일 harness를 독립 실행하고, 결과를 각 matrix 행에 evidence ID로 연결해야 한다.

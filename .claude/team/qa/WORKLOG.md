@@ -962,3 +962,22 @@
 - `node --check qa/m9-acceptance.mjs` exit 0.
 - tracked QA 상태/이력은 `git diff --check` exit 0, 신규 QA 문서·harness는 no-index whitespace check에 whitespace 출력이 없었고 `rg -n '[[:blank:]]+$'` 결과 `trailing-whitespace: clean`이다.
 - 현재 QA 소유 변경은 `qa/M9-review.md`, `qa/m9-acceptance.mjs`, `.claude/team/qa/STATE.md`, `.claude/team/qa/WORKLOG.md`뿐이다. 실제 backend/frontend/API/MySQL/Chrome 및 M9 acceptance는 실행하지 않았다.
+
+## 2026-11-11 KST — M9 audit-1 I1~I9 fix1 정적 closure
+
+### 한 일
+
+- `.superpowers/sdd/M9-admin/acceptance-audit-1.md` 원문 I1~I9를 다시 읽고 현재 source/DTO/DOM과 대조했다. 합성 nickname/email/slug 사전 unique gate와 memory-only browser credentials를 보강했다.
+- browser DOM을 실제 `ADMIN CONSOLE` visible span, `searchbox` label `관리자 사용자 검색`, `[data-layout="app"]` 외곽 1100/860px로 맞췄다. 목록·상세 readiness는 실제 HTTP 200과 fixture row/ID를 함께 요구한다. USER direct guard, profile-menu ADMIN entry, role/status/delete 확인창·canonical 재조회·500 retry·승인 삭제 카피를 추가했다.
+- stale 검사는 실제 upstream `route.fetch()` 200/body를 list/detail/mutation 각각 보류하고, 같은 SPA Provider에서 access/refresh 실패 → B signin form ready → held response release 순서로 검증하도록 바꿨다. 제품에 없는 logout button이나 document `goto` account switch를 사용하지 않는다.
+- I5 race는 Promise.all을 MySQL barrier로 주장하지 않고 허용 status/error 집합·최종 detail state·actor race 복구를 확인한다. 별도 `M9_BACKEND_TEST_XML`/기본 XML에 `AdminConcurrencyMySqlTest` 승인 testcase marker가 있어야 physical barrier evidence가 된다.
+- root와 합의한 native fixture handoff로 seed에 `nativeFixtureRequest:{extraBlogs:true,softDeletedPost:true}`를 추가하고, ready의 `nativeFixtures`·`targetDetailExpectations`를 fail-closed로 검증한다. target comments/reply/actor notification, 4개 accepted universe 방향, like/tags는 harness 실제 API로 만든다. deletion 전 ID 캡처, child table non-empty count, comment/reply/notification masking, exact detail aggregate를 확인하도록 했다.
+- I7 exact ID/filter/summary/paging metadata/page0·page1 union/intersection/large-offset empty를 보강했고, I8 seed 후 실제 ADMIN ACCESS 재발급 및 기존 USER claim 보존, current role/status/deleted 5-method 재검증, refresh ACTIVE/SUSPENDED/deleted 경계를 추가했다. I9 고정 `REQUIRED_EVIDENCE_IDS`/fail-closed gate를 넣었다.
+
+### 검증·미해결
+
+- `node --check qa/m9-acceptance.mjs` exit 0.
+- `git diff --check -- qa/M9-review.md qa/m9-acceptance.mjs .claude/team/qa/STATE.md .claude/team/qa/WORKLOG.md` exit 0; 대상 QA/report files `rg -n '[[:blank:]]+$'` exit 1 (no matches).
+- 실제 API/signup/signin, isolated MySQL/status/fingerprint/query-count, backend XML, Chrome/Playwright, source/JAR provenance는 이번 배정에서 실행하지 않았다. 현재 판정은 **I1~I9 STATICALLY CLOSED / M9 ACCEPTANCE NOT RUN**이다.
+- root handoff 잔여: `nativeFixtureRequest` 처리와 ready `nativeFixtures`/`targetDetailExpectations`, backend physical concurrency XML, source/JAR+FE freeze provenance. 제품/타 역할 tests/DB/runtime/Git는 수정·실행하지 않았다.
+- root feedback 반영: native ready의 auto-increment ID distinct 검사는 blog table 내부 2개와 post table 내부 2개로 분리했다. 서로 다른 테이블의 숫자 ID 겹침은 유효하다.

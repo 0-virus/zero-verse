@@ -79,6 +79,82 @@ const evidence = {
   failures: [],
 };
 
+// I9 fail-closed gate: a required row that is never reached is NOT RUN,
+// rather than an accidental PASS caused by an early return or empty fixture.
+const REQUIRED_EVIDENCE_IDS = [
+  'source-runtime-identity',
+  'runtime-api-openapi',
+  'openapi-m9-paths',
+  'fixture-credentials-unique',
+  'fixture-admin-claim-tokens',
+  'fixture-native-subgraph',
+  'fixture-native-api-subgraph',
+  'http-admin-list-status',
+  'http-admin-detail-status',
+  'http-admin-detail-exact-aggregates',
+  'fixture-target-comments-replies',
+  'fixture-target-actor-comment',
+  'fixture-target-actor-notification',
+  'auth-missing-admin-endpoints',
+  'auth-malformed-admin-endpoints',
+  'auth-bad-signature-admin-endpoints',
+  'auth-user-admin-endpoints',
+  'auth-suspended-admin-endpoints',
+  'auth-deleted-admin-endpoints',
+  'auth-expired-admin-endpoints',
+  'auth-wrong-type-admin-endpoints',
+  'auth-missing-role-admin-endpoints',
+  'auth-missing-subject-admin-endpoints',
+  'validation-admin-queries',
+  'validation-admin-keyword-boundary',
+  'validation-admin-bodies',
+  'admin-query-bound',
+  'list-role-filter-exact',
+  'list-status-filter-exact',
+  'list-literal-wildcard-search-exact',
+  'list-summary-exact',
+  'list-same-created-at-pages',
+  'list-large-offset-empty-exact',
+  'mutation-self-protect',
+  'mutation-role-canonical',
+  'mutation-role-demote-canonical',
+  'mutation-status-canonical',
+  'mutation-soft-delete',
+  'fixture-native-child-counts',
+  'http-target-actor-notification-mask',
+  'http-target-comment-placeholder',
+  'http-target-reply-placeholder',
+  'refresh-suspended-rejected',
+  'refresh-active-accepted',
+  'refresh-deleted-rejected',
+  'post-mutation-subgraph-fingerprint',
+  'http-target-image-before-delete',
+  'http-target-image-after-delete',
+  'http-deleted-image-preservation',
+  'concurrency-actor-demotion-exact',
+  'concurrency-target-mutation-exact',
+  'concurrency-physical-barrier-evidence',
+  'browser-guest-admin-guard',
+  'browser-user-admin-guard',
+  'browser-admin-list-http-ready',
+  'browser-admin-detail-http-ready',
+  'browser-role-confirm-canonical',
+  'browser-mutation-error-retry',
+  'browser-status-confirm-canonical',
+  'browser-delete-copy',
+  'browser-delete-confirm-canonical',
+  'browser-stale-list',
+  'browser-stale-list-pending-sensitive',
+  'browser-stale-detail',
+  'browser-stale-detail-pending-sensitive',
+  'browser-stale-mutation',
+  'browser-auth-final-failure-boundary',
+  'browser-account-switch-stale',
+];
+evidence.requiredChecks = REQUIRED_EVIDENCE_IDS;
+
+check('fixture-credentials-unique', uniqueFixtureValues('email') && uniqueFixtureValues('nickname') && uniqueFixtureValues('blogSlug'), 'synthetic email/nickname/blog slug values are unique before any HTTP registration');
+
 let apiContext;
 let browser;
 
@@ -107,11 +183,13 @@ try {
   }
   const posts = await createFixturePosts(accounts);
   await createFixtureComments(accounts, posts);
+  await createNativeApiSubgraph(accounts, posts);
   await writeFixtureSeed(accounts, posts);
 
   const statusReady = await waitForStatusFixtures();
   evidence.fixture.statusReady = statusReady;
   if (!statusReady && requireStatusFixtures) throw new Error('synthetic M9 status fixtures are not ready');
+  await refreshAdminClaims(accounts);
 
   await runHttpAcceptance(accounts, posts);
   await runBrowserAcceptance(accounts, posts);
@@ -121,6 +199,7 @@ try {
   const safeMessage = scrubSecrets(error instanceof Error ? error.message : String(error));
   evidence.failures.push(`runner: ${safeMessage}`);
   evidence.status = 'NOT RUN';
+  ensureRequiredEvidenceChecks();
   await writeEvidence();
   throw new Error(`M9 acceptance failed: ${safeMessage}`);
 } finally {
@@ -136,8 +215,9 @@ function makeFixtureCredentials(suffix) {
   const labels = ['admin', 'adminPeer', 'adminKeeper', 'user', 'target', 'race', 'suspended', 'deleted', 'special', 'weekBefore', 'weekStart', 'weekAfter'];
   const bulkLabels = Array.from({ length: 21 }, (_, index) => `bulk${String(index + 1).padStart(2, '0')}`);
   const allLabels = [...labels, ...bulkLabels];
-  const accounts = Object.fromEntries(allLabels.map((label) => {
-    const nickname = label.startsWith('bulk') ? `m9${bulkSearchLiteral}${label.slice(-2)}`.slice(0, 20) : `m9${label.slice(0, 4)}${key}`.slice(0, 20);
+  const accounts = Object.fromEntries(allLabels.map((label, index) => {
+    const labelKey = label.replace(/[^a-z0-9]/gi, '').toLowerCase();
+    const nickname = `m9${labelKey.slice(0, 8)}${key}${String(index).padStart(2, '0')}`.slice(0, 20);
     const special = label === 'special';
     return [label, {
       email: `m9-${label}-${suffix}@example.test`,
@@ -160,6 +240,11 @@ function makeFixtureCredentials(suffix) {
     weekBoundaryLabels: ['weekBefore', 'weekStart', 'weekAfter'],
     accounts,
   };
+}
+
+function uniqueFixtureValues(field) {
+  const values = Object.values(fixture.accounts).map((account) => account[field]);
+  return values.length > 0 && new Set(values).size === values.length;
 }
 
 async function verifyApiReadiness() {
@@ -222,14 +307,71 @@ async function registerAndSetup(account, label) {
   check(`${label}-pre-setup-blog`, before.status === 200, 'pre-setup default blog remains readable');
   evidence.fixture.accountIds[label] = me.data.id;
   evidence.fixture.blogIds[label] = blog.data.id;
-  return { token, me: me.data, blog: blog.data };
+  return {
+    token,
+    userToken: token,
+    email: account.email,
+    password: account.password,
+    me: me.data,
+    blog: blog.data,
+  };
+}
+
+async function signinAccount(account, label) {
+  const signin = await apiCall('POST', '/api/v1/auth/signin', undefined, {
+    email: account.email,
+    password: account.password,
+  });
+  const token = signin.data?.accessToken;
+  check(`${label}-re-signin`, signin.status === 200 && typeof token === 'string' && token.length > 20, 'post-seed access token held in memory');
+  if (typeof token !== 'string') throw new Error(`${label} post-seed signin failed`);
+  return token;
+}
+
+function jwtClaimsInMemory(token) {
+  try {
+    const segment = String(token).split('.')[1];
+    if (!segment) return null;
+    return JSON.parse(Buffer.from(segment, 'base64url').toString('utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function tamperJwt(token) {
+  const parts = String(token).split('.');
+  if (parts.length !== 3) return 'malformed.synthetic.signature';
+  const signature = parts[2];
+  const replacement = signature.endsWith('A') ? `${signature.slice(0, -1)}B` : `${signature}A`;
+  return `${parts[0]}.${parts[1]}.${replacement}`;
+}
+
+async function refreshAdminClaims(accounts) {
+  const adminLabels = ['admin', 'adminPeer', 'adminKeeper'];
+  const values = [];
+  for (const label of adminLabels) {
+    const account = accounts[label];
+    const token = await signinAccount(account, label);
+    account.adminClaimToken = token;
+    account.token = token;
+    values.push({ label, userClaim: jwtClaimsInMemory(account.userToken), adminClaim: jwtClaimsInMemory(token) });
+  }
+  const valid = values.every(({ label, userClaim, adminClaim }) => userClaim?.role === 'USER'
+    && userClaim?.type === 'ACCESS'
+    && adminClaim?.role === 'ADMIN'
+    && adminClaim?.type === 'ACCESS'
+    && String(adminClaim.sub) === String(accounts[label].me.id));
+  check('fixture-admin-claim-tokens', valid, 'post-seed ADMIN sign-in has ADMIN ACCESS claim while pre-seed token remains USER claim');
+  if (!valid) throw new Error('post-seed ADMIN claim fixture is invalid');
 }
 
 async function createFixturePosts(accounts) {
   const posts = {
     adminPublic: await createPost(accounts.admin, 'admin public', 'PUBLIC', true),
     userPublic: await createPost(accounts.user, 'user public', 'PUBLIC', true),
-    targetPublic: await createPost(accounts.target, 'target public', 'PUBLIC', true),
+    targetPublic: await createPost(accounts.target, 'target public', 'PUBLIC', true, [
+      `m9-${fixture.key}-tag-a`, `m9-${fixture.key}-tag-b`,
+    ]),
     targetPrivate: await createPost(accounts.target, 'target private', 'PRIVATE', true),
     targetDraft: await createPost(accounts.target, 'target draft', 'PRIVATE', false),
     suspendedPublic: await createPost(accounts.suspended, 'suspended public', 'PUBLIC', true),
@@ -253,7 +395,7 @@ async function createFixturePosts(accounts) {
   return posts;
 }
 
-async function createPost(account, label, visibility, publish) {
+async function createPost(account, label, visibility, publish, tagNames = []) {
   const marker = `${fixture.runId} ${label}`;
   const response = await apiCall('POST', '/api/v1/posts', account.token, {
     blogId: account.blog.id,
@@ -264,7 +406,7 @@ async function createPost(account, label, visibility, publish) {
     visibility,
     publish,
     thumbnailUrl: null,
-    tagNames: [],
+    tagNames,
     images: [],
   });
   check(`fixture-post-${label}`, response.status === 201 && Number.isInteger(response.data?.id), 'synthetic post created');
@@ -287,6 +429,53 @@ async function createFixtureComments(accounts, posts) {
   const actorNotification = (notification.data?.items ?? []).find((item) => Number(item.targetId) === Number(evidence.fixture.commentIds.deletedActorComment));
   if (actorNotification?.id != null) evidence.fixture.notificationIds = { deletedActorComment: actorNotification.id };
   check('fixture-deleted-actor-notification', actorNotification?.id != null, 'deleted actor comment notification ID captured before masking');
+}
+
+async function createNativeApiSubgraph(accounts, posts) {
+  const root = await apiCall('POST', `/api/v1/posts/${posts.adminPublic.id}/comments`, accounts.target.token, {
+    content: 'M9 target root comment', parentId: null,
+  });
+  const reply = root.data?.id
+    ? await apiCall('POST', `/api/v1/posts/${posts.adminPublic.id}/comments`, accounts.target.token, {
+      content: 'M9 target reply comment', parentId: root.data.id,
+    }) : null;
+  const actor = await apiCall('POST', `/api/v1/posts/${posts.adminPublic.id}/comments`, accounts.target.token, {
+    content: 'M9 target actor comment', parentId: null,
+  });
+  const relations = await Promise.all([
+    createUniverseRelation(accounts.target, accounts.user),
+    createUniverseRelation(accounts.user, accounts.target),
+    createUniverseRelation(accounts.target, accounts.special),
+    createUniverseRelation(accounts.adminKeeper, accounts.target),
+  ]);
+  const like = await apiCall('POST', `/api/v1/posts/${posts.targetPublic.id}/likes`, accounts.user.token);
+  const valid = root.status === 201 && Number.isInteger(root.data?.id)
+    && reply?.status === 201 && Number.isInteger(reply.data?.id)
+    && actor.status === 201 && Number.isInteger(actor.data?.id)
+    && relations.every((result) => result.request.status === 201 && result.accept.status === 200)
+    && like.status === 200;
+  check('fixture-native-api-subgraph', valid, 'target comments/reply/actor notification, accepted universe directions, like, and post tags are created through real APIs');
+  if (!valid) throw new Error('native API subgraph fixture failed');
+  evidence.fixture.commentIds.nativeRoot = root.data.id;
+  evidence.fixture.commentIds.nativeReply = reply.data.id;
+  evidence.fixture.commentIds.nativeActor = actor.data.id;
+  evidence.fixture.nativeApi = {
+    rootCommentId: root.data.id,
+    replyCommentId: reply.data.id,
+    actorCommentId: actor.data.id,
+    universeIds: relations.map((result) => result.request.data?.requestId).filter(Number.isInteger),
+    likeCreated: true,
+    tagNames: [`m9-${fixture.key}-tag-a`, `m9-${fixture.key}-tag-b`],
+  };
+}
+
+async function createUniverseRelation(from, to) {
+  const request = await apiCall('POST', `/api/v1/universe/requests/${to.me.id}`, from.token);
+  const requestId = request.data?.requestId;
+  const accept = Number.isInteger(requestId)
+    ? await apiCall('POST', `/api/v1/universe/requests/${requestId}/accept`, to.token)
+    : { status: null, data: null, errorCode: null, envelope: false, cacheControl: '' };
+  return { request, accept };
 }
 
 async function uploadSyntheticImage(account) {
@@ -321,6 +510,7 @@ async function writeFixtureSeed(accounts, posts) {
     bulkLabels: fixture.bulkLabels,
     weekBoundaryLabels: fixture.weekBoundaryLabels,
     preservedImageIds: Object.values(evidence.fixture.imageIds ?? {}),
+    nativeFixtureRequest: { extraBlogs: true, softDeletedPost: true },
     requiredStatusFixture: {
       baseline: {
         admin: { role: 'ADMIN', status: 'ACTIVE', deletedAt: null },
@@ -374,7 +564,12 @@ function validateStatusReady(ready) {
     || !validUtc(ready.time?.weekEndUtc)
     || !Number.isInteger(Number(ready.summaryExpectations?.totalUsers))
     || !Number.isInteger(Number(ready.summaryExpectations?.joinedThisWeek))
-    || !Number.isInteger(Number(ready.summaryExpectations?.suspendedUsers))) return false;
+    || !Number.isInteger(Number(ready.summaryExpectations?.suspendedUsers))
+    || !validNativeFixtureReady({
+      schema: 'zeroverse.m9.native-fixture.v1',
+      ids: ready.nativeFixtures,
+      expected: ready.targetDetailExpectations,
+    })) return false;
   const expected = {
     admin: ['ADMIN', 'ACTIVE', false],
     adminPeer: ['ADMIN', 'ACTIVE', false],
@@ -396,6 +591,26 @@ function validateStatusReady(ready) {
     && (!evidence.fixture.imageIds?.target || ready.preservedImageIds?.includes(evidence.fixture.imageIds.target));
 }
 
+function validNativeFixtureReady(nativeFixture) {
+  const ids = nativeFixture?.ids;
+  const expected = nativeFixture?.expected;
+  const requiredIds = ['activeBlogId', 'deletedBlogId', 'deletedBlogPostId', 'deletedPostId'];
+  return nativeFixture?.schema === 'zeroverse.m9.native-fixture.v1'
+    && requiredIds.every((key) => Number.isInteger(Number(ids?.[key])) && Number(ids[key]) > 0)
+    && new Set(['activeBlogId', 'deletedBlogId'].map((key) => Number(ids[key]))).size === 2
+    && new Set(['deletedBlogPostId', 'deletedPostId'].map((key) => Number(ids[key]))).size === 2
+    && Number(expected?.defaultBlogId) === Number(evidence.fixture.blogIds.target)
+    && Number(expected?.blogCount) === 2
+    && Number(expected?.postCount) === 4
+    && Number(expected?.postStats?.total) === 4
+    && Number(expected?.postStats?.published) === 3
+    && Number(expected?.postStats?.draft) === 1
+    && Number(expected?.commentCount) === 3
+    && Number(expected?.universeStats?.outgoingCount) === 2
+    && Number(expected?.universeStats?.incomingCount) === 2
+    && Number(expected?.universeStats?.connectionCount) === 1;
+}
+
 function validUtc(value) {
   return typeof value === 'string' && Number.isFinite(Date.parse(value));
 }
@@ -409,6 +624,26 @@ function safeStatusEvidence(ready) {
     }])),
     time: ready.time ?? null,
     summaryExpectations: ready.summaryExpectations ?? null,
+    nativeFixture: ready.nativeFixtures ? {
+      schema: 'zeroverse.m9.native-fixture.v1',
+      ids: Object.fromEntries(Object.entries(ready.nativeFixtures).map(([key, id]) => [key, Number(id)])),
+      expected: {
+        defaultBlogId: Number(ready.targetDetailExpectations?.defaultBlogId),
+        blogCount: Number(ready.targetDetailExpectations?.blogCount),
+        postCount: Number(ready.targetDetailExpectations?.postCount),
+        postStats: {
+          total: Number(ready.targetDetailExpectations?.postStats?.total),
+          published: Number(ready.targetDetailExpectations?.postStats?.published),
+          draft: Number(ready.targetDetailExpectations?.postStats?.draft),
+        },
+        commentCount: Number(ready.targetDetailExpectations?.commentCount),
+        universeStats: {
+          outgoingCount: Number(ready.targetDetailExpectations?.universeStats?.outgoingCount),
+          incomingCount: Number(ready.targetDetailExpectations?.universeStats?.incomingCount),
+          connectionCount: Number(ready.targetDetailExpectations?.universeStats?.connectionCount),
+        },
+      },
+    } : null,
     sameCreatedAtCount: Array.isArray(ready.sameCreatedAt?.ids) ? ready.sameCreatedAt.ids.length : 0,
     preservedImageIds: Array.isArray(ready.preservedImageIds)
       ? ready.preservedImageIds.filter((id) => typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id))
@@ -442,7 +677,54 @@ async function runHttpAcceptance(accounts, posts) {
   check('http-admin-detail-post-stats', detail.data?.postStats?.total === detail.data?.postCount
     && Number(detail.data?.postStats?.published) + Number(detail.data?.postStats?.draft) === Number(detail.data?.postStats?.total),
   'postStats totals are internally consistent');
+  const native = evidence.fixture.statusExpectations?.nativeFixture;
+  const expectedNative = native?.expected;
+  check('fixture-native-subgraph', native != null && validNativeFixtureReady(native)
+    && evidence.fixture.nativeApi?.likeCreated === true
+    && evidence.fixture.nativeApi?.tagNames?.length === 2,
+  'status-ready declares root native blog/post IDs and exact ground-truth detail while API fixture owns comments/relations/like/tags');
+  check('http-admin-detail-exact-aggregates', detail.status === 200 && expectedNative != null
+    && Number(detail.data?.defaultBlog?.id) === Number(expectedNative.defaultBlogId)
+    && Number(detail.data?.blogCount) === Number(expectedNative.blogCount)
+    && Number(detail.data?.postCount) === Number(expectedNative.postCount)
+    && Number(detail.data?.postStats?.total) === Number(expectedNative.postStats?.total)
+    && Number(detail.data?.postStats?.published) === Number(expectedNative.postStats?.published)
+    && Number(detail.data?.postStats?.draft) === Number(expectedNative.postStats?.draft)
+    && Number(detail.data?.commentCount) === Number(expectedNative.commentCount)
+    && Number(detail.data?.universeStats?.outgoingCount) === Number(expectedNative.universeStats?.outgoingCount)
+    && Number(detail.data?.universeStats?.incomingCount) === Number(expectedNative.universeStats?.incomingCount)
+    && Number(detail.data?.universeStats?.connectionCount) === Number(expectedNative.universeStats?.connectionCount),
+  'detail aggregate fields exactly match non-empty native fixture and active default blog');
   check('http-admin-detail-privacy', noForbiddenFields(detail.data), 'detail DTO does not expose secret/body fields');
+  const targetComments = await apiCall('GET', `/api/v1/posts/${posts.adminPublic.id}/comments?page=0&size=20`, accounts.adminKeeper.token);
+  const nativeIds = evidence.fixture.nativeApi ?? {};
+  const targetRoot = findItem(targetComments, nativeIds.rootCommentId);
+  const targetReply = pageItems({ data: targetRoot?.replies }).find((item) => Number(item.id) === Number(nativeIds.replyCommentId));
+  check('fixture-target-comments-replies', targetComments.status === 200
+    && targetRoot?.author?.id === accounts.target.me.id
+    && targetRoot?.parentId == null
+    && targetRoot?.content === 'M9 target root comment'
+    && targetReply?.author?.id === accounts.target.me.id
+    && Number(targetReply?.parentId) === Number(nativeIds.rootCommentId)
+    && targetReply?.content === 'M9 target reply comment',
+  'target owns a surviving root comment and nested reply on a surviving post');
+  const targetActorComments = await apiCall('GET', `/api/v1/posts/${posts.adminPublic.id}/comments?page=0&size=20`, accounts.admin.token);
+  const targetActorComment = findItem(targetActorComments, nativeIds.actorCommentId);
+  check('fixture-target-actor-comment', targetActorComments.status === 200
+    && targetActorComment?.author?.id === accounts.target.me.id
+    && targetActorComment?.content === 'M9 target actor comment',
+  'target owns a comment on a surviving other-user post for actor-notification masking');
+  const targetActorNotificationPage = await apiCall('GET', '/api/v1/notifications?read=all&page=0&size=100', accounts.admin.token);
+  const targetActorNotification = (targetActorNotificationPage.data?.items ?? [])
+    .find((item) => Number(item.targetId) === Number(nativeIds.actorCommentId));
+  if (targetActorNotification?.id != null) {
+    evidence.fixture.notificationIds = {
+      ...(evidence.fixture.notificationIds ?? {}),
+      targetActorComment: targetActorNotification.id,
+    };
+  }
+  check('fixture-target-actor-notification', targetActorNotificationPage.status === 200 && targetActorNotification?.id != null,
+    'target actor notification ID is captured before deleting target, without exposing tokens');
 
   await runAdminAuthMatrix(accounts, endpoints);
   await runListMatrix(admin.token, accounts);
@@ -460,12 +742,29 @@ async function runHttpAcceptance(accounts, posts) {
   check('http-deleted-comment-placeholder', survivingComments.status === 200 && deletedComment != null
     && deletedComment.content == null && (deletedComment.author == null || deletedComment.deleted === true),
   'deleted actor comment is preserved as a placeholder on a surviving post');
+  const targetDeletedComment = findItem(survivingComments, evidence.fixture.nativeApi?.actorCommentId);
+  check('http-target-comment-placeholder', survivingComments.status === 200 && targetDeletedComment != null
+    && targetDeletedComment.content == null && (targetDeletedComment.author == null || targetDeletedComment.deleted === true),
+  'target-owned comment history is preserved as a placeholder after target soft delete');
+  const targetRootPlaceholder = findItem(survivingComments, evidence.fixture.nativeApi?.rootCommentId);
+  const targetReplyPlaceholder = pageItems({ data: targetRootPlaceholder?.replies })
+    .find((item) => Number(item.id) === Number(evidence.fixture.nativeApi?.replyCommentId));
+  check('http-target-reply-placeholder', survivingComments.status === 200 && targetRootPlaceholder != null
+    && targetRootPlaceholder.content == null && (targetRootPlaceholder.author == null || targetRootPlaceholder.deleted === true)
+    && targetReplyPlaceholder != null && targetReplyPlaceholder.content == null
+    && (targetReplyPlaceholder.author == null || targetReplyPlaceholder.deleted === true),
+  'target root comment and nested reply remain as masked history after target soft delete');
 
   const notifications = await apiCall('GET', '/api/v1/notifications?read=all&page=0&size=100', admin.token);
   const maskedNotification = (notifications.data?.items ?? []).find((item) => Number(item.id) === Number(evidence.fixture.notificationIds?.deletedActorComment));
   check('http-deleted-actor-notification-mask', notifications.status === 200 && maskedNotification != null
     && maskedNotification.actor == null && maskedNotification.targetId == null && maskedNotification.href == null,
   'notification actor and target are masked after the actor soft delete');
+  const targetMaskedNotification = (notifications.data?.items ?? [])
+    .find((item) => Number(item.id) === Number(evidence.fixture.notificationIds?.targetActorComment));
+  check('http-target-actor-notification-mask', notifications.status === 200 && targetMaskedNotification != null
+    && targetMaskedNotification.actor == null && targetMaskedNotification.targetId == null && targetMaskedNotification.href == null,
+  'target actor notification remains as a masked history row after target soft delete');
 
   const preservedImageIds = evidence.fixture.statusExpectations?.preservedImageIds ?? [];
   if (preservedImageIds.length === 0) {
@@ -485,6 +784,11 @@ async function runAdminAuthMatrix(accounts, endpoints) {
 
   const malformed = await Promise.all(endpoints.map((endpoint) => apiCallWithHeaders(endpoint.method, endpoint.path, { Authorization: 'Basic not-a-bearer' })));
   check('auth-malformed-admin-endpoints', malformed.every((response) => response.status === 401 && response.errorCode === 'AUTH_004' && privateNoStore(response.cacheControl) && response.envelope), 'malformed bearer is not downgraded to guest and remains no-store');
+
+  const badSignature = tamperJwt(accounts.admin.token);
+  const badSignatureResponses = await Promise.all(endpoints.map((endpoint) => apiCall(endpoint.method, endpoint.path, badSignature)));
+  check('auth-bad-signature-admin-endpoints', badSignatureResponses.every((response) => response.status === 401
+    && response.errorCode === 'AUTH_004' && privateNoStore(response.cacheControl) && response.envelope), 'signed token with invalid signature is AUTH_004/no-store on all five admin methods');
 
   const user = await Promise.all(endpoints.map((endpoint) => apiCall(endpoint.method, endpoint.path, accounts.user.token)));
   check('auth-user-admin-endpoints', user.every((response) => response.status === 403 && response.errorCode === 'ADMIN_001' && privateNoStore(response.cacheControl) && response.envelope), 'current USER is rejected by every admin endpoint');
@@ -514,7 +818,8 @@ async function runAdminAuthMatrix(accounts, endpoints) {
     if (!token) notRun(label, `${variable} is not supplied by isolated runtime`);
     else {
       const responses = await Promise.all(endpoints.map((endpoint) => apiCall(endpoint.method, endpoint.path, token)));
-      check(label, responses.every((response) => response.status === 401 && response.errorCode === 'AUTH_004' && privateNoStore(response.cacheControl)), 'signed incomplete claim is AUTH_004 with no-store on all five methods');
+      check(label, responses.every((response) => response.status === 401 && response.errorCode === 'AUTH_004'
+        && privateNoStore(response.cacheControl) && response.envelope), 'signed incomplete claim is AUTH_004/no-store envelope on all five methods');
     }
   }
 
@@ -552,29 +857,77 @@ async function runListMatrix(token, accounts) {
   const pageHundred = await adminList(token, { page: 0, size: 100 });
   const pageOneIds = ids(pageOne);
   const pageHundredIds = ids(pageHundred);
+  const liveLabels = Object.keys(accounts).filter((label) => label !== 'deleted');
+  const expectedLiveIds = new Set(liveLabels.map((label) => Number(accounts[label].me.id)));
+  const expectedAdminIds = new Set(['admin', 'adminPeer', 'adminKeeper'].map((label) => Number(accounts[label].me.id)));
+  const expectedUserIds = new Set(liveLabels.filter((label) => !expectedAdminIds.has(Number(accounts[label].me.id)))
+    .map((label) => Number(accounts[label].me.id)));
+  const expectedActiveIds = new Set(liveLabels.filter((label) => accounts[label].me.id !== accounts.suspended.me.id)
+    .map((label) => Number(accounts[label].me.id)));
+  const summaryExpected = evidence.fixture.statusExpectations?.summaryExpectations;
   check('list-page-shape', pageShape(pageHundred), 'admin list uses offset PageResponse shape');
   check('list-page-size-boundary', pageOne.status === 200 && pageHundred.status === 200 && pageOneIds.size <= 1 && pageHundredIds.size >= pageOneIds.size, 'page size 1 and 100 are accepted');
   check('list-no-duplicate-ids', pageHundredIds.size === pageItems(pageHundred).length, 'list contains no duplicate users');
   check('list-stable-sort', stableCreatedSort(pageItems(pageHundred)), 'list is sorted createdAt DESC,id DESC');
+  check('list-live-id-set-exact', pageHundred.status === 200 && setsEqual(pageHundredIds, expectedLiveIds)
+    && Number(pageHundred.data?.users?.totalElements) === expectedLiveIds.size,
+  'unfiltered list returns exactly every non-deleted fixture user and no deleted ID');
 
   const roleFiltered = await adminList(token, { role: 'USER', size: 100 });
   const statusFiltered = await adminList(token, { status: 'ACTIVE', size: 100 });
-  check('list-role-filter', pageItems(roleFiltered).every((item) => item.role === 'USER'), 'role=USER filter is exact');
-  check('list-status-filter', pageItems(statusFiltered).every((item) => item.status === 'ACTIVE'), 'status=ACTIVE filter is exact');
+  checkPageResponse('list-role-filter', roleFiltered, true);
+  checkPageResponse('list-status-filter', statusFiltered, true);
+  check('list-role-filter-exact', roleFiltered.status === 200 && setsEqual(ids(roleFiltered), expectedUserIds)
+    && pageItems(roleFiltered).every((item) => item.role === 'USER')
+    && Number(roleFiltered.data?.users?.totalElements) === expectedUserIds.size,
+  'role=USER returns the exact non-deleted USER ID set');
+  check('list-status-filter-exact', statusFiltered.status === 200 && setsEqual(ids(statusFiltered), expectedActiveIds)
+    && pageItems(statusFiltered).every((item) => item.status === 'ACTIVE')
+    && Number(statusFiltered.data?.users?.totalElements) === expectedActiveIds.size,
+  'status=ACTIVE returns the exact non-deleted ACTIVE ID set');
 
   const special = await adminList(token, { keyword: fixture.searchLiteral, size: 100 });
-  check('list-literal-wildcard-search', special.status === 200 && pageItems(special).some((item) => Number(item.id) === Number(accounts.special.me.id)), 'percent/underscore/backslash search stays literal');
-  check('list-summary-global', hasSummary(special) && Number(special.data.summary.totalUsers) >= Object.keys(accounts).length - 1, 'summary is global and excludes deleted users');
+  checkPageResponse('list-literal-wildcard-search', special, true);
+  check('list-literal-wildcard-search-exact', special.status === 200
+    && setsEqual(ids(special), new Set([Number(accounts.special.me.id)])), 'percent/underscore/backslash search stays literal and returns the exact fixture match');
+  check('list-summary-exact', hasSummary(special) && summaryExpected != null
+    && Number(special.data.summary.totalUsers) === Number(summaryExpected.totalUsers)
+    && Number(special.data.summary.joinedThisWeek) === Number(summaryExpected.joinedThisWeek)
+    && Number(special.data.summary.suspendedUsers) === Number(summaryExpected.suspendedUsers), 'filtered list summary is global and exactly matches KST fixture expectations');
   check('list-summary-no-deleted', !containsId(pageHundred, accounts.deleted.me.id), 'summary/list exclude deleted account');
 
-  const sameTime = await adminList(token, { keyword: fixture.bulkSearchLiteral, size: 100 });
-  const returnedBulkIds = ids(sameTime);
   const expectedBulkIds = new Set(fixture.bulkLabels.map((label) => Number(accounts[label].me.id)));
+  const sameTime = await adminList(token, { keyword: fixture.bulkSearchLiteral, page: 0, size: 100 });
+  const returnedBulkIds = ids(sameTime);
+  checkPageResponse('list-same-created-at-complete', sameTime, true);
   check('list-same-created-at-complete', sameTime.status === 200 && returnedBulkIds.size === expectedBulkIds.size
-    && [...expectedBulkIds].every((id) => returnedBulkIds.has(id)), 'same-createdAt fixture returns exactly all 21 bulk IDs');
+    && setsEqual(returnedBulkIds, expectedBulkIds)
+    && Number(sameTime.data?.users?.totalElements) === expectedBulkIds.size, 'same-createdAt fixture returns exactly all 21 bulk IDs');
   check('list-same-created-at-deterministic', stableCreatedSort(pageItems(sameTime)), 'same-createdAt fixture is deterministic by createdAt DESC,id DESC');
+  const samePage0 = await adminList(token, { keyword: fixture.bulkSearchLiteral, page: 0, size: 20 });
+  const samePage1 = await adminList(token, { keyword: fixture.bulkSearchLiteral, page: 1, size: 20 });
+  const sameIds0 = ids(samePage0);
+  const sameIds1 = ids(samePage1);
+  const sameUnion = new Set([...sameIds0, ...sameIds1]);
+  const sameIntersection = [...sameIds0].filter((id) => sameIds1.has(id));
+  checkPageResponse('list-same-created-at-page0', samePage0, true);
+  checkPageResponse('list-same-created-at-page1', samePage1, true);
+  check('list-same-created-at-pages', samePage0.status === 200 && samePage1.status === 200
+    && sameIds0.size === 20 && sameIds1.size === 1 && sameIntersection.length === 0
+    && setsEqual(sameUnion, expectedBulkIds)
+    && Number(samePage0.data?.users?.totalElements) === expectedBulkIds.size
+    && Number(samePage0.data?.users?.totalPages) === 2
+    && samePage0.data?.users?.hasNext === true && samePage0.data?.users?.hasPrevious === false
+    && samePage1.data?.users?.hasNext === false && samePage1.data?.users?.hasPrevious === true
+    && stableCreatedSort(pageItems(samePage0)) && stableCreatedSort(pageItems(samePage1)),
+  'same-createdAt 21 rows split across pages have exact union, no intersection, metadata, and deterministic order');
   const offset = await adminList(token, { page: 999_999, size: 100 });
-  check('list-large-offset-empty', offset.status === 200 && Array.isArray(pageItems(offset)), 'large valid offset returns a bounded empty/normal page');
+  checkPageResponse('list-large-offset', offset, true);
+  check('list-large-offset-empty-exact', offset.status === 200 && pageItems(offset).length === 0
+    && Number(offset.data?.users?.totalElements) === expectedLiveIds.size
+    && Number(offset.data?.users?.totalPages) === Math.ceil(expectedLiveIds.size / 100)
+    && offset.data?.users?.hasNext === false && offset.data?.users?.hasPrevious === true,
+  'large valid offset returns an exact empty page with unchanged metadata');
 }
 
 async function runMutationMatrix(accounts, posts) {
@@ -585,26 +938,75 @@ async function runMutationMatrix(accounts, posts) {
   const selfRole = await apiCall('PUT', `/api/v1/admin/users/${admin.me.id}/role`, admin.token, { role: 'USER' });
   const selfStatus = await apiCall('PUT', `/api/v1/admin/users/${admin.me.id}/status`, admin.token, { status: 'SUSPENDED' });
   const selfDelete = await apiCall('DELETE', `/api/v1/admin/users/${admin.me.id}`, admin.token);
-  check('mutation-self-protect', [selfRole, selfStatus, selfDelete].every((response) => response.status === 400 && response.errorCode === 'ADMIN_002'), 'self role removal/status/delete are ADMIN_002');
+  const selfErrorMessage = '자기 자신의 관리자 권한 회수, 계정 정지 또는 삭제는 할 수 없습니다.';
+  check('mutation-self-protect', [selfRole, selfStatus, selfDelete].every((response) => response.status === 400
+    && response.errorCode === 'ADMIN_002' && response.errorMessage === selfErrorMessage
+    && response.envelope && privateNoStore(response.cacheControl)), 'self role removal/status/delete are ADMIN_002 with the approved message/no-store envelope');
 
   const selfKeepRole = await apiCall('PUT', `/api/v1/admin/users/${admin.me.id}/role`, admin.token, { role: 'ADMIN' });
   const selfKeepStatus = await apiCall('PUT', `/api/v1/admin/users/${admin.me.id}/status`, admin.token, { status: 'ACTIVE' });
   check('mutation-self-keep', selfKeepRole.status === 200 && selfKeepStatus.status === 200, 'self ADMIN/ACTIVE idempotent keep requests succeed');
 
   const promoted = await apiCall('PUT', `/api/v1/admin/users/${targetId}/role`, admin.token, { role: 'ADMIN' });
-  const targetAsAdmin = await apiCall('GET', '/api/v1/admin/users?page=0&size=1', accounts.target.token);
-  check('mutation-role-promote-current-token', promoted.status === 200 && targetAsAdmin.status === 200, 'role promotion is reflected by current DB authorization');
+  const targetAdminClaimToken = await signinAccount(fixture.accounts.target, 'target-promoted-admin');
+  accounts.target.adminClaimToken = targetAdminClaimToken;
+  const targetAdminClaims = jwtClaimsInMemory(targetAdminClaimToken);
+  const targetAsAdmin = await apiCall('GET', '/api/v1/admin/users?page=0&size=1', targetAdminClaimToken);
+  const targetOldUserClaim = await apiCall('GET', '/api/v1/admin/users?page=0&size=1', accounts.target.userToken);
+  check('mutation-role-promote-current-token', promoted.status === 200 && targetAdminClaims?.role === 'ADMIN'
+    && targetAsAdmin.status === 200 && targetOldUserClaim.status === 403 && targetOldUserClaim.errorCode === 'ADMIN_001',
+  'role promotion is reflected only by a newly issued current ADMIN claim; prior USER claim stays denied');
+  check('mutation-role-canonical', promoted.status === 200 && promoted.envelope && privateNoStore(promoted.cacheControl)
+    && Number(promoted.data?.id) === Number(targetId) && promoted.data?.role === 'ADMIN',
+  'role promotion returns canonical target ID/role and private no-store envelope');
   const demoted = await apiCall('PUT', `/api/v1/admin/users/${targetId}/role`, admin.token, { role: 'USER' });
-  check('mutation-role-demote', demoted.status === 200 && demoted.data?.role === 'USER', 'role demotion returns canonical detail');
+  const staleTargetAdminAfterDemote = await adminActorMatrix(targetAdminClaimToken, targetId, 'ADMIN_001', 403);
+  check('mutation-role-demote', demoted.status === 200 && demoted.data?.role === 'USER'
+    && staleTargetAdminAfterDemote, 'role demotion returns canonical detail and invalidates existing ADMIN claim authorization');
+  check('mutation-role-demote-canonical', demoted.status === 200 && demoted.envelope && privateNoStore(demoted.cacheControl)
+    && Number(demoted.data?.id) === Number(targetId) && demoted.data?.role === 'USER',
+  'role demotion returns canonical target ID/role and private no-store envelope');
 
+  const suspendedRefreshProbe = await createRefreshProbe(fixture.accounts.target, 'target-before-suspend');
   const suspended = await apiCall('PUT', `/api/v1/admin/users/${targetId}/status`, admin.token, { status: 'SUSPENDED' });
-  const suspendedAccess = await apiCall('GET', '/api/v1/admin/users?page=0&size=1', accounts.target.token);
+  const suspendedAccess = await apiCall('GET', '/api/v1/admin/users?page=0&size=1', targetAdminClaimToken);
   const suspendedPublic = await apiCall('GET', `/api/v1/posts/${posts.targetPublic.id}`);
+  const suspendedWrite = await apiCall('POST', '/api/v1/posts', accounts.target.userToken, {
+    blogId: accounts.target.blog.id,
+    title: 'M9 suspended write must fail',
+    contentJson: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'suspended' }] }] },
+    contentHtml: '<p>suspended</p>', categoryId: null, visibility: 'PUBLIC', publish: true,
+    thumbnailUrl: null, tagNames: [], images: [],
+  });
+  const suspendedNotifications = await apiCall('GET', '/api/v1/notifications?read=all&page=0&size=20', accounts.target.userToken);
+  const suspendedNotificationId = suspendedNotifications.data?.items?.[0]?.id;
+  const suspendedNotificationRead = Number.isInteger(Number(suspendedNotificationId))
+    ? await apiCall('PUT', `/api/v1/notifications/${suspendedNotificationId}/read`, accounts.target.userToken)
+    : null;
   check('mutation-suspend-boundary', suspended.status === 200 && suspendedAccess.status === 403 && suspendedAccess.errorCode === 'USER_003'
-    && suspendedPublic.status === 200, 'SUSPENDED blocks admin access but preserves existing PUBLIC read');
+    && suspendedPublic.status === 200 && suspendedWrite.status === 403 && suspendedWrite.errorCode === 'USER_003'
+    && suspendedNotifications.status === 200 && suspendedNotifications.data?.canManage === false
+    && suspendedNotificationRead != null && suspendedNotificationRead.status === 403 && suspendedNotificationRead.errorCode === 'USER_003',
+  'SUSPENDED blocks admin/write/read mutation access but preserves PUBLIC and notification read-only view');
+  const suspendedRefresh = suspendedRefreshProbe ? await refreshFromProbe(suspendedRefreshProbe) : null;
+  check('refresh-suspended-rejected', suspendedRefresh?.status === 401 && suspendedRefresh.errorCode === 'AUTH_003'
+    && suspendedRefresh.envelope && privateNoStore(suspendedRefresh.cacheControl),
+  'refresh token issued before suspension is rejected as AUTH_003');
+  await suspendedRefreshProbe?.dispose();
   const activated = await apiCall('PUT', `/api/v1/admin/users/${targetId}/status`, admin.token, { status: 'ACTIVE' });
   const repeatedActive = await apiCall('PUT', `/api/v1/admin/users/${targetId}/status`, admin.token, { status: 'ACTIVE' });
-  check('mutation-status-idempotence', activated.status === 200 && repeatedActive.status === 200, 'status changes and repeated same value succeed');
+  const targetAdminAfterActivate = await adminActorMatrix(targetAdminClaimToken, targetId, 'ADMIN_001', 403);
+  check('mutation-status-idempotence', activated.status === 200 && repeatedActive.status === 200 && targetAdminAfterActivate,
+    'status changes and repeated same value succeed without restoring a demoted ADMIN claim');
+  check('mutation-status-canonical', suspended.status === 200 && suspended.envelope && privateNoStore(suspended.cacheControl)
+    && suspended.data?.status === 'SUSPENDED' && activated.status === 200 && activated.data?.status === 'ACTIVE'
+    && repeatedActive.data?.status === 'ACTIVE', 'status mutations return canonical status and private no-store envelopes');
+
+  const activeRefreshProbe = await createRefreshProbe(fixture.accounts.target, 'target-active');
+  const activeRefresh = activeRefreshProbe ? await refreshFromProbe(activeRefreshProbe) : null;
+  check('refresh-active-accepted', activeRefresh?.status === 200 && activeRefresh.envelope,
+    'ACTIVE account refresh succeeds with a current DB-backed user');
+  await activeRefreshProbe?.dispose();
 
   const beforeDeleteFingerprint = await runtimeFingerprint(accounts.target.me.id, 'before-target-delete');
   evidence.fixture.fingerprint.beforeDelete = {
@@ -613,16 +1015,33 @@ async function runMutationMatrix(accounts, posts) {
     childFingerprints: beforeDeleteFingerprint.childFingerprints,
     tableCounts: beforeDeleteFingerprint.tableCounts,
   };
+  const childCounts = beforeDeleteFingerprint.tableCounts ?? {};
+  check('fixture-native-child-counts', Number(childCounts.blogs) >= 2
+    && Number(childCounts.posts) >= 4
+    && Number(childCounts.comments) >= 4
+    && Number(childCounts.post_tags) >= 2
+    && Number(childCounts.post_likes) >= 1
+    && Number(childCounts.universes) >= 4
+    && Number(childCounts.image_uploads) >= 1,
+  'before-delete fingerprint proves non-empty target child rows for blogs/posts/comments/tags/likes/universe/uploads');
   const imageBefore = posts.targetImage
     ? await binaryCall(posts.targetImage.url, accounts.target.token)
     : null;
   check('http-target-image-before-delete', imageBefore?.status === 200 && imageBefore.sha256 === posts.targetImage?.sha256 && imageBefore.size === posts.targetImage?.bytes.length, 'target image is readable with target token and byte hash matches upload');
 
+  const deleteRefreshProbe = await createRefreshProbe(fixture.accounts.target, 'target-before-delete');
   const deleted = await apiCall('DELETE', `/api/v1/admin/users/${targetId}`, admin.token);
   const repeatedDelete = await apiCall('DELETE', `/api/v1/admin/users/${targetId}`, admin.token);
   const deletedDetail = await apiCall('GET', `/api/v1/admin/users/${targetId}`, admin.token);
   check('mutation-soft-delete', [200, 204].includes(deleted.status) && deleted.data == null, 'delete returns empty success');
   check('mutation-delete-idempotence-contract', repeatedDelete.status === 404 && repeatedDelete.errorCode === 'USER_001' && deletedDetail.status === 404, 'deleted target and repeated DELETE are USER_001/404');
+  const targetAdminAfterDelete = await adminActorMatrix(targetAdminClaimToken, targetId, 'USER_001', 404);
+  check('mutation-deleted-admin-claim-recheck', targetAdminAfterDelete, 'previously issued ADMIN claim is rejected as USER_001 after actor deletion');
+  const deletedRefresh = deleteRefreshProbe ? await refreshFromProbe(deleteRefreshProbe) : null;
+  check('refresh-deleted-rejected', deletedRefresh?.status === 401 && deletedRefresh.errorCode === 'AUTH_003'
+    && deletedRefresh.envelope && privateNoStore(deletedRefresh.cacheControl),
+  'refresh token issued before soft delete is rejected as AUTH_003');
+  await deleteRefreshProbe?.dispose();
 
   const afterDeleteFingerprint = await runtimeFingerprint(accounts.target.me.id, 'after-target-delete');
   evidence.fixture.fingerprint.afterDelete = {
@@ -642,24 +1061,109 @@ async function runMutationMatrix(accounts, posts) {
   check('mutation-missing-target', missing.status === 404 && missing.errorCode === 'USER_001', 'missing target is USER_001/404');
 }
 
+async function adminActorMatrix(token, targetId, errorCode, status) {
+  const responses = await Promise.all([
+    apiCall('GET', '/api/v1/admin/users?page=0&size=1', token),
+    apiCall('GET', `/api/v1/admin/users/${targetId}`, token),
+    apiCall('PUT', `/api/v1/admin/users/${targetId}/role`, token, { role: 'USER' }),
+    apiCall('PUT', `/api/v1/admin/users/${targetId}/status`, token, { status: 'ACTIVE' }),
+    apiCall('DELETE', `/api/v1/admin/users/${targetId}`, token),
+  ]);
+  return responses.every((response) => response.status === status
+    && response.errorCode === errorCode && response.envelope && privateNoStore(response.cacheControl));
+}
+
 async function runConcurrencyMatrix(accounts) {
   const raceId = accounts.race.me.id;
   const actorDemotion = await Promise.all([
     apiCall('PUT', `/api/v1/admin/users/${accounts.admin.me.id}/role`, accounts.adminPeer.token, { role: 'USER' }),
     apiCall('PUT', `/api/v1/admin/users/${accounts.user.me.id}/status`, accounts.admin.token, { status: 'SUSPENDED' }),
   ]);
-  check('concurrency-actor-demotion-race', actorDemotion.every((response) => response.status !== 500 && response.status !== 409), 'actor demotion race has no 500/lock leak and stale actor is rechecked');
+  const demoteResponse = actorDemotion[0];
+  const actorStatusResponse = actorDemotion[1];
+  const adminFinal = await apiCall('GET', `/api/v1/admin/users/${accounts.admin.me.id}`, accounts.adminKeeper.token);
+  const userFinal = await apiCall('GET', `/api/v1/admin/users/${accounts.user.me.id}`, accounts.adminKeeper.token);
+  const actorRaceAllowed = [200, 403].includes(actorStatusResponse.status)
+    && (actorStatusResponse.status === 200 || actorStatusResponse.errorCode === 'ADMIN_001')
+    && demoteResponse.status === 200
+    && demoteResponse.data?.role === 'USER'
+    && adminFinal.status === 200 && adminFinal.data?.role === 'USER'
+    && userFinal.status === 200
+    && userFinal.data?.status === (actorStatusResponse.status === 200 ? 'SUSPENDED' : 'ACTIVE')
+    && [demoteResponse, actorStatusResponse].every((response) => response.envelope && privateNoStore(response.cacheControl));
+  evidence.fixture.concurrency = {
+    actorDemotion: actorDemotion.map((response) => ({ status: response.status, errorCode: response.errorCode })),
+    actorFinal: { role: adminFinal.data?.role ?? null, userStatus: userFinal.data?.status ?? null },
+  };
+  check('concurrency-actor-demotion-exact', actorRaceAllowed,
+    'actor demotion race accepts only linearized 200/ADMIN_001 outcomes and verifies final actor/user DB state');
+  check('concurrency-actor-demotion-race', actorRaceAllowed,
+    'HTTP race is an outcome probe only; final state is checked separately from physical lock evidence');
+  const restoreUser = await apiCall('PUT', `/api/v1/admin/users/${accounts.user.me.id}/status`, accounts.adminKeeper.token, { status: 'ACTIVE' });
+  check('concurrency-actor-race-restore', restoreUser.status === 200 && restoreUser.data?.status === 'ACTIVE', 'race fixture user is restored for subsequent browser evidence');
 
   const targetRace = await Promise.all([
     apiCall('PUT', `/api/v1/admin/users/${raceId}/role`, accounts.adminPeer.token, { role: 'ADMIN' }),
     apiCall('PUT', `/api/v1/admin/users/${raceId}/status`, accounts.adminKeeper.token, { status: 'SUSPENDED' }),
     apiCall('DELETE', `/api/v1/admin/users/${raceId}`, accounts.adminPeer.token),
   ]);
-  check('concurrency-target-mutation-race', targetRace.every((response) => response.status !== 500 && response.status !== 409), 'role/status/delete race linearizes without 500 or deadlock response');
+  const targetRoleRace = targetRace[0];
+  const targetStatusRace = targetRace[1];
+  const targetDeleteRace = targetRace[2];
+  const raceFinal = await apiCall('GET', `/api/v1/admin/users/${raceId}`, accounts.adminKeeper.token);
+  const targetRaceAllowed = [200, 404].includes(targetRoleRace.status)
+    && (targetRoleRace.status === 200 ? targetRoleRace.data?.role === 'ADMIN' : targetRoleRace.errorCode === 'USER_001')
+    && [200, 404].includes(targetStatusRace.status)
+    && (targetStatusRace.status === 200 ? targetStatusRace.data?.status === 'SUSPENDED' : targetStatusRace.errorCode === 'USER_001')
+    && [200, 204].includes(targetDeleteRace.status)
+    && targetDeleteRace.data == null
+    && raceFinal.status === 404 && raceFinal.errorCode === 'USER_001'
+    && targetRace.every((response) => response.envelope && privateNoStore(response.cacheControl));
+  evidence.fixture.concurrency.targetMutation = {
+    responses: targetRace.map((response) => ({ status: response.status, errorCode: response.errorCode })),
+    final: { status: raceFinal.status, errorCode: raceFinal.errorCode },
+  };
+  check('concurrency-target-mutation-exact', targetRaceAllowed,
+    'target role/status/delete race accepts only canonical success-or-deleted outcomes and verifies final USER_001');
+  check('concurrency-target-mutation-race', targetRaceAllowed,
+    'target race is not treated as a MySQL barrier; exact response set and final DB state are required');
+
+  await verifyPhysicalConcurrencyEvidence();
 
   const oldAdmin = await apiCall('GET', '/api/v1/admin/users?page=0&size=1', accounts.admin.token);
   const keeperStillAdmin = await apiCall('GET', '/api/v1/admin/users?page=0&size=1', accounts.adminKeeper.token);
   check('concurrency-stale-access', oldAdmin.status === 403 && oldAdmin.errorCode === 'ADMIN_001' && keeperStillAdmin.status === 200, 'old ADMIN token loses current DB permission while keeper remains active');
+}
+
+async function verifyPhysicalConcurrencyEvidence() {
+  const configured = process.env.M9_BACKEND_TEST_XML;
+  const candidate = resolve(root, configured ?? 'build/m9-evidence/backend-test-results.xml');
+  let xml;
+  try {
+    xml = await readFile(candidate, 'utf8');
+  } catch {
+    notRun('concurrency-physical-barrier-evidence', 'root must hand off the independent MySQL test XML; HTTP Promise.all is not a barrier');
+    return;
+  }
+  const required = [
+    'AdminConcurrencyMySqlTest',
+    'mutualChangesLockByIdAndRejectStaleActor',
+    'deleteBeforeSourceMutationRejectsQueuedLike',
+    'sourceMutationBeforeDeleteCommitsAndPreservesHistory',
+    'refreshBeforeAndAfterStateReadPreservesExistingSessionBoundary',
+  ];
+  const complete = required.every((marker) => xml.includes(marker));
+  evidence.fixture.concurrency = {
+    ...(evidence.fixture.concurrency ?? {}),
+    physicalBarrierEvidence: {
+      path: isInsideRoot(candidate) ? candidate.slice(root.length + 1) : '[external-redacted-path]',
+      markers: required.filter((marker) => xml.includes(marker)).length,
+      required: required.length,
+    },
+  };
+  check('concurrency-physical-barrier-evidence', complete,
+    complete ? 'root-provided XML maps all approved AdminConcurrencyMySqlTest barrier cases'
+      : 'backend XML is missing one or more approved physical barrier testcase markers');
 }
 
 async function runBrowserAcceptance(accounts, posts) {
@@ -672,17 +1176,48 @@ async function runBrowserAcceptance(accounts, posts) {
   await guestPage.goto(`${frontendUrl}/admin`, { waitUntil: 'domcontentloaded' });
   await guestPage.waitForURL((url) => url.pathname.endsWith('/signin'), { timeout: 15_000 }).catch(() => undefined);
   check('browser-guest-admin-guard', guestPage.url().endsWith('/signin') && guestRequests.length === 0, 'guest reaches signin without admin API call');
+  await guestPage.goto(`${frontendUrl}/admin/users/${accounts.user.me.id}`, { waitUntil: 'domcontentloaded' });
+  await guestPage.waitForURL((url) => url.pathname.endsWith('/signin'), { timeout: 15_000 }).catch(() => undefined);
+  check('browser-guest-detail-guard', guestPage.url().endsWith('/signin'), 'guest detail route is protected before target data renders');
   await guestPage.close();
+
+  const userPage = await context.newPage();
+  await signInInSpa(userPage, accounts.user);
+  await userPage.goto(`${frontendUrl}/admin`, { waitUntil: 'domcontentloaded' });
+  await userPage.getByRole('heading', { name: '관리자 화면에 접근할 수 없습니다', exact: true }).waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
+  check('browser-user-admin-guard', userPage.url().endsWith('/admin')
+    && await userPage.getByRole('heading', { name: '관리자 화면에 접근할 수 없습니다', exact: true }).count() === 1
+    && await userPage.getByText(accounts.adminKeeper.me.nickname, { exact: true }).count() === 0,
+  'authenticated USER direct entry renders denied guard without admin data');
+  await userPage.close();
 
   const page = await context.newPage();
   await signInInSpa(page, accounts.adminKeeper);
-  await page.goto(`${frontendUrl}/admin`, { waitUntil: 'domcontentloaded' });
-  await waitForAdminReady(page);
-  check('browser-admin-heading', await exactCount(page.getByRole('heading', { name: 'ADMIN CONSOLE', exact: true })) === 1, 'admin list renders canonical heading once');
+  const profile = page.getByRole('link', { name: accounts.adminKeeper.me.nickname, exact: true });
+  await profile.waitFor({ state: 'visible', timeout: 15_000 });
+  await profile.click();
+  const adminMenu = page.getByRole('menuitem', { name: '관리자', exact: true });
+  await adminMenu.waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
+  check('browser-admin-entry-menu', await exactCount(adminMenu) === 1, 'ADMIN enters through the profile menu only');
+  await adminMenu.click();
+  await page.waitForURL((url) => url.pathname === '/admin', { timeout: 15_000 });
+  const listReady = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return response.request().method() === 'GET' && url.pathname === '/api/v1/admin/users'
+      && url.searchParams.get('size') === '100' && response.status() === 200;
+  }, { timeout: 15_000 });
+  await page.goto(`${frontendUrl}/admin?page=0&size=100`, { waitUntil: 'domcontentloaded' });
+  const listResponse = await listReady.catch(() => null);
+  const listBody = listResponse ? await listResponse.json().catch(() => null) : null;
+  check('browser-admin-list-http-ready', listResponse?.status() === 200
+    && (listBody?.data?.users?.items ?? []).some((item) => Number(item.id) === Number(accounts.adminKeeper.me.id)),
+  'admin list readiness requires an actual HTTP 200 and a fixture row, not only heading visibility');
+  await waitForAdminReady(page, accounts.adminKeeper.me.nickname);
+  check('browser-admin-heading', await exactCount(page.getByText('ADMIN CONSOLE', { exact: true })) === 1, 'admin list renders canonical visible label once');
   check('browser-admin-role-label', await exactCount(page.getByText('ROLE: ADMIN', { exact: true })) === 1, 'admin list renders canonical role label once');
   check('browser-admin-list-width', await contentWidth(page, 'list') >= 1080 && await contentWidth(page, 'list') <= 1120, 'admin list content is approximately 1100px at 1440px');
 
-  const search = page.getByRole('textbox', { name: '사용자 검색', exact: true });
+  const search = page.getByRole('searchbox', { name: '관리자 사용자 검색', exact: true });
   check('browser-search-selector-unique', await exactCount(search) === 1, 'search control uses a duplicate-safe accessible selector');
   if (await exactCount(search) === 1) {
     await search.fill(fixture.searchLiteral);
@@ -692,13 +1227,21 @@ async function runBrowserAcceptance(accounts, posts) {
   }
 
   await captureProduct(page, 'admin-list-1440');
+  const detailReady = page.waitForResponse((response) => response.request().method() === 'GET'
+    && new URL(response.url()).pathname === `/api/v1/admin/users/${accounts.user.me.id}` && response.status() === 200, { timeout: 15_000 });
   await page.goto(`${frontendUrl}/admin/users/${accounts.user.me.id}`, { waitUntil: 'domcontentloaded' });
+  const detailResponse = await detailReady.catch(() => null);
+  const detailBody = detailResponse ? await detailResponse.json().catch(() => null) : null;
+  check('browser-admin-detail-http-ready', detailResponse?.status() === 200
+    && Number(detailBody?.data?.id) === Number(accounts.user.me.id),
+  'admin detail readiness requires an actual HTTP 200 for the requested fixture ID');
   await waitForAdminDetail(page);
   check('browser-admin-detail-last-access', await page.getByText('마지막 접속 기록 없음', { exact: true }).count() === 1, 'detail renders unrecorded last access copy');
   check('browser-admin-detail-width', await contentWidth(page, 'detail') >= 820 && await contentWidth(page, 'detail') <= 900, 'admin detail content is approximately 860px at 1440px');
   await captureProduct(page, 'admin-detail-1440');
 
   await runBrowserTarget404Probe(page, accounts.target.me.id);
+  await runBrowserMutationAcceptance(page, accounts);
   await runBrowserStaleProbe(context, accounts);
   await verifyDesignReference(context);
   await page.close();
@@ -719,50 +1262,273 @@ async function runBrowserTarget404Probe(page, targetId) {
     && new URL(candidate.url()).pathname === '/api/v1/admin/users');
   await page.goto(`${frontendUrl}/admin`, { waitUntil: 'domcontentloaded' });
   const listResponse = await listResponsePromise.catch(() => null);
-  check('browser-current-actor-list-after-target-404', listResponse?.status() === 200, 'current ACTIVE ADMIN remains in session after target 404');
+  const listBody = listResponse ? await listResponse.json().catch(() => null) : null;
+  check('browser-current-actor-list-after-target-404', listResponse?.status() === 200
+    && (listBody?.data?.users?.items ?? []).some((item) => Number(item.id) === Number(accounts.adminKeeper.me.id)),
+  'current ACTIVE ADMIN remains in session after target 404 and list returns its exact fixture row');
 }
 
-async function runBrowserStaleProbe(context, accounts) {
-  const page = await context.newPage();
-  await signInInSpa(page, accounts.adminKeeper);
-  await page.goto(`${frontendUrl}/admin`, { waitUntil: 'domcontentloaded' });
-  await waitForAdminReady(page);
+async function runBrowserMutationAcceptance(page, accounts) {
+  const targetId = accounts.user.me.id;
+  await page.goto(`${frontendUrl}/admin/users/${targetId}`, { waitUntil: 'domcontentloaded' });
+  await waitForAdminDetail(page);
 
-  let heldRoute;
-  let observed = false;
-  await page.route('**/api/v1/admin/users*', async (route) => {
-    const request = route.request();
-    if (request.method() === 'GET' && !heldRoute) {
-      observed = true;
-      heldRoute = route;
+  const role = page.getByRole('combobox', { name: '역할', exact: true });
+  const roleButton = page.getByRole('button', { name: '역할 변경', exact: true });
+  await role.selectOption('ADMIN');
+  await roleButton.click();
+  await page.getByRole('heading', { name: '역할 변경 확인', exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
+  const roleMutation = page.waitForResponse((response) => response.request().method() === 'PUT'
+    && new URL(response.url()).pathname === `/api/v1/admin/users/${targetId}/role`);
+  const roleCanonical = page.waitForResponse((response) => response.request().method() === 'GET'
+    && new URL(response.url()).pathname === `/api/v1/admin/users/${targetId}` && response.status() === 200);
+  await page.getByRole('button', { name: '변경 확인', exact: true }).click();
+  const [roleResponse, roleDetailResponse] = await Promise.all([roleMutation, roleCanonical]);
+  check('browser-role-confirm-canonical', roleResponse.status() === 200 && roleDetailResponse.status() === 200
+    && await role.inputValue() === 'ADMIN', 'role confirmation sends one mutation and renders the canonical ADMIN detail');
+
+  // Failure must preserve the row and expose a real retry path; the retry is released
+  // only after the injected response has been observed.
+  let failedRoleRequest = false;
+  await page.route(`**/api/v1/admin/users/${targetId}/role`, async (route) => {
+    if (!failedRoleRequest && route.request().method() === 'PUT') {
+      failedRoleRequest = true;
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: false, data: null, error: { code: 'ADMIN_999', message: 'synthetic retry' }, timestamp: new Date().toISOString() }),
+      });
       return;
     }
     await route.continue();
   });
+  await role.selectOption('USER');
+  await roleButton.click();
+  await page.getByRole('heading', { name: '역할 변경 확인', exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
+  await page.getByRole('button', { name: '변경 확인', exact: true }).click();
+  const retryNotice = page.getByRole('alert').filter({ hasText: 'synthetic retry' });
+  await retryNotice.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => undefined);
+  const retryButton = page.getByRole('button', { name: '다시 시도', exact: true });
+  const rowStillVisible = await page.getByText(accounts.user.me.nickname, { exact: true }).count() === 1;
+  await page.unroute(`**/api/v1/admin/users/${targetId}/role`);
+  let retryResponse = null;
+  let retryDetailResponse = null;
+  if (await exactCount(retryButton) === 1) {
+    const retryMutation = page.waitForResponse((response) => response.request().method() === 'PUT'
+      && new URL(response.url()).pathname === `/api/v1/admin/users/${targetId}/role` && response.status() === 200);
+    const retryCanonical = page.waitForResponse((response) => response.request().method() === 'GET'
+      && new URL(response.url()).pathname === `/api/v1/admin/users/${targetId}` && response.status() === 200);
+    await retryButton.click();
+    [retryResponse, retryDetailResponse] = await Promise.all([retryMutation, retryCanonical]);
+  }
+  check('browser-mutation-error-retry', failedRoleRequest && rowStillVisible && await exactCount(retryButton) === 0
+    && retryResponse?.status() === 200 && retryDetailResponse?.status() === 200 && await role.inputValue() === 'USER',
+  'failed role mutation preserves the row and retry restores canonical state');
 
-  const reloadPromise = page.goto(`${frontendUrl}/admin`, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(200);
-  const signout = page.getByRole('button', { name: '로그아웃', exact: true });
-  if (await exactCount(signout) !== 1) {
-    await page.goto(`${frontendUrl}/settings`, { waitUntil: 'domcontentloaded' });
-  }
-  const signoutFallback = page.getByRole('button', { name: '로그아웃', exact: true });
-  check('browser-stale-signout-selector', await exactCount(signoutFallback) === 1, 'SPA stale probe uses one accessible logout control');
-  if (await exactCount(signoutFallback) === 1) {
-    await signoutFallback.click();
-    await page.waitForURL((url) => url.pathname.endsWith('/signin'), { timeout: 15_000 }).catch(() => undefined);
-    await signInInSpa(page, accounts.special);
-  }
-  if (heldRoute) await heldRoute.continue().catch(() => undefined);
-  await reloadPromise.catch(() => undefined);
+  const suspendButton = page.getByRole('button', { name: '일시 정지', exact: true });
+  await suspendButton.click();
+  await page.getByRole('heading', { name: '계정 상태 변경 확인', exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
+  const suspendMutation = page.waitForResponse((response) => response.request().method() === 'PUT'
+    && new URL(response.url()).pathname === `/api/v1/admin/users/${targetId}/status`);
+  const suspendCanonical = page.waitForResponse((response) => response.request().method() === 'GET'
+    && new URL(response.url()).pathname === `/api/v1/admin/users/${targetId}` && response.status() === 200);
+  await page.getByRole('button', { name: '변경 확인', exact: true }).click();
+  const [suspendResponse, suspendDetailResponse] = await Promise.all([suspendMutation, suspendCanonical]);
+  check('browser-status-confirm-canonical', suspendResponse.status() === 200 && suspendDetailResponse.status() === 200
+    && await page.getByRole('button', { name: '정지 해제', exact: true }).count() === 1, 'status confirmation renders canonical SUSPENDED state');
+
+  const activateButton = page.getByRole('button', { name: '정지 해제', exact: true });
+  await activateButton.click();
+  await page.getByRole('heading', { name: '계정 상태 변경 확인', exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
+  const activateMutation = page.waitForResponse((response) => response.request().method() === 'PUT'
+    && new URL(response.url()).pathname === `/api/v1/admin/users/${targetId}/status`);
+  const activateCanonical = page.waitForResponse((response) => response.request().method() === 'GET'
+    && new URL(response.url()).pathname === `/api/v1/admin/users/${targetId}` && response.status() === 200);
+  await page.getByRole('button', { name: '변경 확인', exact: true }).click();
+  await Promise.all([activateMutation, activateCanonical]);
+
+  const deleteId = accounts.weekAfter.me.id;
+  await page.goto(`${frontendUrl}/admin/users/${deleteId}`, { waitUntil: 'domcontentloaded' });
+  await waitForAdminDetail(page);
+  await page.getByRole('button', { name: '계정 삭제', exact: true }).click();
+  await page.getByRole('heading', { name: '계정 삭제 확인', exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
+  check('browser-delete-copy', await page.getByText('계정 접근이 차단되고 블로그와 게시글이 공개되지 않습니다. 데이터는 보존됩니다.', { exact: true }).count() === 1,
+    'delete confirmation uses the approved soft-delete copy');
+  const deleteMutation = page.waitForResponse((response) => response.request().method() === 'DELETE'
+    && new URL(response.url()).pathname === `/api/v1/admin/users/${deleteId}`);
+  await page.getByRole('button', { name: '삭제 확인', exact: true }).click();
+  const deleteResponse = await deleteMutation;
+  await page.waitForURL((url) => url.pathname === '/admin', { timeout: 15_000 });
+  const deletedSearch = page.getByRole('searchbox', { name: '관리자 사용자 검색', exact: true });
+  const deleteListResponsePromise = page.waitForResponse((response) => response.request().method() === 'GET'
+    && new URL(response.url()).pathname === '/api/v1/admin/users' && response.status() === 200, { timeout: 15_000 });
+  await deletedSearch.fill(accounts.weekAfter.me.nickname);
+  await deletedSearch.press('Enter');
+  const deleteListResponse = await deleteListResponsePromise.catch(() => null);
+  await page.waitForTimeout(250);
+  check('browser-delete-confirm-canonical', [200, 204].includes(deleteResponse.status()) && page.url().endsWith('/admin')
+    && deleteListResponse?.status() === 200
+    && await page.getByText(accounts.weekAfter.me.nickname, { exact: true }).count() === 0,
+  'delete confirmation returns to canonical list and exact search proves the deleted row is absent');
+}
+
+async function runBrowserStaleProbe(context, accounts) {
+  void context;
+  const listOk = await runBrowserStaleListProbe(accounts);
+  const detailOk = await runBrowserStaleDetailProbe(accounts);
+  const mutationOk = await runBrowserStaleMutationProbe(accounts);
+  check('browser-account-switch-stale', listOk && detailOk && mutationOk,
+    'all independent same-Provider list/detail/mutation stale probes reject the prior account response');
+}
+
+async function runBrowserStaleListProbe(accounts) {
+  const probeContext = await newBrowserContext();
+  const page = await probeContext.newPage();
+  const holder = await holdAdminResponse(page, (request) => request.method() === 'GET'
+    && new URL(request.url()).pathname === '/api/v1/admin/users'
+    && new URL(request.url()).searchParams.get('size') === '100');
+  await signInInSpa(page, accounts.adminKeeper);
+  const listNavigation = page.goto(`${frontendUrl}/admin?page=0&size=100`, { waitUntil: 'domcontentloaded' });
+  const upstream = await holder.readyPromise;
+  check('browser-stale-list-upstream-200', upstream.status === 200 && upstream.bodyBytes > 0, 'held list response is fetched from the real upstream before account expiry');
+  check('browser-stale-list-pending-sensitive', await page.getByText(accounts.adminKeeper.email, { exact: true }).count() === 0,
+    'held list response does not expose the sensitive A row before release');
+  await triggerAuthExpiry(page, holder);
+  await signInExistingSpa(page, accounts.special);
+  await waitForUserReady(page, accounts.special);
+  holder.release();
+  await listNavigation.catch(() => undefined);
   await page.waitForTimeout(300);
-  check('browser-account-switch-stale', observed && !page.url().includes('/admin') && await page.getByText(accounts.adminKeeper.me.nickname, { exact: true }).count() === 0, 'late ADMIN response cannot repopulate USER SPA session');
-  await page.unroute('**/api/v1/admin/users*').catch(() => undefined);
-  await page.close();
+  const ok = !page.url().includes('/admin')
+    && await page.getByText(accounts.adminKeeper.me.nickname, { exact: true }).count() === 0
+    && await page.getByText(accounts.adminKeeper.email, { exact: true }).count() === 0;
+  check('browser-stale-list', ok,
+  'late A list 200 cannot repopulate the same SPA Provider after B is ready');
+  await holder.dispose();
+  await probeContext.close();
+  return ok;
+}
+
+async function runBrowserStaleDetailProbe(accounts) {
+  const probeContext = await newBrowserContext();
+  const page = await probeContext.newPage();
+  const holder = await holdAdminResponse(page, (request) => request.method() === 'GET'
+    && new URL(request.url()).pathname === `/api/v1/admin/users/${accounts.user.me.id}`);
+  await signInInSpa(page, accounts.adminKeeper);
+  const detailNavigation = page.goto(`${frontendUrl}/admin/users/${accounts.user.me.id}`, { waitUntil: 'domcontentloaded' });
+  const upstream = await holder.readyPromise;
+  check('browser-stale-detail-upstream-200', upstream.status === 200 && upstream.bodyBytes > 0, 'held detail response is fetched from the real upstream before account expiry');
+  check('browser-stale-detail-pending-sensitive', await page.getByText(accounts.user.me.email, { exact: true }).count() === 0,
+    'held detail response does not expose target details before release');
+  await triggerAuthExpiry(page, holder);
+  await signInExistingSpa(page, accounts.special);
+  await waitForUserReady(page, accounts.special);
+  holder.release();
+  await detailNavigation.catch(() => undefined);
+  await page.waitForTimeout(300);
+  const ok = !page.url().includes('/admin')
+    && await page.getByText(accounts.user.me.nickname, { exact: true }).count() === 0;
+  check('browser-stale-detail', ok,
+  'late A detail 200 cannot repopulate the same SPA Provider after B is ready');
+  await holder.dispose();
+  await probeContext.close();
+  return ok;
+}
+
+async function runBrowserStaleMutationProbe(accounts) {
+  const probeContext = await newBrowserContext();
+  const page = await probeContext.newPage();
+  await signInInSpa(page, accounts.adminKeeper);
+  await page.goto(`${frontendUrl}/admin/users/${accounts.user.me.id}`, { waitUntil: 'domcontentloaded' });
+  await waitForAdminDetail(page);
+  const holder = await holdAdminResponse(page, (request) => request.method() === 'PUT'
+    && new URL(request.url()).pathname === `/api/v1/admin/users/${accounts.user.me.id}/role`);
+  const role = page.getByRole('combobox', { name: '역할', exact: true });
+  await role.selectOption('ADMIN');
+  await page.getByRole('button', { name: '역할 변경', exact: true }).click();
+  await page.getByRole('heading', { name: '역할 변경 확인', exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
+  await page.getByRole('button', { name: '변경 확인', exact: true }).click();
+  const upstream = await holder.readyPromise;
+  check('browser-stale-mutation-upstream-200', upstream.status === 200 && upstream.bodyBytes > 0, 'held mutation response is fetched from the real upstream before account expiry');
+  await triggerAuthExpiry(page, holder);
+  await signInExistingSpa(page, accounts.special);
+  await waitForUserReady(page, accounts.special);
+  holder.release();
+  await page.waitForTimeout(300);
+  const ok = !page.url().includes('/admin')
+    && await page.getByText(accounts.user.me.nickname, { exact: true }).count() === 0;
+  check('browser-stale-mutation', ok,
+  'late A mutation 200 cannot navigate or restore detail after B is ready');
+  await apiCall('PUT', `/api/v1/admin/users/${accounts.user.me.id}/role`, accounts.adminKeeper.token, { role: 'USER' });
+  await holder.dispose();
+  await probeContext.close();
+  return ok;
+}
+
+async function holdAdminResponse(page, predicate) {
+  let held = null;
+  let expired = false;
+  let resolveReady;
+  let releaseResolve;
+  const readyPromise = new Promise((resolvePromise) => { resolveReady = resolvePromise; });
+  const releasePromise = new Promise((resolvePromise) => { releaseResolve = resolvePromise; });
+  const pattern = '**/api/v1/admin/users*';
+  await page.route(pattern, async (route) => {
+    const url = new URL(route.request().url());
+    if (expired && route.request().method() === 'GET' && url.searchParams.get('size') === '1') {
+      await route.fulfill({ status: 401, contentType: 'application/json', headers: { 'cache-control': 'private, no-store' },
+        body: JSON.stringify({ success: false, data: null, error: { code: 'AUTH_004', message: 'expired synthetic access' }, timestamp: new Date().toISOString() }) });
+      return;
+    }
+    if (held || !predicate(route.request())) {
+      await route.continue();
+      return;
+    }
+    const upstream = await route.fetch();
+    const body = await upstream.body();
+    held = {
+      status: upstream.status(),
+      headers: upstream.headers(),
+      body,
+      bodyBytes: body.length,
+      readyPromise,
+      release() { releaseResolve(); },
+    };
+    resolveReady({ status: upstream.status(), bodyBytes: body.length });
+    await releasePromise;
+    await route.fulfill({ status: held.status, headers: held.headers, body: held.body });
+  });
+  return {
+    get readyPromise() { return readyPromise; },
+    release() { releaseResolve(); },
+    expire() { expired = true; },
+    async dispose() { await page.unroute(pattern).catch(() => undefined); },
+  };
+}
+
+async function triggerAuthExpiry(page, holder) {
+  await page.route('**/api/v1/auth/refresh', async (route) => {
+    await route.fulfill({ status: 401, contentType: 'application/json', headers: { 'cache-control': 'private, no-store' },
+      body: JSON.stringify({ success: false, data: null, error: { code: 'AUTH_003', message: 'expired synthetic refresh' }, timestamp: new Date().toISOString() }) });
+  });
+  holder.expire();
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await page.waitForURL((url) => url.pathname.endsWith('/signin'), { timeout: 15_000 }).catch(() => undefined);
+  check('browser-auth-final-failure-boundary', page.url().endsWith('/signin'), 'same SPA auth-expiry path reaches signin after access and refresh fail');
+  await page.unroute('**/api/v1/auth/refresh');
 }
 
 async function signInInSpa(page, account) {
   await page.goto(`${frontendUrl}/signin`, { waitUntil: 'domcontentloaded' });
+  await submitSigninForm(page, account);
+}
+
+async function signInExistingSpa(page, account) {
+  await page.waitForURL((url) => url.pathname.endsWith('/signin'), { timeout: 15_000 }).catch(() => undefined);
+  await submitSigninForm(page, account);
+}
+
+async function submitSigninForm(page, account) {
   const email = page.getByLabel('이메일', { exact: true });
   const password = page.getByLabel('비밀번호', { exact: true });
   const submit = page.getByRole('button', { name: '로그인', exact: true });
@@ -774,21 +1540,31 @@ async function signInInSpa(page, account) {
   await page.waitForURL((url) => !url.pathname.endsWith('/signin'), { timeout: 15_000 });
 }
 
-async function waitForAdminReady(page) {
-  const heading = page.getByRole('heading', { name: 'ADMIN CONSOLE', exact: true });
-  await heading.waitFor({ state: 'visible', timeout: 15_000 });
+async function waitForUserReady(page, account) {
+  await page.getByRole('link', { name: account.me.nickname, exact: true })
+    .waitFor({ state: 'visible', timeout: 15_000 });
+}
+
+async function waitForAdminReady(page, expectedNickname) {
+  const section = page.locator('section[aria-label="관리자 콘솔"]');
+  await section.waitFor({ state: 'visible', timeout: 15_000 });
+  await page.getByText('ADMIN CONSOLE', { exact: true }).waitFor({ state: 'visible', timeout: 15_000 });
+  const search = page.getByRole('searchbox', { name: '관리자 사용자 검색', exact: true });
+  await search.waitFor({ state: 'visible', timeout: 15_000 });
+  if (expectedNickname) {
+    await page.getByText(expectedNickname, { exact: true }).first().waitFor({ state: 'visible', timeout: 15_000 });
+  }
   const busy = page.locator('[aria-busy="true"]');
   if (await busy.count() > 0) await busy.first().waitFor({ state: 'hidden', timeout: 15_000 }).catch(() => undefined);
 }
 
 async function waitForAdminDetail(page) {
-  const heading = page.getByRole('heading', { name: '사용자 상세', exact: true });
-  await heading.waitFor({ state: 'visible', timeout: 15_000 });
+  await page.locator('section[aria-label="사용자 상세"]').waitFor({ state: 'visible', timeout: 15_000 });
 }
 
 async function contentWidth(page, kind) {
-  const selector = kind === 'list' ? 'main' : 'main';
-  const locator = page.locator(selector);
+  void kind;
+  const locator = page.locator('[data-layout="app"]');
   if (await exactCount(locator) !== 1) return 0;
   const box = await locator.boundingBox();
   return box?.width ?? 0;
@@ -843,7 +1619,38 @@ async function apiCallWithHeaders(method, path, headers, data) {
     success: json?.success === true,
     data: json?.data ?? null,
     errorCode: json?.error?.code ?? null,
+    errorMessage: json?.error?.message ?? null,
     envelope: Boolean(json && typeof json.success === 'boolean' && 'data' in json && 'error' in json && 'timestamp' in json),
+  };
+}
+
+async function createRefreshProbe(account, label) {
+  const context = await requestApi.newContext({
+    baseURL: apiBaseUrl,
+    extraHTTPHeaders: { Origin: frontendUrl },
+  });
+  const response = await context.fetch('/api/v1/auth/signin', {
+    method: 'POST',
+    data: { email: account.email, password: account.password },
+  });
+  const json = await safeJson(response);
+  const ok = response.status() === 200 && typeof json?.data?.accessToken === 'string';
+  check(`refresh-probe-${label}`, ok, 'refresh probe signed in with credentials held only in memory');
+  if (!ok) {
+    await context.dispose();
+    return null;
+  }
+  return context;
+}
+
+async function refreshFromProbe(context) {
+  const response = await context.fetch('/api/v1/auth/refresh', { method: 'POST' });
+  const json = await safeJson(response);
+  return {
+    status: response.status(),
+    errorCode: json?.error?.code ?? null,
+    envelope: Boolean(json && typeof json.success === 'boolean' && 'data' in json && 'error' in json && 'timestamp' in json),
+    cacheControl: response.headers()['cache-control'] ?? '',
   };
 }
 
@@ -882,6 +1689,11 @@ function hasSummary(response) {
 
 function ids(response) {
   return new Set(pageItems(response).map((item) => Number(item.id)).filter(Number.isInteger));
+}
+
+function setsEqual(left, right) {
+  return left instanceof Set && right instanceof Set && left.size === right.size
+    && [...left].every((value) => right.has(value));
 }
 
 function pageItems(response) {
@@ -1130,12 +1942,25 @@ async function newBrowserContext() {
 }
 
 async function finishEvidence() {
+  ensureRequiredEvidenceChecks();
   evidence.status = evidence.failures.length === 0 ? 'PASS' : 'NOT RUN';
   await writeEvidence();
   const pass = evidence.checks.filter((item) => item.status === 'PASS').length;
   const notRunCount = evidence.checks.filter((item) => item.status === 'NOT RUN').length;
   console.log(JSON.stringify({ outputDir, screenshots: evidence.screenshots.length, pass, notRun: notRunCount, failures: evidence.failures.length, fixtureIds: evidence.fixture }));
   if (evidence.failures.length > 0) throw new Error(`M9 acceptance has ${evidence.failures.length} findings`);
+}
+
+function ensureRequiredEvidenceChecks() {
+  const present = new Set(evidence.checks.map((item) => item.name));
+  const missing = REQUIRED_EVIDENCE_IDS.filter((id) => !present.has(id));
+  for (const id of missing) {
+    notRun(id, 'required matrix evidence was not reached; fail-closed until the independent runtime path executes');
+  }
+  if (missing.length === 0) {
+    const existing = evidence.checks.find((item) => item.name === 'required-matrix-complete');
+    if (!existing) check('required-matrix-complete', true, 'all required matrix evidence IDs were reached');
+  }
 }
 
 async function writeEvidence() {

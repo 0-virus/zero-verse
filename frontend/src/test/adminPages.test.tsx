@@ -79,6 +79,10 @@ describe('관리자 화면', () => {
     expect(screen.getByText('정지 계정')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('이메일 · 닉네임 검색')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '관리' })).toHaveAttribute('href', '/admin/users/7');
+    const table = screen.getByRole('table', { name: '관리자 사용자 목록' });
+    expect(table).toHaveAttribute('data-admin-user-grid', '2fr 1.6fr 1fr 1fr 1fr 90px');
+    expect(table.querySelector('thead tr')).toHaveClass('gap-[10px]', 'px-5', 'py-[11px]', 'text-[11px]');
+    expect(table.querySelector('tbody tr')).toHaveClass('gap-[10px]', 'px-5', 'py-[13px]');
   });
 
   it('상세는 lastAccess 미기록을 표시하고 역할·상태·삭제 확인을 제공한다', async () => {

@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { Avatar } from '../components/ui/Avatar';
-import { Badge } from '../components/ui/Badge';
+import { useSearchParams } from 'react-router-dom';
 import { Pagination } from '../components/ui/Pagination';
-import { Table, type TableColumn } from '../components/ui/Table';
 import { isAdminPermissionError, isAdminActorNotFound, useAdminAccess } from '../features/admin/AdminAccessProvider';
 import { adminApi, DEFAULT_ADMIN_PAGE_SIZE, normalizeAdminKeyword } from '../features/admin/adminApi';
-import type { AdminUserListResponse, AdminUserSummary } from '../features/admin/types';
+import { AdminUserTable } from '../features/admin/AdminUserTable';
+import type { AdminUserListResponse } from '../features/admin/types';
 import { ApiRequestError } from '../lib/apiClient';
 
 interface AdminListView {
@@ -29,11 +27,6 @@ function parseSize(value: string | null): number {
   return Number.isSafeInteger(parsed) && parsed >= 1 && parsed <= 100 ? parsed : DEFAULT_ADMIN_PAGE_SIZE;
 }
 
-function formatDate(value: string): string {
-  const date = value.slice(0, 10);
-  return /^\d{4}-\d{2}-\d{2}$/u.test(date) ? date.replaceAll('-', '.') : '날짜 미정';
-}
-
 function errorMessage(error: unknown): string {
   if (error instanceof ApiRequestError) {
     if (error.code === 'ADMIN_001') return '현재 관리자 권한이 없습니다.';
@@ -47,26 +40,6 @@ function errorMessage(error: unknown): string {
 
 function initialView(key: string): AdminListView {
   return { key, response: null, loading: false, error: null, canRetry: false };
-}
-
-function UserCell({ user }: { user: AdminUserSummary }) {
-  return (
-    <div className="flex min-w-0 items-center gap-2">
-      {user.profileImageUrl ? (
-        <img
-          src={user.profileImageUrl}
-          alt=""
-          className="h-7 w-7 shrink-0 border-2 border-ink object-cover"
-        />
-      ) : (
-        <Avatar emoji="🛰" size={28} label={`${user.nickname} 아바타`} />
-      )}
-      <div className="min-w-0">
-        <b className="block truncate">{user.nickname}</b>
-        <span className="block truncate text-[11px] text-text-muted">{user.email}</span>
-      </div>
-    </div>
-  );
 }
 
 /** `/admin` — 현재 권한이 확인된 관리자용 사용자 목록. */
@@ -169,32 +142,6 @@ export function AdminPage() {
     }
   };
 
-  const columns: TableColumn<AdminUserSummary>[] = [
-    { key: 'user', header: '사용자', width: '32%', render: (user) => <UserCell user={user} /> },
-    {
-      key: 'blog',
-      header: '블로그',
-      width: '25%',
-      render: (user) => <span className="text-text-body">{user.defaultBlog?.title ?? '블로그 없음'}</span>,
-    },
-    { key: 'role', header: '역할', width: '14%', render: (user) => <Badge kind={user.role} /> },
-    { key: 'status', header: '상태', width: '14%', render: (user) => <Badge kind={user.status} /> },
-    { key: 'joined', header: '가입일', width: '15%', render: (user) => <span className="text-xs text-text-muted">{formatDate(user.createdAt)}</span> },
-    {
-      key: 'action',
-      header: '',
-      width: '90px',
-      render: (user) => (
-        <Link
-          to={`/admin/users/${user.id}`}
-          className="block border-2 border-ink bg-surface px-2 py-1 text-center text-xs font-semibold text-ink hover:bg-surface-raise"
-        >
-          관리
-        </Link>
-      ),
-    },
-  ];
-
   return (
     <section aria-label="관리자 콘솔">
       <h1 className="sr-only">관리자</h1>
@@ -244,7 +191,7 @@ export function AdminPage() {
       )}
       {response && users && users.items.length > 0 && (
         <>
-          <Table columns={columns} rows={users.items} rowKey={(user) => String(user.id)} />
+          <AdminUserTable users={users.items} />
           <div className="mt-6">
             <Pagination page={Math.min(users.page, Math.max(0, users.totalPages - 1))} totalPages={users.totalPages} onChange={(nextPage) => updateQuery({ page: nextPage })} />
           </div>

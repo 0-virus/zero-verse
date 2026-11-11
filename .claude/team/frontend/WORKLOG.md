@@ -578,3 +578,12 @@
 - GREEN: `npm test -- --run --maxWorkers=1 src/test/adminAccess.test.tsx` → exit 0, 1 file/8 tests(`frontend/.m9-evidence/fix1-green-adminAccess-2.log`). `npm test -- --run --maxWorkers=1 src/test/adminAccess.test.tsx src/test/adminPages.test.tsx src/test/adminRaces.test.tsx src/test/router.test.tsx` → exit 0, **4 files/37 tests**, failures/errors/skipped 0(`frontend/.m9-evidence/fix1-focused-green-2.log`).
 - 정적: `git diff --check -- frontend .claude/team/frontend .superpowers/sdd/M9-admin/task-3-report.md` → exit 0. 부모 지시대로 full suite/lint/build는 이번 fix round에서 반복하지 않았다. 이전 Task3 final full/lint/build 원문과 수치는 직전 기록에 보존돼 있다.
 - 인계/남은 게이트: F5 table track/cell spacing 차이는 deferred visual ledger로 유지하고 root/QA 1440px screenshot에서 확인한다. backend HTTP/ACL/DB 및 실제 browser lifecycle/profile-menu 키보드 검증도 root/QA 게이트다. source freeze·Git ownership을 유지하며 부모 fix commit/re-review로 인계한다. 상세 원문은 `.superpowers/sdd/M9-admin/task-3-report.md` Fix round 1 섹션이다.
+
+## 2026-11-11 15:04:17 KST — M9 Task3 F5 관리자 표 디자인 정합 패치
+
+- 담당/경계: 독립 review2가 F1~F4를 Approved한 뒤 남은 F5 minor만 수정했다. `docs/design/ZeroVerse Pages.dc.html:421~446` inline style과 `DESIGN-SYSTEM.md:404~409`를 직접 대조했다. `frontend/**`, frontend AGENTS/STATE/WORKLOG 및 명시 report만 변경했고 공통 Table·backend/QA/root docs/Git/의존성은 건드리지 않았다.
+- 원본 근거: 관리자 표 track은 `2fr 1.6fr 1fr 1fr 1fr 90px`, gap `10px`, header `padding:11px 20px`/font `11px`, row `padding:13px 20px`/font `13px`/align center이며 외곽 1100px layout은 기존 AppShell을 유지한다.
+- 구현: `frontend/src/features/admin/AdminUserTable.tsx`를 추가해 semantic `<table>/<thead>/<tbody>/<tr>/<th>/<td>`를 유지하면서 관리자 전용 grid track/gap/padding, 28px avatar·9px cell gap·12px 관리 button·원본 색/타이포를 적용했다. `AdminPage.tsx`는 기존 공통 `Table` 대신 이 컴포넌트만 소비한다. `features/admin/AGENTS.md`에 정합 규칙을 기록했다.
+- TDD 회귀: `adminPages.test.tsx`에 data grid track 및 header/row exact class assertion을 추가했다. 기존 목록·검색·통계·관리 link와 transient 보존 테스트는 유지했다.
+- 검증: `npm test -- --run --maxWorkers=1 src/test/adminPages.test.tsx` → exit 0, 1 file/4 tests (`frontend/.m9-evidence/fix1-f5-adminPages-focused.log`); `npm run lint` → exit 0 (`fix1-f5-lint.log`); `npm run build` → exit 0, `tsc -b`+Vite 149 modules, 기존 >500 kB warning만 (`fix1-f5-build.log`); `git diff --check -- frontend .claude/team/frontend .superpowers/sdd/M9-admin/task-3-report.md` → exit 0.
+- 인계: F5 정적/자동 근거는 GREEN이다. full suite는 부모 지시대로 반복하지 않았고, 실제 1440px screenshot 및 layout diff는 root/독립 시각 gate에서 확인한다. source freeze·Git ownership을 유지한다.

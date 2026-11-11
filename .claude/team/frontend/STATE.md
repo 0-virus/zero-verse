@@ -2,7 +2,7 @@
 
 > 덮어쓰기 스냅샷. 시간순 이력은 `WORKLOG.md`, 마일스톤 이력은 `docs/worklog/**`를 본다.
 
-마지막 갱신: 2026-11-11 14:56:29 KST
+마지막 갱신: 2026-11-11 15:04:17 KST
 
 ## 현재 단계
 
@@ -42,9 +42,10 @@
 
 - `AdminRoute`는 admin 경로 진입 및 `focus`·`pageshow`·visible `visibilitychange`에서 current probe를 실행한다. 일반 probe는 새 session generation으로 민감 child를 숨기며, detail target USER_001 재검증은 `preserveAllowed`로 target 404 owner를 유지한다.
 - `AdminUserPage`는 mounted/target/operation/access snapshot으로 target7의 늦은 PUT/canonical/retry/delete navigate가 target8에 도달하지 않게 한다. actor USER_001은 guard denied로, target USER_001은 유한 target 404로 정착한다.
-- `AdminPage`는 transient 오류에서 이전 성공 행·pagination을 보존한다. F5 테이블 열 track/셀 간격 차이는 deferred visual ledger이며 root/QA 1440px에서 확인한다.
+- `AdminPage`는 transient 오류에서 이전 성공 행·pagination을 보존한다. F5는 관리자 전용 semantic `AdminUserTable`로 원본 track `2fr 1.6fr 1fr 1fr 1fr 90px`, gap `10px`, header `11px 20px`, row `13px 20px`를 적용했고 공통 Table 소비자는 변경하지 않았다. 실제 1440px screenshot/layout diff는 root/QA 게이트다.
 - Fix focused: `adminAccess/adminPages/adminRaces/router` 4 files/37 tests passed, exit 0 (`frontend/.m9-evidence/fix1-focused-green-2.log`). diff check exit 0. 이번 fix round에는 full/lint/build를 반복하지 않았다.
+- F5 focused: `adminPages.test.tsx` 1 file/4 tests passed, exit 0 (`frontend/.m9-evidence/fix1-f5-adminPages-focused.log`); lint/build exit 0 (`fix1-f5-lint.log`, `fix1-f5-build.log`, 149 modules). F5 이후 full suite는 부모 지시대로 재실행하지 않았다.
 
 ## 다음 작업
 
-- 이 역할은 제품 변경을 동결한다. root가 fix commit 후 실제 HTTP/1440px lifecycle·프로필 메뉴 검증과 독립 review1 재검토를 수행한다. frontend 결함이 재배정될 때만 수정한다.
+- 이 역할은 제품 변경을 동결한다. root가 fix commit 후 실제 HTTP/1440px lifecycle·프로필 메뉴 검증과 독립 시각 gate를 수행한다. frontend 결함이 재배정될 때만 수정한다.

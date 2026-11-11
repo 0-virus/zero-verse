@@ -83,3 +83,6 @@ docs/design/*
 ### 로컬 실행 파일 ###
 run-backend.sh
 run-frontend.sh
+
+### 로컬 배포 설계 문서 ###
+/zeroverse-deployment-plan.html

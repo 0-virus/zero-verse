@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { AppRoutes } from '../routes/router';
 import { AuthProvider } from '../lib/authContext';
 import { resetApiClient } from '../lib/apiClient';
+import { AdminAccessProvider } from '../features/admin/AdminAccessProvider';
 
 /**
  * 라우트가 대응 화면을 렌더하는지 확인한다.
@@ -17,7 +18,7 @@ const AUTHENTICATED_USER = {
   email: 'router@zeroverse.test',
   name: '테스터',
   nickname: 'router',
-  role: 'USER' as const,
+  role: 'ADMIN' as const,
   profileImageUrl: null,
   defaultBlog: { id: 1, title: '테스터의 블로그', urlSlug: 'router', isSetupCompleted: true },
 };
@@ -105,6 +106,32 @@ function stubSession(user: typeof AUTHENTICATED_USER | null) {
       if (url.includes('/api/v1/posts/43')) return body(alternatePost);
       if (url.includes('/api/v1/posts/42')) return body(post);
       if (url.includes('/api/v1/blogs/1/categories')) return body(categoryPage);
+      if (url.includes('/api/v1/admin/users/7')) {
+        return body({
+          id: 7,
+          email: 'admin-target@zeroverse.test',
+          name: '관리 대상',
+          nickname: '관리 대상',
+          role: 'USER',
+          status: 'ACTIVE',
+          profileImageUrl: null,
+          createdAt: '2026-01-01T00:00:00Z',
+          updatedAt: '2026-01-01T00:00:00Z',
+          defaultBlog: null,
+          blogCount: 0,
+          postCount: 0,
+          postStats: { total: 0, published: 0, draft: 0 },
+          commentCount: 0,
+          universeStats: { outgoingCount: 0, incomingCount: 0, connectionCount: 0 },
+          lastAccessAt: null,
+        });
+      }
+      if (url.includes('/api/v1/admin/users')) {
+        return body({
+          users: { items: [], page: 0, size: 1, totalElements: 0, totalPages: 0, hasNext: false, hasPrevious: false },
+          summary: { totalUsers: 0, joinedThisWeek: 0, suspendedUsers: 0 },
+        });
+      }
       return body(null);
     }),
   );
@@ -115,7 +142,9 @@ function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <AuthProvider>
-        <AppRoutes />
+        <AdminAccessProvider>
+          <AppRoutes />
+        </AdminAccessProvider>
       </AuthProvider>
     </MemoryRouter>,
   );

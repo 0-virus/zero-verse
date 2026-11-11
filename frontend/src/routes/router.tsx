@@ -1,7 +1,7 @@
 import { Route, Routes } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell';
 import { useAuth } from '../lib/authContext';
-import { GuestOnlyRoute, SetupGuard } from './guards';
+import { AdminRoute, GuestOnlyRoute, SetupGuard } from './guards';
 import { MainPage } from '../pages/MainPage';
 import { SigninPage } from '../pages/SigninPage';
 import { SignupPage } from '../pages/SignupPage';
@@ -28,7 +28,7 @@ import { NotFoundPage } from '../pages/NotFoundPage';
  * - `ProtectedRoute` — 로그인이 필요한 화면.
  *
  * `/`·공개 블로그·게시글·`/search`는 비로그인도 볼 수 있어 가드를 걸지 않는다.
- * `AdminRoute`는 M9다 — 지금 만들면 쓸 화면이 없다.
+ * `AdminRoute`는 AuthProvider 아래 AdminAccessProvider의 현재 권한 probe를 사용한다(M9).
  *
  * M1의 보호 화면은 모두 초기 설정 흐름에 묶여 있어 `SetupGuard`만 쓴다. `ProtectedRoute`는
  * PRD §8.3이 정의한 가드로 구현·검증해 두었고, 초기 설정과 무관한 보호 화면이 생기는
@@ -116,8 +116,22 @@ export function AppRoutes() {
             </SetupGuard>
           }
         />
-        <Route path="/admin" element={<AdminPage />} />
-        <Route path="/admin/users/:userId" element={<AdminUserPage />} />
+        <Route
+          path="/admin"
+          element={
+            <AdminRoute>
+              <AdminPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/users/:userId"
+          element={
+            <AdminRoute>
+              <AdminUserPage />
+            </AdminRoute>
+          }
+        />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </AppShell>

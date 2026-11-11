@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { normalizeSearchKeyword } from '../../features/search/searchApi';
+import { useOptionalAdminAccess } from '../../features/admin/AdminAccessProvider';
 import {
   isNotificationAuthFailure,
   isNotificationMutationSuperseded,
@@ -50,7 +51,9 @@ export function TopBar({ nickname }: { nickname?: string | null }) {
   const [notificationError, setNotificationError] = useState<string | null>(null);
   const [notificationRetry, setNotificationRetry] = useState<NotificationRetry | null>(null);
   const [notificationBusyId, setNotificationBusyId] = useState<number | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
   const notifications = useNotificationPreview();
+  const adminAccess = useOptionalAdminAccess();
 
   useEffect(() => {
     setKeyword(searchParams.get('keyword') ?? '');
@@ -58,13 +61,16 @@ export function TopBar({ nickname }: { nickname?: string | null }) {
   }, [searchParams.toString()]);
 
   useEffect(() => {
-    if (!notificationOpen) return undefined;
+    if (!notificationOpen && !profileOpen) return undefined;
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setNotificationOpen(false);
+      if (event.key === 'Escape') {
+        setNotificationOpen(false);
+        setProfileOpen(false);
+      }
     };
     document.addEventListener('keydown', closeOnEscape);
     return () => document.removeEventListener('keydown', closeOnEscape);
-  }, [notificationOpen]);
+  }, [notificationOpen, profileOpen]);
 
   useEffect(() => {
     setNotificationError(null);
@@ -101,6 +107,16 @@ export function TopBar({ nickname }: { nickname?: string | null }) {
         notifications.retryGeneration,
       );
       if (retry) void retry().catch(() => undefined);
+    }
+  };
+
+  const toggleProfile = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    setNotificationOpen(false);
+    const nextOpen = !profileOpen;
+    setProfileOpen(nextOpen);
+    if (nextOpen && isSignedIn && adminAccess && adminAccess.status !== 'allowed') {
+      void adminAccess.probe();
     }
   };
 
@@ -234,13 +250,58 @@ export function TopBar({ nickname }: { nickname?: string | null }) {
             </span>
           )}
         </Link>
-        <Link
-          to={isSignedIn ? '/settings' : '/signin'}
-          style={{ padding: '7px 14px' }}
-          className="border-[3px] border-ink bg-surface text-[13px] font-semibold text-ink shadow-btn hover:bg-surface-raise"
-        >
-          {profileLabel}
-        </Link>
+        {isSignedIn ? (
+          <div className="relative">
+            <Link
+              to="/settings"
+              aria-haspopup="menu"
+              aria-expanded={profileOpen}
+              onClick={toggleProfile}
+              style={{ padding: '7px 14px' }}
+              className="border-[3px] border-ink bg-surface text-[13px] font-semibold text-ink shadow-btn hover:bg-surface-raise"
+            >
+              {profileLabel}
+            </Link>
+            {profileOpen && (
+              <div
+                role="menu"
+                aria-label="프로필 메뉴"
+                style={{ top: 50, right: 0, width: 190 }}
+                className="absolute z-[99] border-[3px] border-ink bg-surface shadow-card"
+              >
+                <Link
+                  role="menuitem"
+                  to="/settings"
+                  onClick={() => setProfileOpen(false)}
+                  className="block border-b border-line px-3.5 py-2.5 text-[13px] text-ink hover:bg-surface-soft"
+                >
+                  프로필 · 계정
+                </Link>
+                {adminAccess?.status === 'allowed' && (
+                  <Link
+                    role="menuitem"
+                    to="/admin"
+                    onClick={() => setProfileOpen(false)}
+                    className="block px-3.5 py-2.5 text-[13px] font-semibold text-ink hover:bg-surface-soft"
+                  >
+                    관리자
+                  </Link>
+                )}
+                {adminAccess && (adminAccess.status === 'loading' || adminAccess.status === 'idle') && (
+                  <span className="block px-3.5 py-2.5 text-xs text-text-muted">관리자 권한 확인 중...</span>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <Link
+            to="/signin"
+            style={{ padding: '7px 14px' }}
+            className="border-[3px] border-ink bg-surface text-[13px] font-semibold text-ink shadow-btn hover:bg-surface-raise"
+          >
+            {profileLabel}
+          </Link>
+        )}
       </nav>
       {notificationOpen && (
         <div

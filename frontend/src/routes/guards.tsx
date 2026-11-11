@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
+import { adminAccessErrorMessage, useAdminAccess } from '../features/admin/AdminAccessProvider';
 import { useAuth } from '../lib/authContext';
 
 /**
@@ -8,7 +9,8 @@ import { useAuth } from '../lib/authContext';
  * <p>세 가드 모두 `isLoading` 동안에는 판단을 미룬다. 초기 세션 복구가 끝나기 전에 리다이렉트하면
  * 로그인 상태인데도 `/signin`으로 튕기는 깜빡임이 생긴다.
  *
- * <p>관리자 가드(AdminRoute)는 M9다 — 지금 만들면 쓸 화면이 없다.
+ * <p>관리자 가드(AdminRoute)는 AuthUser.role을 최종 권한으로 신뢰하지 않고, 현재 DB 권한을
+ * 목록 size=1 probe로 확인한 뒤 민감한 자식 화면을 렌더한다(M9 A-v2).
  */
 
 /** 판정을 미루는 동안 보여줄 자리. 레이아웃이 흔들리지 않게 최소한만 차지한다. */
@@ -97,5 +99,56 @@ export function SetupGuard({ children }: { children: ReactNode }) {
   if (!isSetupPage && !isSetupCompleted) {
     return <Navigate to="/blog/setup" replace />;
   }
+  return <>{children}</>;
+}
+
+/** 현재 DB의 ADMIN 권한을 확인한 사용자만 관리자 화면에 진입시킨다. */
+export function AdminRoute({ children }: { children: ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth();
+  const location = useLocation();
+  const access = useAdminAccess();
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && access.status === 'idle') void access.probe();
+  }, [access.probe, access.status, isAuthenticated, isLoading]);
+
+  if (isLoading) return <GuardPending />;
+  if (!isAuthenticated) {
+    return <Navigate to="/signin" state={{ from: location }} replace />;
+  }
+
+  if (access.status === 'idle' || access.status === 'loading') {
+    return <GuardPending />;
+  }
+
+  if (access.status === 'denied') {
+    return (
+      <section aria-label="관리자 권한 없음" className="px-6 py-12">
+        <h1 className="text-[23px] font-bold">관리자 화면에 접근할 수 없습니다</h1>
+        <p className="mt-2 text-[13px] text-text-body">
+          {adminAccessErrorMessage(access.error)}
+        </p>
+      </section>
+    );
+  }
+
+  if (access.status === 'error') {
+    return (
+      <section aria-label="관리자 권한 확인 오류" className="px-6 py-12">
+        <h1 className="text-[23px] font-bold">관리자 권한을 확인하지 못했습니다</h1>
+        <p role="alert" className="mt-2 text-[13px] text-danger">
+          {adminAccessErrorMessage(access.error)}
+        </p>
+        <button
+          type="button"
+          onClick={() => void access.retry()}
+          className="mt-5 border-[3px] border-ink bg-surface px-[18px] py-2 text-[13px] font-bold shadow-btn hover:bg-surface-raise"
+        >
+          다시 시도
+        </button>
+      </section>
+    );
+  }
+
   return <>{children}</>;
 }

@@ -2,55 +2,42 @@
 
 > 덮어쓰기 스냅샷. 시간순 이력은 `WORKLOG.md`, 마일스톤 이력은 `docs/worklog/**`를 본다.
 
-마지막 갱신: 2026-11-10 17:47:26 KST
+마지막 갱신: 2026-11-11 14:37:55 KST
 
 ## 현재 단계
 
-- M8 frontend 역할 완료. PR #14가 `dev`에 통합됐고 QA §10 최종 독립 판정은 Ready Yes다. 현재 진행 중인 frontend 작업은 없다.
-- M8 Task4 frontend 구현을 완료하고 자동 검증을 통과했다. 사용자 승인 A-v2의 §9 계약에 맞춰 notifications API/types/provider, 센터, TopBar dropdown/badge, Main Feed RightPanel preview를 연결했다.
-- preview(page 0,size 3)와 center(page,size 20) cache를 분리하고, unreadCount/canManage를 공유한다. viewer account·mutation·request 세대와 account-scoped mutation dedupe/stale completion guard를 적용했다.
-- ACTIVE는 read/read-all/delete 후 canonical 재조회, SUSPENDED는 관리 mutation을 막고 서버가 반환한 안전한 href 열람만 허용한다. unavailable은 고정 문구와 민감 필드 masking을 유지한다.
-- fix1 review 반영: main preview consumer 재진입 effect와 in-flight 완료 시점 정리, USER_001/AUTH 최종 실패의 양쪽 cache·summary·진행 요청 무효화, 센터/TopBar/RightPanel mutation retry 및 canonical 이동, transient center error 중 기존 행·paging 보존을 추가했다.
-- mutation retry callback은 state-updater 오호출 없이 동일 read/delete/read-all 작업을 재호출하며, auth 최종 실패에는 retry를 숨긴다. TopBar도 `useNotificationPreview` entry effect를 사용해 provider 유지 상태에서 재진입 preview를 갱신한다.
-- fix2 review 경계: session/retry generation을 mutation snapshot과 retry callback에 함께 묶었다. PUT 후 canonical GET USER_001이면 mutation 결과/href 반환을 supersede하고, 계정·최종 auth 전환 뒤 old retry는 UI에서 제거되며 provider가 API 호출 전 거부한다. 늦은 A catch가 B UI retry를 다시 만들지 않도록 generation 검사를 적용했다.
-- final review minor 반영: TopBar dropdown과 Main Feed RightPanel preview에서 `canManage=false` 응답을 받은 정지 계정에 `정지된 계정은 알림을 읽기 전용으로 확인할 수 있습니다.` 안내를 warning token으로 표시한다. 기존 safe href 열람과 관리 mutation 비활성화는 유지한다.
-- closeout evidence 동기화: root의 `frontend-final-2-test.log`는 47 files/439 tests PASS, final readonly 안내 변경은 별도 1 file/8 tests PASS이다. 두 결과를 합산한 441 tests로 보고하지 않는다. Task4 독립 검토는 Approved이고 whole-branch minor도 Approved다. PR #14 merge SHA는 `b9fcb0469f42077447ce8a8842ce22f24bc94af5`다.
+- M9 Task3 frontend 관리자 guard·목록·상세 구현을 완료하고 root 제품 동결/독립 review에 인계할 준비가 됐다.
+- 사용자 승인 A-v2와 `task-3-brief.md`, REQUIREMENTS §6.13-A, M9 회의 §5·§10/10.1·§11, ADR-0008의 frontend 경계를 구현했다. backend DTO/OpenAPI·DB·Git·QA 파일은 수정하지 않았다.
+- M8 frontend는 이전 마일스톤에서 완료·통합됐다. 상세 이력과 근거는 `WORKLOG.md`에 보존한다.
 
 ## 구현 범위
 
-- `frontend/src/features/notifications/`: API client, DTO types, shared provider/store, 계약·상태·계정 전환·mutation race 테스트, 하위 경로 AGENTS 지침.
-- `frontend/src/pages/NotificationsPage.tsx`: 860px 센터, 전체 이력 paging, loading/error/retry/empty/out-of-range, unread/read-all, read canonical href, delete 실패 보존, SUSPENDED read-only.
-- `frontend/src/components/layout/TopBar.tsx`: 330px dropdown, shared unread badge, open/read/error/loading/guest 상태, Escape, canonical href 이동.
-- `frontend/src/components/layout/RightPanel.tsx`: 최근 3건, shared unread, empty/error/loading/guest 상태, 센터 링크, safe href/read 동작.
-- `frontend/src/pages/SettingsUniversePage.tsx`: block/unblock 성공 시 notification store invalidate.
-- `frontend/src/App.tsx`: `NotificationProvider`를 AuthProvider 아래 앱 공통으로 배치.
+- `frontend/src/features/admin/`: `types.ts`, `adminApi.ts`, `AdminAccessProvider.tsx`, 하위 `AGENTS.md`를 추가했다. API는 `/api/v1/admin/users` 목록·상세·role/status mutation·DELETE와 UTF-16 검색어 100자, page/size 계약을 소비한다.
+- `AdminAccessProvider`는 AuthProvider 아래에서만 현재 계정에 대해 목록 `size=1` probe를 실행한다. guest 호출 없음, stale USER claim의 probe 성공 승격, account/request/session generation stale guard, permission/actor·target 404 경계를 제공한다.
+- `AdminRoute`와 `/admin`, `/admin/users/:userId` 라우트를 연결했다. 초기 auth/probe 중 민감 자식은 숨기고, guest는 signin, 권한 거부/일시 오류는 안전한 안내와 retry를 노출한다.
+- `AdminPage`는 1100px 화면 정본의 `ADMIN CONSOLE`, `ROLE: ADMIN`, 검색·3 summary 카드·사용자 Table·URL keyword/page/size·pagination·error retry·역순 응답 guard를 구현했다.
+- `AdminUserPage`는 860px 상세 정본의 role/status/delete confirmation, 승인 삭제 카피, `마지막 접속 기록 없음`, self-protection, canonical mutation 재조회, target404와 actor 권한 상실 구분, 실패 입력 보존/retry를 구현했다. lastAccess는 기록하거나 생성하지 않는다.
+- `TopBar` 로그인 프로필은 기존 `/settings` link semantics를 보존하면서 클릭 시 프로필 메뉴를 열고, 현재 probe가 허용된 경우에만 `관리자` 진입을 표시한다. 별도 관리자 상단 버튼은 추가하지 않았다.
+- 테스트는 `adminApi.test.ts`, `adminAccess.test.tsx`, `adminPages.test.tsx`, `adminRaces.test.tsx`와 router fixture 보강을 추가했다.
 
 ## TDD·검증
 
-- API/store/UI 초기 RED 후 GREEN: notification targeted 5 files/16 tests, post-fix shell/page targeted 2 files/8 tests. fix1 focused는 5 files/25 tests passed.
-- mutation account-generation RED: guard 전 A→B read/read-all race 1 file/2 tests 실패. account-scoped key, 시작 account 세대 캡처, stale completion rejection 및 superseded UI 무시 후 1 file/2 tests 통과.
-- fix1 필수 회귀: 동일계정 pre-read 지연 응답, read-all 후 신규 unread, 다른 center query 역순 summary, USER_001 조회·mutation cache clear, preview re-entry, transient center 보존, TopBar/RightPanel/center retry가 모두 GREEN이다.
-- fix2 회귀: PUT 성공→후속 GET USER_001 href/이동 금지, A→B old read-all retry API 미호출, transient→USER_001 old preview retry API 미호출, NotificationsPage/TopBar retry 제거 및 늦은 실패 catch 차단이 GREEN이다.
-- 전체 frontend(root evidence): `build/m8-evidence/frontend-final-2-test.log` → 47 files/439 tests passed, failures 0, errors 0, skipped 0, exit 0. final readonly 변경 후 전체 441건은 재실행하지 않았다.
-- lint: `npm run lint` → oxlint exit 0.
-- build: `npm run build` → `tsc -b` + Vite exit 0, 145 modules. 기존 500 kB 초과 chunk warning만 남고 build 오류는 없다.
-- 정적: `git diff --check -- frontend .claude/team/frontend` exit 0. notification 구현에서 debug log, polling, 폐기 다크 토큰, radius 선언을 찾지 못했다. `지난 30일`은 부재를 검증하는 테스트 assertion에만 남아 있다.
-- fix1 raw 원문: `frontend/.m8-evidence/raw/frontend-fix1-focused-green.log`(5 files/25 tests), `frontend/.m8-evidence/raw/frontend-fix1-lint.log`(oxlint), `frontend/.m8-evidence/raw/frontend-fix1-build.log`(tsc+Vite; 기존 >500 kB warning만).
-- fix2 raw 원문: `frontend/.m8-evidence/raw/frontend-fix2-focused-green.log`(5 files/31 tests), `frontend/.m8-evidence/raw/frontend-fix2-lint.log`(oxlint), `frontend/.m8-evidence/raw/frontend-fix2-build.log`(tsc+Vite; 기존 >500 kB warning만).
-- final review raw 원문: `frontend/.m8-evidence/raw/frontend-final-fix-readonly-focused.log`(1 file/8 tests), `frontend/.m8-evidence/raw/frontend-final-fix-readonly-lint.log`(oxlint), `frontend/.m8-evidence/raw/frontend-final-fix-readonly-build.log`(tsc+Vite; 기존 >500 kB warning만).
-- root actual acceptance: `build/m8-acceptance-20261110-173900/evidence.json` → 323 PASS / 0 FAIL / 0 NOT RUN, 1440px viewport, source/JAR hash match, five PNG evidence (`design-notifications.png`, `design-main-notifications.png`, `notifications-owner.png`, `topbar-notifications.png`, `main-owner-notifications.png`). QA `qa/M8-review.md` §10 final independent verdict is Ready Yes.
-
-## 증거·변경 경계
-
-- 명령·결과 요약: `frontend/.m8-evidence/task4-targeted.txt`, `task4-full.txt`, `task4-lint-build.txt`, `task4-static.txt`.
-- 제품·테스트 변경은 `frontend/**`, 상태·작업 기록은 `.claude/team/frontend/**`에 한정했다. Git commit/의존성 추가/backend/root docs/QA/runtime 파일은 이 역할에서 수행하지 않았다.
-- 부모/root의 기존 타 역할 변경과 untracked 파일은 보존했으며 되돌리지 않았다.
+- 초기 RED: 관리자 4개 테스트 파일을 구현 전에 추가해 missing admin 모듈/placeholder 화면으로 실패를 확인했다. 원문은 `frontend/.m9-evidence-admin-red.log`에 있다(구현 후 evidence 디렉터리와 분리된 기존 scratch 로그).
+- targeted GREEN: `npm test -- --run --maxWorkers=1 src/test/adminApi.test.ts src/test/adminAccess.test.tsx src/test/adminPages.test.tsx src/test/adminRaces.test.tsx` → **4 files / 15 tests passed**, exit 0. 원문 `frontend/.m9-evidence/admin-targeted-final.log`.
+- race GREEN: `npm test -- --run --maxWorkers=1 src/test/adminRaces.test.tsx` → **1 file / 4 tests passed**, exit 0. 원문 `frontend/.m9-evidence/admin-race-final.log`.
+- routing regression: `npm test -- --run --maxWorkers=1 src/test/router.test.tsx src/test/guards.test.tsx src/test/TopBar.test.tsx` → **3 files / 31 tests passed**, exit 0. 원문 `frontend/.m9-evidence/admin-routing-final.log`.
+- 첫 full run은 TopBar 프로필 link 회귀 1건으로 실패했다: `frontend/.m9-evidence/frontend-final-test.log` (**50 passed / 1 failed**, 51 files / 456 tests). 원인은 기존 settings contract가 `behaver` link를 요구한 것.
+- 수정 근거: 프로필 trigger를 `/settings` `Link`로 유지하고 click에서 메뉴를 열도록 바꿨다. isolated settings suite는 **32/32**, 최종 full run `npm test -- --run --maxWorkers=1`은 `frontend/.m9-evidence/frontend-final-test-2.log`의 **51 files / 456 tests passed**, failures/errors/skipped 0, exit 0이다. 중간 `profile-menu-regression-final.log`의 장시간 timeout은 최종 결과로 대체하지 않으며, 이후 isolated/full 재실행에서 통과했다.
+- `npm run lint` → oxlint exit 0, 원문 `frontend/.m9-evidence/frontend-final-lint.log`.
+- `npm run build` → `tsc -b` + Vite exit 0, 149 modules, 기존 >500 kB chunk warning만, 원문 `frontend/.m9-evidence/frontend-final-build.log`.
+- `git diff --check -- frontend .claude/team/frontend` → exit 0. 새 의존성·환경변수·DB/업로드·Git 조작 없음.
 
 ## 남은 게이트·우려
 
-- backend DTO/OpenAPI/HTTP·MySQL 권한 projection과 실제 1440px HTTP/Chrome 인수는 root evidence로 PASS했다. frontend 역할은 브라우저 runtime을 직접 실행하지 않았지만, 제출된 다섯 PNG와 QA §10 독립 시각 판정으로 M8 gate가 닫혔다.
-- `feature/M8-notifications`의 tested head `201cd181ec8332e85f2cc985c9560d947b2833f4`와 `dev` merge tree `9da6077a89a4528df3cb55c13556ed28300cfd28`는 동일하다. 추가 frontend 차단 요인은 없다.
+- frontend 자동 검증은 GREEN이나 실제 backend HTTP/DTO/ACL, Chrome 1440px 동작·시각 검증은 root/독립 QA 게이트다. frontend 역할은 브라우저 runtime을 실행하지 않았다.
+- 프로필 이름 클릭은 기존 `/settings` 링크 호환을 위해 default navigation을 막고 메뉴를 토글한다. 프로필 메뉴의 `관리자` link는 current DB probe가 `allowed`가 된 뒤에만 나타난다. root actual browser에서 이 흐름과 권한 loss를 확인해야 한다.
+- build의 >500 kB chunk 경고는 기존 번들 경고이며 이번 범위에서 의존성/코드 분할을 추가하지 않았다.
 
 ## 다음 작업
 
-- 사용자 다음 마일스톤 지시를 기다린다. M9는 이번 실행에 포함하지 않는다.
+- 이 역할은 제품 변경을 동결한다. root가 report·실제 HTTP/1440px·독립 review를 수행한 뒤 결함이 frontend 소유로 재배정될 때만 수정한다.

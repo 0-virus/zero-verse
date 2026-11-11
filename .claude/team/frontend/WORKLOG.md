@@ -540,3 +540,29 @@
 - 통합: PR #14가 `dev`에 merge됐다(merge SHA `b9fcb0469f42077447ce8a8842ce22f24bc94af5`). local `dev` fast-forward 후 tested head `201cd181ec8332e85f2cc985c9560d947b2833f4`와 merge tree `9da6077a89a4528df3cb55c13556ed28300cfd28`가 동일하다.
 - 최종 증거: root 전체 frontend는 47 files/439 tests PASS, final readonly 변경은 별도 1 file/8 tests PASS·lint/build PASS이며 전체 441건은 실행하지 않았다. 실제 M8 acceptance는 323 PASS/0 FAIL/0 NOT RUN, 1440px·source/JAR 일치·PNG 5개이고, `qa/M8-review.md` §10 최종 독립 판정은 Ready Yes다.
 - 상태: M8 frontend 역할은 완료됐고 현재 진행 중 작업은 없다. M9는 이번 실행 범위가 아니며 사용자의 다음 마일스톤 지시를 기다린다.
+
+## 2026-11-11 12:47:27 KST — M9 FE 관리자 화면 read-only 준비·계약 갭 인계
+
+- 범위/경계: 헌법→루트/역할 지침→frontend `STATE.md`, `docs/design/AGENTS.md`·`DESIGN-SYSTEM.md`·`ZeroVerse Pages.dc.html`, PRD §5.13/§7/§9-K·U/§10, REQUIREMENTS FR-ADMIN-01~05와 현재 `AdminPage`·`AdminUserPage`·라우터·가드·AuthContext·TopBar·공통 Table/PageResponse/API 경계를 읽기 전용으로 대조했다. 제품 코드·테스트·의존성·Git·디자인 원본은 수정하지 않았고 이 역할의 `STATE.md`와 본 작업로그만 갱신했다.
+- 디자인 사실: `/admin`은 단일 1100px 컬럼, `/admin/users/:id`는 860px 컬럼이다. 목록은 `ADMIN CONSOLE`, `ROLE: ADMIN`, `이메일 · 닉네임 검색`, `전체 사용자`·`이번 주 가입`·`정지 계정` 3 카드, `사용자`·`블로그`·`역할`·`상태`·`가입일`·`관리` 열을 쓴다. 상세는 `ADMIN CONSOLE › 사용자 상세`, 60px 아바타, 이름/상태·email·가입일·마지막 접속·UID, `게시글`·`댓글`·`유니버스 연결`, 역할 변경, 일시 정지/해제, 위험 구역 계정 삭제 카피다. 토큰은 paper/ink/accent, radius 0, 3px 주 보더, hard-offset shadow, 데스크톱 min-width 1440px다.
+- 현재 구현 사실: `AdminPage`·`AdminUserPage`는 `PageScaffold` placeholder다. `/admin` 및 `/admin/users/:userId`는 현재 `AdminRoute` 없이 라우트만 존재하고, guards에는 AdminRoute가 없다. `AuthUser`는 `role`만 제공하며 status/lastLoginAt은 없다. TopBar는 `/settings` 단일 프로필 링크만 있어 PRD §9-K의 “프로필 메뉴 경유” 관리자 진입점은 제품에 없다. `Table`, feature별 `PageResponse`, `ApiRequestError`는 재사용 가능한 기반이다.
+- 계약 갭/결정 필요: REQUIREMENTS §6.13은 관리자 API를 “초안”이라고 명시한다. 목록 3개 통계 카드의 summary 응답 또는 별도 집계 API, role/status 검색 파라미터와 디자인상 status select 미노출(PRD §9-U)의 조합, 목록 `최근 수정일`과 디자인 상세 `마지막 접속`의 필드/저장 근거, 댓글 통계의 DTO 의미, `deleted_at` soft delete와 “블로그·게시글·댓글이 모두 삭제/복구 불가” 카피의 실제 범위를 심의에서 확정해야 한다. 임의 endpoint·필드·삭제 동작은 추가하지 않는다.
+- 최소 권고: 계약 승인 후 `AdminRoute`(loading/guest/non-admin/admin) 회귀부터 추가하고, admin DTO/API → 목록 search·summary·pageable → 상세 role/status/delete mutation·canonical 재조회 순으로 구현한다. API 오류·계정 전환·늦은 응답은 기존 generation guard와 `ApiRequestError` 경계를 재사용하고, 최종에 1440px 실제 동작/시각 검증을 별도 수행한다.
+- 검증/인계: `git status --short`에서 기존 사용자 변경 `.gitignore`만 보존된 것을 확인했다. 이번 준비에서는 제품 명령(test/lint/build/브라우저)을 실행하지 않았으므로 M9 통과를 주장하지 않는다. 부모에게 위 정본 경로·결정 목록·현재 scaffold 상태를 전달하며, 승인된 DTO/OpenAPI 전에는 frontend 제품 파일을 동결한다.
+
+## 2026-11-11 12:49:42 KST — M9 FE 기준선 검증 정정
+
+- 위 read-only 조사 인계 후 기존 frontend 기준선 명령을 실행했다. `npm test -- --run --maxWorkers=1` → 47 files / 441 tests passed, 실패·오류·skip 0. `npm run lint` → oxlint exit 0. `npm run build` → `tsc -b`·Vite exit 0, 145 modules; 기존 500 kB 초과 chunk warning만 남았다.
+- `git diff --check -- frontend .claude/team/frontend`는 오류가 없고, 변경 목록은 허용된 `.claude/team/frontend/STATE.md`, `.claude/team/frontend/WORKLOG.md`와 기존 사용자 변경 `.gitignore`뿐이다. 브라우저/1440px 검증은 제품 구현이 없는 read-only 준비 범위라 실행하지 않았으며 M9 완료·시각 PASS를 주장하지 않는다. 앞 항목의 “제품 명령 미실행” 문구는 이 기준선 검증 결과로 정정한다.
+
+## 2026-11-11 14:37:55 KST — M9 Task3 frontend 관리자 guard·목록·상세 구현·동결 인계
+
+- 담당/경계: 부모가 배정한 사용자 승인 M9 A-v2 Task3에 따라 `frontend/**`, `.claude/team/frontend/STATE.md`·`WORKLOG.md`, 명시된 scratch report만 수정했다. `.superpowers/sdd/M9-admin/task-3-report.md`는 부모 인계용으로 작성하며 backend/QA/root docs/Git/의존성/환경변수/DB/업로드는 건드리지 않았다. 공유 체크아웃의 다른 작업자 변경은 보존했다.
+- 선행 대조: 헌법→AGENTS/CLAUDE→frontend CLAUDE/STATE, Task3 brief, DESIGN AGENTS/DESIGN-SYSTEM 및 Pages 원본, REQUIREMENTS §6.13-A, PRD 관련 절, M9 회의 §5·§10/10.1·§11, ADR-0008을 직접 읽었다. 1100/860px, 1440px min-width, radius 0, cream paper/hard shadow, 승인 삭제 카피, lastAccess 미기록, current-admin `size=1` probe와 세대 격리를 구현 기준으로 삼았다.
+- TDD RED: 구현 전에 `adminApi`, `adminAccess`, `adminPages`, `adminRaces`를 추가해 missing admin 모듈/placeholder 화면으로 4개 파일 실패를 확인했다. raw output은 `frontend/.m9-evidence-admin-red.log`에 보존했다.
+- GREEN 구현: `features/admin` DTO/API/provider 및 하위 AGENTS를 추가했다. AdminRoute는 guest no-call/signin, auth/probe loading 민감 화면 숨김, current DB probe 승격·강등, actor/target 404 경계를 제공한다. 목록은 URL 검색·paging·3 summary·Table·retry·out-of-range canonicalize, 상세는 role/status/delete confirm·canonical 재조회·self 보호·target error·입력 보존 retry를 연결했다.
+- UI/회귀: TopBar는 기존 로그인 프로필 `/settings` link semantics를 유지하면서 click으로 메뉴를 열고 current probe가 허용된 경우만 `관리자`를 표시한다. 별도 관리자 버튼·status filter·lastAccess 기록은 추가하지 않았다. router fixture와 stale account/request/target 역순 race 테스트를 추가했다.
+- 검증: targeted `npm test -- --run --maxWorkers=1 src/test/adminApi.test.ts src/test/adminAccess.test.tsx src/test/adminPages.test.tsx src/test/adminRaces.test.tsx` → exit 0, 4 files/15 tests; race → exit 0, 1 file/4 tests; routing/guards/TopBar → exit 0, 3 files/31 tests. raw는 `frontend/.m9-evidence/admin-targeted-final.log`, `admin-race-final.log`, `admin-routing-final.log`이다.
+- full 첫 결과는 TopBar 기존 link contract 1건 실패(`frontend/.m9-evidence/frontend-final-test.log`, 50 passed/1 failed, 51 files/456 tests)였다. trigger를 `/settings` Link로 수정하고 isolated settings 32/32를 확인한 뒤, 최종 `npm test -- --run --maxWorkers=1` → exit 0, 51 files/456 tests passed, failures/errors/skipped 0 (`frontend/.m9-evidence/frontend-final-test-2.log`). 중간 profile-menu targeted timeout raw는 `profile-menu-regression-final.log`에 남겼고 최종 full 결과로 덮어쓰지 않았다.
+- 최종 정적 검증: `npm run lint` exit 0 (`frontend/.m9-evidence/frontend-final-lint.log`), `npm run build` exit 0 (`tsc -b`+Vite, 149 modules; 기존 >500 kB warning만, `frontend/.m9-evidence/frontend-final-build.log`), `git diff --check -- frontend .claude/team/frontend` exit 0.
+- 인계/남은 게이트: source freeze 상태로 root 실제 backend HTTP/DTO/ACL, Chrome 1440px 동작·시각 검증 및 독립 QA에 인계한다. frontend 역할은 브라우저 runtime을 직접 실행하지 않았고, report 경로는 `.superpowers/sdd/M9-admin/task-3-report.md`다.

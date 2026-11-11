@@ -1178,17 +1178,17 @@ async function runMutationMatrix(accounts, posts) {
     'SUSPENDED signin and post/comment/like/universe writes remain denied with the exact state error');
   const suspendedRefresh = suspendedRefreshProbe ? await refreshFromProbe(suspendedRefreshProbe) : null;
   const suspendedRefreshAgain = suspendedRefreshProbe ? await refreshFromProbe(suspendedRefreshProbe) : null;
-  check('refresh-suspended-rejected', suspendedRefresh?.status === 401 && suspendedRefresh.errorCode === 'AUTH_003'
-    && suspendedRefresh.envelope && privateNoStore(suspendedRefresh.cacheControl),
-  'refresh token issued before suspension is rejected as AUTH_003');
-  check('refresh-suspended-reuse-rejected', suspendedRefreshAgain?.status === 401 && suspendedRefreshAgain.errorCode === 'AUTH_003'
-    && suspendedRefreshAgain.envelope && privateNoStore(suspendedRefreshAgain.cacheControl),
-  'the same pre-suspension refresh credential remains rejected on reuse and is not consumed into a false success');
+  checkStateResponses('refresh-suspended-rejected', suspendedRefresh?.status === 401 && suspendedRefresh.errorCode === 'AUTH_003'
+    && suspendedRefresh.envelope && hasNoStore(suspendedRefresh.cacheControl),
+  'refresh token issued before suspension is rejected as AUTH_003', { suspendedRefresh });
+  checkStateResponses('refresh-suspended-reuse-rejected', suspendedRefreshAgain?.status === 401 && suspendedRefreshAgain.errorCode === 'AUTH_003'
+    && suspendedRefreshAgain.envelope && hasNoStore(suspendedRefreshAgain.cacheControl),
+  'the same pre-suspension refresh credential remains rejected on reuse and is not consumed into a false success', { suspendedRefreshAgain });
   const activated = await apiCall('PUT', `/api/v1/admin/users/${targetId}/status`, admin.token, { status: 'ACTIVE' });
   const reactivatedRefresh = suspendedRefreshProbe ? await refreshFromProbe(suspendedRefreshProbe) : null;
-  check('refresh-reactivated-existing-accepted', activated.status === 200
-    && reactivatedRefresh?.status === 200 && reactivatedRefresh.envelope && privateNoStore(reactivatedRefresh.cacheControl),
-  'the pre-suspension refresh credential remains usable after reactivation when it was not discarded');
+  checkStateResponses('refresh-reactivated-existing-accepted', activated.status === 200
+    && reactivatedRefresh?.status === 200 && reactivatedRefresh.envelope && hasNoStore(reactivatedRefresh.cacheControl),
+  'the pre-suspension refresh credential remains usable after reactivation when it was not discarded', { activated, reactivatedRefresh });
   await suspendedRefreshProbe?.dispose();
   const repeatedActive = await apiCall('PUT', `/api/v1/admin/users/${targetId}/status`, admin.token, { status: 'ACTIVE' });
   const targetAdminAfterActivate = await adminActorMatrix(targetAdminClaimToken, targetId, 'ADMIN_001', 403);
@@ -1237,9 +1237,9 @@ async function runMutationMatrix(accounts, posts) {
   const targetAdminAfterDelete = await adminActorMatrix(targetAdminClaimToken, targetId, 'USER_001', 404);
   check('mutation-deleted-admin-claim-recheck', targetAdminAfterDelete, 'previously issued ADMIN claim is rejected as USER_001 after actor deletion');
   const deletedRefresh = deleteRefreshProbe ? await refreshFromProbe(deleteRefreshProbe) : null;
-  check('refresh-deleted-rejected', deletedRefresh?.status === 401 && deletedRefresh.errorCode === 'AUTH_003'
-    && deletedRefresh.envelope && privateNoStore(deletedRefresh.cacheControl),
-  'refresh token issued before soft delete is rejected as AUTH_003');
+  checkStateResponses('refresh-deleted-rejected', deletedRefresh?.status === 401 && deletedRefresh.errorCode === 'AUTH_003'
+    && deletedRefresh.envelope && hasNoStore(deletedRefresh.cacheControl),
+  'refresh token issued before soft delete is rejected as AUTH_003', { deletedRefresh });
   await deleteRefreshProbe?.dispose();
 
   const deletedSignin = await signinAttempt(fixture.accounts.target, 'deleted-target');
@@ -1255,12 +1255,13 @@ async function runMutationMatrix(accounts, posts) {
   });
   const deletedLikeWrite = await apiCall('POST', `/api/v1/posts/${posts.adminPublic.id}/likes`, accounts.target.userToken);
   const deletedUniverseWrite = await apiCall('POST', `/api/v1/universe/requests/${accounts.special.me.id}`, accounts.target.userToken);
-  check('mutation-deleted-signin-and-writes', deletedSignin.status === 401 && deletedSignin.errorCode === 'AUTH_001'
-    && deletedPostWrite.status === 404 && deletedPostWrite.errorCode === 'USER_001'
+  checkStateResponses('mutation-deleted-signin-and-writes', deletedSignin.status === 401 && deletedSignin.errorCode === 'AUTH_001'
+    && deletedPostWrite.status === 404 && deletedPostWrite.errorCode === 'BLOG_001'
     && deletedCommentWrite.status === 404 && deletedCommentWrite.errorCode === 'USER_001'
     && deletedLikeWrite.status === 404 && deletedLikeWrite.errorCode === 'USER_001'
     && deletedUniverseWrite.status === 404 && deletedUniverseWrite.errorCode === 'USER_001',
-  'soft-deleted actor signin is AUTH_001/401 while authenticated mutations remain USER_001/404');
+  'soft-deleted actor signin is AUTH_001/401, own-blog post creation is BLOG_001/404, and other authenticated writes are USER_001/404',
+  { deletedSignin, deletedPostWrite, deletedCommentWrite, deletedLikeWrite, deletedUniverseWrite });
 
   const afterDeleteFingerprint = await runtimeFingerprint(accounts.target.me.id, 'after-target-delete');
   evidence.fixture.fingerprint.afterDelete = {
@@ -1524,14 +1525,21 @@ async function runBrowserAcceptance(accounts, posts) {
       && Number(detailBody?.data?.id) === Number(accounts.user.me.id),
     'admin detail readiness requires an actual HTTP 200 for the requested fixture ID');
     await waitForAdminDetail(page);
-    check('browser-admin-detail-last-access', await page.getByText('마지막 접속 기록 없음', { exact: true }).count() === 1, 'detail renders unrecorded last access copy');
+    const detailHeader = page.locator('section[aria-label="사용자 상세"] header');
+    const detailEmail = detailHeader.getByText(accounts.user.email, { exact: false });
+    await detailEmail.waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
+    check('browser-admin-detail-last-access', Number(detailBody?.data?.id) === Number(accounts.user.me.id)
+      && detailBody?.data?.email === accounts.user.email && detailBody?.data?.lastAccessAt === null
+      && await exactCount(detailEmail) === 1
+      && await exactCount(detailHeader.getByText('마지막 접속 기록 없음', { exact: false })) === 1,
+    'canonical target detail header renders unrecorded last access copy');
     check('browser-admin-detail-width', await contentWidth(page, 'detail') >= 820 && await contentWidth(page, 'detail') <= 900, 'admin detail content is approximately 860px at 1440px');
     await captureProduct(page, 'admin-detail-1440');
     check('browser-screenshot-evidence', evidence.screenshots.includes('admin-list-1440.png')
       && evidence.screenshots.includes('admin-detail-1440.png'),
     '1440px list and detail screenshots are captured as evidence');
 
-    await runBrowserTarget404Probe(page, accounts.target.me.id);
+    await runBrowserTarget404Probe(page, accounts.target.me.id, accounts.adminKeeper.me.id);
     await runBrowserMutationAcceptance(page, accounts);
     await runBrowserStaleProbe(adminContext, accounts);
     await verifyDesignReference(adminContext);
@@ -1597,7 +1605,7 @@ async function runBrowserListTransientAcceptance(page, accounts) {
   const detailPattern = new RegExp(`/api/v1/admin/users/${accounts.user.me.id}$`);
   let detailFailed = false;
   await page.route(detailPattern, async (route) => {
-    if (!detailFailed && route.request().method() === 'GET') {
+    if (route.request().method() === 'GET') {
       detailFailed = true;
       await route.fulfill({
         status: 500,
@@ -1612,7 +1620,7 @@ async function runBrowserListTransientAcceptance(page, accounts) {
   await page.goto(`${frontendUrl}/admin/users/${accounts.user.me.id}`, { waitUntil: 'domcontentloaded' });
   const detailRetryNotice = page.getByRole('alert').filter({ hasText: 'synthetic detail retry' });
   await detailRetryNotice.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => undefined);
-  const detailRetryButton = page.getByRole('button', { name: '다시 시도', exact: true });
+  const detailRetryButton = detailRetryNotice.getByRole('button', { name: '다시 시도', exact: true });
   check('browser-detail-transient-retry', detailFailed && await exactCount(detailRetryButton) === 1,
     'transient detail failure exposes a scoped retry without stale target data');
   await page.unroute(detailPattern);
@@ -1623,8 +1631,12 @@ async function runBrowserListTransientAcceptance(page, accounts) {
     await detailRetryButton.click();
     detailRetryResponse = await responsePromise.catch(() => null);
   }
+  const detailRetryBody = detailRetryResponse ? await detailRetryResponse.json().catch(() => null) : null;
+  const retryTargetEmail = page.locator('section[aria-label="사용자 상세"] header').getByText(accounts.user.email, { exact: false });
+  await retryTargetEmail.waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
   check('browser-detail-transient-retry-result', detailRetryResponse?.status() === 200
-    && await page.getByText(accounts.user.me.nickname, { exact: true }).count() === 1,
+    && Number(detailRetryBody?.data?.id) === Number(accounts.user.me.id)
+    && detailRetryBody?.data?.email === accounts.user.email && await exactCount(retryTargetEmail) === 1,
   'detail retry restores the requested canonical target');
   await page.goto(`${frontendUrl}/admin?page=0&size=20`, { waitUntil: 'domcontentloaded' });
   await waitForAdminReady(page);
@@ -1745,7 +1757,7 @@ async function runBrowserRevalidationBoundaryProbes(accounts) {
   }
 }
 
-async function runBrowserTarget404Probe(page, targetId) {
+async function runBrowserTarget404Probe(page, targetId, expectedKeeperId) {
   const responsePromise = page.waitForResponse((response) => response.request().method() === 'GET'
     && new URL(response.url()).pathname === `/api/v1/admin/users/${targetId}`);
   await page.goto(`${frontendUrl}/admin/users/${targetId}`, { waitUntil: 'domcontentloaded' });
@@ -1758,7 +1770,7 @@ async function runBrowserTarget404Probe(page, targetId) {
   const listResponse = await listResponsePromise.catch(() => null);
   const listBody = listResponse ? await listResponse.json().catch(() => null) : null;
   check('browser-current-actor-list-after-target-404', listResponse?.status() === 200
-    && (listBody?.data?.users?.items ?? []).some((item) => Number(item.id) === Number(accounts.adminKeeper.me.id)),
+    && (listBody?.data?.users?.items ?? []).some((item) => Number(item.id) === Number(expectedKeeperId)),
   'current ACTIVE ADMIN remains in session after target 404 and list returns its exact fixture row');
 }
 
@@ -2381,6 +2393,22 @@ function containsText(response, text) {
 
 function privateNoStore(value) {
   return /private/i.test(value ?? '') && /no-store/i.test(value ?? '');
+}
+
+function hasNoStore(value) {
+  return /(?:^|,)\s*no-store\s*(?:,|$)/i.test(value ?? '');
+}
+
+function checkStateResponses(label, passed, detail, responses) {
+  const diagnostics = passed ? '' : `: ${JSON.stringify(Object.entries(responses).map(([name, response]) => ({
+    name,
+    status: response?.status ?? null,
+    errorCode: typeof response?.errorCode === 'string' && /^[A-Z][A-Z0-9]*_\d{3}$/.test(response.errorCode) ? response.errorCode : null,
+    envelope: response?.envelope === true,
+    cacheNoStore: hasNoStore(response?.cacheControl),
+    cachePrivate: /(?:^|,)\s*private\s*(?:,|$)/i.test(response?.cacheControl ?? ''),
+  })))}`;
+  check(label, passed, detail + diagnostics);
 }
 
 function exactCount(locator) {

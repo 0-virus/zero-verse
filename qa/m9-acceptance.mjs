@@ -16,6 +16,8 @@
  * M9_RUNTIME_SQL_HELPER는 root가 격리 MySQL에서만 실행한다. fingerprint는
  * stdin/stdout JSON handshake를 사용하고, query-count는 고정된 performance_schema
  * scalar SELECT만 사용한다. 사용자 입력을 SQL로 조합하지 않는다.
+ * 최종 BE XML/summary와 FE JSON은 qa/m9-test-evidence.mjs의 구조화 parser로만
+ * 연결한다. 문자열 marker나 전체-suite 수만으로 PASS를 만들지 않는다.
  *
  * 정본 계약: REQUIREMENTS §6.13-A, ADR-0008, M9 회의 §5·§10·§10.1·§11.
  * A-v2 승인 자체는 PASS가 아니며, runtime/source/JAR/BE/FE evidence가 모두
@@ -28,6 +30,7 @@ import { fileURLToPath } from 'node:url';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { spawn } from 'node:child_process';
+import { collectTestEvidence } from './m9-test-evidence.mjs';
 
 const require = createRequire(import.meta.url);
 const playwrightModule = process.env.M9_PLAYWRIGHT_MODULE ?? 'playwright';
@@ -52,6 +55,8 @@ const statusWaitMs = Number(process.env.M9_STATUS_WAIT_MS ?? 180_000);
 const screenshotsEnabled = process.env.M9_SCREENSHOTS !== '0';
 const chromeHeadless = process.env.M9_HEADLESS !== '0';
 const runSuffix = `${Date.now().toString(36)}${randomBytes(5).toString('hex')}`;
+const ADMIN_USERS_ROUTE_PATTERN = /\/api\/v1\/admin\/users(?:\/|\?|$)/;
+const STALE_PROBE_TIMEOUT_MS = Number(process.env.M9_STALE_PROBE_TIMEOUT_MS ?? 15_000);
 
 const fixture = makeFixtureCredentials(runSuffix);
 const evidence = {
@@ -89,12 +94,15 @@ const REQUIRED_EVIDENCE_IDS = [
   'fixture-admin-claim-tokens',
   'fixture-native-subgraph',
   'fixture-native-api-subgraph',
+  'fixture-target-all-visibility',
+  'fixture-target-deleted-opponent-relation',
   'http-admin-list-status',
   'http-admin-detail-status',
   'http-admin-detail-exact-aggregates',
   'fixture-target-comments-replies',
   'fixture-target-actor-comment',
   'fixture-target-actor-notification',
+  'fixture-target-soft-deleted-own-comment',
   'auth-missing-admin-endpoints',
   'auth-malformed-admin-endpoints',
   'auth-bad-signature-admin-endpoints',
@@ -105,6 +113,8 @@ const REQUIRED_EVIDENCE_IDS = [
   'auth-wrong-type-admin-endpoints',
   'auth-missing-role-admin-endpoints',
   'auth-missing-subject-admin-endpoints',
+  'auth-invalid-role-admin-endpoints',
+  'auth-invalid-subject-admin-endpoints',
   'validation-admin-queries',
   'validation-admin-keyword-boundary',
   'validation-admin-bodies',
@@ -112,19 +122,31 @@ const REQUIRED_EVIDENCE_IDS = [
   'list-role-filter-exact',
   'list-status-filter-exact',
   'list-literal-wildcard-search-exact',
+  'list-email-search-exact',
+  'list-nickname-search-exact',
+  'list-name-search-exact',
   'list-summary-exact',
   'list-same-created-at-pages',
+  'list-same-created-at-global-order',
   'list-large-offset-empty-exact',
   'mutation-self-protect',
   'mutation-role-canonical',
+  'mutation-role-promote-current-token',
   'mutation-role-demote-canonical',
   'mutation-status-canonical',
+  'mutation-same-value-audit-immutable',
+  'mutation-suspend-boundary',
   'mutation-soft-delete',
+  'mutation-suspended-signin-and-writes',
+  'mutation-deleted-signin-and-writes',
   'fixture-native-child-counts',
   'http-target-actor-notification-mask',
   'http-target-comment-placeholder',
   'http-target-reply-placeholder',
+  'http-target-own-comment-preservation',
   'refresh-suspended-rejected',
+  'refresh-suspended-reuse-rejected',
+  'refresh-reactivated-existing-accepted',
   'refresh-active-accepted',
   'refresh-deleted-rejected',
   'post-mutation-subgraph-fingerprint',
@@ -137,8 +159,20 @@ const REQUIRED_EVIDENCE_IDS = [
   'browser-guest-admin-guard',
   'browser-user-admin-guard',
   'browser-admin-list-http-ready',
+  'browser-admin-list-pending-sensitive',
+  'browser-list-empty-state',
+  'browser-list-transient-retry',
+  'browser-list-transient-retry-result',
+  'browser-search-paging-history',
+  'browser-admin-focus-suspended',
+  'browser-admin-visible-deleted',
+  'browser-admin-denied-reentry',
   'browser-admin-detail-http-ready',
+  'browser-detail-transient-retry',
+  'browser-detail-transient-retry-result',
+  'browser-screenshot-evidence',
   'browser-role-confirm-canonical',
+  'browser-mutation-duplicate-submit',
   'browser-mutation-error-retry',
   'browser-status-confirm-canonical',
   'browser-delete-copy',
@@ -150,6 +184,10 @@ const REQUIRED_EVIDENCE_IDS = [
   'browser-stale-mutation',
   'browser-auth-final-failure-boundary',
   'browser-account-switch-stale',
+  'backend-rr-writer-evidence',
+  'backend-noop-audit-evidence',
+  'backend-state-policy-evidence',
+  'frontend-matrix-evidence',
 ];
 evidence.requiredChecks = REQUIRED_EVIDENCE_IDS;
 
@@ -193,6 +231,7 @@ try {
 
   await runHttpAcceptance(accounts, posts);
   await runBrowserAcceptance(accounts, posts);
+  await verifyPhysicalConcurrencyEvidence();
 
   await finishEvidence();
 } catch (error) {
@@ -211,16 +250,20 @@ function makeFixtureCredentials(suffix) {
   const key = suffix.slice(-8).toLowerCase();
   const password = `M9!Qa${suffix}7`;
   const searchLiteral = `%_\\${key}`;
+  const searchEmailLiteral = `m9email${key}`;
+  const searchNicknameLiteral = `m9nick${key}`;
   const bulkSearchLiteral = `bulk${key}`;
   const labels = ['admin', 'adminPeer', 'adminKeeper', 'user', 'target', 'race', 'suspended', 'deleted', 'special', 'weekBefore', 'weekStart', 'weekAfter'];
   const bulkLabels = Array.from({ length: 21 }, (_, index) => `bulk${String(index + 1).padStart(2, '0')}`);
   const allLabels = [...labels, ...bulkLabels];
   const accounts = Object.fromEntries(allLabels.map((label, index) => {
     const labelKey = label.replace(/[^a-z0-9]/gi, '').toLowerCase();
-    const nickname = `m9${labelKey.slice(0, 8)}${key}${String(index).padStart(2, '0')}`.slice(0, 20);
+    const nickname = label === 'special'
+      ? `${searchNicknameLiteral}00`.slice(0, 20)
+      : `m9${labelKey.slice(0, 8)}${key}${String(index).padStart(2, '0')}`.slice(0, 20);
     const special = label === 'special';
     return [label, {
-      email: `m9-${label}-${suffix}@example.test`,
+      email: special ? `${searchEmailLiteral}@example.test` : `m9-${label}-${suffix}@example.test`,
       password,
       name: `M9 QA ${special ? `name ${searchLiteral}` : label.startsWith('bulk') ? `${bulkSearchLiteral} ${label}` : label}`,
       nickname,
@@ -234,6 +277,8 @@ function makeFixtureCredentials(suffix) {
     key,
     password,
     searchLiteral,
+    searchEmailLiteral,
+    searchNicknameLiteral,
     bulkSearchLiteral,
     labels: allLabels,
     bulkLabels,
@@ -328,6 +373,16 @@ async function signinAccount(account, label) {
   return token;
 }
 
+async function signinAttempt(account, label) {
+  const response = await apiCall('POST', '/api/v1/auth/signin', undefined, {
+    email: account.email,
+    password: account.password,
+  });
+  check(`fixture-${label}-signin-attempt`, response.status === 200 || response.status === 403 || response.status === 404,
+    'signin boundary response is captured without retaining a token');
+  return response;
+}
+
 function jwtClaimsInMemory(token) {
   try {
     const segment = String(token).split('.')[1];
@@ -372,7 +427,7 @@ async function createFixturePosts(accounts) {
     targetPublic: await createPost(accounts.target, 'target public', 'PUBLIC', true, [
       `m9-${fixture.key}-tag-a`, `m9-${fixture.key}-tag-b`,
     ]),
-    targetPrivate: await createPost(accounts.target, 'target private', 'PRIVATE', true),
+    targetPrivate: await createPost(accounts.target, 'target universe', 'UNIVERSE', true),
     targetDraft: await createPost(accounts.target, 'target draft', 'PRIVATE', false),
     suspendedPublic: await createPost(accounts.suspended, 'suspended public', 'PUBLIC', true),
     deletedActorPublic: await createPost(accounts.deleted, 'deleted actor public', 'PUBLIC', true),
@@ -392,6 +447,11 @@ async function createFixturePosts(accounts) {
     if (label.endsWith('Image')) continue;
     evidence.fixture.postIds[label] = post.id;
   }
+  check('fixture-target-all-visibility', posts.targetPublic.visibility === 'PUBLIC'
+    && posts.targetPrivate.visibility === 'UNIVERSE'
+    && posts.targetDraft.visibility === 'PRIVATE'
+    && posts.targetDraft.publishedAt == null,
+  'target fixture has non-empty PUBLIC, UNIVERSE, and PRIVATE/draft visibility rows for aggregate coverage');
   return posts;
 }
 
@@ -442,27 +502,41 @@ async function createNativeApiSubgraph(accounts, posts) {
   const actor = await apiCall('POST', `/api/v1/posts/${posts.adminPublic.id}/comments`, accounts.target.token, {
     content: 'M9 target actor comment', parentId: null,
   });
+  const deletedOwn = await apiCall('POST', `/api/v1/posts/${posts.adminPublic.id}/comments`, accounts.target.token, {
+    content: 'M9 target soft-deleted own comment', parentId: null,
+  });
+  const deletedOwnId = deletedOwn.data?.id;
+  const deletedOwnDelete = Number.isInteger(deletedOwnId)
+    ? await apiCall('DELETE', `/api/v1/comments/${deletedOwnId}`, accounts.target.token)
+    : null;
   const relations = await Promise.all([
     createUniverseRelation(accounts.target, accounts.user),
     createUniverseRelation(accounts.user, accounts.target),
     createUniverseRelation(accounts.target, accounts.special),
     createUniverseRelation(accounts.adminKeeper, accounts.target),
+    createUniverseRelation(accounts.target, accounts.deleted),
   ]);
   const like = await apiCall('POST', `/api/v1/posts/${posts.targetPublic.id}/likes`, accounts.user.token);
   const valid = root.status === 201 && Number.isInteger(root.data?.id)
     && reply?.status === 201 && Number.isInteger(reply.data?.id)
     && actor.status === 201 && Number.isInteger(actor.data?.id)
+    && deletedOwn.status === 201 && Number.isInteger(deletedOwnId)
+    && deletedOwnDelete?.status === 200
     && relations.every((result) => result.request.status === 201 && result.accept.status === 200)
     && like.status === 200;
   check('fixture-native-api-subgraph', valid, 'target comments/reply/actor notification, accepted universe directions, like, and post tags are created through real APIs');
+  check('fixture-target-deleted-opponent-relation', relations[4]?.request?.status === 201 && relations[4]?.accept?.status === 200,
+    'target has an accepted relation to a still-live opponent before the root soft-deletes that opponent');
   if (!valid) throw new Error('native API subgraph fixture failed');
   evidence.fixture.commentIds.nativeRoot = root.data.id;
   evidence.fixture.commentIds.nativeReply = reply.data.id;
   evidence.fixture.commentIds.nativeActor = actor.data.id;
+  evidence.fixture.commentIds.nativeDeletedOwn = deletedOwnId;
   evidence.fixture.nativeApi = {
     rootCommentId: root.data.id,
     replyCommentId: reply.data.id,
     actorCommentId: actor.data.id,
+    deletedOwnCommentId: deletedOwnId,
     universeIds: relations.map((result) => result.request.data?.requestId).filter(Number.isInteger),
     likeCreated: true,
     tagNames: [`m9-${fixture.key}-tag-a`, `m9-${fixture.key}-tag-b`],
@@ -714,6 +788,12 @@ async function runHttpAcceptance(accounts, posts) {
     && targetActorComment?.author?.id === accounts.target.me.id
     && targetActorComment?.content === 'M9 target actor comment',
   'target owns a comment on a surviving other-user post for actor-notification masking');
+  const targetDeletedOwnComment = findItem(targetComments, nativeIds.deletedOwnCommentId);
+  check('fixture-target-soft-deleted-own-comment', targetComments.status === 200
+    && targetDeletedOwnComment?.content == null
+    && targetDeletedOwnComment?.deleted === true
+    && targetDeletedOwnComment?.author?.id === accounts.target.me.id,
+  'target has a non-empty soft-deleted own comment counterexample that must be excluded from active aggregates but retained as history');
   const targetActorNotificationPage = await apiCall('GET', '/api/v1/notifications?read=all&page=0&size=100', accounts.admin.token);
   const targetActorNotification = (targetActorNotificationPage.data?.items ?? [])
     .find((item) => Number(item.targetId) === Number(nativeIds.actorCommentId));
@@ -754,6 +834,10 @@ async function runHttpAcceptance(accounts, posts) {
     && targetReplyPlaceholder != null && targetReplyPlaceholder.content == null
     && (targetReplyPlaceholder.author == null || targetReplyPlaceholder.deleted === true),
   'target root comment and nested reply remain as masked history after target soft delete');
+  const targetOwnPlaceholder = findItem(survivingComments, evidence.fixture.nativeApi?.deletedOwnCommentId);
+  check('http-target-own-comment-preservation', survivingComments.status === 200 && targetOwnPlaceholder != null
+    && targetOwnPlaceholder.content == null && targetOwnPlaceholder.deleted === true,
+  'target-owned comment deleted before account soft delete remains a deleted placeholder after account soft delete');
 
   const notifications = await apiCall('GET', '/api/v1/notifications?read=all&page=0&size=100', admin.token);
   const maskedNotification = (notifications.data?.items ?? []).find((item) => Number(item.id) === Number(evidence.fixture.notificationIds?.deletedActorComment));
@@ -820,6 +904,16 @@ async function runAdminAuthMatrix(accounts, endpoints) {
       const responses = await Promise.all(endpoints.map((endpoint) => apiCall(endpoint.method, endpoint.path, token)));
       check(label, responses.every((response) => response.status === 401 && response.errorCode === 'AUTH_004'
         && privateNoStore(response.cacheControl) && response.envelope), 'signed incomplete claim is AUTH_004/no-store envelope on all five methods');
+    }
+  }
+
+  for (const [label, variable] of [['auth-invalid-role-admin-endpoints', 'M9_INVALID_ROLE_TOKEN'], ['auth-invalid-subject-admin-endpoints', 'M9_INVALID_SUBJECT_TOKEN']]) {
+    const token = process.env[variable];
+    if (!token) notRun(label, `${variable} is not supplied by isolated runtime`);
+    else {
+      const responses = await Promise.all(endpoints.map((endpoint) => apiCall(endpoint.method, endpoint.path, token)));
+      check(label, responses.every((response) => response.status === 401 && response.errorCode === 'AUTH_004'
+        && privateNoStore(response.cacheControl) && response.envelope), 'signed invalid role/subject claim is AUTH_004/no-store envelope on all five methods');
     }
   }
 
@@ -890,6 +984,18 @@ async function runListMatrix(token, accounts) {
   checkPageResponse('list-literal-wildcard-search', special, true);
   check('list-literal-wildcard-search-exact', special.status === 200
     && setsEqual(ids(special), new Set([Number(accounts.special.me.id)])), 'percent/underscore/backslash search stays literal and returns the exact fixture match');
+  const emailSearch = await adminList(token, { keyword: fixture.searchEmailLiteral, size: 100 });
+  const nicknameSearch = await adminList(token, { keyword: fixture.searchNicknameLiteral, size: 100 });
+  const nameSearch = await adminList(token, { keyword: `name ${fixture.searchLiteral}`, size: 100 });
+  checkPageResponse('list-email-search', emailSearch, true);
+  checkPageResponse('list-nickname-search', nicknameSearch, true);
+  checkPageResponse('list-name-search', nameSearch, true);
+  check('list-email-search-exact', emailSearch.status === 200
+    && setsEqual(ids(emailSearch), new Set([Number(accounts.special.me.id)])), 'email-only keyword search returns the exact special fixture ID');
+  check('list-nickname-search-exact', nicknameSearch.status === 200
+    && setsEqual(ids(nicknameSearch), new Set([Number(accounts.special.me.id)])), 'nickname-only keyword search returns the exact special fixture ID');
+  check('list-name-search-exact', nameSearch.status === 200
+    && setsEqual(ids(nameSearch), new Set([Number(accounts.special.me.id)])), 'name-only keyword search returns the exact special fixture ID');
   check('list-summary-exact', hasSummary(special) && summaryExpected != null
     && Number(special.data.summary.totalUsers) === Number(summaryExpected.totalUsers)
     && Number(special.data.summary.joinedThisWeek) === Number(summaryExpected.joinedThisWeek)
@@ -908,6 +1014,9 @@ async function runListMatrix(token, accounts) {
   const samePage1 = await adminList(token, { keyword: fixture.bulkSearchLiteral, page: 1, size: 20 });
   const sameIds0 = ids(samePage0);
   const sameIds1 = ids(samePage1);
+  const expectedBulkOrder = [...expectedBulkIds].sort((left, right) => right - left);
+  const actualBulkOrder0 = pageItems(samePage0).map((item) => Number(item.id));
+  const actualBulkOrder1 = pageItems(samePage1).map((item) => Number(item.id));
   const sameUnion = new Set([...sameIds0, ...sameIds1]);
   const sameIntersection = [...sameIds0].filter((id) => sameIds1.has(id));
   checkPageResponse('list-same-created-at-page0', samePage0, true);
@@ -921,6 +1030,10 @@ async function runListMatrix(token, accounts) {
     && samePage1.data?.users?.hasNext === false && samePage1.data?.users?.hasPrevious === true
     && stableCreatedSort(pageItems(samePage0)) && stableCreatedSort(pageItems(samePage1)),
   'same-createdAt 21 rows split across pages have exact union, no intersection, metadata, and deterministic order');
+  check('list-same-created-at-global-order', samePage0.status === 200 && samePage1.status === 200
+    && arrayEqual(actualBulkOrder0, expectedBulkOrder.slice(0, 20))
+    && arrayEqual(actualBulkOrder1, expectedBulkOrder.slice(20)),
+  'same-createdAt page0/page1 match the exact globally sorted ID slices, not merely per-page order');
   const offset = await adminList(token, { page: 999_999, size: 100 });
   checkPageResponse('list-large-offset', offset, true);
   check('list-large-offset-empty-exact', offset.status === 200 && pageItems(offset).length === 0
@@ -943,9 +1056,19 @@ async function runMutationMatrix(accounts, posts) {
     && response.errorCode === 'ADMIN_002' && response.errorMessage === selfErrorMessage
     && response.envelope && privateNoStore(response.cacheControl)), 'self role removal/status/delete are ADMIN_002 with the approved message/no-store envelope');
 
+  const selfBeforeKeep = await apiCall('GET', `/api/v1/admin/users/${admin.me.id}`, admin.token);
   const selfKeepRole = await apiCall('PUT', `/api/v1/admin/users/${admin.me.id}/role`, admin.token, { role: 'ADMIN' });
   const selfKeepStatus = await apiCall('PUT', `/api/v1/admin/users/${admin.me.id}/status`, admin.token, { status: 'ACTIVE' });
+  const selfAfterKeep = await apiCall('GET', `/api/v1/admin/users/${admin.me.id}`, admin.token);
   check('mutation-self-keep', selfKeepRole.status === 200 && selfKeepStatus.status === 200, 'self ADMIN/ACTIVE idempotent keep requests succeed');
+  check('mutation-same-value-audit-immutable', selfKeepRole.status === 200 && selfKeepStatus.status === 200
+    && selfAfterKeep.status === 200 && selfAfterKeep.data?.role === 'ADMIN'
+    && selfAfterKeep.data?.status === 'ACTIVE'
+    && selfBeforeKeep.status === 200
+    && selfBeforeKeep.data?.updatedAt === selfAfterKeep.data?.updatedAt
+    && selfKeepRole.data?.updatedAt === selfAfterKeep.data?.updatedAt
+    && selfKeepStatus.data?.updatedAt === selfAfterKeep.data?.updatedAt,
+  'same-value role/status mutations return canonical detail without an audit updatedAt change');
 
   const promoted = await apiCall('PUT', `/api/v1/admin/users/${targetId}/role`, admin.token, { role: 'ADMIN' });
   const targetAdminClaimToken = await signinAccount(fixture.accounts.target, 'target-promoted-admin');
@@ -954,8 +1077,9 @@ async function runMutationMatrix(accounts, posts) {
   const targetAsAdmin = await apiCall('GET', '/api/v1/admin/users?page=0&size=1', targetAdminClaimToken);
   const targetOldUserClaim = await apiCall('GET', '/api/v1/admin/users?page=0&size=1', accounts.target.userToken);
   check('mutation-role-promote-current-token', promoted.status === 200 && targetAdminClaims?.role === 'ADMIN'
-    && targetAsAdmin.status === 200 && targetOldUserClaim.status === 403 && targetOldUserClaim.errorCode === 'ADMIN_001',
-  'role promotion is reflected only by a newly issued current ADMIN claim; prior USER claim stays denied');
+    && targetAsAdmin.status === 200
+    && targetOldUserClaim.status === 200 && targetOldUserClaim.envelope && privateNoStore(targetOldUserClaim.cacheControl),
+  'role promotion is authorized by current ACTIVE DB role even for a pre-promotion USER claim; a fresh ADMIN claim also succeeds');
   check('mutation-role-canonical', promoted.status === 200 && promoted.envelope && privateNoStore(promoted.cacheControl)
     && Number(promoted.data?.id) === Number(targetId) && promoted.data?.role === 'ADMIN',
   'role promotion returns canonical target ID/role and private no-store envelope');
@@ -978,6 +1102,12 @@ async function runMutationMatrix(accounts, posts) {
     contentHtml: '<p>suspended</p>', categoryId: null, visibility: 'PUBLIC', publish: true,
     thumbnailUrl: null, tagNames: [], images: [],
   });
+  const suspendedCommentWrite = await apiCall('POST', `/api/v1/posts/${posts.adminPublic.id}/comments`, accounts.target.userToken, {
+    content: 'M9 suspended comment must fail', parentId: null,
+  });
+  const suspendedLikeWrite = await apiCall('POST', `/api/v1/posts/${posts.adminPublic.id}/likes`, accounts.target.userToken);
+  const suspendedUniverseWrite = await apiCall('POST', `/api/v1/universe/requests/${accounts.special.me.id}`, accounts.target.userToken);
+  const suspendedSignin = await signinAttempt(fixture.accounts.suspended, 'suspended');
   const suspendedNotifications = await apiCall('GET', '/api/v1/notifications?read=all&page=0&size=20', accounts.target.userToken);
   const suspendedNotificationId = suspendedNotifications.data?.items?.[0]?.id;
   const suspendedNotificationRead = Number.isInteger(Number(suspendedNotificationId))
@@ -985,15 +1115,27 @@ async function runMutationMatrix(accounts, posts) {
     : null;
   check('mutation-suspend-boundary', suspended.status === 200 && suspendedAccess.status === 403 && suspendedAccess.errorCode === 'USER_003'
     && suspendedPublic.status === 200 && suspendedWrite.status === 403 && suspendedWrite.errorCode === 'USER_003'
+    && suspendedCommentWrite.status === 403 && suspendedCommentWrite.errorCode === 'USER_003'
+    && suspendedLikeWrite.status === 403 && suspendedLikeWrite.errorCode === 'USER_003'
+    && suspendedUniverseWrite.status === 403 && suspendedUniverseWrite.errorCode === 'USER_003'
+    && suspendedSignin.status === 403 && suspendedSignin.errorCode === 'USER_003'
     && suspendedNotifications.status === 200 && suspendedNotifications.data?.canManage === false
     && suspendedNotificationRead != null && suspendedNotificationRead.status === 403 && suspendedNotificationRead.errorCode === 'USER_003',
   'SUSPENDED blocks admin/write/read mutation access but preserves PUBLIC and notification read-only view');
   const suspendedRefresh = suspendedRefreshProbe ? await refreshFromProbe(suspendedRefreshProbe) : null;
+  const suspendedRefreshAgain = suspendedRefreshProbe ? await refreshFromProbe(suspendedRefreshProbe) : null;
   check('refresh-suspended-rejected', suspendedRefresh?.status === 401 && suspendedRefresh.errorCode === 'AUTH_003'
     && suspendedRefresh.envelope && privateNoStore(suspendedRefresh.cacheControl),
   'refresh token issued before suspension is rejected as AUTH_003');
-  await suspendedRefreshProbe?.dispose();
+  check('refresh-suspended-reuse-rejected', suspendedRefreshAgain?.status === 401 && suspendedRefreshAgain.errorCode === 'AUTH_003'
+    && suspendedRefreshAgain.envelope && privateNoStore(suspendedRefreshAgain.cacheControl),
+  'the same pre-suspension refresh credential remains rejected on reuse and is not consumed into a false success');
   const activated = await apiCall('PUT', `/api/v1/admin/users/${targetId}/status`, admin.token, { status: 'ACTIVE' });
+  const reactivatedRefresh = suspendedRefreshProbe ? await refreshFromProbe(suspendedRefreshProbe) : null;
+  check('refresh-reactivated-existing-accepted', activated.status === 200
+    && reactivatedRefresh?.status === 200 && reactivatedRefresh.envelope && privateNoStore(reactivatedRefresh.cacheControl),
+  'the pre-suspension refresh credential remains usable after reactivation when it was not discarded');
+  await suspendedRefreshProbe?.dispose();
   const repeatedActive = await apiCall('PUT', `/api/v1/admin/users/${targetId}/status`, admin.token, { status: 'ACTIVE' });
   const targetAdminAfterActivate = await adminActorMatrix(targetAdminClaimToken, targetId, 'ADMIN_001', 403);
   check('mutation-status-idempotence', activated.status === 200 && repeatedActive.status === 200 && targetAdminAfterActivate,
@@ -1008,6 +1150,10 @@ async function runMutationMatrix(accounts, posts) {
     'ACTIVE account refresh succeeds with a current DB-backed user');
   await activeRefreshProbe?.dispose();
 
+  // Sign in before the fingerprint: the refresh row is a real child and must
+  // be present in both sides of the later soft-delete comparison. No target
+  // signin is allowed after the before snapshot.
+  const deleteRefreshProbe = await createRefreshProbe(fixture.accounts.target, 'target-before-delete');
   const beforeDeleteFingerprint = await runtimeFingerprint(accounts.target.me.id, 'before-target-delete');
   evidence.fixture.fingerprint.beforeDelete = {
     phase: beforeDeleteFingerprint.phase,
@@ -1018,10 +1164,10 @@ async function runMutationMatrix(accounts, posts) {
   const childCounts = beforeDeleteFingerprint.tableCounts ?? {};
   check('fixture-native-child-counts', Number(childCounts.blogs) >= 2
     && Number(childCounts.posts) >= 4
-    && Number(childCounts.comments) >= 4
+    && Number(childCounts.comments) >= 5
     && Number(childCounts.post_tags) >= 2
     && Number(childCounts.post_likes) >= 1
-    && Number(childCounts.universes) >= 4
+    && Number(childCounts.universes) >= 5
     && Number(childCounts.image_uploads) >= 1,
   'before-delete fingerprint proves non-empty target child rows for blogs/posts/comments/tags/likes/universe/uploads');
   const imageBefore = posts.targetImage
@@ -1029,7 +1175,6 @@ async function runMutationMatrix(accounts, posts) {
     : null;
   check('http-target-image-before-delete', imageBefore?.status === 200 && imageBefore.sha256 === posts.targetImage?.sha256 && imageBefore.size === posts.targetImage?.bytes.length, 'target image is readable with target token and byte hash matches upload');
 
-  const deleteRefreshProbe = await createRefreshProbe(fixture.accounts.target, 'target-before-delete');
   const deleted = await apiCall('DELETE', `/api/v1/admin/users/${targetId}`, admin.token);
   const repeatedDelete = await apiCall('DELETE', `/api/v1/admin/users/${targetId}`, admin.token);
   const deletedDetail = await apiCall('GET', `/api/v1/admin/users/${targetId}`, admin.token);
@@ -1042,6 +1187,26 @@ async function runMutationMatrix(accounts, posts) {
     && deletedRefresh.envelope && privateNoStore(deletedRefresh.cacheControl),
   'refresh token issued before soft delete is rejected as AUTH_003');
   await deleteRefreshProbe?.dispose();
+
+  const deletedSignin = await signinAttempt(fixture.accounts.target, 'deleted-target');
+  const deletedPostWrite = await apiCall('POST', '/api/v1/posts', accounts.target.userToken, {
+    blogId: accounts.target.blog.id,
+    title: 'M9 deleted post must fail',
+    contentJson: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'deleted' }] }] },
+    contentHtml: '<p>deleted</p>', categoryId: null, visibility: 'PUBLIC', publish: true,
+    thumbnailUrl: null, tagNames: [], images: [],
+  });
+  const deletedCommentWrite = await apiCall('POST', `/api/v1/posts/${posts.adminPublic.id}/comments`, accounts.target.userToken, {
+    content: 'M9 deleted comment must fail', parentId: null,
+  });
+  const deletedLikeWrite = await apiCall('POST', `/api/v1/posts/${posts.adminPublic.id}/likes`, accounts.target.userToken);
+  const deletedUniverseWrite = await apiCall('POST', `/api/v1/universe/requests/${accounts.special.me.id}`, accounts.target.userToken);
+  check('mutation-deleted-signin-and-writes', deletedSignin.status === 404 && deletedSignin.errorCode === 'USER_001'
+    && deletedPostWrite.status === 404 && deletedPostWrite.errorCode === 'USER_001'
+    && deletedCommentWrite.status === 404 && deletedCommentWrite.errorCode === 'USER_001'
+    && deletedLikeWrite.status === 404 && deletedLikeWrite.errorCode === 'USER_001'
+    && deletedUniverseWrite.status === 404 && deletedUniverseWrite.errorCode === 'USER_001',
+  'soft-deleted actor cannot sign in or create comment/like/universe mutations, all with USER_001');
 
   const afterDeleteFingerprint = await runtimeFingerprint(accounts.target.me.id, 'after-target-delete');
   evidence.fixture.fingerprint.afterDelete = {
@@ -1128,127 +1293,373 @@ async function runConcurrencyMatrix(accounts) {
   check('concurrency-target-mutation-race', targetRaceAllowed,
     'target race is not treated as a MySQL barrier; exact response set and final DB state are required');
 
-  await verifyPhysicalConcurrencyEvidence();
-
   const oldAdmin = await apiCall('GET', '/api/v1/admin/users?page=0&size=1', accounts.admin.token);
   const keeperStillAdmin = await apiCall('GET', '/api/v1/admin/users?page=0&size=1', accounts.adminKeeper.token);
   check('concurrency-stale-access', oldAdmin.status === 403 && oldAdmin.errorCode === 'ADMIN_001' && keeperStillAdmin.status === 200, 'old ADMIN token loses current DB permission while keeper remains active');
 }
 
 async function verifyPhysicalConcurrencyEvidence() {
-  const configured = process.env.M9_BACKEND_TEST_XML;
-  const candidate = resolve(root, configured ?? 'build/m9-evidence/backend-test-results.xml');
-  let xml;
+  const backendRoot = process.env.M9_BACKEND_EVIDENCE_DIR ?? 'build/m9-evidence/backend-final-2';
+  const backendDir = process.env.M9_BACKEND_TEST_RESULTS_DIR ?? `${backendRoot}/test-results`;
+  const backendSummary = resolve(root, process.env.M9_BACKEND_SUMMARY_JSON ?? `${backendRoot}/summary.json`);
+  const frontendJson = resolve(root, process.env.M9_FRONTEND_EVIDENCE_JSON ?? 'build/m9-evidence/frontend-final-result.json');
+  let result;
   try {
-    xml = await readFile(candidate, 'utf8');
-  } catch {
-    notRun('concurrency-physical-barrier-evidence', 'root must hand off the independent MySQL test XML; HTTP Promise.all is not a barrier');
+    result = await collectTestEvidence({ root, backendDir: resolve(root, backendDir), backendSummary, frontendJson });
+  } catch (error) {
+    notRun('concurrency-physical-barrier-evidence', `test evidence helper unavailable: ${scrubSecrets(error instanceof Error ? error.message : String(error))}`);
+    notRun('backend-rr-writer-evidence', 'test evidence helper did not return a structured result');
+    notRun('backend-noop-audit-evidence', 'test evidence helper did not return a structured result');
+    notRun('backend-state-policy-evidence', 'test evidence helper did not return a structured result');
+    notRun('frontend-matrix-evidence', 'test evidence helper did not return a structured result');
     return;
   }
-  const required = [
-    'AdminConcurrencyMySqlTest',
-    'mutualChangesLockByIdAndRejectStaleActor',
-    'deleteBeforeSourceMutationRejectsQueuedLike',
-    'sourceMutationBeforeDeleteCommitsAndPreservesHistory',
-    'refreshBeforeAndAfterStateReadPreservesExistingSessionBoundary',
-  ];
-  const complete = required.every((marker) => xml.includes(marker));
-  evidence.fixture.concurrency = {
-    ...(evidence.fixture.concurrency ?? {}),
-    physicalBarrierEvidence: {
-      path: isInsideRoot(candidate) ? candidate.slice(root.length + 1) : '[external-redacted-path]',
-      markers: required.filter((marker) => xml.includes(marker)).length,
-      required: required.length,
-    },
+  evidence.fixture.testArtifacts = {
+    mappings: result?.mappings ?? {},
+    artifactHashes: result?.artifactHashes ?? {},
   };
-  check('concurrency-physical-barrier-evidence', complete,
-    complete ? 'root-provided XML maps all approved AdminConcurrencyMySqlTest barrier cases'
-      : 'backend XML is missing one or more approved physical barrier testcase markers');
+  const checks = Array.isArray(result?.checks) ? result.checks : [];
+  const expectedIds = [
+    'concurrency-physical-barrier-evidence',
+    'backend-rr-writer-evidence',
+    'backend-noop-audit-evidence',
+    'backend-state-policy-evidence',
+    'frontend-matrix-evidence',
+  ];
+  for (const id of expectedIds) {
+    const row = checks.find((checkRow) => checkRow?.id === id);
+    if (!row) notRun(id, 'test evidence helper omitted required structured artifact mapping');
+    else {
+      const uncovered = id === 'frontend-matrix-evidence'
+        ? (result.mappings?.uncoveredFrontendRows ?? [])
+        : id === 'backend-state-policy-evidence'
+          ? (result.mappings?.uncoveredStatePolicyRows ?? []) : [];
+      const unresolved = uncovered.filter((item) => !directEvidenceCovers(id, item));
+      const passed = row.passed === true && unresolved.length === 0;
+      if (unresolved.length > 0) {
+        evidence.fixture.testArtifacts.uncovered = {
+          ...(evidence.fixture.testArtifacts.uncovered ?? {}),
+          [id]: unresolved,
+        };
+      }
+      check(id, passed, scrubSecrets(JSON.stringify({ helper: row.detail, unresolved })));
+    }
+  }
+}
+
+function directEvidenceCovers(group, row) {
+  const id = String(row?.id ?? row ?? '');
+  const required = group === 'frontend-matrix-evidence'
+    ? id === 'admin-probe-pending'
+      ? ['browser-admin-list-pending-sensitive']
+      : id === 'same-provider-account-switch'
+        ? ['browser-stale-list', 'browser-stale-detail', 'browser-stale-mutation', 'browser-account-switch-stale']
+        : id === 'return-probe-state-variants'
+          ? ['browser-admin-focus-suspended', 'browser-admin-visible-deleted', 'browser-admin-denied-reentry']
+          : id === 'list-detail-empty-error-retry'
+            ? ['browser-list-empty-state', 'browser-list-transient-retry', 'browser-list-transient-retry-result', 'browser-detail-transient-retry', 'browser-detail-transient-retry-result', 'browser-mutation-error-retry']
+            : id === 'mutation-duplicate-submit'
+              ? ['browser-mutation-duplicate-submit']
+              : id === 'visual-browser-url'
+                ? ['browser-admin-list-width', 'browser-admin-detail-width', 'browser-search-url-state', 'browser-search-paging-history', 'browser-screenshot-evidence', 'browser-admin-entry-menu', 'browser-admin-heading', 'browser-admin-role-label']
+                : []
+    : id === 'suspended-deleted-signin'
+      ? ['mutation-suspend-boundary', 'mutation-deleted-signin-and-writes']
+      : id === 'reactivated-existing-refresh'
+        ? ['refresh-reactivated-existing-accepted']
+        : id === 'full-write-state-transitions'
+          ? ['mutation-suspend-boundary', 'mutation-deleted-signin-and-writes']
+          : [];
+  return required.length > 0 && required.every((name) => {
+    const rows = evidence.checks.filter((item) => item.name === name);
+    return rows.length > 0 && rows.every((item) => item.status === 'PASS');
+  });
 }
 
 async function runBrowserAcceptance(accounts, posts) {
-  const context = await newBrowserContext();
-  const guestPage = await context.newPage();
-  const guestRequests = [];
-  guestPage.on('request', (request) => {
-    if (request.url().includes('/api/v1/admin/')) guestRequests.push(request.url());
-  });
-  await guestPage.goto(`${frontendUrl}/admin`, { waitUntil: 'domcontentloaded' });
-  await guestPage.waitForURL((url) => url.pathname.endsWith('/signin'), { timeout: 15_000 }).catch(() => undefined);
-  check('browser-guest-admin-guard', guestPage.url().endsWith('/signin') && guestRequests.length === 0, 'guest reaches signin without admin API call');
-  await guestPage.goto(`${frontendUrl}/admin/users/${accounts.user.me.id}`, { waitUntil: 'domcontentloaded' });
-  await guestPage.waitForURL((url) => url.pathname.endsWith('/signin'), { timeout: 15_000 }).catch(() => undefined);
-  check('browser-guest-detail-guard', guestPage.url().endsWith('/signin'), 'guest detail route is protected before target data renders');
-  await guestPage.close();
-
-  const userPage = await context.newPage();
-  await signInInSpa(userPage, accounts.user);
-  await userPage.goto(`${frontendUrl}/admin`, { waitUntil: 'domcontentloaded' });
-  await userPage.getByRole('heading', { name: '관리자 화면에 접근할 수 없습니다', exact: true }).waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
-  check('browser-user-admin-guard', userPage.url().endsWith('/admin')
-    && await userPage.getByRole('heading', { name: '관리자 화면에 접근할 수 없습니다', exact: true }).count() === 1
-    && await userPage.getByText(accounts.adminKeeper.me.nickname, { exact: true }).count() === 0,
-  'authenticated USER direct entry renders denied guard without admin data');
-  await userPage.close();
-
-  const page = await context.newPage();
-  await signInInSpa(page, accounts.adminKeeper);
-  const profile = page.getByRole('link', { name: accounts.adminKeeper.me.nickname, exact: true });
-  await profile.waitFor({ state: 'visible', timeout: 15_000 });
-  await profile.click();
-  const adminMenu = page.getByRole('menuitem', { name: '관리자', exact: true });
-  await adminMenu.waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
-  check('browser-admin-entry-menu', await exactCount(adminMenu) === 1, 'ADMIN enters through the profile menu only');
-  await adminMenu.click();
-  await page.waitForURL((url) => url.pathname === '/admin', { timeout: 15_000 });
-  const listReady = page.waitForResponse((response) => {
-    const url = new URL(response.url());
-    return response.request().method() === 'GET' && url.pathname === '/api/v1/admin/users'
-      && url.searchParams.get('size') === '100' && response.status() === 200;
-  }, { timeout: 15_000 });
-  await page.goto(`${frontendUrl}/admin?page=0&size=100`, { waitUntil: 'domcontentloaded' });
-  const listResponse = await listReady.catch(() => null);
-  const listBody = listResponse ? await listResponse.json().catch(() => null) : null;
-  check('browser-admin-list-http-ready', listResponse?.status() === 200
-    && (listBody?.data?.users?.items ?? []).some((item) => Number(item.id) === Number(accounts.adminKeeper.me.id)),
-  'admin list readiness requires an actual HTTP 200 and a fixture row, not only heading visibility');
-  await waitForAdminReady(page, accounts.adminKeeper.me.nickname);
-  check('browser-admin-heading', await exactCount(page.getByText('ADMIN CONSOLE', { exact: true })) === 1, 'admin list renders canonical visible label once');
-  check('browser-admin-role-label', await exactCount(page.getByText('ROLE: ADMIN', { exact: true })) === 1, 'admin list renders canonical role label once');
-  check('browser-admin-list-width', await contentWidth(page, 'list') >= 1080 && await contentWidth(page, 'list') <= 1120, 'admin list content is approximately 1100px at 1440px');
-
-  const search = page.getByRole('searchbox', { name: '관리자 사용자 검색', exact: true });
-  check('browser-search-selector-unique', await exactCount(search) === 1, 'search control uses a duplicate-safe accessible selector');
-  if (await exactCount(search) === 1) {
-    await search.fill(fixture.searchLiteral);
-    await search.press('Enter');
-    await page.waitForTimeout(250);
-    check('browser-search-url-state', new URL(page.url()).searchParams.get('keyword') === fixture.searchLiteral, 'search keyword is URL state');
+  // Refresh cookies are context-scoped. Keep guest, USER, and ADMIN baseline
+  // journeys isolated so a closed page cannot restore the next account.
+  const guestContext = await newBrowserContext();
+  try {
+    const guestPage = await guestContext.newPage();
+    const guestRequests = [];
+    guestPage.on('request', (request) => {
+      if (request.url().includes('/api/v1/admin/')) guestRequests.push(request.url());
+    });
+    await guestPage.goto(`${frontendUrl}/admin`, { waitUntil: 'domcontentloaded' });
+    await guestPage.waitForURL((url) => url.pathname.endsWith('/signin'), { timeout: 15_000 }).catch(() => undefined);
+    check('browser-guest-admin-guard', guestPage.url().endsWith('/signin') && guestRequests.length === 0, 'guest reaches signin without admin API call');
+    await guestPage.goto(`${frontendUrl}/admin/users/${accounts.user.me.id}`, { waitUntil: 'domcontentloaded' });
+    await guestPage.waitForURL((url) => url.pathname.endsWith('/signin'), { timeout: 15_000 }).catch(() => undefined);
+    check('browser-guest-detail-guard', guestPage.url().endsWith('/signin'), 'guest detail route is protected before target data renders');
+  } finally {
+    await guestContext.close();
   }
 
-  await captureProduct(page, 'admin-list-1440');
-  const detailReady = page.waitForResponse((response) => response.request().method() === 'GET'
-    && new URL(response.url()).pathname === `/api/v1/admin/users/${accounts.user.me.id}` && response.status() === 200, { timeout: 15_000 });
-  await page.goto(`${frontendUrl}/admin/users/${accounts.user.me.id}`, { waitUntil: 'domcontentloaded' });
-  const detailResponse = await detailReady.catch(() => null);
-  const detailBody = detailResponse ? await detailResponse.json().catch(() => null) : null;
-  check('browser-admin-detail-http-ready', detailResponse?.status() === 200
-    && Number(detailBody?.data?.id) === Number(accounts.user.me.id),
-  'admin detail readiness requires an actual HTTP 200 for the requested fixture ID');
-  await waitForAdminDetail(page);
-  check('browser-admin-detail-last-access', await page.getByText('마지막 접속 기록 없음', { exact: true }).count() === 1, 'detail renders unrecorded last access copy');
-  check('browser-admin-detail-width', await contentWidth(page, 'detail') >= 820 && await contentWidth(page, 'detail') <= 900, 'admin detail content is approximately 860px at 1440px');
-  await captureProduct(page, 'admin-detail-1440');
+  const userContext = await newBrowserContext();
+  try {
+    const userPage = await userContext.newPage();
+    await signInInSpa(userPage, accounts.user);
+    await userPage.goto(`${frontendUrl}/admin`, { waitUntil: 'domcontentloaded' });
+    await userPage.getByRole('heading', { name: '관리자 화면에 접근할 수 없습니다', exact: true }).waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
+    check('browser-user-admin-guard', userPage.url().endsWith('/admin')
+      && await userPage.getByRole('heading', { name: '관리자 화면에 접근할 수 없습니다', exact: true }).count() === 1
+      && await userPage.getByText(accounts.adminKeeper.me.nickname, { exact: true }).count() === 0,
+    'authenticated USER direct entry renders denied guard without admin data');
+  } finally {
+    await userContext.close();
+  }
 
-  await runBrowserTarget404Probe(page, accounts.target.me.id);
-  await runBrowserMutationAcceptance(page, accounts);
-  await runBrowserStaleProbe(context, accounts);
-  await verifyDesignReference(context);
-  await page.close();
-  await context.close();
+  const adminContext = await newBrowserContext();
+  try {
+    const page = await adminContext.newPage();
+    await signInInSpa(page, accounts.adminKeeper);
+    const profile = page.getByRole('link', { name: accounts.adminKeeper.me.nickname, exact: true });
+    await profile.waitFor({ state: 'visible', timeout: 15_000 });
+    await profile.click();
+    const adminMenu = page.getByRole('menuitem', { name: '관리자', exact: true });
+    await adminMenu.waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
+    check('browser-admin-entry-menu', await exactCount(adminMenu) === 1, 'ADMIN enters through the profile menu only');
+    await adminMenu.click();
+    await page.waitForURL((url) => url.pathname === '/admin', { timeout: 15_000 });
+    const pendingListHolder = await holdAdminResponse(page, (request) => request.method() === 'GET'
+      && new URL(request.url()).pathname === '/api/v1/admin/users'
+      && new URL(request.url()).searchParams.get('size') === '100');
+    const listReady = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return response.request().method() === 'GET' && url.pathname === '/api/v1/admin/users'
+        && url.searchParams.get('size') === '100' && response.status() === 200;
+    }, { timeout: 15_000 });
+    await page.goto(`${frontendUrl}/admin?page=0&size=100`, { waitUntil: 'domcontentloaded' });
+    const pendingListUpstream = await withTimeout(pendingListHolder.readyPromise, STALE_PROBE_TIMEOUT_MS, 'admin list pending response');
+    check('browser-admin-list-pending-sensitive', pendingListUpstream.status === 200
+      && await page.getByText(accounts.adminKeeper.me.email, { exact: true }).count() === 0
+      && await page.getByText(accounts.adminKeeper.me.nickname, { exact: true }).count() === 0,
+    'list pending state does not expose fixture rows before the actual HTTP 200 is released');
+    pendingListHolder.release();
+    await withTimeout(pendingListHolder.released, STALE_PROBE_TIMEOUT_MS, 'admin list pending release');
+    await pendingListHolder.dispose();
+    const listResponse = await listReady.catch(() => null);
+    const listBody = listResponse ? await listResponse.json().catch(() => null) : null;
+    check('browser-admin-list-http-ready', listResponse?.status() === 200
+      && (listBody?.data?.users?.items ?? []).some((item) => Number(item.id) === Number(accounts.adminKeeper.me.id)),
+    'admin list readiness requires an actual HTTP 200 and a fixture row, not only heading visibility');
+    await waitForAdminReady(page, accounts.adminKeeper.me.nickname);
+    check('browser-admin-heading', await exactCount(page.getByText('ADMIN CONSOLE', { exact: true })) === 1, 'admin list renders canonical visible label once');
+    check('browser-admin-role-label', await exactCount(page.getByText('ROLE: ADMIN', { exact: true })) === 1, 'admin list renders canonical role label once');
+    check('browser-admin-list-width', await contentWidth(page, 'list') >= 1080 && await contentWidth(page, 'list') <= 1120, 'admin list content is approximately 1100px at 1440px');
+    await runBrowserListTransientAcceptance(page, accounts);
+    await runBrowserSearchPagingHistory(page, accounts);
+    await runBrowserRevalidationBoundaryProbes(accounts);
+
+    const search = page.getByRole('searchbox', { name: '관리자 사용자 검색', exact: true });
+    check('browser-search-selector-unique', await exactCount(search) === 1, 'search control uses a duplicate-safe accessible selector');
+    if (await exactCount(search) === 1) {
+      await search.fill(fixture.searchLiteral);
+      await search.press('Enter');
+      await page.waitForTimeout(250);
+      check('browser-search-url-state', new URL(page.url()).searchParams.get('keyword') === fixture.searchLiteral, 'search keyword is URL state');
+    }
+
+    await captureProduct(page, 'admin-list-1440');
+    const detailReady = page.waitForResponse((response) => response.request().method() === 'GET'
+      && new URL(response.url()).pathname === `/api/v1/admin/users/${accounts.user.me.id}` && response.status() === 200, { timeout: 15_000 });
+    await page.goto(`${frontendUrl}/admin/users/${accounts.user.me.id}`, { waitUntil: 'domcontentloaded' });
+    const detailResponse = await detailReady.catch(() => null);
+    const detailBody = detailResponse ? await detailResponse.json().catch(() => null) : null;
+    check('browser-admin-detail-http-ready', detailResponse?.status() === 200
+      && Number(detailBody?.data?.id) === Number(accounts.user.me.id),
+    'admin detail readiness requires an actual HTTP 200 for the requested fixture ID');
+    await waitForAdminDetail(page);
+    check('browser-admin-detail-last-access', await page.getByText('마지막 접속 기록 없음', { exact: true }).count() === 1, 'detail renders unrecorded last access copy');
+    check('browser-admin-detail-width', await contentWidth(page, 'detail') >= 820 && await contentWidth(page, 'detail') <= 900, 'admin detail content is approximately 860px at 1440px');
+    await captureProduct(page, 'admin-detail-1440');
+    check('browser-screenshot-evidence', evidence.screenshots.includes('admin-list-1440.png')
+      && evidence.screenshots.includes('admin-detail-1440.png'),
+    '1440px list and detail screenshots are captured as evidence');
+
+    await runBrowserTarget404Probe(page, accounts.target.me.id);
+    await runBrowserMutationAcceptance(page, accounts);
+    await runBrowserStaleProbe(adminContext, accounts);
+    await verifyDesignReference(adminContext);
+  } finally {
+    await adminContext.close();
+  }
 
   // posts is intentionally accepted by the signature: the browser target route uses only IDs.
   void posts;
+}
+
+async function runBrowserListTransientAcceptance(page, accounts) {
+  const search = page.getByRole('searchbox', { name: '관리자 사용자 검색', exact: true });
+  const transientKeyword = `${fixture.runId}-transient`;
+  const emptyKeyword = `${fixture.runId}-empty`;
+  let listFailed = false;
+  const listPattern = /\/api\/v1\/admin\/users(?:\?|$)/;
+  await page.route(listPattern, async (route) => {
+    const url = new URL(route.request().url());
+    if (!listFailed && route.request().method() === 'GET' && url.searchParams.get('keyword') === transientKeyword) {
+      listFailed = true;
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        headers: { 'cache-control': 'private, no-store' },
+        body: JSON.stringify({ success: false, data: null, error: { code: 'ADMIN_999', message: 'synthetic list retry' }, timestamp: new Date().toISOString() }),
+      });
+      return;
+    }
+    await route.continue();
+  });
+  await search.fill(transientKeyword);
+  await search.press('Enter');
+  const listRetryNotice = page.getByRole('alert').filter({ hasText: 'synthetic list retry' });
+  await listRetryNotice.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => undefined);
+  const listRetryButton = page.getByRole('button', { name: '다시 시도', exact: true }).first();
+  const priorRowVisible = await page.getByText(accounts.adminKeeper.me.nickname, { exact: true }).count() === 1;
+  check('browser-list-transient-retry', listFailed && priorRowVisible && await exactCount(listRetryButton) === 1,
+    'transient list failure preserves the prior fixture row and exposes a single retry action');
+  await page.unroute(listPattern);
+  let listRetryResponse = null;
+  if (await exactCount(listRetryButton) === 1) {
+    const responsePromise = page.waitForResponse((response) => response.request().method() === 'GET'
+      && new URL(response.url()).pathname === '/api/v1/admin/users' && response.status() === 200, { timeout: 15_000 });
+    await listRetryButton.click();
+    listRetryResponse = await responsePromise.catch(() => null);
+  }
+  check('browser-list-transient-retry-result', listRetryResponse?.status() === 200
+    && await page.getByText(accounts.adminKeeper.me.nickname, { exact: true }).count() === 1,
+  'list retry restores a canonical HTTP 200 result and the prior fixture row');
+
+  await search.fill(emptyKeyword);
+  await search.press('Enter');
+  await page.getByText('검색 결과가 없습니다.', { exact: true }).waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
+  check('browser-list-empty-state', await page.getByText('검색 결과가 없습니다.', { exact: true }).count() === 1
+    && await page.getByText(accounts.adminKeeper.me.nickname, { exact: true }).count() === 0,
+  'a real successful empty response renders the empty state without stale rows');
+  await search.fill('');
+  await search.press('Enter');
+  await page.getByText(accounts.adminKeeper.me.nickname, { exact: true }).first().waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
+
+  const detailPattern = new RegExp(`/api/v1/admin/users/${accounts.user.me.id}$`);
+  let detailFailed = false;
+  await page.route(detailPattern, async (route) => {
+    if (!detailFailed && route.request().method() === 'GET') {
+      detailFailed = true;
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        headers: { 'cache-control': 'private, no-store' },
+        body: JSON.stringify({ success: false, data: null, error: { code: 'ADMIN_999', message: 'synthetic detail retry' }, timestamp: new Date().toISOString() }),
+      });
+      return;
+    }
+    await route.continue();
+  });
+  await page.goto(`${frontendUrl}/admin/users/${accounts.user.me.id}`, { waitUntil: 'domcontentloaded' });
+  const detailRetryNotice = page.getByRole('alert').filter({ hasText: 'synthetic detail retry' });
+  await detailRetryNotice.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => undefined);
+  const detailRetryButton = page.getByRole('button', { name: '다시 시도', exact: true });
+  check('browser-detail-transient-retry', detailFailed && await exactCount(detailRetryButton) === 1,
+    'transient detail failure exposes a scoped retry without stale target data');
+  await page.unroute(detailPattern);
+  let detailRetryResponse = null;
+  if (await exactCount(detailRetryButton) === 1) {
+    const responsePromise = page.waitForResponse((response) => response.request().method() === 'GET'
+      && new URL(response.url()).pathname === `/api/v1/admin/users/${accounts.user.me.id}` && response.status() === 200, { timeout: 15_000 });
+    await detailRetryButton.click();
+    detailRetryResponse = await responsePromise.catch(() => null);
+  }
+  check('browser-detail-transient-retry-result', detailRetryResponse?.status() === 200
+    && await page.getByText(accounts.user.me.nickname, { exact: true }).count() === 1,
+  'detail retry restores the requested canonical target');
+  await page.goto(`${frontendUrl}/admin?page=0&size=100`, { waitUntil: 'domcontentloaded' });
+  await waitForAdminReady(page, accounts.adminKeeper.me.nickname);
+}
+
+async function runBrowserSearchPagingHistory(page, accounts) {
+  const search = page.getByRole('searchbox', { name: '관리자 사용자 검색', exact: true });
+  await search.fill(fixture.bulkSearchLiteral);
+  await search.press('Enter');
+  await page.getByRole('button', { name: '2 페이지', exact: true }).waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
+  const next = page.getByRole('button', { name: '다음 페이지', exact: true });
+  let pageOneResponse = null;
+  if (await exactCount(next) === 1) {
+    const responsePromise = page.waitForResponse((response) => response.request().method() === 'GET'
+      && new URL(response.url()).pathname === '/api/v1/admin/users'
+      && new URL(response.url()).searchParams.get('page') === '1' && response.status() === 200, { timeout: 15_000 });
+    await next.click();
+    pageOneResponse = await responsePromise.catch(() => null);
+  }
+  const pageOne = new URL(page.url()).searchParams.get('page') === '1';
+  await page.goBack({ waitUntil: 'domcontentloaded' }).catch(() => undefined);
+  await waitForAdminReady(page).catch(() => undefined);
+  const backToPageZero = !new URL(page.url()).searchParams.get('page');
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await waitForAdminReady(page).catch(() => undefined);
+  const reloadedKeyword = new URL(page.url()).searchParams.get('keyword') === fixture.bulkSearchLiteral;
+  const reloadedRows = await page.getByText(accounts.bulk01.me.nickname, { exact: true }).count();
+  check('browser-search-paging-history', pageOneResponse?.status() === 200 && pageOne && backToPageZero
+    && reloadedKeyword && reloadedRows === 1,
+  'search keyword/page state survives next-page navigation, browser back, and reload without losing URL state');
+  await search.fill('');
+  await search.press('Enter');
+  await page.getByText(accounts.adminKeeper.me.nickname, { exact: true }).first().waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
+}
+
+async function runBrowserRevalidationBoundaryProbes(accounts) {
+  const probes = [
+    { check: 'browser-admin-focus-suspended', code: 'USER_003', event: 'focus', message: 'synthetic suspended actor' },
+    { check: 'browser-admin-visible-deleted', code: 'USER_001', event: 'visibilitychange', message: 'synthetic deleted actor' },
+  ];
+  for (const probe of probes) {
+    const context = await newBrowserContext();
+    try {
+      const page = await context.newPage();
+      let phase = 'initial';
+      const routePattern = /\/api\/v1\/admin\/users(?:\?|$)/;
+      await page.route(routePattern, async (route) => {
+        const url = new URL(route.request().url());
+        if (phase === 'boundary' && route.request().method() === 'GET' && url.searchParams.get('size') === '1') {
+          await route.fulfill({
+            status: probe.code === 'USER_003' ? 403 : 404,
+            contentType: 'application/json',
+            headers: { 'cache-control': 'private, no-store' },
+            body: JSON.stringify({ success: false, data: null, error: { code: probe.code, message: probe.message }, timestamp: new Date().toISOString() }),
+          });
+          return;
+        }
+        await route.continue();
+      });
+      await signInInSpa(page, accounts.adminKeeper);
+      await page.goto(`${frontendUrl}/admin`, { waitUntil: 'domcontentloaded' });
+      await waitForAdminReady(page, accounts.adminKeeper.me.nickname);
+      phase = 'boundary';
+      await page.evaluate((eventName) => {
+        if (eventName === 'visibilitychange') {
+          Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+          document.dispatchEvent(new Event('visibilitychange'));
+        } else {
+          window.dispatchEvent(new Event(eventName));
+        }
+      }, probe.event);
+      const denied = page.getByRole('heading', { name: '관리자 화면에 접근할 수 없습니다', exact: true });
+      await denied.waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
+      const deniedOk = await exactCount(denied) === 1
+        && await page.getByText(accounts.adminKeeper.me.nickname, { exact: true }).count() === 0;
+      check(probe.check, deniedOk, `${probe.event} revalidation renders ${probe.code} denied state without stale admin rows`);
+      phase = 'allow';
+      await page.goto(`${frontendUrl}/admin`, { waitUntil: 'domcontentloaded' });
+      await waitForAdminReady(page, accounts.adminKeeper.me.nickname).catch(() => undefined);
+      const reentryOk = await exactCount(page.getByText('ADMIN CONSOLE', { exact: true })) === 1
+        && await page.getByText(accounts.adminKeeper.me.nickname, { exact: true }).count() === 1;
+      check('browser-admin-denied-reentry', reentryOk, 'denied state can re-enter after a fresh current probe succeeds');
+    } catch (error) {
+      check(probe.check, false, scrubSecrets(error instanceof Error ? error.message : String(error)));
+      check('browser-admin-denied-reentry', false, 'revalidation boundary probe did not reach a stable re-entry state');
+    } finally {
+      await context.close();
+    }
+  }
 }
 
 async function runBrowserTarget404Probe(page, targetId) {
@@ -1277,20 +1688,31 @@ async function runBrowserMutationAcceptance(page, accounts) {
   const roleButton = page.getByRole('button', { name: '역할 변경', exact: true });
   await role.selectOption('ADMIN');
   await roleButton.click();
-  await page.getByRole('heading', { name: '역할 변경 확인', exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
+  const roleDialog = page.getByRole('dialog', { name: '역할 변경 확인', exact: true });
+  await roleDialog.waitFor({ state: 'visible', timeout: 10_000 });
+  let roleMutationCount = 0;
+  const initialRoleRoutePattern = new RegExp(`/api/v1/admin/users/${targetId}/role$`);
+  await page.route(initialRoleRoutePattern, async (route) => {
+    if (route.request().method() === 'PUT') roleMutationCount += 1;
+    await route.continue();
+  });
   const roleMutation = page.waitForResponse((response) => response.request().method() === 'PUT'
     && new URL(response.url()).pathname === `/api/v1/admin/users/${targetId}/role`);
   const roleCanonical = page.waitForResponse((response) => response.request().method() === 'GET'
     && new URL(response.url()).pathname === `/api/v1/admin/users/${targetId}` && response.status() === 200);
-  await page.getByRole('button', { name: '변경 확인', exact: true }).click();
+  await roleDialog.getByRole('button', { name: '변경 확인', exact: true }).dblclick().catch(() => undefined);
   const [roleResponse, roleDetailResponse] = await Promise.all([roleMutation, roleCanonical]);
+  await page.unroute(initialRoleRoutePattern);
   check('browser-role-confirm-canonical', roleResponse.status() === 200 && roleDetailResponse.status() === 200
     && await role.inputValue() === 'ADMIN', 'role confirmation sends one mutation and renders the canonical ADMIN detail');
+  check('browser-mutation-duplicate-submit', roleMutationCount === 1,
+    'double activation of a confirmation control sends exactly one role mutation');
 
   // Failure must preserve the row and expose a real retry path; the retry is released
   // only after the injected response has been observed.
   let failedRoleRequest = false;
-  await page.route(`**/api/v1/admin/users/${targetId}/role`, async (route) => {
+  const roleRoutePattern = new RegExp(`/api/v1/admin/users/${targetId}/role$`);
+  await page.route(roleRoutePattern, async (route) => {
     if (!failedRoleRequest && route.request().method() === 'PUT') {
       failedRoleRequest = true;
       await route.fulfill({
@@ -1304,13 +1726,14 @@ async function runBrowserMutationAcceptance(page, accounts) {
   });
   await role.selectOption('USER');
   await roleButton.click();
-  await page.getByRole('heading', { name: '역할 변경 확인', exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
-  await page.getByRole('button', { name: '변경 확인', exact: true }).click();
+  const retryRoleDialog = page.getByRole('dialog', { name: '역할 변경 확인', exact: true });
+  await retryRoleDialog.waitFor({ state: 'visible', timeout: 10_000 });
+  await retryRoleDialog.getByRole('button', { name: '변경 확인', exact: true }).click();
   const retryNotice = page.getByRole('alert').filter({ hasText: 'synthetic retry' });
   await retryNotice.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => undefined);
   const retryButton = page.getByRole('button', { name: '다시 시도', exact: true });
   const rowStillVisible = await page.getByText(accounts.user.me.nickname, { exact: true }).count() === 1;
-  await page.unroute(`**/api/v1/admin/users/${targetId}/role`);
+  await page.unroute(roleRoutePattern);
   let retryResponse = null;
   let retryDetailResponse = null;
   if (await exactCount(retryButton) === 1) {
@@ -1327,36 +1750,39 @@ async function runBrowserMutationAcceptance(page, accounts) {
 
   const suspendButton = page.getByRole('button', { name: '일시 정지', exact: true });
   await suspendButton.click();
-  await page.getByRole('heading', { name: '계정 상태 변경 확인', exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
+  const suspendDialog = page.getByRole('dialog', { name: '계정 상태 변경 확인', exact: true });
+  await suspendDialog.waitFor({ state: 'visible', timeout: 10_000 });
   const suspendMutation = page.waitForResponse((response) => response.request().method() === 'PUT'
     && new URL(response.url()).pathname === `/api/v1/admin/users/${targetId}/status`);
   const suspendCanonical = page.waitForResponse((response) => response.request().method() === 'GET'
     && new URL(response.url()).pathname === `/api/v1/admin/users/${targetId}` && response.status() === 200);
-  await page.getByRole('button', { name: '변경 확인', exact: true }).click();
+  await suspendDialog.getByRole('button', { name: '변경 확인', exact: true }).click();
   const [suspendResponse, suspendDetailResponse] = await Promise.all([suspendMutation, suspendCanonical]);
   check('browser-status-confirm-canonical', suspendResponse.status() === 200 && suspendDetailResponse.status() === 200
     && await page.getByRole('button', { name: '정지 해제', exact: true }).count() === 1, 'status confirmation renders canonical SUSPENDED state');
 
   const activateButton = page.getByRole('button', { name: '정지 해제', exact: true });
   await activateButton.click();
-  await page.getByRole('heading', { name: '계정 상태 변경 확인', exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
+  const activateDialog = page.getByRole('dialog', { name: '계정 상태 변경 확인', exact: true });
+  await activateDialog.waitFor({ state: 'visible', timeout: 10_000 });
   const activateMutation = page.waitForResponse((response) => response.request().method() === 'PUT'
     && new URL(response.url()).pathname === `/api/v1/admin/users/${targetId}/status`);
   const activateCanonical = page.waitForResponse((response) => response.request().method() === 'GET'
     && new URL(response.url()).pathname === `/api/v1/admin/users/${targetId}` && response.status() === 200);
-  await page.getByRole('button', { name: '변경 확인', exact: true }).click();
+  await activateDialog.getByRole('button', { name: '변경 확인', exact: true }).click();
   await Promise.all([activateMutation, activateCanonical]);
 
   const deleteId = accounts.weekAfter.me.id;
   await page.goto(`${frontendUrl}/admin/users/${deleteId}`, { waitUntil: 'domcontentloaded' });
   await waitForAdminDetail(page);
   await page.getByRole('button', { name: '계정 삭제', exact: true }).click();
-  await page.getByRole('heading', { name: '계정 삭제 확인', exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
-  check('browser-delete-copy', await page.getByText('계정 접근이 차단되고 블로그와 게시글이 공개되지 않습니다. 데이터는 보존됩니다.', { exact: true }).count() === 1,
+  const deleteDialog = page.getByRole('dialog', { name: '계정 삭제 확인', exact: true });
+  await deleteDialog.waitFor({ state: 'visible', timeout: 10_000 });
+  check('browser-delete-copy', await deleteDialog.getByText('계정 접근이 차단되고 블로그와 게시글이 공개되지 않습니다. 데이터는 보존됩니다.', { exact: true }).count() === 1,
     'delete confirmation uses the approved soft-delete copy');
   const deleteMutation = page.waitForResponse((response) => response.request().method() === 'DELETE'
     && new URL(response.url()).pathname === `/api/v1/admin/users/${deleteId}`);
-  await page.getByRole('button', { name: '삭제 확인', exact: true }).click();
+  await deleteDialog.getByRole('button', { name: '삭제 확인', exact: true }).click();
   const deleteResponse = await deleteMutation;
   await page.waitForURL((url) => url.pathname === '/admin', { timeout: 15_000 });
   const deletedSearch = page.getByRole('searchbox', { name: '관리자 사용자 검색', exact: true });
@@ -1381,101 +1807,173 @@ async function runBrowserStaleProbe(context, accounts) {
     'all independent same-Provider list/detail/mutation stale probes reject the prior account response');
 }
 
+async function enterAdminViaProfileMenu(page, account) {
+  const profile = page.getByRole('link', { name: account.me.nickname, exact: true });
+  await profile.waitFor({ state: 'visible', timeout: 15_000 });
+  await profile.click();
+  const adminMenu = page.getByRole('menuitem', { name: '관리자', exact: true });
+  await adminMenu.waitFor({ state: 'visible', timeout: 15_000 });
+  await adminMenu.click();
+  await page.waitForURL((url) => url.pathname === '/admin', { timeout: 15_000 });
+}
+
 async function runBrowserStaleListProbe(accounts) {
   const probeContext = await newBrowserContext();
   const page = await probeContext.newPage();
-  const holder = await holdAdminResponse(page, (request) => request.method() === 'GET'
-    && new URL(request.url()).pathname === '/api/v1/admin/users'
-    && new URL(request.url()).searchParams.get('size') === '100');
-  await signInInSpa(page, accounts.adminKeeper);
-  const listNavigation = page.goto(`${frontendUrl}/admin?page=0&size=100`, { waitUntil: 'domcontentloaded' });
-  const upstream = await holder.readyPromise;
-  check('browser-stale-list-upstream-200', upstream.status === 200 && upstream.bodyBytes > 0, 'held list response is fetched from the real upstream before account expiry');
-  check('browser-stale-list-pending-sensitive', await page.getByText(accounts.adminKeeper.email, { exact: true }).count() === 0,
-    'held list response does not expose the sensitive A row before release');
-  await triggerAuthExpiry(page, holder);
-  await signInExistingSpa(page, accounts.special);
-  await waitForUserReady(page, accounts.special);
-  holder.release();
-  await listNavigation.catch(() => undefined);
-  await page.waitForTimeout(300);
-  const ok = !page.url().includes('/admin')
-    && await page.getByText(accounts.adminKeeper.me.nickname, { exact: true }).count() === 0
-    && await page.getByText(accounts.adminKeeper.email, { exact: true }).count() === 0;
-  check('browser-stale-list', ok,
-  'late A list 200 cannot repopulate the same SPA Provider after B is ready');
-  await holder.dispose();
-  await probeContext.close();
-  return ok;
+  let holder;
+  let armed = false;
+  try {
+    holder = await holdAdminResponse(page, (request) => request.method() === 'GET'
+      && new URL(request.url()).pathname === '/api/v1/admin/users'
+      && new URL(request.url()).searchParams.get('size') === '100'
+      && armed);
+    await signInInSpa(page, accounts.adminKeeper);
+    await enterAdminViaProfileMenu(page, accounts.adminKeeper);
+    await waitForAdminReady(page, accounts.adminKeeper.me.nickname);
+    const search = page.getByRole('searchbox', { name: '관리자 사용자 검색', exact: true });
+    await search.fill(fixture.searchLiteral);
+    await search.press('Enter');
+    await page.getByText(accounts.special.me.nickname, { exact: true }).first().waitFor({ state: 'visible', timeout: 15_000 });
+    const providerMarker = await markProviderDocument(page);
+    armed = true;
+    await search.fill(fixture.bulkSearchLiteral);
+    await search.press('Enter');
+    const upstream = await withTimeout(holder.readyPromise, STALE_PROBE_TIMEOUT_MS, 'stale list upstream response');
+    check('browser-stale-list-upstream-200', upstream.status === 200 && upstream.bodyBytes > 0, 'held list response is fetched from the real upstream before account expiry');
+    check('browser-stale-list-pending-sensitive', await page.getByText(accounts.adminKeeper.email, { exact: true }).count() === 0,
+      'held list response does not expose the sensitive A row before release');
+    await triggerAuthExpiry(page, holder);
+    await signInExistingSpa(page, accounts.special);
+    await waitForUserReady(page, accounts.special);
+    const bStable = new URL(page.url()).pathname === '/'
+      && await page.getByRole('link', { name: accounts.special.me.nickname, exact: true }).count() === 1;
+    const sameDocument = await sameProviderDocument(page, providerMarker);
+    check('browser-stale-list-b-session-stable', bStable && sameDocument, 'B is stably authenticated on the same SPA Provider/document before A release');
+    holder.release();
+    await withTimeout(holder.released, STALE_PROBE_TIMEOUT_MS, 'stale list release');
+    await page.waitForTimeout(300);
+    const ok = bStable && sameDocument && new URL(page.url()).pathname === '/'
+      && await page.getByText(accounts.adminKeeper.me.nickname, { exact: true }).count() === 0
+      && await page.getByText(accounts.adminKeeper.email, { exact: true }).count() === 0;
+    check('browser-stale-list', ok,
+    'late A list 200 cannot repopulate the same SPA Provider after B is ready');
+    return ok;
+  } catch (error) {
+    check('browser-stale-list', false, scrubSecrets(error instanceof Error ? error.message : String(error)));
+    return false;
+  } finally {
+    holder?.release();
+    await holder?.dispose();
+    await probeContext.close();
+  }
 }
 
 async function runBrowserStaleDetailProbe(accounts) {
   const probeContext = await newBrowserContext();
   const page = await probeContext.newPage();
-  const holder = await holdAdminResponse(page, (request) => request.method() === 'GET'
-    && new URL(request.url()).pathname === `/api/v1/admin/users/${accounts.user.me.id}`);
-  await signInInSpa(page, accounts.adminKeeper);
-  const detailNavigation = page.goto(`${frontendUrl}/admin/users/${accounts.user.me.id}`, { waitUntil: 'domcontentloaded' });
-  const upstream = await holder.readyPromise;
-  check('browser-stale-detail-upstream-200', upstream.status === 200 && upstream.bodyBytes > 0, 'held detail response is fetched from the real upstream before account expiry');
-  check('browser-stale-detail-pending-sensitive', await page.getByText(accounts.user.me.email, { exact: true }).count() === 0,
-    'held detail response does not expose target details before release');
-  await triggerAuthExpiry(page, holder);
-  await signInExistingSpa(page, accounts.special);
-  await waitForUserReady(page, accounts.special);
-  holder.release();
-  await detailNavigation.catch(() => undefined);
-  await page.waitForTimeout(300);
-  const ok = !page.url().includes('/admin')
-    && await page.getByText(accounts.user.me.nickname, { exact: true }).count() === 0;
-  check('browser-stale-detail', ok,
-  'late A detail 200 cannot repopulate the same SPA Provider after B is ready');
-  await holder.dispose();
-  await probeContext.close();
-  return ok;
+  let holder;
+  let armed = false;
+  try {
+    holder = await holdAdminResponse(page, (request) => request.method() === 'GET'
+      && new URL(request.url()).pathname === `/api/v1/admin/users/${accounts.user.me.id}`
+      && armed);
+    await signInInSpa(page, accounts.adminKeeper);
+    await enterAdminViaProfileMenu(page, accounts.adminKeeper);
+    await waitForAdminReady(page, accounts.adminKeeper.me.nickname);
+    const providerMarker = await markProviderDocument(page);
+    armed = true;
+    const targetRow = page.locator('tr').filter({ hasText: accounts.user.me.nickname }).first();
+    await targetRow.getByRole('link', { name: '관리', exact: true }).click();
+    const upstream = await withTimeout(holder.readyPromise, STALE_PROBE_TIMEOUT_MS, 'stale detail upstream response');
+    check('browser-stale-detail-upstream-200', upstream.status === 200 && upstream.bodyBytes > 0, 'held detail response is fetched from the real upstream before account expiry');
+    check('browser-stale-detail-pending-sensitive', await page.getByText(accounts.user.me.email, { exact: true }).count() === 0,
+      'held detail response does not expose target details before release');
+    await triggerAuthExpiry(page, holder);
+    await signInExistingSpa(page, accounts.special);
+    await waitForUserReady(page, accounts.special);
+    const bStable = new URL(page.url()).pathname === '/'
+      && await page.getByRole('link', { name: accounts.special.me.nickname, exact: true }).count() === 1;
+    const sameDocument = await sameProviderDocument(page, providerMarker);
+    check('browser-stale-detail-b-session-stable', bStable && sameDocument, 'B is stably authenticated on the same SPA Provider/document before A release');
+    holder.release();
+    await withTimeout(holder.released, STALE_PROBE_TIMEOUT_MS, 'stale detail release');
+    await page.waitForTimeout(300);
+    const ok = bStable && sameDocument && new URL(page.url()).pathname === '/'
+      && await page.getByText(accounts.user.me.nickname, { exact: true }).count() === 0;
+    check('browser-stale-detail', ok,
+    'late A detail 200 cannot repopulate the same SPA Provider after B is ready');
+    return ok;
+  } catch (error) {
+    check('browser-stale-detail', false, scrubSecrets(error instanceof Error ? error.message : String(error)));
+    return false;
+  } finally {
+    holder?.release();
+    await holder?.dispose();
+    await probeContext.close();
+  }
 }
 
 async function runBrowserStaleMutationProbe(accounts) {
   const probeContext = await newBrowserContext();
   const page = await probeContext.newPage();
-  await signInInSpa(page, accounts.adminKeeper);
-  await page.goto(`${frontendUrl}/admin/users/${accounts.user.me.id}`, { waitUntil: 'domcontentloaded' });
-  await waitForAdminDetail(page);
-  const holder = await holdAdminResponse(page, (request) => request.method() === 'PUT'
-    && new URL(request.url()).pathname === `/api/v1/admin/users/${accounts.user.me.id}/role`);
-  const role = page.getByRole('combobox', { name: '역할', exact: true });
-  await role.selectOption('ADMIN');
-  await page.getByRole('button', { name: '역할 변경', exact: true }).click();
-  await page.getByRole('heading', { name: '역할 변경 확인', exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
-  await page.getByRole('button', { name: '변경 확인', exact: true }).click();
-  const upstream = await holder.readyPromise;
-  check('browser-stale-mutation-upstream-200', upstream.status === 200 && upstream.bodyBytes > 0, 'held mutation response is fetched from the real upstream before account expiry');
-  await triggerAuthExpiry(page, holder);
-  await signInExistingSpa(page, accounts.special);
-  await waitForUserReady(page, accounts.special);
-  holder.release();
-  await page.waitForTimeout(300);
-  const ok = !page.url().includes('/admin')
-    && await page.getByText(accounts.user.me.nickname, { exact: true }).count() === 0;
-  check('browser-stale-mutation', ok,
-  'late A mutation 200 cannot navigate or restore detail after B is ready');
-  await apiCall('PUT', `/api/v1/admin/users/${accounts.user.me.id}/role`, accounts.adminKeeper.token, { role: 'USER' });
-  await holder.dispose();
-  await probeContext.close();
-  return ok;
+  let holder;
+  try {
+    await signInInSpa(page, accounts.adminKeeper);
+    await page.goto(`${frontendUrl}/admin/users/${accounts.user.me.id}`, { waitUntil: 'domcontentloaded' });
+    await waitForAdminDetail(page);
+    const providerMarker = await markProviderDocument(page);
+    holder = await holdAdminResponse(page, (request) => request.method() === 'PUT'
+      && new URL(request.url()).pathname === `/api/v1/admin/users/${accounts.user.me.id}/role`);
+    const role = page.getByRole('combobox', { name: '역할', exact: true });
+    await role.selectOption('ADMIN');
+    await page.getByRole('button', { name: '역할 변경', exact: true }).click();
+    const roleDialog = page.getByRole('dialog', { name: '역할 변경 확인', exact: true });
+    await roleDialog.waitFor({ state: 'visible', timeout: 10_000 });
+    await roleDialog.getByRole('button', { name: '변경 확인', exact: true }).click();
+    const upstream = await withTimeout(holder.readyPromise, STALE_PROBE_TIMEOUT_MS, 'stale mutation upstream response');
+    check('browser-stale-mutation-upstream-200', upstream.status === 200 && upstream.bodyBytes > 0, 'held mutation response is fetched from the real upstream before account expiry');
+    await triggerAuthExpiry(page, holder);
+    await signInExistingSpa(page, accounts.special);
+    await waitForUserReady(page, accounts.special);
+    const bStable = new URL(page.url()).pathname === '/'
+      && await page.getByRole('link', { name: accounts.special.me.nickname, exact: true }).count() === 1;
+    const sameDocument = await sameProviderDocument(page, providerMarker);
+    check('browser-stale-mutation-b-session-stable', bStable && sameDocument, 'B is stably authenticated on the same SPA Provider/document before A release');
+    holder.release();
+    await withTimeout(holder.released, STALE_PROBE_TIMEOUT_MS, 'stale mutation release');
+    await page.waitForTimeout(300);
+    const ok = bStable && sameDocument && new URL(page.url()).pathname === '/'
+      && await page.getByText(accounts.user.me.nickname, { exact: true }).count() === 0;
+    check('browser-stale-mutation', ok,
+    'late A mutation 200 cannot navigate or restore detail after B is ready');
+    return ok;
+  } catch (error) {
+    check('browser-stale-mutation', false, scrubSecrets(error instanceof Error ? error.message : String(error)));
+    return false;
+  } finally {
+    await apiCall('PUT', `/api/v1/admin/users/${accounts.user.me.id}/role`, accounts.adminKeeper.token, { role: 'USER' }).catch(() => undefined);
+    holder?.release();
+    await holder?.dispose();
+    await probeContext.close();
+  }
 }
 
 async function holdAdminResponse(page, predicate) {
   let held = null;
-  let expired = false;
+  let expireNext = false;
+  let expiryConsumed = false;
+  let released = false;
   let resolveReady;
   let releaseResolve;
+  let resolveReleased;
   const readyPromise = new Promise((resolvePromise) => { resolveReady = resolvePromise; });
   const releasePromise = new Promise((resolvePromise) => { releaseResolve = resolvePromise; });
-  const pattern = '**/api/v1/admin/users*';
+  const releasedPromise = new Promise((resolvePromise) => { resolveReleased = resolvePromise; });
+  const pattern = ADMIN_USERS_ROUTE_PATTERN;
   await page.route(pattern, async (route) => {
     const url = new URL(route.request().url());
-    if (expired && route.request().method() === 'GET' && url.searchParams.get('size') === '1') {
+    if (expireNext && !expiryConsumed && route.request().method() === 'GET' && url.searchParams.get('size') === '1') {
+      expiryConsumed = true;
       await route.fulfill({ status: 401, contentType: 'application/json', headers: { 'cache-control': 'private, no-store' },
         body: JSON.stringify({ success: false, data: null, error: { code: 'AUTH_004', message: 'expired synthetic access' }, timestamp: new Date().toISOString() }) });
       return;
@@ -1497,11 +1995,16 @@ async function holdAdminResponse(page, predicate) {
     resolveReady({ status: upstream.status(), bodyBytes: body.length });
     await releasePromise;
     await route.fulfill({ status: held.status, headers: held.headers, body: held.body });
+    if (!released) {
+      released = true;
+      resolveReleased();
+    }
   });
   return {
     get readyPromise() { return readyPromise; },
+    get released() { return releasedPromise; },
     release() { releaseResolve(); },
-    expire() { expired = true; },
+    expireOnce() { expireNext = true; },
     async dispose() { await page.unroute(pattern).catch(() => undefined); },
   };
 }
@@ -1511,11 +2014,32 @@ async function triggerAuthExpiry(page, holder) {
     await route.fulfill({ status: 401, contentType: 'application/json', headers: { 'cache-control': 'private, no-store' },
       body: JSON.stringify({ success: false, data: null, error: { code: 'AUTH_003', message: 'expired synthetic refresh' }, timestamp: new Date().toISOString() }) });
   });
-  holder.expire();
+  holder.expireOnce();
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await page.waitForURL((url) => url.pathname.endsWith('/signin'), { timeout: 15_000 }).catch(() => undefined);
   check('browser-auth-final-failure-boundary', page.url().endsWith('/signin'), 'same SPA auth-expiry path reaches signin after access and refresh fail');
   await page.unroute('**/api/v1/auth/refresh');
+}
+
+async function markProviderDocument(page) {
+  return page.evaluate(() => {
+    const key = '__m9ProviderDocumentMarker';
+    const marker = window[key] ?? `${Date.now()}-${Math.random()}`;
+    window[key] = marker;
+    return marker;
+  });
+}
+
+async function sameProviderDocument(page, marker) {
+  return page.evaluate((expected) => window.__m9ProviderDocumentMarker === expected, marker).catch(() => false);
+}
+
+function withTimeout(promise, timeoutMs, label) {
+  let timeout;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeout = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeout));
 }
 
 async function signInInSpa(page, account) {
@@ -1526,12 +2050,24 @@ async function signInInSpa(page, account) {
 async function signInExistingSpa(page, account) {
   await page.waitForURL((url) => url.pathname.endsWith('/signin'), { timeout: 15_000 }).catch(() => undefined);
   await submitSigninForm(page, account);
+  // Signin preserves the protected `from` pathname. For the USER stale probe
+  // that is /admin, so leave the denied route through the real SPA logo link
+  // while retaining the same document/Provider instance.
+  if (new URL(page.url()).pathname.startsWith('/admin')) {
+    const homeLink = page.getByRole('link', { name: 'ZEROVERSE', exact: true });
+    await homeLink.waitFor({ state: 'visible', timeout: 15_000 });
+    await homeLink.click();
+    await page.waitForURL((url) => url.pathname === '/', { timeout: 15_000 });
+  }
 }
 
 async function submitSigninForm(page, account) {
   const email = page.getByLabel('이메일', { exact: true });
   const password = page.getByLabel('비밀번호', { exact: true });
-  const submit = page.getByRole('button', { name: '로그인', exact: true });
+  const submit = page.getByRole('button', { name: '접속하기 ✦', exact: true });
+  await email.waitFor({ state: 'visible', timeout: 15_000 });
+  await password.waitFor({ state: 'visible', timeout: 15_000 });
+  await submit.waitFor({ state: 'visible', timeout: 15_000 });
   check(`browser-signin-${account.me?.id ?? 'fixture'}`, await exactCount(email) === 1 && await exactCount(password) === 1 && await exactCount(submit) === 1, 'signin controls are unique');
   if (await exactCount(email) !== 1 || await exactCount(password) !== 1 || await exactCount(submit) !== 1) throw new Error('signin controls are not unique');
   await email.fill(account.email);
@@ -1694,6 +2230,11 @@ function ids(response) {
 function setsEqual(left, right) {
   return left instanceof Set && right instanceof Set && left.size === right.size
     && [...left].every((value) => right.has(value));
+}
+
+function arrayEqual(left, right) {
+  return Array.isArray(left) && Array.isArray(right) && left.length === right.length
+    && left.every((value, index) => value === right[index]);
 }
 
 function pageItems(response) {
@@ -1943,7 +2484,14 @@ async function newBrowserContext() {
 
 async function finishEvidence() {
   ensureRequiredEvidenceChecks();
-  evidence.status = evidence.failures.length === 0 ? 'PASS' : 'NOT RUN';
+  const requiredNotRun = REQUIRED_EVIDENCE_IDS.filter((id) => evidence.checks.some((item) => item.name === id && item.status === 'NOT RUN'));
+  const requiredFailed = REQUIRED_EVIDENCE_IDS.filter((id) => evidence.checks.some((item) => item.name === id && item.status === 'FAIL'));
+  // M9_REQUIRE_FULL may relax process exit handling, but it never turns an
+  // incomplete required matrix into a top-level PASS.
+  evidence.status = evidence.failures.length === 0 && requiredNotRun.length === 0 && requiredFailed.length === 0
+    ? 'PASS' : 'NOT RUN';
+  evidence.requiredNotRun = requiredNotRun;
+  evidence.requiredFailed = requiredFailed;
   await writeEvidence();
   const pass = evidence.checks.filter((item) => item.status === 'PASS').length;
   const notRunCount = evidence.checks.filter((item) => item.status === 'NOT RUN').length;
@@ -1975,6 +2523,8 @@ function scrubSecrets(value) {
   }
   result = result.replaceAll(fixture.runId, '[redacted-run-id]');
   result = result.replaceAll(fixture.searchLiteral, '[redacted-search-marker]');
+  result = result.replaceAll(fixture.searchEmailLiteral, '[redacted-email-marker]');
+  result = result.replaceAll(fixture.searchNicknameLiteral, '[redacted-nickname-marker]');
   result = result.replaceAll(fixture.bulkSearchLiteral, '[redacted-bulk-marker]');
   result = result.replace(/Bearer\s+\S+/gi, 'Bearer [redacted-token]');
   result = result.replace(/[A-Za-z0-9_-]{30,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g, '[redacted-token]');

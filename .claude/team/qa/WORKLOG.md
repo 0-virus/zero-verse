@@ -981,3 +981,53 @@
 - 실제 API/signup/signin, isolated MySQL/status/fingerprint/query-count, backend XML, Chrome/Playwright, source/JAR provenance는 이번 배정에서 실행하지 않았다. 현재 판정은 **I1~I9 STATICALLY CLOSED / M9 ACCEPTANCE NOT RUN**이다.
 - root handoff 잔여: `nativeFixtureRequest` 처리와 ready `nativeFixtures`/`targetDetailExpectations`, backend physical concurrency XML, source/JAR+FE freeze provenance. 제품/타 역할 tests/DB/runtime/Git는 수정·실행하지 않았다.
 - root feedback 반영: native ready의 auto-increment ID distinct 검사는 blog table 내부 2개와 post table 내부 2개로 분리했다. 서로 다른 테이블의 숫자 ID 겹침은 유효하다.
+
+## 2026-11-11 KST — M9 audit-2 fix2 정적 보완
+
+### 한 일
+
+- `acceptance-audit-2.md` F1~F9 원문과 현재 QA harness를 재대조했다. promotion 뒤 pre-promotion USER claim은 current ACTIVE DB ADMIN이면 200이어야 하므로 기대값을 수정했고, demotion 뒤 fresh ADMIN claim 재평가를 유지했다.
+- `qa/m9-acceptance.mjs`의 stale probe를 실제 `/api/v1/admin/users(?:/|?|$)` 정규식과 one-shot expiry, 유한 ready/release timeout, same-document marker, B 안정화 후 release, finally cleanup으로 보완했다. guest/USER/ADMIN 일반 시나리오는 별도 BrowserContext로 격리했다.
+- 실제 accessible DOM 계약에 맞춰 signin `접속하기 ✦`, modal `role=dialog`/`aria-label`, scoped delete copy를 사용했다. list/detail empty·transient retry, duplicate confirm click, focus/visible denied/re-entry, 1440px screenshot evidence를 required matrix에 추가했다.
+- target native API fixture에 PUBLIC/UNIVERSE/PRIVATE-draft, target→deleted-opponent accepted relation, target own soft-deleted comment, suspended/deleted signin·post/comment/like/universe write, reactivation 후 기존 refresh 재사용을 연결했다. 삭제 전 refresh probe가 fingerprint를 오염하지 않도록 순서를 이동했다.
+- email/nickname/name independent search와 same-createdAt global ID slice 검사를 추가했다. required NOT RUN은 `M9_REQUIRE_FULL=0`이어도 top-level PASS가 되지 않도록 finish gate를 고쳤다.
+- 별도 QA evidence helper `qa/m9-test-evidence.mjs`를 main harness에 연결했다. backend XML/summary와 FE JSON을 구조 파싱하고 exact testcase/class/source/assertion 및 zero failure/skip을 확인하며, mapped-only PASS와 uncovered rows를 분리한다.
+
+### 검증·미실행
+
+- `node --check qa/m9-acceptance.mjs` exit 0.
+- `node --check qa/m9-test-evidence.mjs` exit 0.
+- `node --check qa/m9-test-evidence.test.mjs` exit 0.
+- `node --test qa/m9-test-evidence.test.mjs` exit 0 — 13 tests / 13 passed / 0 failed.
+- `git diff --check -- qa/m9-acceptance.mjs qa/m9-test-evidence.mjs qa/m9-test-evidence.test.mjs` exit 0.
+- 실제 signup/signin·API·MySQL 13319·status/fingerprint/query-count·backend runtime·Chrome/Playwright·source/JAR live provenance는 실행하지 않았다. 현재 M9는 **NOT RUN**이며 helper focused artifact 검증은 전체 acceptance PASS가 아니다.
+
+### 잔여 handoff
+
+- root는 final source/JAR/runtime provenance와 isolated API/FE/MySQL를 동결한 뒤 `qa/m9-acceptance.mjs`를 단일 실행해야 한다.
+- helper의 `uncoveredFrontendRows`/`uncoveredStatePolicyRows`는 direct browser/HTTP evidence가 모두 PASS일 때만 main이 닫는다. raw token/credential/log는 evidence에 쓰지 않는다.
+- 제품 코드·타 역할 테스트·사용자 DB/업로드·Git은 이 fix2에서 수정하지 않았다.
+
+### fix2 후속 정적 보정
+
+- stale list/detail probe는 SPA 관리자 진입과 target link 전환을 먼저 완료한 뒤 provider document marker를 설정하도록 재배치했다. baseline `page.goto`가 marker를 지우는 false failure를 제거했으며, A hold→B signin/home→release 구간만 same-document로 판정한다.
+- browser direct matrix에 list/detail transient retry 결과, successful empty state, duplicate submit 1회, focus/visibility denied/re-entry, same-createdAt 검색 page/back/reload와 list/detail screenshot rows를 추가했다.
+- 후속 `node --check qa/m9-acceptance.mjs` exit 0 및 `git diff --check -- qa/m9-acceptance.mjs` exit 0을 확인했다. actual acceptance는 여전히 NOT RUN이다.
+
+## 2026-11-11 KST — M9 fix2 정적 최종 확인·QA 파일 동결 인계
+
+### 검증
+
+- `node --check qa/m9-acceptance.mjs` exit 0.
+- `node --check qa/m9-test-evidence.mjs` exit 0.
+- `node --check qa/m9-test-evidence.test.mjs` exit 0.
+- `node --test qa/m9-test-evidence.test.mjs` exit 0 — 13 tests / 13 passed / 0 failed / 0 skipped.
+- `git diff --check -- qa/m9-acceptance.mjs qa/m9-test-evidence.mjs qa/m9-test-evidence.test.mjs qa/M9-review.md .claude/team/qa/STATE.md .claude/team/qa/WORKLOG.md` exit 0; 대상 파일 trailing whitespace clean.
+- helper SHA-256은 `qa/m9-test-evidence.mjs`=`b02a2922bc22a271448b69e35f5440473c8d270128d82bba77cec4719bcd8f6e`, `qa/m9-test-evidence.test.mjs`=`b4abdcd0e0173b62f61c490ed85ff6973751f8d930b654d6cc53eae107ad59ec`로 확인했다.
+- `git diff --name-only 6a8763d..HEAD`에는 제품 `src/**`/`frontend/**`가 없고 문서·PM 상태만 있어, QA 작업 트리의 제품 소스 무변경을 read-only로 확인했다. live JAR/FE provenance는 root가 별도 확인할 대상이다.
+
+### 판정·인계
+
+- QA harness 및 구조화 helper는 fix2 정적 동결 상태다. helper의 mapped-only PASS는 전체 인수 PASS가 아니며 uncovered direct rows와 required matrix는 실제 실행 전까지 닫지 않는다.
+- 실제 signup/signin·API `18089`·FE `5179`·MySQL `13319`·status/fingerprint/query-count·backend barrier·Chrome/1440px는 실행하지 않았다. M9 판정은 계속 **A-v2 APPROVED / HARNESS STATIC-FROZEN / ACCEPTANCE NOT RUN**이다.
+- root가 명시 QA 6개 파일을 커밋하고 동일 독립 auditor의 scoped re-review를 거친 뒤, immutable source/JAR/live runtime provenance가 준비되면 단일 실제 acceptance를 실행한다. 제품·DB·runtime·Git은 이 확인에서 수정하지 않았다.

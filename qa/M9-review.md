@@ -1,6 +1,6 @@
 # M9 — 관리자 독립 QA 준비 및 인수 기준
 
-> **현재 상태: A-v2 APPROVED / I1~I9 FIX1 STATICALLY CLOSED / ACCEPTANCE NOT RUN**
+> **현재 상태: A-v2 APPROVED / audit-2 FIX2 HARNESS UPDATED / ACCEPTANCE NOT RUN**
 >
 > 사용자의 `A-v2 전체 승인`으로 회의 §5·§10·§10.1·§11, REQUIREMENTS §6.13-A, ADR-0008이 현재 계약이 됐다. 승인은 제품 PASS가 아니며, 구현 freeze·격리 runtime·실제 HTTP/Chrome/DB 증거 전에는 인수 완료를 주장하지 않는다.
 
@@ -171,7 +171,7 @@
 
 root helper `apply_seed`는 **사용자 DB가 아닌 MySQL `127.0.0.1:13319`**에서만 seed IDs를 사용해 baseline 상태·동일 `created_at` 21행·`weekBoundaryLabels`의 KST 월요일 직전/시작/직후 시각·선택적 image fixture를 적용하고, `nativeFixtureRequest:{extraBlogs:true,softDeletedPost:true}`가 있을 때 target의 추가 활성 blog 1개·삭제 blog 1개·삭제 blog post 1개·기본 blog 삭제 post 1개를 기존 스키마로 생성한다. `M9_STATUS_READY_FILE`에는 `zeroverse.m9.status-ready.v1` JSON을 원자적으로 쓴다. ready에는 `runId`, `phase=baseline`, 각 필수 계정의 id/role/status/deletedAt, `sameCreatedAt.ids` 21개, seed의 `preservedImageIds`, `time.{requestNowUtc,weekStartUtc,weekEndUtc}`, `summaryExpectations.{totalUsers,joinedThisWeek,suspendedUsers}`, `nativeFixtures.{activeBlogId,deletedBlogId,deletedBlogPostId,deletedPostId}`, `targetDetailExpectations.{defaultBlogId,blogCount,postCount,postStats:{total,published,draft},commentCount,universeStats:{outgoingCount,incomingCount,connectionCount}}`를 포함한다. 누락·불일치 시 harness는 fail-closed한다.
 
-comments/reply, target actor comment notification, accepted universe directions (target→user, user→target, target→special, adminKeeper→target), post like와 target post tags는 root SQL seed가 아니라 harness가 인증된 실제 API로 생성한다. 해당 합성 ID는 seed `commentIds`/evidence memory에만 보관하며 raw credential/token은 쓰지 않는다. target의 기대 detail은 root SQL ground truth와 API fixture가 합쳐진 정확한 수치 `{blogCount:2,postCount:4,postStats:{total:4,published:3,draft:1},commentCount:3,universeStats:{outgoingCount:2,incomingCount:2,connectionCount:1}}`와 일치해야 한다.
+comments/reply, target actor comment notification, accepted universe directions (target→user, user→target, target→special, adminKeeper→target, target→deleted-opponent), post like와 target post tags는 root SQL seed가 아니라 harness가 인증된 실제 API로 생성한다. target 본인의 soft-deleted comment도 API로 생성·삭제해 active aggregate에는 제외되고 history/fingerprint에는 남는 반례를 만든다. target post fixture는 PUBLIC·UNIVERSE·PRIVATE draft를 모두 포함한다. 해당 합성 ID는 seed `commentIds`/evidence memory에만 보관하며 raw credential/token은 쓰지 않는다. target의 기대 detail은 root SQL ground truth와 API fixture가 합쳐진 정확한 수치 `{blogCount:2,postCount:4,postStats:{total:4,published:3,draft:1},commentCount:3,universeStats:{outgoingCount:2,incomingCount:2,connectionCount:1}}`와 일치해야 한다.
 
 `runId`·각 ID·필수 role/status/deleted 상태·21개 bulk ID·UUID image ID가 맞지 않으면 harness는 실행을 계속하지 않고 `NOT RUN`/실패로 종료한다. helper는 기존 사용자 DB·업로드를 조회하거나 수정하지 않는다.
 
@@ -196,7 +196,7 @@ harness는 root의 `python3 build/m9-runtime.py fingerprint`를 호출하고 std
 
 query-count는 별도 추상화/토큰 전달 없이 기존 root `sql` CLI로 performance schema scalar를 삭제 전후 읽는다. harness가 **실제 Bearer를 메모리에서 사용한 HTTP 200** list size=1, list size=100, detail 요청을 각각 수행하고, 각 요청 전후 `statement/sql/select` count 차이를 기록한다. 양쪽 list/detail 모두 `1..14`, list size1→size100 delta `0`이어야 한다. performance_schema 비활성·0·request non-200은 PASS가 아니다.
 
-root acceptance가 메모리/env로 제공하는 `M9_EXPIRED_ACCESS_TOKEN`, `M9_WRONG_TYPE_TOKEN`, `M9_MISSING_ROLE_TOKEN`, `M9_MISSING_SUBJECT_TOKEN`은 raw token을 evidence/log에 쓰지 않고 5개 admin method의 AUTH_002/AUTH_004·no-store만 판정한다.
+root acceptance가 메모리/env로 제공하는 `M9_EXPIRED_ACCESS_TOKEN`, `M9_WRONG_TYPE_TOKEN`, `M9_MISSING_ROLE_TOKEN`, `M9_MISSING_SUBJECT_TOKEN`, `M9_INVALID_ROLE_TOKEN`, `M9_INVALID_SUBJECT_TOKEN`은 raw token을 evidence/log에 쓰지 않고 5개 admin method의 AUTH_002/AUTH_004·no-store만 판정한다.
 
 ### 11.3 실행·증거 경계
 
@@ -213,7 +213,7 @@ node qa/m9-acceptance.mjs
 
 현재 준비 명령은 `node --check qa/m9-acceptance.mjs`뿐이다. 실제 HTTP·DB·Chrome·source/JAR acceptance는 아직 실행하지 않았고, 본 문서의 모든 매트릭스 행은 `NOT RUN`이다.
 
-## 12. Audit-1 I1~I9 fix1 closure (정적 보완, 실제 인수 미실행)
+## 12. Audit-1 I1~I9 fix1 closure (역사 기록; §13 fix2가 현재 기준)
 
 | Audit finding | 정적 보완 근거 | 현재 상태 |
 |---|---|---|
@@ -228,3 +228,27 @@ node qa/m9-acceptance.mjs
 | I9 | 고정 `REQUIRED_EVIDENCE_IDS`와 `ensureRequiredEvidenceChecks()` fail-closed, auth/bad-signature/refresh/read-only/write/UI confirm/canonical/retry/guard/stale evidence IDs 추가 | STATIC CLOSED / 전체 acceptance NOT RUN |
 
 Fix1 범위의 정적 검증은 `node --check qa/m9-acceptance.mjs`와 whitespace/diff 점검뿐이다. 실제 합성 signup/signin, API, isolated MySQL, fingerprint/query-count, backend XML, Playwright/Chrome 1440px, source/JAR provenance는 실행하지 않았으므로 이 closure는 M9 PASS가 아니다. root가 source/JAR freeze와 위 native/status/BE XML handoff를 마친 뒤 동일 harness를 독립 실행하고, 결과를 각 matrix 행에 evidence ID로 연결해야 한다.
+
+## 13. Audit-2 fix2 정적 보완 — 실제 인수 미실행
+
+`acceptance-audit-2.md` F1~F9 원문과 root의 final artifact handoff를 다시 대조했다. 아래 보완은 QA harness·QA 기록 범위에 한정하며 제품/API/DB 계약을 새로 확정하지 않는다.
+
+| finding | fix2 보완 | 현재 판정 |
+|---|---|---|
+| F1 / I8 | promotion 뒤 pre-promotion USER claim도 current ACTIVE DB ADMIN이면 `200`/envelope/no-store로 확인하고, fresh ADMIN claim·demotion stale ADMIN 거부를 별도 유지 | STATIC HARNESS UPDATED / HTTP NOT RUN |
+| F2 / I5 | `qa/m9-test-evidence.mjs`가 final backend XML을 Python stdlib XML로 구조 파싱하고 suite totals, exact testcase/classname, testcase failure/error/skipped, source method/assertion 연결을 검증한다. AdminConcurrency 7 cases와 AdminQueryBound 3 cases의 RR/lock evidence를 substring marker로 대체하지 않는다 | HELPER 13/13 FOCUSED PASS / FINAL RUNTIME NOT RUN |
+| F3 / I4 | admin route glob을 slash/query를 포함하는 정규식으로 교체하고, expiry 1회 소비·ready/release 유한 timeout·same-document marker·B 안정화 후 release·finally cleanup을 사용한다. list/detail/mutation 각각 real upstream body hold를 유지한다 | STATIC HARNESS UPDATED / Chrome NOT RUN |
+| F4 / I9 | signin 실제 accessible name `접속하기 ✦`, modal `role=dialog`/`aria-label` title, delete copy dialog scope를 사용한다 | STATIC HARNESS UPDATED / Chrome NOT RUN |
+| F5 | guest/USER/ADMIN 일반 browser journey를 별도 BrowserContext로 격리하고, same-Provider account switch만 stale probe context에서 수행한다 | STATIC HARNESS UPDATED / Chrome NOT RUN |
+| F6 / I6 | 삭제 거부용 refresh probe를 `before-target-delete` fingerprint 이전에 만들고 전후 fingerprint 사이 target signin을 금지한다 | STATIC HARNESS UPDATED / DB NOT RUN |
+| F7 / I9 | invalid role/subject env, no-op audit, suspended/deleted signin·post/comment/like/universe write, suspended refresh 재사용·reactivation, pending/empty/transient/retry/duplicate-submit/deny re-entry rows를 required ID로 고정했다. helper의 mapped-only PASS와 direct caller evidence를 합치며, required NOT RUN이 있으면 `M9_REQUIRE_FULL=0`이어도 top-level `PASS`가 되지 않는다 | STATIC MATRIX UPDATED / runtime NOT RUN |
+| F8 / I6 | target→soft-deleted opponent ACCEPTED relation, target own soft-deleted comment, PUBLIC/UNIVERSE/PRIVATE-draft rows를 실제 API fixture로 만들고 active aggregate에서 제외·history/fingerprint에서 보존되는지 확인한다 | STATIC FIXTURE UPDATED / API/DB NOT RUN |
+| F9 / I7 | email/nickname/name 독립 keyword fixture, exact ID set, same-createdAt global DESC ID page slices를 추가했다 | STATIC MATRIX UPDATED / HTTP NOT RUN |
+
+### 13.1 Evidence helper handoff
+
+`qa/m9-test-evidence.mjs`의 `collectTestEvidence({root, backendDir, backendSummary, frontendJson})`는 다음 다섯 결과를 반환한다: `concurrency-physical-barrier-evidence`, `backend-rr-writer-evidence`, `backend-noop-audit-evidence`, `backend-state-policy-evidence`, `frontend-matrix-evidence`. `mappings.backend/frontend`, `uncoveredFrontendRows`, `uncoveredStatePolicyRows`, `artifactHashes`는 raw token/log 없이 보존한다. helper의 현재 13개 focused test는 artifact 변조·deceptive comment marker·wrong class·summary mismatch·FE failed assertion/source comment 위장을 거부한다. mapped named coverage가 전체 browser/HTTP matrix를 대신하지 않으며, direct harness rows가 모두 실제 PASS일 때만 caller가 uncovered row를 닫는다.
+
+### 13.2 Fix2 정적 검증과 경계
+
+검증 명령은 `node --check qa/m9-acceptance.mjs` exit 0, `node --check qa/m9-test-evidence.mjs` exit 0, `node --check qa/m9-test-evidence.test.mjs` exit 0, `node --test qa/m9-test-evidence.test.mjs` exit 0 (13/13), `git diff --check -- qa/m9-acceptance.mjs qa/m9-test-evidence.mjs qa/m9-test-evidence.test.mjs` exit 0이다. 이 명령들은 저장된 artifact parser와 JavaScript syntax만 검사한다. signup/signin, API, MySQL 13319, fingerprint/query-count, backend final runtime, Playwright/Chrome, source/JAR live provenance는 실행하지 않았으므로 현재 M9 판정은 **NOT RUN / A-v2 APPROVED / HARNESS UPDATED**이며 PASS·완료·merge-ready를 주장하지 않는다.

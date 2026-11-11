@@ -576,3 +576,9 @@
 - 사용자 `A-v2 전체 승인` 확인, 회의 §11/ADR-0008/REQUIREMENTS §6.13-A·PM PRD §9.12 등 정본동기화 Task1완료. 실행 진행.
 - backend m9_backend_impl(Task2), frontend m9_frontend_impl(Task3), QA m9_qa_prep(Task4harness), PM m9_pm_prep(Task1정본)을 독립소유로 배정. root Git/runtime/worklog/검증종합 단독소유.
 - 실제 HEAD e5c38cd(외부 사용자gitignore커밋) 보존. shared featurecheckout, M9전용13319/18089/5179와 합성계정만사용. 사용자 DB13307/환경/업로드는 접근하지않음. M10·배포는 제외.
+
+## 2026-11-11 KST — M9 독립 task review·실제 가입 시각 결함
+
+- Task3 frontend 독립 F1~F5 수정·재검토 Approved, root51files464tests PASS. Task2 backend 복구 담당 m9_backend_recovery와 helper 소유분리로 구현9a4d03f; root107suites632tests baseline PASS. 실제 API/Chrome 인수·최종통합은 아직 남음.
+- 후속 실제HTTP signup에서 KST audit 9시간 오차와 UTC DATETIME(0) 반올림의 즉시통계 누락을 재현했다. Task2 M1 Important/Needs fixes로 유지하고 UTC JVM 실행 전제·초단위 audit precision 수정을 원 backend에 배정. 독립 검토자가 최소 기술안 검증, 회의 §12·ADR·README·RISK-0021에 근거/기존 DB 제외 경계 기록.
+- QA harness I1~I9는 원QA fix1 중이며 root는 전용 native fixture·전체row/file fingerprint·source/JAR provenance를 준비한다. 기존632PASS를 새수정의 최종PASS로 재사용하지 않는다.

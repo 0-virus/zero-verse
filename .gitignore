@@ -66,6 +66,8 @@ frontend/dist/
 frontend/.vite/
 *.tsbuildinfo
 *.local
+frontend/.m9-evidence/
+frontend/.m9-evidence-*.log
 
 ### Docs — 스펙 원본은 무시, 에이전트 지침·운영 기록만 추적 ###
 docs/*

@@ -124,3 +124,21 @@ Files: 기존 각역할 기록/PM PRD, root worklog/JOURNAL/registers/README. Gi
 - `m9_backend_impl` Task2 src/security/user·backend기록/Gradle단일실행, `m9_frontend_impl` Task3 frontend·역할기록, QA `m9_qa_prep` Task4 승인매트릭스/인수도구, PM `m9_pm_prep` Task1PRD 소유. 전원 타역할 파일변경금지·Git root단독·독립review별도.
 - SDD ledger `.superpowers/sdd/M9-admin/progress.md`, exact task brief/report로 추적. 기존 shared checkout/독립소유병렬·root Git은 프로젝트규칙에 따라 범용기본값보다 우선한다.
 - root는 전용 Docker서버29.5.2 상태확인, M9runtime helper를 build/m9-runtime.py로 준비했다. API18089/FE5179/MySQL13319 합성환경만 사용. 제품/실제인수 PASS는 아직 없다.
+
+### 2026-11-11 KST — Task3 자체검증·독립 리뷰 착수
+
+- frontend m9_frontend_impl 구현을 a176049에 동결했다. 원본 frontend-final-test-2.log는51files/456tests PASS, lint/build exit0(기존500kB chunkwarning). 최초full의프로필링크1fail은수정후최종full재실행으로해소했다.
+- root가보고서/실제diff/원본출력을직접확인하고 별도 m9_frontend_review에8e9559c..a176049 task범위독립검토를배정했다. 아직Task3독립승인/전체M9완료아님.
+- 전용MySQL13319 ready, FE5179은build/m9-vite.mjs(envDir:false)로실행. API18089은최종backendartifact이후기동한다. 외부사용자 e5c38cd와기존영속데이터보존.
+
+### 2026-11-11 KST — Task3 독립 review1 수정 배정
+
+- 독립검토Needsfixes: Important4건(F1진입/복귀probe, F2target404재검증unmountloop, F3oldtargetmutation/retry/navigation, F4transient목록행숨김). root가중요코드경로확인후원작성자fix1에RED→GREEN 및실provider/guard/page조합회귀를배정했다.
+- MinorF5테이블열배치/spacing은최종1440px시각gate에서추적한다. src/backend구현은계속별도소유로진행하며, Task3완료판정은독립재검토뒤다.
+
+### 2026-11-11 KST — Task2/3 검증 중간 결과·UTC 결함
+
+- Task3 F1~F4는7f61a98, F5는3d34468에서 수정했고 별도 frontend 검토자가 모두 ADDRESSED/Approved로 판정했다. root 최종 FE 자동검증은51files/464tests PASS, lint/build exit0. 실제 API/1440px 제품 화면은 아직 Task4 gate다.
+- Task2 구현9a4d03f의 admin33/보안62 targeted와 root 전체107suites/632tests/0fail/0error/0skip+bootJar exit0를 확인했다. 이는 후속 UTC 수정 전 baseline이며 현재 최종 통과를 뜻하지 않는다.
+- 추가 실제 HTTP 가입 테스트에서 KST JVM audit가 UTC보다9시간 앞서는3assertion RED를 재현했다. 독립검토M1 Important로 Task2를 Needs fixes로 전환했다. 이어 UTC 실행에서도 DATETIME(0) 반올림에 의한 즉시통계 누락을 재현했다. 회의 §12/ADR 보완처럼 UTC 실행 전제와 audit 초 정밀도 수정을 원 backend에 배정했다. 비UTC JAR 차단·지원UTC 가입/즉시통계·audit 경계 및 전체재검증 전에는 닫지 않는다.
+- QA 도구 독립감사 I1~I9(유일fixture·실제ADMIN claim·DOM·stale계정격리·정확한경쟁/검색/집계·비어있지않은삭제보존·필수행누락방지)도 원QA가 fix1중이다. root는 합성 DB native blog/post fixture·전체row/file fingerprint·실행 전후 source/JAR provenance를 보강한다. 사용자 DB/업로드 변경 없음.

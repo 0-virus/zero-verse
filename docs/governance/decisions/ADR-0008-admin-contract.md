@@ -17,3 +17,7 @@
 ## 대안·영향·검증
 
 접속추적/cascade삭제/복구·감사체계는 DB·개인정보·범위를 확장하므로 제외했다. 제품 bootstrap/실사용 DB 승격은 추가하지 않는다. 합성 ADMIN fixture와 실제 MySQL경쟁·하위 fingerprint·HTTP·1440px Chrome·BE/FE전체자동검증·저자와 다른 QA를 완료 gate로 한다. 기존 V1~V6·사용자 DB/업로드를 보존하고 M10/배포로 확대하지 않는다.
+
+## 2026-11-11 실행 전제 검증 보완
+
+회의 §12의 재현으로 UTC JVM 지원 전제를 실행 경로에 명시한다. bootRun/테스트는 UTC이며 직접 JAR은 `-Duser.timezone=UTC`를 요구하고 비UTC 실행은 DB 연결 전에 중단한다. audit는 기존 DATETIME(0)에 맞춰 초 단위 truncate하여 반올림된 미래 가입 시각을 방지한다. 이는 승인된 UTC DB audit 계약의 결함 수정이며 과거 DATETIME의 시간대 호환성이나 자동 보정을 보장하지 않는다. 기존 DB 적용은 RISK-0021의 별도 점검 대상이다.

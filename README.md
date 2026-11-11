@@ -21,6 +21,12 @@ npm.cmd --version
 API만 확인한다면 Node/npm과 프론트 실행은 생략할 수 있습니다.
 현재 로컬 인증·블로그·카테고리·글·이미지 기능에는 LocalStack/S3가 필요하지 않습니다.
 
+### 서버 시각 기준
+
+서버 JVM은 **UTC**로 실행합니다. `bootRun`과 Gradle 테스트는 UTC로 설정되며, JAR 직접 실행은 `java -Duser.timezone=UTC -jar ...`를 사용합니다. UTC가 아닌 JAR 실행은 DB 연결 전에 실행 방법을 안내하고 중단합니다. 관리자 이번 주 통계의 주 시작은 Asia/Seoul 월요일 00시이며, 저장 시각은 UTC 기준입니다.
+
+기존 `DATETIME` 값에는 시간대 정보가 없습니다. 과거 서버의 시간대가 확인되지 않은 DB는 UTC 실행만으로 호환성을 보장할 수 없으므로 적용 전 별도 확인이 필요합니다. M9 검증은 격리된 합성 DB만 사용하며 기존 사용자 DB의 시각을 자동 보정하지 않습니다.
+
 ### M7 검색 본문 이관과 복구
 
 M7 서버는 시작할 때 Flyway V4로 `posts.content_text`를 추가하고 V5로 기존 글의 JSON 본문에서 검색 텍스트를 채웁니다. 삭제 글과 임시저장 글도 이관하며 원문·HTML·조회수·작성/수정 시각은 보존합니다. 기존 DB에 적용하기 전에는 모든 쓰기 서버를 중지하고 DB 백업을 확보하세요. 이관 중 잘못된 본문을 만나면 해당 글 ID와 함께 시작에 실패하며, V5의 텍스트 변경 전체는 롤백되고 V4 컬럼은 남습니다.
@@ -267,7 +273,7 @@ Flyway가 필요한 migration을 적용하고 Hibernate가 스키마를 검증�
 ```powershell
 .\gradlew.bat --no-daemon --max-workers=1 bootJar
 if ($LASTEXITCODE -eq 0) {
-    java -jar build/libs/zeroverse-server-0.0.1-SNAPSHOT.jar --spring.profiles.active=local --server.address=127.0.0.1 --server.port=18080
+    java -Duser.timezone=UTC -jar build/libs/zeroverse-server-0.0.1-SNAPSHOT.jar --spring.profiles.active=local --server.address=127.0.0.1 --server.port=18080
 }
 ```
 

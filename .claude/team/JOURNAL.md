@@ -582,3 +582,9 @@
 - Task3 frontend 독립 F1~F5 수정·재검토 Approved, root51files464tests PASS. Task2 backend 복구 담당 m9_backend_recovery와 helper 소유분리로 구현9a4d03f; root107suites632tests baseline PASS. 실제 API/Chrome 인수·최종통합은 아직 남음.
 - 후속 실제HTTP signup에서 KST audit 9시간 오차와 UTC DATETIME(0) 반올림의 즉시통계 누락을 재현했다. Task2 M1 Important/Needs fixes로 유지하고 UTC JVM 실행 전제·초단위 audit precision 수정을 원 backend에 배정. 독립 검토자가 최소 기술안 검증, 회의 §12·ADR·README·RISK-0021에 근거/기존 DB 제외 경계 기록.
 - QA harness I1~I9는 원QA fix1 중이며 root는 전용 native fixture·전체row/file fingerprint·source/JAR provenance를 준비한다. 기존632PASS를 새수정의 최종PASS로 재사용하지 않는다.
+
+## 2026-11-11 KST — M9 실제 인수 PASS·최종 독립 검토 배정
+
+- 실제 최종 후보 `build/m9-acceptance-20261111-174413`은396PASS/0FAIL/0NOTRUN/exit0, BE109suites637·FE51files464 자동검증과 구분해 기록한다. source424/current hash 일치 및117 artifact의 전후·현재 hash/JARc6f381…을 root와 backend 기록 담당이 직접 확인했다. 실제 조회SQL5/5/3·delta0, 비어있지 않은 target 하위 row/파일hash 보존·1440px controls/같은SPA stale 결과 모두 통과.
+- static QA 초기 5회 loop와 후속 actual integration의 원인/수정/실패 run은 M9 worklog·QA 기록·SDD ledger에 보존했다. 실패 DB는 삭제 없이 archive-container로 보관, 사용자 데이터는 미접근. 제품 source/JAR은6a8763d 후 불변이며 QA 현재3a2752e다.
+- 새 가장 강한 독립 컨텍스트 `m9_final_review`가848d272..3a2752e 전체 diff·정본·실제 raw evidence·original/product PNG를 검토한다. backend/frontend/QA/PM 기록은 actualPASS와 최종 독립/PR/dev대기를 구분해 역할 소유자로 동기화 중이다. final review 및 통합 전 M9 완료 선언은 보류한다.

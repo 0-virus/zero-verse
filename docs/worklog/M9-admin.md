@@ -149,3 +149,13 @@ Files: 기존 각역할 기록/PM PRD, root worklog/JOURNAL/registers/README. Gi
 - Task3 root 최종464PASS를 testcase 단위로 인계하기 위해 F7 증거 누락 우려에 한해 구조화 reporter를 실행했다. `build/m9-evidence/frontend-final-result.json` success=true/testResults51/464passed/0failed/0pending. source frontend는3d34468후불변이며 과거456과 합산하지 않는다. envDir:false로 사용자 env를 읽지 않았다.
 - Task4 QA fix1(01d8582)은 audit2에서 CHANGES REQUIRED. I1~I3 ADDRESSED, I4~I9 잔여/F1~F9 Important는 원QA fixround2로 모두 배정했다. M1 실제runtime provenance는 최종 whole-branch gate로 남긴다. actual acceptance는 NOT RUN이다.
 - root는 provisional API28555만 종료하고 최종검증JAR API36756/18089를 UTC로기동했다. Swagger실제GET에서 admin4paths/5methods등록확인. 전용MySQL13319·FE5179·업로드 build/m9-api-data만사용하며 사용자자료불변. tested-version manifest는424files/sourceSHA63d720de69a286736f77406cf3a33019ef4871b09cd6632ec7f483ce15b9602c/JAR위hash다.
+
+## [실제 인수] 2026-11-11 KST — 396 PASS·최종 독립 검토 진행
+
+- root 최종 후보 `build/m9-acceptance-20261111-174413/evidence.json`은 **PASS / 396 checks PASS / 실패0 / 미실행0**, `acceptance-diagnostic-7.log` process exit0다. 체크 건수와 BE637/FE464 자동 테스트 건수는 구분한다.
+- 실제 HTTP는 현재 DB 권한·기존 claim 승격/강등·정지/삭제·불완전/변조 ACCESS·self 보호·canonical 변경·same-value audit·검색/전역summary/주경계·21행 페이징·하위집계·상태/refresh 경계·삭제 ACL·댓글/알림 masking을 확인했다. SELECT는 인증 포함 size1=5/size100=5/detail3, page 크기 증가에 따른 증가0이며14 이하다.
+- 사용자 삭제 전후 target 전체 하위 row(NULL/감사시각 포함) 및 파일 바이트 hash가 같았다. 합성 fixture는 blogs3/posts6/post_images1/post_tags2/comments5/post_likes1/universes5/notifications16/image_uploads1/refresh_tokens7로 공집합 보존을 피했다. 활성/삭제 blog·post, draft·공개범위, 삭제된 상대/댓글 제외를 정확한 수치로 대조했다.
+- Chrome1440px에서 profile 메뉴, 목록/상세, 검색·페이지/back/reload, 확인창/copy·canonical 변경·중복 클릭/오류 재시도, 권한 probe·복귀, 같은 SPA/document의 A→B 지연 목록/상세/mutation 응답 폐기를 실제로 검증했다. 최종 제품 PNG2개와 원본 디자인의 관리자/상세 화면 전환 검증을 보존했다. 독립 시각 판정은 아래 최종 review gate로 남긴다.
+- 검증 버전: product source424files SHA63d720de69a286736f77406cf3a33019ef4871b09cd6632ec7f483ce15b9602c, JARc6f381f72bf94528f54e3bb805403d23a0e119673c6183c9aff66af3ac0d9c52. source-after424match, main/QA helper/root runtime/Vite/JAR/BE XML/FE JSON117파일의 시작·종료 및 현재 hash 일치를 root가 직접 확인했다. live-runtime은 단일 API listener/PID/JAR/UTC를 연결한다.
+- 초기 진단1~6은 모두 실패 증거·합성 DB를 보존했다. default profile의 업로드404는 전용 test profile로 보완했고, packaged application-test 설정 부재를 확인·guard하여 사용자 local 설정을 읽지 않았다. 이후 실패는 이미지 본문/snapshot 불일치, 서명 문자를 append해 바이트가 안 바뀐 테스트, 누락 PUT 본문·기존 오류/캐시 계약 오인, selector/응답 상관관계·route 정리·원본 화면 선택 등 검증 도구 결함을 원인 재현 후 수정했다. 제품 보안·허용 기준을 완화하지 않았다.
+- 초기 QA static fix loop는 독립 scoped review6에서 CLEAN으로 닫혔다. runtime integration 수정은 실제 RED→GREEN과 focused signature/route 검증으로 확인했고, 전체 post-loop diff를 새 `m9_final_review`에 넘겼다. **현재 최종 whole-branch·시각 검토 및 PR/dev 통합은 진행 전/중이며 M9 통합 완료를 아직 주장하지 않는다.** 사용자 DB13307·기존 환경·업로드·M10·배포는 제외 상태다.

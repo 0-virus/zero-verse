@@ -2,27 +2,27 @@
 
 ## 현재 단계
 
-- 2026-11-11 M9 Task2 M1 fix round1 구현·자체 검증 완료, source frozen. root의 독립 시간대 평가 A 선택으로 지원 bootRun/test/JAR JVM을 UTC로 일치시켰다. JAR main은 non-UTC를 Spring/DB 시작 전에 명확 거부하며 시간대를 몰래 변경하지 않는다.
-- 실제 signup UTC 재검증에서 DATETIME(0) 반올림의 별도 실패도 발견했다. root 추가 ruling으로 SecondPrecisionAuditTimeProvider가 기존 JVM local audit의 소수 초만 버리도록 보정했다. provider timezone 전환/legacy reader/manual writer/기존행/schema 변경은 없다.
-- M1 이전 full107suites632tests0/0/0와 앞선 Task2 Approved는 당시 baseline이다. 신규 발견 뒤 독립 판정은 Needs fixes였으며 현재 수정본은 scoped 재검토·새 full을 기다린다.
+- M9 A-v2 backend 구현·M1 시간대/초 정밀도 수정 및 root 최종 자동 검증·격리 실제 인수 PASS. backend source는 `6a8763d`에서 동결됐고 root 인계 HEAD `3a2752e`까지 후속 변경은 QA 도구·기록이다. 최종 whole-branch 독립 검토와 PR/dev 통합은 대기한다.
+- Task2 독립 재검토 `.superpowers/sdd/M9-admin/task-2-review2.md`는 `/root/m9_backend_review`가 M1·DATETIME(0) 반올림을 ADDRESSED, Critical/Important/Minor 0, Approved로 판정했다. 이 scoped 승인을 M9 전체 최종 승인으로 확대하지 않는다.
 
 ## 진행 중
 
-- 최종 recovery-runtime-utc-green-2:15suites79tests/0failure0error0skip, bootJar PASS30s. host JAVA_TOOL_OPTIONS를 Asia/Seoul로 둔 상태에서 Gradle test의 명시 UTC가 실제 우선됨을 확인했다.
-- 실제 HTTP signup DB/DTO createdAt·updatedAt UTC before/after bounds, 즉시 joinedThisWeek1→2, .999999999 provider/실제 DATETIME(0) floor insert/update, 제어된 서로 다른 초 updatedAt strictafter/createdAt보존, non-UTC 기동거부2/UTC기동1 및 주변 Post/Discovery/Comment/Notification/Refresh 회귀 통과.
-- 최종 실제 JAR clean-env KST 실행은 UTC안내와 exit1, Spring배너/Hikari/DB 초기화 없음. 원문 KST signup RED와 UTC 정밀도 RED는 보존했다. 증거/명령/영향은 task2 report의 M1 round1 append, manifest는 build/m9-evidence/task2/recovery-runtime-utc-source-manifest.json이다.
+- root 최종 `build/m9-evidence/backend-final-2/summary.json` 및 XML 직접 재집계: 109 suites / 637 tests / failures 0 / errors 0 / skipped 0 / exit 0, `test bootJar` 로그 BUILD SUCCESSFUL in 2m 59s. JAR SHA-256 `c6f381f72bf94528f54e3bb805403d23a0e119673c6183c9aff66af3ac0d9c52`.
+- root 실제 HTTP/DB/Chrome 인수 `build/m9-acceptance-20261111-174413/evidence.json`: 396 PASS / 0 FAIL / 0 NOT_RUN, requiredNotRun/requiredFailed 빈 배열. current DB ACTIVE ADMIN 재검증, self 보호, user-only soft delete·하위 row/파일 보존·삭제 owner 이미지 UPLOAD_003/404를 포함한다. 실제 HTTP SELECT는 목록 size1=5 / size100=5 / 상세=3, 크기별 증가 0이다.
+- `source-after.json`은 424 files match=true. tested-version의 source SHA-256 `63d720de69a286736f77406cf3a33019ef4871b09cd6632ec7f483ce15b9602c`, 모든 source 개별 hash 및 runtime JAR hash를 직접 대조해 mismatch 0을 확인했다. runner-provenance before/after 117개 hash 동일, 현재 artifact hash도 모두 일치한다.
+- 지원 bootRun/test/JAR는 UTC 전제이며 non-UTC main은 Spring/DB 시작 전 거부한다. audit provider는 JVM local의 소수 초만 truncate하여 DATETIME(0) 미래 반올림을 방지한다. 과거 107 suites/632 tests와 targeted 79건은 역사 증거이며 최신 637건에 합산하지 않는다.
 
 ## 다음 작업
 
-- root에 Gradle 실행권 반환. 독립 scoped 재검토와 최종 source freeze 이후 root 새 full·bootJar, 합성 실제 API/Chrome 인수, 승인된 dev 통합을 수행한다. 기존632와 신규79를 합쳐 새 전체PASS로 표현하지 않는다.
-- README는 root, PRD는 별도 소유자가 UTC runtime 전제와 역사 DATETIME 한계를 동기화한다. backend는 이 문서를 편집하지 않았다.
+- `/root/m9_final_review`의 최종 whole-branch/실제 증거/시각 독립 판정 후 root가 PR·승인된 dev 통합을 진행한다. merge 완료 SHA·검증을 전달받으면 backend 역할 기록만 최종 동기화한다.
+- 신규 backend 기능·추가 검증 실행은 배정되지 않았다. 제품 source freeze와 root 단일 runner를 유지한다.
 
 ## 차단 요인
 
-- M1 자체 targeted의 남은 실패는 없다. 독립 재검토/최종 full·인수·dev 통합은 후속 gate다.
-- 영향은 BaseEntity 상속11entity의 앞으로 생성·수정되는 createdAt/updatedAt precision이다. 같은 초 updatedAt 동일은 기존 DATETIME(0) 정밀도 한계다. 기존 DATETIME은 provenance가 없어 실제 사용자 DB 시간대 전환·재해석·일괄 ±9h 보정은 별도 조사/결정 전까지 금지한다.
-- 사용자 DB13307·환경·업로드·기존행·schema·legacy reader/manual writer·FE/QA/Git은 변경하지 않았다. 운영 bootstrap/전역 revoke/M10/배포는 범위 밖이다.
+- backend 수정 미해결 실패는 없다. 최종 독립 승인·PR/dev merge는 아직 완료로 기록하지 않는다.
+- RISK-0021: 기존 DATETIME은 기록 시간대 provenance가 없으므로 역사 시각 호환성이나 실사용 DB UTC 전환 안전성을 보장하지 않는다. 기존 DB 적용·시각 재해석·일괄 ±9h 보정은 별도 조사/결정 전 제외한다. 같은 초 updatedAt 동일은 기존 DATETIME(0) 정밀도 한계다.
+- 사용자 DB13307·환경·업로드·기존행/schema 보정, 운영 bootstrap/전역 revoke, S3/M10/배포는 이번 완료 범위가 아니다. 이 기록 작업은 제품·테스트·Gradle·runtime·DB·Git mutation을 수행하지 않았다.
 
 ## 갱신 시각
 
-2026-11-11 15:35 KST · `/root/m9_backend_recovery` (M1 round1 source frozen, Gradle root 반환)
+2026-11-11 17:50 KST · `/root/m9_backend_records` (원문 증거 read-only 대조·역할 기록만 동기화)

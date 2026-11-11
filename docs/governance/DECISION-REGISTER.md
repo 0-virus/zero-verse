@@ -35,3 +35,10 @@ M4 현재 실행 판단에는 마지막 `M4-20261003-local`을 적용한다. 이
 | M8-20261110-policy | 2026-11-10 | 전체 이력·생성/재행동·권한상실·읽음·갱신·소급제외 9개 제품 정책 | HIGH | APPROVED | 사용자 `모두 권고안으로 진행하자`; 구체 기술 계약/실행 승인은 별도 | [회의 §2](meetings/M8-20261110-notifications.md), [M8 계획](../worklog/M8-notifications.md) |
 | M8-20261110-notifications | 2026-11-10 | A-v2 알림 API·생성 원자성·fan-out/잠금·V6인덱스·보안·화면/검증 | HIGH | APPROVED | 사용자 `A-v2 전체 승인`; 구현·독립QA·실제인수·dev통합 실행 | [회의 §9~10](meetings/M8-20261110-notifications.md#9-a-v2--구체-계약실행-승인-대상), [M8 계획](../worklog/M8-notifications.md) |
 | ADR-0007 | 2026-11-10 | M8 알림의 전체이력·동기원자성·권한표현·정렬잠금·API/DB 계약 | HIGH | ACCEPTED | 사용자 A-v2 전체 승인 내용을 지속 계약으로 보존 | [ADR-0007](decisions/ADR-0007-notifications-contract.md), [회의 §9~10](meetings/M8-20261110-notifications.md) |
+
+## 2026-11-11 M9 관리자 준비
+
+| ID | 날짜 | 안건 | 등급 | 상태 | 결정 근거 | 문서 |
+|---|---|---|---|---|---|---|
+| M9-20261111-admin | 2026-11-11 | 관리자 현재권한·목록/통계·역할/상태·user soft delete·화면/인수 | HIGH | APPROVED | 사용자 `A-v2 전체 승인`; 독립3인 보완 A-v2 §10/10.1 및 Task1~5 실행 | [회의 §11](meetings/M9-20261111-admin.md), [계획](../worklog/M9-admin.md) |
+| ADR-0008 | 2026-11-11 | M9 관리자 현재권한·조회/통계·self보호·soft delete·검증 계약 | HIGH | ACCEPTED | 사용자 A-v2 전체 승인 | [ADR-0008](decisions/ADR-0008-admin-contract.md) |

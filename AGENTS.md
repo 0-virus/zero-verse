@@ -181,3 +181,9 @@ U0만 승인된 검증 의존성: `gradle/u0`의 AWS SDK Java2 S3/BOM `2.49.6`, 
 ### 2026-11-10 M8 실행 결정
 
 사용자는 M8 알림 A-v2와 구현·독립 QA·dev 통합을 전체 승인했다. 현재 범위·API/DB/권한·잠금 계약은 `docs/governance/meetings/M8-20261110-notifications.md` §9~10, `docs/governance/decisions/ADR-0007-notifications-contract.md`, REQUIREMENTS §6.11-A, PRD §9.11, 실행계획은 `docs/worklog/M8-notifications.md`를 따른다. M5/M6의 알림 미생성은 당시 단계의 경계이며 M8에서 실제 생성으로 연결한다. M7 읽기 무부작용은 유지한다. M9는 이번 실행에 포함하지 않으며 사용자 파일·기존 DB·업로드는 보존한다.
+
+### 2026-11-11 M9 착수
+
+사용자 `m9 완료를 목표로 착수해줘`에 따라 M9 관리자 계획·독립 심의·승인된 구현·QA·dev 통합을 시작한다. 현재 실행/승인 상태는 `docs/worklog/M9-admin.md`와 `docs/governance/meetings/M9-20261111-admin.md`를 따른다. M8 당시의 M9 제외는 과거 실행 경계이며 이번 착수 지시로 대체된다. 구체 HIGH 계약은 심의 후 사용자 승인 전 구현하지 않는다. M10·배포·사용자 DB 적용은 이번 범위에 포함하지 않는다.
+
+사용자가 M9 `A-v2 전체 승인`으로 회의 §5·§10/10.1과 Task1~5 구현·독립QA·실제인수·dev통합을 승인했다. 현재 계약은 REQUIREMENTS §6.13-A·ADR-0008·PRD M9를 따른다. 사용자만 soft delete/하위이력 보존, 현재 ACTIVE ADMIN 검증, 자기권한회수/정지/삭제금지, lastAccess 미기록·승인된 삭제카피를 적용한다.

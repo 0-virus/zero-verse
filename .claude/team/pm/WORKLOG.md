@@ -446,3 +446,30 @@
 - 최종 브리프에서 현재 M8 §10의 `구현·자동검증·독립 QA·실제 인수·dev 통합은 별도 완료 gate이며 아직 완료를 주장하지 않는다` 문구가 최종 상태와 충돌함을 확인했다. 해당 문장을 QA §10 `Ready to merge: Yes`, run3 `323 PASS / 0 FAIL / 0 NOT_RUN`, PR #14 `dev` 통합 완료 근거로 교체했다.
 - 역사적 승인·계약 설명의 “별도 완료 gate” 문구는 당시 심의/계약 의미를 보존하기 위해 유지했고, 현재 M8 상태 문구와 충돌하지 않는지 재검색했다. PM STATE의 M8 gate 문구도 모두 통과한 상태로 정정했다.
 - 검증: PRD·STATE·WORKLOG 재독 및 `git diff --check`를 실행한다. 제품 코드·QA·runtime·Git은 수정하지 않는다.
+
+## 2026-11-11 12:58:40 KST — M9 착수·PM 상태 정합화
+
+- **한 일**: 헌법 → root `AGENTS.md`/`CLAUDE.md` → PM 지침/STATE 순서로 읽고, `docs/worklog/M9-admin.md`, M9 회의 상태, REQUIREMENTS §6.13, PRD 관리자 화면·M9 마일스톤, 실제 Git을 직접 대조했다. 사용자 `m9 완료를 목표로 착수해줘`에 따른 현재 상태를 M9 `REVIEWING`으로 정리했다.
+- **M8 정정**: 이전 PM STATE의 `b80ede0` docs-only closeout 대기와 현재 `HEAD` 주장은 낡은 상태였다. 실제 Git은 `feature/M9-admin`, `HEAD=dev=origin/dev=848d272`이며 `2cc4ff9` M8 closeout과 `56ea133` M8 상태 정합화가 존재하고, `848d272`가 그 후속 커밋임을 확인했다. M8 `docs/worklog/M8-notifications.md`의 `[머지·완료]`도 재확인했다.
+- **M9 정합화**: `docs/worklog/M9-admin.md`와 회의의 상태가 계획·심의 REVIEWING, 구체 HIGH 계약 사용자 승인 대기, 제품 구현 미착수임을 확인했다. `git diff --name-only -- src frontend`는 출력이 없었고 기존 Admin scaffold/router와 ADMIN 오류코드만 선행 산출물로 보존한다. 독립 council의 결론은 사용하지 않고 회의의 REVIEWING 상태·정본·Git 사실만 반영했다.
+- **PM 산출물**: `.claude/team/pm/STATE.md`를 현재 M9 상태로 덮어썼다. PRD는 수정하지 않았다. 승인 후 동기화 후보를 PRD §5.13·§7·§9·§10·§11·§13으로 표시하고, soft delete/공개 효과·deleted 노출·SUSPENDED ADMIN·self 보호/오류·idempotency·lastAccessAt·summary 시간대·refresh 폐기를 `권고(미확정)`/차단 요인으로 남겼다.
+- **검증**: `git branch --show-current`, `git status --short`, `git log --oneline -10`, `git rev-parse HEAD/dev/origin/dev`, `git show -s 2cc4ff9 56ea133 848d272`, `git diff --name-only -- src frontend`, PRD/REQUIREMENTS/M9 worklog·회의 검색을 실행했다. PM STATE/WORKLOG 재독과 `git diff --check -- .claude/team/pm/STATE.md .claude/team/pm/WORKLOG.md`도 오류 없이 통과했다. 제품 테스트·build·runtime·DB·Git 조작은 하지 않았다.
+- **미해결**: M9 A-v2·실행계획의 사용자 승인, 그 후 REQUIREMENTS/governance 정본 확정과 PM PRD 동기화, backend/frontend 구현, 독립 QA·실제 인수·`dev` 통합이 남아 있다. M10·배포·사용자 DB 적용은 범위 밖이다.
+
+## 2026-11-11 13:03:54 KST — M9 구체 계약·실행 승인 대기 정합화
+
+- **한 일**: root가 갱신한 M9 회의 §10/§10.1 A-v2와 Task1~5 사용자 비동기 승인 요청 제출 상태를 확인하고 PM STATE를 `REVIEWING`에서 `USER_DECISION_REQUIRED`로 동기화했다. A-v2는 아직 사용자 승인 전 제안으로 유지했다.
+- **심의 상태**: 독립 Product/Architecture/Delivery 결과는 각각 `APPROVE_WITH_CHANGES/HIGH`(확신도 89/93/88)이다. 이 결과와 A-v2의 구체 계약은 승인 대기 근거로만 기록하며 제품 결정으로 확정하지 않는다.
+- **Git 정합화**: 현재 branch는 `feature/M9-admin`, `HEAD=e5c38cd`, `dev=origin/dev=848d272`다. `e5c38cd`는 외부 사용자 gitignore 변경을 보존한 커밋이며 제품 변경은 없다. M9 구현·테스트·runtime은 미착수다.
+- **PM 산출물**: `.claude/team/pm/STATE.md`만 현재 승인 대기·HEAD 상태로 갱신하고 이 항목을 append했다. PRD·제품·QA·governance는 수정하지 않았다. 승인 전 PRD 동기화 후보 §5.13/§7/§9/§10/§11/§13과 미확정 충돌은 그대로 유지했다.
+- **검증**: `git branch --show-current`, `git rev-parse HEAD`, `git rev-parse dev`, `git log -3 --oneline`, M9 회의 §10/§10.1·`USER_DECISION_REQUIRED` 검색을 실행했다. 추가 테스트·build·runtime·DB 조사는 하지 않았다.
+- **미해결**: 사용자 M9 A-v2·Task1~5 비동기 승인 응답 대기. 무응답을 승인으로 간주하지 않으며, 승인 후에만 PM PRD 동기화와 구현 gate를 진행한다.
+
+## 2026-11-11 13:19:47 KST — M9 A-v2 승인·Task1 PRD 정본 동기화
+
+- **근거**: 사용자 `A-v2 전체 승인`을 M9 회의 §11의 승인으로 확인하고, REQUIREMENTS §6.13-A, ADR-0008, `docs/worklog/M9-admin.md`의 승인 Task1 및 기존 PRD 관리자 화면/마일스톤을 대조했다. 회의 상태는 `APPROVED`이며 승인 자체를 구현·검증 PASS로 간주하지 않는다.
+- **PRD 동기화**: PM 소유 `docs/PRD.md` §5.13에 정확한 5개 API/DTO·DB current ACTIVE ADMIN/no-store·deleted 포함 ID 정렬 lock·RR/batch/query bound·user-only soft delete·기존 상태/ACL/refresh 경계를 반영했다. §7 관리자 목록/상세에 current probe·stale 격리·lastAccess 기록 없음·승인 삭제 카피와 디자인 override를 반영했고, §9.12에 승인 결정 로그, §10 M9 실행 순서, §11 M9 검증 매트릭스, §13 확정 항목/§13.5 현행 상태를 추가했다.
+- **반영한 승인 경계**: 동일값 성공·audit 무변경, self role/status/delete `ADMIN_002/400`, missing/deleted/repeated DELETE `USER_001/404`, KST 주간 summary와 명시 RR/SELECT≤14·size1→100 증가0, 정지 기존 상태표·PUBLIC·알림 GET read-only, refresh 전역 revoke 비확대, bootstrap/실사용 DB 승격·새 library/migration·M10·배포 제외를 확정 정본에 기록했다. 과거 M9 미승인 문구는 회의 이력으로 덮어쓰지 않았다.
+- **STATE 동기화**: PM `STATE.md`를 `APPROVED`·Task1 완료·Task2~5 실행/완료 gate 대기로 갱신했다. 현재 branch `feature/M9-admin`, `HEAD=e5c38cd`, `dev=origin/dev=848d272`를 유지한다.
+- **소유권·검증**: 이번 턴은 PM 소유 `docs/PRD.md`, `.claude/team/pm/STATE.md`, `.claude/team/pm/WORKLOG.md`만 편집했다. 제품 코드·타 역할·governance·Git은 수정하지 않았고, 테스트/build/runtime/DB는 실행하지 않았다. 변경 후 PRD/STATE/WORKLOG 재독 및 `git diff --check`를 수행했고 오류 없이 통과했다.
+- **미해결**: Task2 backend·Task3 frontend 구현/자동검증, Task4 독립 QA·실제 API/Chrome 1440px 인수, Task5 root PR/`dev` merge/tree 대조/runtime 정리가 남아 있다. M9 최종 PASS는 해당 gate 후에만 기록한다.

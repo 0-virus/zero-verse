@@ -557,3 +557,22 @@
 - Task 1-6 complete: BE full 599 + final covering 5; FE full 439 + final covering 8; HTTP/Chrome 323 PASS. No claim that the final full 441 FE suite was executed. Identical product tree does not require duplicate full testing.
 - Stopped this run API18088 PID32743, Vite5178 PID24738 and zeroverse-m8-mysql84. Synthetic database/uploads/evidence/screenshots preserved. User DB13307, environment, uploads and four untracked root files preserved.
 - Role STATE/WORKLOG and PRD are synchronized to M8 completion. M9 remains excluded. Execution state: WAITING FOR USER after M8 completion; no new scope under project-lead.
+
+## 2026-11-11 KST — M9 사용자 착수 지시
+
+- 사용자 `m9 완료를 목표로 착수해줘`로 M9 계획·심의·승인된 구현·독립 QA·dev 통합 지휘를 시작했다. M10/배포/사용자 DB 적용은 별도 범위다.
+- brief 재확인: main/dev/origin refs `848d272`, 기존 `.gitignore` 1건 사용자 변경 보존, M8 완료 및 보존 검증 결과 유지. `feature/M9-admin`을 dev에서 생성했다.
+- backend `m9_backend_prep`는 권한/잠금/soft delete/API 기술 조사, frontend `m9_frontend_prep`는 디자인/화면/guard 조사와 자기 역할 기록만 소유한다. root는 M9 worklog/governance/Git 단일 소유다.
+- 현 상태 진행(계약 준비). 독립 3인 심의와 HIGH 사용자 구체 승인 전 제품 구현은 보류한다.
+
+## 2026-11-11 KST — M9 독립 심의 종합·구체 승인 대기
+
+- Product89/Architecture93/Delivery88 모두 APPROVE_WITH_CHANGES/HIGH. 주 에이전트가 source/current auth/상태/잠금/soft delete/디자인을 직접 대조하고 회의 §10/10.1 A-v2로 보완했다.
+- BE/FE 조사와 QA 인수기준 및 PM 준비 기록을 확인했다. 현재 `feature/M9-admin`/848d272, 제품 변경0, 기존 사용자 `.gitignore` 변경 보존. 루트 지침/레지스터/위험/worklog를 현재 M9 준비에 연결했다.
+- 상태 대기(사용자 구체 A-v2 승인). 사용자에게 결정 근거와 삭제/self보호/lastAccess/현재권한·통계 정의 및 Task1~5 구현·QA·dev통합을 함께 요청한다. 제품 코드·DB/migration/runtime은 아직 변경하지 않았다.
+
+## 2026-11-11 KST — M9 사용자 전체 승인·구현 실행
+
+- 사용자 `A-v2 전체 승인` 확인, 회의 §11/ADR-0008/REQUIREMENTS §6.13-A·PM PRD §9.12 등 정본동기화 Task1완료. 실행 진행.
+- backend m9_backend_impl(Task2), frontend m9_frontend_impl(Task3), QA m9_qa_prep(Task4harness), PM m9_pm_prep(Task1정본)을 독립소유로 배정. root Git/runtime/worklog/검증종합 단독소유.
+- 실제 HEAD e5c38cd(외부 사용자gitignore커밋) 보존. shared featurecheckout, M9전용13319/18089/5179와 합성계정만사용. 사용자 DB13307/환경/업로드는 접근하지않음. M10·배포는 제외.

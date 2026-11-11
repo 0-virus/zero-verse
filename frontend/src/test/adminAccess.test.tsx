@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { AuthProvider } from '../lib/authContext';
 import { resetApiClient } from '../lib/apiClient';
 import { AdminAccessProvider, useAdminAccess } from '../features/admin/AdminAccessProvider';
@@ -93,6 +93,16 @@ function renderRoute(user: AuthUser | null, adminResponse: Response | null) {
   return fetchMock;
 }
 
+function RouteSwitcher() {
+  const navigate = useNavigate();
+  return (
+    <div>
+      <button type="button" onClick={() => navigate('/outside')}>outside</button>
+      <button type="button" onClick={() => navigate('/admin')}>admin</button>
+    </div>
+  );
+}
+
 describe('AdminAccessProvider', () => {
   beforeEach(() => resetApiClient());
   afterEach(() => {
@@ -144,5 +154,107 @@ describe('AdminAccessProvider', () => {
     renderRoute(USER, response);
 
     await waitFor(() => expect(screen.getByText('관리자 민감 화면')).toBeInTheDocument());
+  });
+
+  it('denied 상태도 관리자 경로 재진입에서 current probe로 승격한다', async () => {
+    let allowed = false;
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/auth/refresh')) return envelope({ accessToken: 't', tokenType: 'Bearer', expiresIn: 3600 });
+      if (url.includes('/auth/me')) return envelope(USER);
+      if (url.includes('/api/v1/admin/users')) {
+        return allowed
+          ? envelope({ users: { items: [], page: 0, size: 1, totalElements: 1, totalPages: 1, hasNext: false, hasPrevious: false }, summary: { totalUsers: 1, joinedThisWeek: 0, suspendedUsers: 0 } })
+          : envelope(null, false, { code: 'ADMIN_001', message: '관리자 권한이 필요합니다.', details: [] });
+      }
+      return envelope(null);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/admin']}>
+        <AuthProvider>
+          <AdminAccessProvider>
+            <RouteSwitcher />
+            <Routes>
+              <Route path="/admin" element={<AdminRoute><p>관리자 민감 화면</p></AdminRoute>} />
+              <Route path="/outside" element={<p>outside</p>} />
+            </Routes>
+          </AdminAccessProvider>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText('관리자 화면에 접근할 수 없습니다')).toBeInTheDocument());
+    allowed = true;
+    await user.click(screen.getByRole('button', { name: 'outside' }));
+    await user.click(screen.getByRole('button', { name: 'admin' }));
+    await waitFor(() => expect(screen.getByText('관리자 민감 화면')).toBeInTheDocument());
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/api/v1/admin/users')).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('허용된 관리자 화면은 브라우저 focus 복귀에서 권한을 다시 확인한다', async () => {
+    let allowed = true;
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/auth/refresh')) return envelope({ accessToken: 't', tokenType: 'Bearer', expiresIn: 3600 });
+      if (url.includes('/auth/me')) return envelope(USER);
+      if (url.includes('/api/v1/admin/users')) {
+        return allowed
+          ? envelope({ users: { items: [], page: 0, size: 1, totalElements: 1, totalPages: 1, hasNext: false, hasPrevious: false }, summary: { totalUsers: 1, joinedThisWeek: 0, suspendedUsers: 0 } })
+          : envelope(null, false, { code: 'ADMIN_001', message: '관리자 권한이 필요합니다.', details: [] });
+      }
+      return envelope(null);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(
+      <MemoryRouter initialEntries={['/admin']}>
+        <AuthProvider>
+          <AdminAccessProvider>
+            <Routes>
+              <Route path="/admin" element={<AdminRoute><p>관리자 민감 화면</p></AdminRoute>} />
+            </Routes>
+          </AdminAccessProvider>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText('관리자 민감 화면')).toBeInTheDocument());
+    allowed = false;
+    fireEvent(window, new Event('focus'));
+    await waitFor(() => expect(screen.getByText('관리자 화면에 접근할 수 없습니다')).toBeInTheDocument());
+    expect(screen.queryByText('관리자 민감 화면')).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/api/v1/admin/users')).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('visible 복귀 이벤트도 허용된 관리자 화면의 current probe를 갱신한다', async () => {
+    let allowed = true;
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/auth/refresh')) return envelope({ accessToken: 't', tokenType: 'Bearer', expiresIn: 3600 });
+      if (url.includes('/auth/me')) return envelope(USER);
+      if (url.includes('/api/v1/admin/users')) {
+        return allowed
+          ? envelope({ users: { items: [], page: 0, size: 1, totalElements: 1, totalPages: 1, hasNext: false, hasPrevious: false }, summary: { totalUsers: 1, joinedThisWeek: 0, suspendedUsers: 0 } })
+          : envelope(null, false, { code: 'ADMIN_001', message: '관리자 권한이 필요합니다.', details: [] });
+      }
+      return envelope(null);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(
+      <MemoryRouter initialEntries={['/admin']}>
+        <AuthProvider>
+          <AdminAccessProvider>
+            <Routes>
+              <Route path="/admin" element={<AdminRoute><p>관리자 민감 화면</p></AdminRoute>} />
+            </Routes>
+          </AdminAccessProvider>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText('관리자 민감 화면')).toBeInTheDocument());
+    allowed = false;
+    fireEvent(document, new Event('visibilitychange'));
+    await waitFor(() => expect(screen.getByText('관리자 화면에 접근할 수 없습니다')).toBeInTheDocument());
+    expect(screen.queryByText('관리자 민감 화면')).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/api/v1/admin/users')).length).toBeGreaterThanOrEqual(2);
   });
 });

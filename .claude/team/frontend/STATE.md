@@ -2,11 +2,11 @@
 
 > 덮어쓰기 스냅샷. 시간순 이력은 `WORKLOG.md`, 마일스톤 이력은 `docs/worklog/**`를 본다.
 
-마지막 갱신: 2026-11-11 14:37:55 KST
+마지막 갱신: 2026-11-11 14:56:29 KST
 
 ## 현재 단계
 
-- M9 Task3 frontend 관리자 guard·목록·상세 구현을 완료하고 root 제품 동결/독립 review에 인계할 준비가 됐다.
+- M9 Task3 frontend 관리자 guard·목록·상세 구현과 review1 F1~F4 fix round1을 완료하고 root 제품 동결/독립 re-review에 인계할 준비가 됐다.
 - 사용자 승인 A-v2와 `task-3-brief.md`, REQUIREMENTS §6.13-A, M9 회의 §5·§10/10.1·§11, ADR-0008의 frontend 경계를 구현했다. backend DTO/OpenAPI·DB·Git·QA 파일은 수정하지 않았다.
 - M8 frontend는 이전 마일스톤에서 완료·통합됐다. 상세 이력과 근거는 `WORKLOG.md`에 보존한다.
 
@@ -38,6 +38,13 @@
 - 프로필 이름 클릭은 기존 `/settings` 링크 호환을 위해 default navigation을 막고 메뉴를 토글한다. 프로필 메뉴의 `관리자` link는 current DB probe가 `allowed`가 된 뒤에만 나타난다. root actual browser에서 이 흐름과 권한 loss를 확인해야 한다.
 - build의 >500 kB chunk 경고는 기존 번들 경고이며 이번 범위에서 의존성/코드 분할을 추가하지 않았다.
 
+## Fix round1 현재 상태
+
+- `AdminRoute`는 admin 경로 진입 및 `focus`·`pageshow`·visible `visibilitychange`에서 current probe를 실행한다. 일반 probe는 새 session generation으로 민감 child를 숨기며, detail target USER_001 재검증은 `preserveAllowed`로 target 404 owner를 유지한다.
+- `AdminUserPage`는 mounted/target/operation/access snapshot으로 target7의 늦은 PUT/canonical/retry/delete navigate가 target8에 도달하지 않게 한다. actor USER_001은 guard denied로, target USER_001은 유한 target 404로 정착한다.
+- `AdminPage`는 transient 오류에서 이전 성공 행·pagination을 보존한다. F5 테이블 열 track/셀 간격 차이는 deferred visual ledger이며 root/QA 1440px에서 확인한다.
+- Fix focused: `adminAccess/adminPages/adminRaces/router` 4 files/37 tests passed, exit 0 (`frontend/.m9-evidence/fix1-focused-green-2.log`). diff check exit 0. 이번 fix round에는 full/lint/build를 반복하지 않았다.
+
 ## 다음 작업
 
-- 이 역할은 제품 변경을 동결한다. root가 report·실제 HTTP/1440px·독립 review를 수행한 뒤 결함이 frontend 소유로 재배정될 때만 수정한다.
+- 이 역할은 제품 변경을 동결한다. root가 fix commit 후 실제 HTTP/1440px lifecycle·프로필 메뉴 검증과 독립 review1 재검토를 수행한다. frontend 결함이 재배정될 때만 수정한다.

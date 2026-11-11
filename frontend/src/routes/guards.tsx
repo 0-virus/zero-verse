@@ -109,8 +109,24 @@ export function AdminRoute({ children }: { children: ReactNode }) {
   const access = useAdminAccess();
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated && access.status === 'idle') void access.probe();
-  }, [access.probe, access.status, isAuthenticated, isLoading]);
+    if (!isLoading && isAuthenticated) void access.probe();
+  }, [access.probe, isAuthenticated, isLoading, location.pathname]);
+
+  useEffect(() => {
+    if (isLoading || !isAuthenticated) return undefined;
+    const revalidate = () => {
+      if (document.visibilityState === 'hidden') return;
+      void access.probe();
+    };
+    window.addEventListener('focus', revalidate);
+    window.addEventListener('pageshow', revalidate);
+    document.addEventListener('visibilitychange', revalidate);
+    return () => {
+      window.removeEventListener('focus', revalidate);
+      window.removeEventListener('pageshow', revalidate);
+      document.removeEventListener('visibilitychange', revalidate);
+    };
+  }, [access.probe, isAuthenticated, isLoading, location.pathname]);
 
   if (isLoading) return <GuardPending />;
   if (!isAuthenticated) {

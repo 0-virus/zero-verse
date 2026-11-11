@@ -14,6 +14,10 @@ import { adminApi } from './adminApi';
 
 export type AdminAccessStatus = 'idle' | 'loading' | 'allowed' | 'denied' | 'error';
 export type AdminErrorBoundary = 'permission' | 'target' | 'transient';
+export interface AdminProbeOptions {
+  /** target USER_001을 확인하는 동안 이미 허용된 route를 unmount하지 않는다. */
+  preserveAllowed?: boolean;
+}
 
 export interface AdminAccessValue {
   status: AdminAccessStatus;
@@ -21,11 +25,11 @@ export interface AdminAccessValue {
   error: unknown | null;
   generation: number;
   viewerId: number | null;
-  probe: () => Promise<boolean>;
+  probe: (options?: AdminProbeOptions) => Promise<boolean>;
   retry: () => Promise<boolean>;
   invalidate: (error?: unknown) => void;
   isCurrent: (generation: number, viewerId?: number | null) => boolean;
-  revalidateAfterError: (error: unknown) => Promise<AdminErrorBoundary>;
+  revalidateAfterError: (error: unknown, options?: AdminProbeOptions) => Promise<AdminErrorBoundary>;
 }
 
 const AdminAccessContext = createContext<AdminAccessValue | null>(null);
@@ -76,6 +80,7 @@ export function AdminAccessProvider({ children }: { children: ReactNode }) {
   const authKey = authKeyFor(isAuthLoading, isAuthenticated, auth?.sessionExpired ?? false, viewerId);
   const [status, setStatus] = useState<AdminAccessStatus>('idle');
   const [error, setError] = useState<unknown | null>(null);
+  const statusRef = useRef<AdminAccessStatus>('idle');
   const accountGeneration = useRef(0);
   const requestGeneration = useRef(0);
   const sessionGeneration = useRef(0);
@@ -90,6 +95,7 @@ export function AdminAccessProvider({ children }: { children: ReactNode }) {
     accountKeyRef.current = authKey;
     viewerIdRef.current = viewerId;
     inFlight.current = null;
+    statusRef.current = 'idle';
     setStatus('idle');
     setError(null);
   }, [authKey, viewerId]);
@@ -98,21 +104,27 @@ export function AdminAccessProvider({ children }: { children: ReactNode }) {
     requestGeneration.current += 1;
     sessionGeneration.current += 1;
     inFlight.current = null;
+    statusRef.current = 'denied';
     setStatus('denied');
     setError(nextError ?? null);
   }, []);
 
-  const probe = useCallback(async (): Promise<boolean> => {
+  const probe = useCallback(async (options: AdminProbeOptions = {}): Promise<boolean> => {
     if (isAuthLoading || !isAuthenticated || viewerId === null) return false;
     const key = `${accountGeneration.current}:${viewerId}`;
     if (inFlight.current?.key === key) return inFlight.current.promise;
+    const preserveAllowed = options.preserveAllowed === true && statusRef.current === 'allowed';
     const snapshot = {
       account: accountGeneration.current,
       request: ++requestGeneration.current,
       viewerId,
     };
 
-    setStatus('loading');
+    if (!preserveAllowed) {
+      sessionGeneration.current += 1;
+      statusRef.current = 'loading';
+      setStatus('loading');
+    }
     setError(null);
     const promise = (async () => {
       try {
@@ -125,6 +137,7 @@ export function AdminAccessProvider({ children }: { children: ReactNode }) {
         ) {
           return false;
         }
+        statusRef.current = 'allowed';
         setStatus('allowed');
         setError(null);
         return true;
@@ -136,7 +149,9 @@ export function AdminAccessProvider({ children }: { children: ReactNode }) {
         ) {
           return false;
         }
-        setStatus(isAuthBoundaryError(caught) ? 'denied' : 'error');
+        const nextStatus = isAuthBoundaryError(caught) ? 'denied' : 'error';
+        statusRef.current = nextStatus;
+        setStatus(nextStatus);
         setError(caught);
         return false;
       } finally {
@@ -154,13 +169,13 @@ export function AdminAccessProvider({ children }: { children: ReactNode }) {
   }, [viewerId]);
 
   const revalidateAfterError = useCallback(
-    async (caught: unknown): Promise<AdminErrorBoundary> => {
+    async (caught: unknown, options: AdminProbeOptions = {}): Promise<AdminErrorBoundary> => {
       if (isAdminPermissionError(caught)) {
         invalidate(caught);
         return 'permission';
       }
       if (!isAdminActorNotFound(caught)) return 'transient';
-      const current = await probe();
+      const current = await probe(options);
       if (current) return 'target';
       return 'permission';
     },

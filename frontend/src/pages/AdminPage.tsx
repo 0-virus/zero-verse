@@ -237,12 +237,12 @@ export function AdminPage() {
           )}
         </div>
       )}
-      {response && !currentView.error && users && users.items.length === 0 && (
+      {response && users && users.items.length === 0 && (
         <div className="border-[3px] border-ink bg-surface px-6 py-12 text-center text-[13px] text-text-muted shadow-panel">
           검색 결과가 없습니다.
         </div>
       )}
-      {response && !currentView.error && users && users.items.length > 0 && (
+      {response && users && users.items.length > 0 && (
         <>
           <Table columns={columns} rows={users.items} rowKey={(user) => String(user.id)} />
           <div className="mt-6">

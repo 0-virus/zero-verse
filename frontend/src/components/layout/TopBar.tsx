@@ -115,7 +115,7 @@ export function TopBar({ nickname }: { nickname?: string | null }) {
     setNotificationOpen(false);
     const nextOpen = !profileOpen;
     setProfileOpen(nextOpen);
-    if (nextOpen && isSignedIn && adminAccess && adminAccess.status !== 'allowed') {
+    if (nextOpen && isSignedIn && adminAccess) {
       void adminAccess.probe();
     }
   };

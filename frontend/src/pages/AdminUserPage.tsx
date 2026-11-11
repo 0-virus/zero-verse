@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -18,6 +18,13 @@ type Notice = { message: string; retry?: () => Promise<void> } | null;
 type PendingChange =
   | { kind: 'role'; role: AdminRole }
   | { kind: 'status'; status: AdminStatus };
+type AdminOperationSnapshot = {
+  targetId: number;
+  targetGeneration: number;
+  operationGeneration: number;
+  accessGeneration: number;
+  viewerId: number | null;
+};
 
 function parseUserId(value: string | undefined): number | null {
   if (!value || !/^\d+$/u.test(value)) return null;
@@ -66,12 +73,39 @@ export function AdminUserPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [pendingChange, setPendingChange] = useState<PendingChange | null>(null);
   const [retryKey, setRetryKey] = useState(0);
+  const mountedRef = useRef(false);
+  const targetGenerationRef = useRef(0);
+  const operationGenerationRef = useRef(0);
 
   const isSelf = detail !== null && auth?.user?.id === detail.id;
   const canMutate = !isSelf && detail !== null && access.status === 'allowed' && mutation === null;
   const actionAvailable = canMutate && pendingChange === null;
 
+  function isPageCurrent(snapshot: AdminOperationSnapshot) {
+    return (
+      mountedRef.current &&
+      snapshot.targetId === userId &&
+      snapshot.targetGeneration === targetGenerationRef.current &&
+      access.isCurrent(snapshot.accessGeneration, snapshot.viewerId)
+    );
+  }
+
+  function isOperationCurrent(snapshot: AdminOperationSnapshot) {
+    return isPageCurrent(snapshot) && snapshot.operationGeneration === operationGenerationRef.current;
+  }
+
   useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      targetGenerationRef.current += 1;
+      operationGenerationRef.current += 1;
+    };
+  }, []);
+
+  useEffect(() => {
+    targetGenerationRef.current += 1;
+    operationGenerationRef.current += 1;
     setDetail(null);
     setNotice(null);
     setTargetMissing(false);
@@ -83,32 +117,42 @@ export function AdminUserPage() {
 
   useEffect(() => {
     if (access.status !== 'allowed' || userId === null) return undefined;
-    const generation = access.generation;
-    const viewerId = access.viewerId;
+    const operationSnapshot: AdminOperationSnapshot = {
+      targetId: userId,
+      targetGeneration: targetGenerationRef.current,
+      operationGeneration: ++operationGenerationRef.current,
+      accessGeneration: access.generation,
+      viewerId: access.viewerId,
+    };
     let cancelled = false;
     setLoading(true);
     setNotice(null);
     setTargetMissing(false);
     void adminApi.get(userId)
       .then((loaded) => {
-        if (cancelled || !access.isCurrent(generation, viewerId)) return;
+        if (cancelled || !isOperationCurrent(operationSnapshot)) return;
         setDetail(loaded);
         setSelectedRole(loaded.role);
         setLoading(false);
       })
       .catch(async (caught: unknown) => {
-        if (cancelled || !access.isCurrent(generation, viewerId)) return;
+        if (cancelled || !isOperationCurrent(operationSnapshot)) return;
         if (isAdminPermissionError(caught) || isAdminActorNotFound(caught)) {
-          const boundary = await access.revalidateAfterError(caught);
+          setDetail(null);
+          setLoading(true);
+          setTargetMissing(false);
+          const boundary = await access.revalidateAfterError(caught, { preserveAllowed: true });
+          if (!isOperationCurrent(operationSnapshot)) return;
           if (boundary === 'target') {
             setDetail(null);
+            setLoading(false);
             setTargetMissing(true);
           }
           return;
         }
         setLoading(false);
         setNotice({ message: adminAccessErrorMessage(caught), retry: async () => {
-          if (!access.isCurrent(generation, viewerId)) return;
+          if (!isOperationCurrent(operationSnapshot)) return;
           setRetryKey((value) => value + 1);
         } });
       });
@@ -121,20 +165,26 @@ export function AdminUserPage() {
     if (detail) setSelectedRole(detail.role);
   }, [detail]);
 
-  const refreshCanonical = async (generation: number, viewerId: number | null) => {
-    const canonical = await adminApi.get(userId as number);
-    if (!access.isCurrent(generation, viewerId)) return false;
+  const refreshCanonical = async (snapshot: AdminOperationSnapshot) => {
+    if (!isOperationCurrent(snapshot)) return false;
+    const canonical = await adminApi.get(snapshot.targetId);
+    if (!isOperationCurrent(snapshot)) return false;
     setDetail(canonical);
     setSelectedRole(canonical.role);
     return true;
   };
 
-  const handleMutationError = async (caught: unknown, generation: number, viewerId: number | null, retry: () => Promise<void>) => {
-    if (!access.isCurrent(generation, viewerId)) return;
+  const handleMutationError = async (caught: unknown, snapshot: AdminOperationSnapshot, retry: () => Promise<void>) => {
+    if (!isOperationCurrent(snapshot)) return;
     if (isAdminPermissionError(caught) || isAdminActorNotFound(caught)) {
-      const boundary = await access.revalidateAfterError(caught);
+      setDetail(null);
+      setLoading(true);
+      setTargetMissing(false);
+      const boundary = await access.revalidateAfterError(caught, { preserveAllowed: true });
+      if (!isOperationCurrent(snapshot)) return;
       if (boundary === 'target') {
         setDetail(null);
+        setLoading(false);
         setTargetMissing(true);
       }
       return;
@@ -144,19 +194,24 @@ export function AdminUserPage() {
 
   const changeRole = async (nextRole = selectedRole) => {
     if (!detail || !canMutate || nextRole === detail.role) return;
-    const generation = access.generation;
-    const viewerId = access.viewerId;
+    const snapshot: AdminOperationSnapshot = {
+      targetId: detail.id,
+      targetGeneration: targetGenerationRef.current,
+      operationGeneration: ++operationGenerationRef.current,
+      accessGeneration: access.generation,
+      viewerId: access.viewerId,
+    };
     const action = async () => {
-      if (!access.isCurrent(generation, viewerId)) return;
+      if (!isOperationCurrent(snapshot)) return;
       setNotice(null);
       setMutation('role');
       try {
-        await adminApi.changeRole(detail.id, nextRole);
-        await refreshCanonical(generation, viewerId);
+        await adminApi.changeRole(snapshot.targetId, nextRole);
+        await refreshCanonical(snapshot);
       } catch (caught) {
-        await handleMutationError(caught, generation, viewerId, action);
+        await handleMutationError(caught, snapshot, action);
       } finally {
-        if (access.isCurrent(generation, viewerId)) setMutation(null);
+        if (isOperationCurrent(snapshot)) setMutation(null);
       }
     };
     await action();
@@ -164,19 +219,24 @@ export function AdminUserPage() {
 
   const changeStatus = async (nextStatus: AdminStatus = detail?.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE') => {
     if (!detail || !canMutate) return;
-    const generation = access.generation;
-    const viewerId = access.viewerId;
+    const snapshot: AdminOperationSnapshot = {
+      targetId: detail.id,
+      targetGeneration: targetGenerationRef.current,
+      operationGeneration: ++operationGenerationRef.current,
+      accessGeneration: access.generation,
+      viewerId: access.viewerId,
+    };
     const action = async () => {
-      if (!access.isCurrent(generation, viewerId)) return;
+      if (!isOperationCurrent(snapshot)) return;
       setNotice(null);
       setMutation('status');
       try {
-        await adminApi.changeStatus(detail.id, nextStatus);
-        await refreshCanonical(generation, viewerId);
+        await adminApi.changeStatus(snapshot.targetId, nextStatus);
+        await refreshCanonical(snapshot);
       } catch (caught) {
-        await handleMutationError(caught, generation, viewerId, action);
+        await handleMutationError(caught, snapshot, action);
       } finally {
-        if (access.isCurrent(generation, viewerId)) setMutation(null);
+        if (isOperationCurrent(snapshot)) setMutation(null);
       }
     };
     await action();
@@ -192,17 +252,23 @@ export function AdminUserPage() {
 
   const deleteAccount = async () => {
     if (!detail || !canMutate) return;
-    const generation = access.generation;
-    const viewerId = access.viewerId;
+    const snapshot: AdminOperationSnapshot = {
+      targetId: detail.id,
+      targetGeneration: targetGenerationRef.current,
+      operationGeneration: ++operationGenerationRef.current,
+      accessGeneration: access.generation,
+      viewerId: access.viewerId,
+    };
+    if (!isOperationCurrent(snapshot)) return;
     setMutation('delete');
     setNotice(null);
     try {
-      await adminApi.delete(detail.id);
-      if (access.isCurrent(generation, viewerId)) navigate('/admin');
+      await adminApi.delete(snapshot.targetId);
+      if (isOperationCurrent(snapshot)) navigate('/admin');
     } catch (caught) {
-      await handleMutationError(caught, generation, viewerId, deleteAccount);
+      await handleMutationError(caught, snapshot, deleteAccount);
     } finally {
-      if (access.isCurrent(generation, viewerId)) {
+      if (isOperationCurrent(snapshot)) {
         setMutation(null);
         setDeleteOpen(false);
       }

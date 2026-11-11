@@ -44,6 +44,9 @@ const access = {
 
 vi.mock('../features/admin/AdminAccessProvider', () => ({
   useAdminAccess: () => access,
+  isAdminPermissionError: () => false,
+  isAdminActorNotFound: () => false,
+  adminAccessErrorMessage: (error: unknown) => error instanceof Error ? error.message : '관리자 오류',
 }));
 
 vi.mock('../features/admin/adminApi', () => ({
@@ -117,5 +120,33 @@ describe('관리자 화면', () => {
     await user.click(screen.getByRole('button', { name: '계정 삭제' }));
     await user.click(screen.getByRole('button', { name: '삭제 확인' }));
     await waitFor(() => expect(vi.mocked(adminApi.delete)).toHaveBeenCalledWith(7));
+  });
+
+  it('transient 목록 오류에서도 직전 사용자 행과 pagination을 보존한다', async () => {
+    vi.mocked(adminApi.list)
+      .mockResolvedValueOnce({
+        users: { items: [summary], page: 0, size: 20, totalElements: 21, totalPages: 2, hasNext: true, hasPrevious: false },
+        summary: { totalUsers: 21, joinedThisWeek: 2, suspendedUsers: 1 },
+      })
+      .mockRejectedValueOnce(new Error('temporary list failure'));
+
+    render(
+      <MemoryRouter initialEntries={['/admin']}>
+        <Routes>
+          <Route path="/admin" element={<AdminPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText('orbit@universe.dev')).toBeInTheDocument());
+    expect(screen.getByRole('navigation', { name: '페이지' })).toBeInTheDocument();
+    const user = userEvent.setup();
+    const search = screen.getByPlaceholderText('이메일 · 닉네임 검색');
+    await user.type(search, 'next');
+    await user.keyboard('{Enter}');
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('temporary list failure'));
+    expect(screen.getByText('orbit@universe.dev')).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: '페이지' })).toBeInTheDocument();
   });
 });

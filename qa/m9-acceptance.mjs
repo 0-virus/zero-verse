@@ -1984,22 +1984,47 @@ async function runBrowserStaleListProbe(accounts) {
     holder = await holdAdminResponse(page, (request) => request.method() === 'GET'
       && new URL(request.url()).pathname === '/api/v1/admin/users'
       && new URL(request.url()).searchParams.get('size') === '20'
+      && !new URL(request.url()).searchParams.get('keyword')
       && armed);
     await signInInSpa(page, accounts.adminKeeper);
     await enterAdminViaProfileMenu(page, accounts.adminKeeper);
     await waitForAdminReady(page);
     const search = page.getByRole('searchbox', { name: '관리자 사용자 검색', exact: true });
+    const baselinePending = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return response.request().method() === 'GET' && url.pathname === '/api/v1/admin/users'
+        && url.searchParams.get('keyword') === fixture.searchLiteral && url.searchParams.get('size') === '20'
+        && Number(url.searchParams.get('page') ?? 0) === 0 && response.status() === 200;
+    }, { timeout: STALE_PROBE_TIMEOUT_MS }).catch(() => null);
     await search.fill(fixture.searchLiteral);
     await search.press('Enter');
+    const baselineResponse = await baselinePending;
+    const baselineBody = baselineResponse ? await baselineResponse.json().catch(() => null) : null;
+    const baselineIds = baselineBody?.data?.users?.items?.map((item) => Number(item.id)) ?? [];
+    await page.waitForFunction((email) => {
+      const table = document.querySelector('table[aria-label="관리자 사용자 목록"]');
+      return table?.querySelectorAll('tbody tr').length === 1 && table.textContent.includes(email);
+    }, accounts.special.email, { timeout: STALE_PROBE_TIMEOUT_MS }).catch(() => undefined);
     await adminUserRow(page, accounts.special.me.email).first().waitFor({ state: 'visible', timeout: 15_000 });
+    const baselineOk = baselineResponse?.status() === 200
+      && isDeepStrictEqual(baselineIds, [Number(accounts.special.me.id)])
+      && await adminUserTable(page).getByRole('row').count() === 2
+      && await exactCount(adminUserRow(page, accounts.special.email)) === 1;
+    if (!baselineOk) throw new Error(`stale list baseline is not the canonical single special row: ${JSON.stringify({ status: baselineResponse?.status() ?? null, ids: baselineIds })}`);
     const providerMarker = await markProviderDocument(page);
     armed = true;
-    await search.fill(fixture.bulkSearchLiteral);
+    await search.fill('');
     await search.press('Enter');
     const upstream = await withTimeout(holder.readyPromise, STALE_PROBE_TIMEOUT_MS, 'stale list upstream response');
-    check('browser-stale-list-upstream-200', upstream.status === 200 && upstream.bodyBytes > 0, 'held list response is fetched from the real upstream before account expiry');
-    check('browser-stale-list-pending-sensitive', await exactCount(adminUserRow(page, accounts.adminKeeper.email)) === 0,
-      'held list response does not expose the sensitive A row before release');
+    const anchor = Object.values(accounts).find((account) => upstream.userIds?.includes(Number(account.me.id))
+      && !baselineIds.includes(Number(account.me.id)));
+    const anchoredUpstream = upstream.status === 200 && upstream.bodyBytes > 0 && anchor != null;
+    const anchorEvidence = { baselineIds, heldUserIds: upstream.userIds ?? [], anchorId: anchor?.me.id ?? null };
+    check('browser-stale-list-upstream-200', anchoredUpstream,
+      `held real list 200 contains a sensitive row absent from the canonical baseline: ${JSON.stringify(anchorEvidence)}`);
+    if (!anchoredUpstream) throw new Error('held list has no verifiable sensitive fixture anchor');
+    check('browser-stale-list-pending-sensitive', baselineOk && await exactCount(adminUserRow(page, anchor.email)) === 0,
+      `held list anchor is absent before release; previously authorized baseline rows may remain: ${JSON.stringify(anchorEvidence)}`);
     await triggerAuthExpiry(page, holder);
     await signInExistingSpa(page, accounts.special);
     await waitForUserReady(page, accounts.special);
@@ -2012,9 +2037,9 @@ async function runBrowserStaleListProbe(accounts) {
     const disposed = await holder.dispose();
     await page.waitForTimeout(300);
     const ok = delivery.ok && disposed.ok && bStable && sameDocument && new URL(page.url()).pathname === '/'
-      && await exactCount(adminUserRow(page, accounts.adminKeeper.email)) === 0;
+      && await exactCount(adminUserRow(page, anchor.email)) === 0;
     check('browser-stale-list', ok,
-    `late A list 200 cannot repopulate the same SPA Provider after B is ready: ${JSON.stringify({ delivery, disposed })}`);
+    `late A list 200 cannot repopulate its actual sensitive anchor after B is ready: ${JSON.stringify({ delivery, disposed, ...anchorEvidence })}`);
     return ok;
   } catch (error) {
     check('browser-stale-list', false, scrubSecrets(error instanceof Error ? error.message : String(error)));
@@ -2181,7 +2206,12 @@ async function holdAdminResponse(page, predicate) {
       const status = upstream.status();
       const headers = upstream.headers();
       entry.status = status;
-      resolveReady({ status, bodyBytes: body.length });
+      let userIds = [];
+      try {
+        const items = JSON.parse(body.toString('utf8'))?.data?.users?.items;
+        if (Array.isArray(items)) userIds = items.map((item) => item.id).filter(Number.isInteger);
+      } catch { /* Non-list bodies do not provide list fixture IDs. */ }
+      resolveReady({ status, bodyBytes: body.length, userIds });
       stage = 'hold';
       await releasePromise;
       stage = 'deliver';
@@ -2390,8 +2420,20 @@ async function verifyDesignReference(context) {
   const designPath = resolve(root, 'docs/design/ZeroVerse Pages.dc.html');
   try {
     await page.goto(`file://${designPath}`, { waitUntil: 'domcontentloaded' });
-    const text = await page.locator('body').innerText();
-    check('design-admin-reference', /ADMIN CONSOLE/.test(text) && /사용자/.test(text), 'design source contains M9 admin reference');
+    const screens = [];
+    for (const [button, label] of [['관리자', '관리자'], ['관리자·상세', '관리자 사용자 상세']]) {
+      await page.getByText(button, { exact: true }).first().click();
+      const screen = page.locator(`[data-screen-label="${label}"]:visible`);
+      await screen.waitFor({ state: 'visible', timeout: 15_000 });
+      const text = await screen.innerText();
+      const bounds = await screen.boundingBox();
+      screens.push({ label, count: await screen.count(), bounds,
+        hasAdminConsole: /ADMIN CONSOLE/.test(text), hasUserCopy: /사용자/.test(text) });
+    }
+    evidence.designReference = { screens };
+    check('design-admin-reference', screens.length === 2 && screens.every((screen) => screen.count === 1
+      && screen.bounds?.width > 0 && screen.bounds?.height > 0 && screen.hasAdminConsole && screen.hasUserCopy),
+    'design switcher renders the visible admin list and user detail references');
   } catch (error) {
     check('design-admin-reference', false, scrubSecrets(error instanceof Error ? error.message : String(error)));
   } finally {
@@ -2790,7 +2832,7 @@ async function finishEvidence() {
   await writeEvidence();
   const pass = evidence.checks.filter((item) => item.status === 'PASS').length;
   const notRunCount = evidence.checks.filter((item) => item.status === 'NOT RUN').length;
-  console.log(JSON.stringify({ outputDir, screenshots: evidence.screenshots.length, pass, notRun: notRunCount, failures: evidence.failures.length, fixtureIds: evidence.fixture }));
+  console.log(JSON.stringify({ outputDir, screenshots: evidence.screenshots.length, pass, notRun: notRunCount, failures: evidence.failures.length }));
   if (evidence.failures.length > 0) throw new Error(`M9 acceptance has ${evidence.failures.length} findings`);
 }
 

@@ -397,9 +397,10 @@ function jwtClaimsInMemory(token) {
 function tamperJwt(token) {
   const parts = String(token).split('.');
   if (parts.length !== 3) return 'malformed.synthetic.signature';
-  const signature = parts[2];
-  const replacement = signature.endsWith('A') ? `${signature.slice(0, -1)}B` : `${signature}A`;
-  return `${parts[0]}.${parts[1]}.${replacement}`;
+  const signature = Buffer.from(parts[2], 'base64url');
+  if (signature.length === 0) throw new Error('synthetic JWT signature is empty');
+  signature[0] ^= 1;
+  return `${parts[0]}.${parts[1]}.${signature.toString('base64url')}`;
 }
 
 async function refreshAdminClaims(accounts) {
@@ -894,47 +895,66 @@ async function runHttpAcceptance(accounts, posts) {
 }
 
 async function runAdminAuthMatrix(accounts, endpoints) {
-  const missing = await Promise.all(endpoints.map((endpoint) => apiCall(endpoint.method, endpoint.path)));
-  check('auth-missing-admin-endpoints', missing.every((response) => response.status === 401 && response.errorCode === 'AUTH_004' && privateNoStore(response.cacheControl) && response.envelope), 'missing auth is 401 AUTH_004 with envelope/no-store');
+  const authFailureDetails = (responses, status, errorCode) => {
+    if (responses.every((response) => response.status === status && response.errorCode === errorCode
+      && response.envelope && privateNoStore(response.cacheControl))) return '';
+    return `: ${JSON.stringify(responses.map((response, index) => ({
+      method: endpoints[index].method,
+      path: endpoints[index].path,
+      status: response.status,
+      errorCode: typeof response.errorCode === 'string' && /^[A-Z][A-Z0-9]*_\d{3}$/.test(response.errorCode) ? response.errorCode : null,
+      envelope: response.envelope,
+      cachePrivate: /(?:^|,)\s*private\s*(?:,|$)/i.test(response.cacheControl),
+      cacheNoStore: /(?:^|,)\s*no-store\s*(?:,|$)/i.test(response.cacheControl),
+    })))}`;
+  };
+  const missing = await Promise.all(endpoints.map((endpoint) => apiCall(endpoint.method, endpoint.path, undefined, endpoint.data)));
+  check('auth-missing-admin-endpoints', missing.every((response) => response.status === 401 && response.errorCode === 'AUTH_004' && privateNoStore(response.cacheControl) && response.envelope), 'missing auth is 401 AUTH_004 with envelope/no-store' + authFailureDetails(missing, 401, 'AUTH_004'));
 
-  const malformed = await Promise.all(endpoints.map((endpoint) => apiCallWithHeaders(endpoint.method, endpoint.path, { Authorization: 'Basic not-a-bearer' })));
-  check('auth-malformed-admin-endpoints', malformed.every((response) => response.status === 401 && response.errorCode === 'AUTH_004' && privateNoStore(response.cacheControl) && response.envelope), 'malformed bearer is not downgraded to guest and remains no-store');
+  const malformed = await Promise.all(endpoints.map((endpoint) => apiCallWithHeaders(endpoint.method, endpoint.path, { Authorization: 'Basic not-a-bearer' }, endpoint.data)));
+  check('auth-malformed-admin-endpoints', malformed.every((response) => response.status === 401 && response.errorCode === 'AUTH_004' && privateNoStore(response.cacheControl) && response.envelope), 'malformed bearer is not downgraded to guest and remains no-store' + authFailureDetails(malformed, 401, 'AUTH_004'));
 
   const badSignature = tamperJwt(accounts.admin.token);
-  const badSignatureResponses = await Promise.all(endpoints.map((endpoint) => apiCall(endpoint.method, endpoint.path, badSignature)));
+  const badSignatureProbe = await apiCall('GET', endpoints[0].path, badSignature);
+  if (badSignatureProbe.status !== 401 || badSignatureProbe.errorCode !== 'AUTH_004') {
+    const diagnostic = authFailureDetails([badSignatureProbe], 401, 'AUTH_004');
+    check('auth-bad-signature-admin-endpoints', false, `invalid signature GET must be rejected before mutation methods${diagnostic}`);
+    throw new Error(`invalid signature preflight failed; mutation methods were not sent${diagnostic}`);
+  }
+  const badSignatureResponses = await Promise.all(endpoints.map((endpoint) => apiCall(endpoint.method, endpoint.path, badSignature, endpoint.data)));
   check('auth-bad-signature-admin-endpoints', badSignatureResponses.every((response) => response.status === 401
-    && response.errorCode === 'AUTH_004' && privateNoStore(response.cacheControl) && response.envelope), 'signed token with invalid signature is AUTH_004/no-store on all five admin methods');
+    && response.errorCode === 'AUTH_004' && privateNoStore(response.cacheControl) && response.envelope), 'signed token with invalid signature is AUTH_004/no-store on all five admin methods' + authFailureDetails(badSignatureResponses, 401, 'AUTH_004'));
 
-  const user = await Promise.all(endpoints.map((endpoint) => apiCall(endpoint.method, endpoint.path, accounts.user.token)));
-  check('auth-user-admin-endpoints', user.every((response) => response.status === 403 && response.errorCode === 'ADMIN_001' && privateNoStore(response.cacheControl) && response.envelope), 'current USER is rejected by every admin endpoint');
+  const user = await Promise.all(endpoints.map((endpoint) => apiCall(endpoint.method, endpoint.path, accounts.user.token, endpoint.data)));
+  check('auth-user-admin-endpoints', user.every((response) => response.status === 403 && response.errorCode === 'ADMIN_001' && privateNoStore(response.cacheControl) && response.envelope), 'current USER is rejected by every admin endpoint' + authFailureDetails(user, 403, 'ADMIN_001'));
 
-  const suspended = await Promise.all(endpoints.map((endpoint) => apiCall(endpoint.method, endpoint.path, accounts.suspended.token)));
-  check('auth-suspended-admin-endpoints', suspended.every((response) => response.status === 403 && response.errorCode === 'USER_003' && privateNoStore(response.cacheControl) && response.envelope), 'current SUSPENDED actor is rejected by every admin endpoint');
+  const suspended = await Promise.all(endpoints.map((endpoint) => apiCall(endpoint.method, endpoint.path, accounts.suspended.token, endpoint.data)));
+  check('auth-suspended-admin-endpoints', suspended.every((response) => response.status === 403 && response.errorCode === 'USER_003' && privateNoStore(response.cacheControl) && response.envelope), 'current SUSPENDED actor is rejected by every admin endpoint' + authFailureDetails(suspended, 403, 'USER_003'));
 
-  const deleted = await Promise.all(endpoints.map((endpoint) => apiCall(endpoint.method, endpoint.path, accounts.deleted.token)));
-  check('auth-deleted-admin-endpoints', deleted.every((response) => response.status === 404 && response.errorCode === 'USER_001' && privateNoStore(response.cacheControl) && response.envelope), 'current deleted actor is rejected by every admin endpoint');
+  const deleted = await Promise.all(endpoints.map((endpoint) => apiCall(endpoint.method, endpoint.path, accounts.deleted.token, endpoint.data)));
+  check('auth-deleted-admin-endpoints', deleted.every((response) => response.status === 404 && response.errorCode === 'USER_001' && privateNoStore(response.cacheControl) && response.envelope), 'current deleted actor is rejected by every admin endpoint' + authFailureDetails(deleted, 404, 'USER_001'));
 
   const expired = process.env.M9_EXPIRED_ACCESS_TOKEN;
   if (!expired) notRun('auth-expired-admin-endpoints', 'M9_EXPIRED_ACCESS_TOKEN is not supplied by isolated runtime');
   else {
-    const responses = await Promise.all(endpoints.map((endpoint) => apiCall(endpoint.method, endpoint.path, expired)));
-    check('auth-expired-admin-endpoints', responses.every((response) => response.status === 401 && response.errorCode === 'AUTH_002' && privateNoStore(response.cacheControl) && response.envelope), 'signed expired ACCESS is AUTH_002 with no-store envelope');
+    const responses = await Promise.all(endpoints.map((endpoint) => apiCall(endpoint.method, endpoint.path, expired, endpoint.data)));
+    check('auth-expired-admin-endpoints', responses.every((response) => response.status === 401 && response.errorCode === 'AUTH_002' && privateNoStore(response.cacheControl) && response.envelope), 'signed expired ACCESS is AUTH_002 with no-store envelope' + authFailureDetails(responses, 401, 'AUTH_002'));
   }
 
   const wrongType = process.env.M9_WRONG_TYPE_TOKEN;
   if (!wrongType) notRun('auth-wrong-type-admin-endpoints', 'M9_WRONG_TYPE_TOKEN is not supplied by isolated runtime');
   else {
-    const responses = await Promise.all(endpoints.map((endpoint) => apiCall(endpoint.method, endpoint.path, wrongType)));
-    check('auth-wrong-type-admin-endpoints', responses.every((response) => response.status === 401 && response.errorCode === 'AUTH_004' && privateNoStore(response.cacheControl) && response.envelope), 'signed wrong-type token is AUTH_004 with no-store envelope');
+    const responses = await Promise.all(endpoints.map((endpoint) => apiCall(endpoint.method, endpoint.path, wrongType, endpoint.data)));
+    check('auth-wrong-type-admin-endpoints', responses.every((response) => response.status === 401 && response.errorCode === 'AUTH_004' && privateNoStore(response.cacheControl) && response.envelope), 'signed wrong-type token is AUTH_004 with no-store envelope' + authFailureDetails(responses, 401, 'AUTH_004'));
   }
 
   for (const [label, variable] of [['auth-missing-role-admin-endpoints', 'M9_MISSING_ROLE_TOKEN'], ['auth-missing-subject-admin-endpoints', 'M9_MISSING_SUBJECT_TOKEN']]) {
     const token = process.env[variable];
     if (!token) notRun(label, `${variable} is not supplied by isolated runtime`);
     else {
-      const responses = await Promise.all(endpoints.map((endpoint) => apiCall(endpoint.method, endpoint.path, token)));
+      const responses = await Promise.all(endpoints.map((endpoint) => apiCall(endpoint.method, endpoint.path, token, endpoint.data)));
       check(label, responses.every((response) => response.status === 401 && response.errorCode === 'AUTH_004'
-        && privateNoStore(response.cacheControl) && response.envelope), 'signed incomplete claim is AUTH_004/no-store envelope on all five methods');
+        && privateNoStore(response.cacheControl) && response.envelope), 'signed incomplete claim is AUTH_004/no-store envelope on all five methods' + authFailureDetails(responses, 401, 'AUTH_004'));
     }
   }
 
@@ -942,9 +962,9 @@ async function runAdminAuthMatrix(accounts, endpoints) {
     const token = process.env[variable];
     if (!token) notRun(label, `${variable} is not supplied by isolated runtime`);
     else {
-      const responses = await Promise.all(endpoints.map((endpoint) => apiCall(endpoint.method, endpoint.path, token)));
+      const responses = await Promise.all(endpoints.map((endpoint) => apiCall(endpoint.method, endpoint.path, token, endpoint.data)));
       check(label, responses.every((response) => response.status === 401 && response.errorCode === 'AUTH_004'
-        && privateNoStore(response.cacheControl) && response.envelope), 'signed invalid role/subject claim is AUTH_004/no-store envelope on all five methods');
+        && privateNoStore(response.cacheControl) && response.envelope), 'signed invalid role/subject claim is AUTH_004/no-store envelope on all five methods' + authFailureDetails(responses, 401, 'AUTH_004'));
     }
   }
 
@@ -2201,8 +2221,8 @@ function adminEndpoints(targetId) {
   return [
     { method: 'GET', path: '/api/v1/admin/users?page=0&size=20' },
     { method: 'GET', path: `/api/v1/admin/users/${targetId}` },
-    { method: 'PUT', path: `/api/v1/admin/users/${targetId}/role` },
-    { method: 'PUT', path: `/api/v1/admin/users/${targetId}/status` },
+    { method: 'PUT', path: `/api/v1/admin/users/${targetId}/role`, data: { role: 'USER' } },
+    { method: 'PUT', path: `/api/v1/admin/users/${targetId}/status`, data: { status: 'ACTIVE' } },
     { method: 'DELETE', path: `/api/v1/admin/users/${targetId}` },
   ];
 }

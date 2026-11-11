@@ -142,3 +142,10 @@ Files: 기존 각역할 기록/PM PRD, root worklog/JOURNAL/registers/README. Gi
 - Task2 구현9a4d03f의 admin33/보안62 targeted와 root 전체107suites/632tests/0fail/0error/0skip+bootJar exit0를 확인했다. 이는 후속 UTC 수정 전 baseline이며 현재 최종 통과를 뜻하지 않는다.
 - 추가 실제 HTTP 가입 테스트에서 KST JVM audit가 UTC보다9시간 앞서는3assertion RED를 재현했다. 독립검토M1 Important로 Task2를 Needs fixes로 전환했다. 이어 UTC 실행에서도 DATETIME(0) 반올림에 의한 즉시통계 누락을 재현했다. 회의 §12/ADR 보완처럼 UTC 실행 전제와 audit 초 정밀도 수정을 원 backend에 배정했다. 비UTC JAR 차단·지원UTC 가입/즉시통계·audit 경계 및 전체재검증 전에는 닫지 않는다.
 - QA 도구 독립감사 I1~I9(유일fixture·실제ADMIN claim·DOM·stale계정격리·정확한경쟁/검색/집계·비어있지않은삭제보존·필수행누락방지)도 원QA가 fix1중이다. root는 합성 DB native blog/post fixture·전체row/file fingerprint·실행 전후 source/JAR provenance를 보강한다. 사용자 DB/업로드 변경 없음.
+
+## [리뷰] 2026-11-11 KST — Task2/3 종료·Task4 보완 중
+
+- Task2 수정6a8763d: 독립 backend `task-2-review2.md`는 M1 시간대·DATETIME(0) 반올림 모두 ADDRESSED, Critical/Important/Minor0, Approved. root가 source7files hash 및15suites79tests targeted 원문을 대조했다. 새 전체 `build/m9-evidence/backend-final-2/summary.json`은109suites637tests/0failure/0error/0skip/exit0+bootJar. JAR SHA256 `c6f381f72bf94528f54e3bb805403d23a0e119673c6183c9aff66af3ac0d9c52`.
+- Task3 root 최종464PASS를 testcase 단위로 인계하기 위해 F7 증거 누락 우려에 한해 구조화 reporter를 실행했다. `build/m9-evidence/frontend-final-result.json` success=true/testResults51/464passed/0failed/0pending. source frontend는3d34468후불변이며 과거456과 합산하지 않는다. envDir:false로 사용자 env를 읽지 않았다.
+- Task4 QA fix1(01d8582)은 audit2에서 CHANGES REQUIRED. I1~I3 ADDRESSED, I4~I9 잔여/F1~F9 Important는 원QA fixround2로 모두 배정했다. M1 실제runtime provenance는 최종 whole-branch gate로 남긴다. actual acceptance는 NOT RUN이다.
+- root는 provisional API28555만 종료하고 최종검증JAR API36756/18089를 UTC로기동했다. Swagger실제GET에서 admin4paths/5methods등록확인. 전용MySQL13319·FE5179·업로드 build/m9-api-data만사용하며 사용자자료불변. tested-version manifest는424files/sourceSHA63d720de69a286736f77406cf3a33019ef4871b09cd6632ec7f483ce15b9602c/JAR위hash다.

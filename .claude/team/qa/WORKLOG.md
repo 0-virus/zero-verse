@@ -1201,6 +1201,15 @@
 
 - malformed runtime bundles cannot echo arbitrary status/runId/check IDs into evidence: runtime evidence serialization now retains only the exact schema/status, safe `m10-*` run ID, approved named IDs, and hash fields. This preserves the token/cookie/password/email non-output boundary while remaining fail-closed on schema mismatch.
 
+## 2026-11-12 KST — M10 Task4 fix round 2/5 — I-1~I-3 closure
+
+- 범위: `task-4-fix1-rereview.md`의 Important I-1~I-3만 반영했다. deferred Minor M-1/M-2는 수정하지 않았다. 변경은 `qa/m10-acceptance.mjs`, `qa/M10-review.md`, QA STATE/WORKLOG 및 prep report이며 제품/Git/root 파일·runtime/DB는 건드리지 않았다.
+- I-1 OpenAPI/API: current public `security:[]` allowlist에 public blog slug, blog posts(id/slug), categories, post comments, interactions, public feed를 정확히 포함하고 self-check로 누락을 거부한다. HTTP matrix는 400 `VALIDATION_001`, 401 `AUTH_004`, 403 `POST_002`, 404 `POST_001`, 409 `CAT_005` canonical error.code를 실제 body에서 대조한다.
+- I-2 image fixture: image-only publish는 외부 URL을 사용하지 않고 실제 multipart `POST_IMAGE` upload를 실행해 canonical `/api/v1/uploads/{UUID}/content`를 얻는다. 같은 URL을 contentJson/image snapshot에 쓰고 thumbnail은 null로 두며 upload metadata(size/contentType/purpose)·published target ID·contentJson/image snapshot body를 검증한다.
+- I-3 runtime attestation: bundle에 database `zeroverse_m10`, exact `M10_RUN_ID`를 요구한다. repository-local attestation reference path/SHA-256을 읽고 `zeroverse.m10.runtime-attestation.v1`, same runId, `status=PASS`, current-bound observedAt, 8개 required per-check `ok=true`/observedAt/artifactPaths, raw artifact hash map과 실제 파일 SHA-256을 검증한다. generatedAt/attestation timestamps는 현재 run 시작 기준 ±15분 bound이며 malformed/stale/forged DB/run bundle은 PASS하지 않는다.
+- 정적 검증: `node --check qa/m10-acceptance.mjs` exit `0`; `M10_OUTPUT_DIR=build/m10-selfcheck-fix2-final2 node qa/m10-acceptance.mjs --self-check` exit `0` / `SELF-CHECK PASS`; static `359 files / 281 classified / 0 unclassified`; malformed/NOT RUN/user DB/stale-run/forged-database negative fixture row PASS. `M10_MYSQL_HOST=127.0.0.1 M10_MYSQL_PORT=13307` with run ID exit `1` (`refusing user MySQL port 13307`); `M10_SCREENSHOTS=0` with approved port exit `1` (`M10 full acceptance cannot disable canonical screenshots`); missing `M10_RUN_ID` exit `1` (`M10_RUN_ID is required...`).
+- 미실행/concerns: actual generated `/v3/api-docs`, multipart API, MySQL 13320, attestation/artifacts, backend/frontend final build, Chrome/13 PNG, admin/upload/restart runtime은 모두 **NOT RUN**이다. 실제 bundle 생성·현재 run ID 주입·attestation artifact 보존은 root 후속이며, 이번 QA는 source-level fail-closed 준비만 판정한다.
+
 ## 2026-11-12 KST — M10 Task4 runtime implementation ownership conflict
 
 - 배정 내용: root가 `build/m10-runtime.py`, `build/m10-vite.mjs` 및 runtime report 구현을 요청했다. 해당 도구는 M10 전용 MySQL/API/FE 기동·재기동·증거 bundle 생성까지 포함한다.

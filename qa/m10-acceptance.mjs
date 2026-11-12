@@ -29,6 +29,7 @@ const execFile = promisify(execFileCallback);
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const selfCheck = process.argv.includes('--self-check');
 const suffix = `${Date.now().toString(36)}${randomBytes(6).toString('hex')}`;
+const runId = process.env.M10_RUN_ID ?? `m10-${suffix}`;
 const apiBaseUrl = process.env.M10_API_BASE_URL ?? 'http://127.0.0.1:18090';
 const frontendUrl = process.env.M10_FRONTEND_URL ?? 'http://127.0.0.1:5180';
 const outputDir = resolve(root, process.env.M10_OUTPUT_DIR ?? `build/m10-acceptance-${suffix}`);
@@ -48,6 +49,8 @@ const screenshotsEnabled = true;
 const headless = process.env.M10_HEADLESS !== '0';
 
 const runtimeEvidenceSchema = 'zeroverse.m10.runtime-evidence.v1';
+const runtimeAttestationSchema = 'zeroverse.m10.runtime-attestation.v1';
+const attestationSkewMs = 15 * 60 * 1000;
 const runtimeEvidenceCheckIds = [
   'admin-current-actor', 'admin-stale-claim', 'admin-self-protection',
   'admin-mutations', 'admin-deleted-target', 'admin-soft-delete-preservation',
@@ -94,10 +97,21 @@ const screenExpectations = {
   'admin-detail': { pathname: /^\/admin\/users\/\d+$/, selectors: ['section[aria-label="사용자 상세"]'] },
 };
 
+// Generated OpenAPI marks these current operations with @SecurityRequirements.
+// Keep the public map explicit so a missing security annotation cannot be
+// mistaken for a protected operation (or silently make coverage incomplete).
+const publicOpenApiOperations = new Set([
+  'post:/api/v1/auth/register', 'post:/api/v1/auth/signin', 'post:/api/v1/auth/refresh', 'post:/api/v1/auth/signout',
+  'get:/api/v1/blogs/slug/{urlSlug}', 'get:/api/v1/blogs/{blogId}/posts',
+  'get:/api/v1/blogs/slug/{urlSlug}/posts', 'get:/api/v1/blogs/{blogId}/categories',
+  'get:/api/v1/posts/{postId}', 'get:/api/v1/posts/{postId}/comments', 'get:/api/v1/posts/{postId}/interactions',
+  'get:/api/v1/tags/{tagName}/posts', 'get:/api/v1/feed/public', 'get:/api/v1/search',
+]);
+
 const requiredChecks = [
-  'source-runtime-identity', 'runtime-evidence-schema', 'runtime-openapi', 'openapi-required-paths', 'openapi-coverage',
+  'source-runtime-identity', 'runtime-evidence-schema', 'runtime-attestation-schema', 'runtime-openapi', 'openapi-required-paths', 'openapi-coverage',
   'synthetic-register-owner', 'synthetic-register-friend', 'signin-owner', 'signin-friend',
-  'setup-owner', 'setup-friend', 'general-category-fixture', 'draft-empty-allowed', 'publish-empty-rejected', 'publish-image-only-allowed', 'publish-public', 'public-guest-read',
+  'setup-owner', 'setup-friend', 'general-category-fixture', 'image-upload-fixture', 'draft-empty-allowed', 'publish-empty-rejected', 'publish-image-only-allowed', 'publish-public', 'public-guest-read',
   'refresh-rotation', 'logout-refresh-reuse-rejected', 'universe-request', 'universe-accept',
   'universe-post-read', 'comment-create', 'like-create', 'notification-list', 'notification-event-identity', 'notification-read-delete',
   'content-sanitize',
@@ -125,7 +139,7 @@ const evidence = {
   sourceManifest: null,
   runtimeEvidence: null,
   provenance: { before: null, after: null },
-  fixture: { runId: `m10-${suffix}`, accountIds: {}, blogIds: {}, categoryIds: {}, postIds: {}, commentIds: {} },
+  fixture: { runId, accountIds: {}, blogIds: {}, categoryIds: {}, postIds: {}, commentIds: {} },
   screenshots: [],
   checks: [],
   failures: [],
@@ -297,9 +311,115 @@ function hasAll(values, required) {
 
 function markRuntimeEvidenceMissing(detail) {
   check('runtime-evidence-schema', false, `NOT RUN: ${detail}`, { required: true });
+  check('runtime-attestation-schema', false, `NOT RUN: runtime attestation did not verify (${detail})`, { required: true });
   for (const id of runtimeEvidenceCheckIds) {
     check(id, false, `NOT RUN: runtime evidence did not supply ${id}`, { required: true });
   }
+}
+
+function withinCurrentRun(value, now = Date.now()) {
+  if (!validIso(value)) return false;
+  const timestamp = Date.parse(value);
+  const started = Date.parse(evidence.startedAt);
+  return timestamp >= started - attestationSkewMs && timestamp <= now + attestationSkewMs;
+}
+
+function safeRelativePath(value) {
+  return typeof value === 'string'
+    && value.length > 0
+    && !value.startsWith('/')
+    && !value.split('/').includes('..')
+    && /^[A-Za-z0-9._/-]+$/.test(value);
+}
+
+async function verifyRuntimeAttestation(bundle) {
+  const reference = bundle?.attestation;
+  if (!reference || !safeRelativePath(reference.path) || !isSha256(reference.sha256)) {
+    return { ok: false, detail: 'attestation path/SHA-256 reference is missing' };
+  }
+  let attestationPath;
+  try {
+    attestationPath = resolve(root, reference.path);
+    assertInsideRoot(attestationPath, 'attestation');
+  } catch (error) {
+    return { ok: false, detail: scrub(error instanceof Error ? error.message : error) };
+  }
+  let raw;
+  let attestation;
+  try {
+    raw = await readFile(attestationPath, 'utf8');
+    const actualHash = createHash('sha256').update(raw).digest('hex');
+    if (actualHash !== reference.sha256) return { ok: false, detail: 'attestation SHA-256 mismatch' };
+    attestation = JSON.parse(raw);
+  } catch (error) {
+    return { ok: false, detail: `attestation could not be read (${scrub(error instanceof Error ? error.message : error)})` };
+  }
+  const artifactHashes = attestation?.artifactHashes;
+  const artifactEntries = artifactHashes && typeof artifactHashes === 'object' && !Array.isArray(artifactHashes)
+    ? Object.entries(artifactHashes)
+    : [];
+  const now = Date.now();
+  const basicShape = attestation?.schema === runtimeAttestationSchema
+    && attestation?.milestone === 'M10'
+    && attestation?.status === 'PASS'
+    && attestation?.runId === bundle?.runId
+    && attestation?.runId === process.env.M10_RUN_ID
+    && withinCurrentRun(attestation?.observedAt, now)
+    && artifactEntries.length > 0
+    && artifactEntries.every(([path, hash]) => safeRelativePath(path) && isSha256(hash));
+  const verifiedArtifacts = [];
+  let artifactsOk = basicShape;
+  if (basicShape) {
+    for (const [path, expectedHash] of artifactEntries) {
+      try {
+        const artifactPath = resolve(root, path);
+        assertInsideRoot(artifactPath, 'attestation artifact');
+        const actualHash = await sha256(artifactPath);
+        const ok = actualHash === expectedHash;
+        artifactsOk = artifactsOk && ok;
+        verifiedArtifacts.push({ path, sha256: expectedHash, ok });
+      } catch (error) {
+        artifactsOk = false;
+        verifiedArtifacts.push({ path, sha256: expectedHash, ok: false });
+      }
+    }
+  }
+  const checkResults = {};
+  let checksOk = artifactsOk;
+  for (const id of runtimeEvidenceCheckIds) {
+    const result = attestation?.checks?.[id];
+    const artifactPaths = Array.isArray(result?.artifactPaths) ? result.artifactPaths : [];
+    const ok = result?.ok === true
+      && withinCurrentRun(result?.observedAt, now)
+      && artifactPaths.length > 0
+      && artifactPaths.every((path) => safeRelativePath(path) && Object.hasOwn(artifactHashes ?? {}, path));
+    checksOk = checksOk && ok;
+    checkResults[id] = {
+      ok: result?.ok === true,
+      observedAt: withinCurrentRun(result?.observedAt, now) ? result.observedAt : null,
+      artifactPaths: artifactPaths.filter((path) => safeRelativePath(path) && Object.hasOwn(artifactHashes ?? {}, path)),
+    };
+  }
+  const secretFree = !/(?:Bearer\s+|password\s*[:=]|refresh[_-]?token\s*[:=]|set-cookie\s*[:=]|@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/i.test(`${JSON.stringify(bundle)}\n${raw}`);
+  const summary = {
+    path: reference.path,
+    sha256: reference.sha256,
+    schema: attestation?.schema === runtimeAttestationSchema ? runtimeAttestationSchema : null,
+    milestone: attestation?.milestone === 'M10' ? 'M10' : null,
+    status: attestation?.status === 'PASS' ? 'PASS' : null,
+    runId: typeof attestation?.runId === 'string' && /^m10-[A-Za-z0-9_-]+$/.test(attestation.runId) ? attestation.runId : null,
+    observedAt: withinCurrentRun(attestation?.observedAt, now) ? attestation.observedAt : null,
+    artifactHashes: verifiedArtifacts,
+    checks: checkResults,
+  };
+  return {
+    ok: Boolean(basicShape && artifactsOk && checksOk && secretFree),
+    detail: basicShape && artifactsOk && checksOk && secretFree
+      ? 'current attestation file, raw artifact hashes, per-check observations and run timestamps verified'
+      : 'NOT RUN: attestation schema/runId/timestamp/per-check/artifact hash or secret-free validation failed',
+    summary,
+    secretFree,
+  };
 }
 
 async function verifyRuntimeEvidence() {
@@ -323,13 +443,17 @@ async function verifyRuntimeEvidence() {
   const admin = bundle?.checks?.admin;
   const upload = bundle?.checks?.upload;
   const restart = bundle?.checks?.restart;
-  const schemaShape = bundle?.schema === runtimeEvidenceSchema
+  const attestationResult = await verifyRuntimeAttestation(bundle);
+  const now = Date.now();
+  const bundleSchemaShape = bundle?.schema === runtimeEvidenceSchema
     && bundle?.milestone === 'M10'
+    && bundle?.runId === process.env.M10_RUN_ID
     && typeof bundle?.runId === 'string'
     && /^m10-[A-Za-z0-9_-]+$/.test(bundle.runId)
-    && validIso(bundle?.generatedAt)
+    && withinCurrentRun(bundle?.generatedAt, now)
     && bundle?.runtime?.mysql?.host === approvedMysqlHost
     && Number(bundle?.runtime?.mysql?.port) === approvedMysqlPort
+    && bundle?.runtime?.mysql?.database === 'zeroverse_m10'
     && bundle?.runtime?.api?.baseUrl === apiBaseUrl
     && bundle?.runtime?.api?.timezone === 'UTC'
     && isSha256(bundle?.runtime?.api?.jarSha256)
@@ -350,7 +474,9 @@ async function verifyRuntimeEvidence() {
     && hasAll(admin?.ids, runtimeAdminEvidenceIds)
     && hasAll(upload?.ids, runtimeUploadEvidenceIds)
     && hasAll(restart?.ids, runtimeRestartEvidenceIds);
-  const noSecrets = !/(?:Bearer\s+|password\s*[:=]|refresh[_-]?token\s*[:=]|set-cookie\s*[:=]|@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/i.test(JSON.stringify(bundle));
+  const schemaShape = bundleSchemaShape && attestationResult.ok;
+  const noSecrets = attestationResult.secretFree !== false
+    && !/(?:Bearer\s+|password\s*[:=]|refresh[_-]?token\s*[:=]|set-cookie\s*[:=]|@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/i.test(JSON.stringify(bundle));
   const before = evidence.provenance.before;
   const currentMatches = schemaShape
     && noSecrets
@@ -360,7 +486,8 @@ async function verifyRuntimeEvidence() {
     && bundle.provenance.frontendDistSha256 === before.frontendSha256
     && bundle.provenance.harnessSha256 === before.harnessSha256
     && bundle.provenance.gitCommit === before.gitCommit
-    && bundle.provenance.gitTree === before.gitTree;
+    && bundle.provenance.gitTree === before.gitTree
+    && attestationResult.ok;
   const sanitizedChecks = {
     admin: { status: admin?.status === 'PASS' ? 'PASS' : null, ids: Array.isArray(admin?.ids) ? admin.ids.filter((id) => runtimeAdminEvidenceIds.includes(id)) : [] },
     upload: { status: upload?.status === 'PASS' ? 'PASS' : null, ids: Array.isArray(upload?.ids) ? upload.ids.filter((id) => runtimeUploadEvidenceIds.includes(id)) : [] },
@@ -380,14 +507,23 @@ async function verifyRuntimeEvidence() {
       frontendDistSha256: bundle.provenance.frontendDistSha256,
       harnessSha256: bundle.provenance.harnessSha256,
     } : null,
+    attestation: attestationResult.summary ?? null,
     checks: sanitizedChecks,
   };
   check(
     'runtime-evidence-schema',
     Boolean(currentMatches),
     currentMatches
-      ? 'runtime bundle schema, loopback runtime, grouped named checks, current Git/source/JAR/FE/harness hashes and secret-free boundary match the verified manifest'
-      : 'NOT RUN: runtime bundle schema/status/named checks or current provenance hashes do not match the verified manifest',
+      ? 'runtime bundle schema, loopback DB/runtime identity, grouped named checks, current Git/source/JAR/FE/harness hashes, attestation artifacts/timestamps and secret-free boundary match the verified manifest'
+      : `NOT RUN: runtime bundle schema/status/named checks, attestation (${attestationResult.detail}) or current provenance hashes do not match the verified manifest`,
+    { required: true },
+  );
+  check(
+    'runtime-attestation-schema',
+    attestationResult.ok && noSecrets,
+    attestationResult.ok && noSecrets
+      ? 'attestation schema, exact M10_RUN_ID, bounded observedAt values, per-check ok/artifact references and raw artifact hashes are current and secret-free'
+      : `NOT RUN: ${attestationResult.detail}`,
     { required: true },
   );
   const namedPass = currentMatches && schemaShape;
@@ -402,7 +538,7 @@ async function verifyRuntimeEvidence() {
     'restart-persistence': 'restart.same-jar/same-db/same-file-hash/post-restart-content-get',
   };
   for (const id of runtimeEvidenceCheckIds) {
-    check(id, namedPass, namedPass ? `runtime bundle named check ${namedDetails[id]} is PASS` : `NOT RUN: runtime bundle did not verify ${namedDetails[id]}`, { required: true });
+    check(id, namedPass, namedPass ? `runtime bundle named check ${namedDetails[id]} and attestation evidence are PASS` : `NOT RUN: runtime bundle did not verify ${namedDetails[id]} with current attestation`, { required: true });
   }
 }
 
@@ -417,7 +553,16 @@ async function call(method, path, token, body) {
   return { status: response.status(), headers: response.headers(), body: await safeJson(response) };
 }
 
+async function callMultipart(path, token, multipart) {
+  const headers = { Origin: frontendUrl };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const response = await api.fetch(path, { method: 'POST', headers, multipart });
+  return { status: response.status(), headers: response.headers(), body: await safeJson(response) };
+}
+
 function data(result) { return result?.body?.data ?? null; }
+
+function errorCode(result) { return result?.body?.error?.code ?? null; }
 
 function cookiePair(headers) {
   const raw = headers?.['set-cookie'];
@@ -618,12 +763,7 @@ async function verifyOpenApi() {
   const operationIdsUnique = operationIds.length === new Set(operationIds).size;
   const bearer = spec?.components?.securitySchemes?.bearerAuth;
   const bearerContract = bearer?.type === 'http' && String(bearer.scheme).toLowerCase() === 'bearer';
-  const publicOperations = new Set([
-    'post:/api/v1/auth/register', 'post:/api/v1/auth/signin', 'post:/api/v1/auth/refresh', 'post:/api/v1/auth/signout',
-    'get:/api/v1/posts/{postId}', 'get:/api/v1/blogs/slug/{urlSlug}/posts', 'get:/api/v1/tags/{tagName}/posts',
-    'get:/api/v1/search',
-  ]);
-  const securedOperations = operations.filter(({ path, method }) => !publicOperations.has(`${method}:${path}`));
+  const securedOperations = operations.filter(({ path, method }) => !publicOpenApiOperations.has(`${method}:${path}`));
   const securityOk = securedOperations.every(({ operation }) => {
     const security = operation?.security ?? spec?.security;
     return Array.isArray(security) && security.some((entry) => entry && typeof entry === 'object' && Object.hasOwn(entry, 'bearerAuth'));
@@ -707,21 +847,46 @@ async function runHttpAcceptance() {
     categoryId: Number.isInteger(categoryId) ? categoryId : null, visibility: 'PUBLIC', publish: true,
     thumbnailUrl: null, tagNames: [], images: [],
   });
-  check('publish-empty-rejected', publishEmpty.status === 400, 'publishing an empty title/body is rejected');
-  const imageOnlyUrl = `https://example.test/m10-image-${suffix}.png`;
+  check('publish-empty-rejected', publishEmpty.status === 400 && errorCode(publishEmpty) === 'VALIDATION_001', 'publishing an empty title/body is rejected with VALIDATION_001');
+  const imageBytes = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    'base64',
+  );
+  const imageUpload = await callMultipart('/api/v1/uploads?purpose=POST_IMAGE', owner.token, {
+    file: { name: `m10-image-${suffix}.png`, mimeType: 'image/png', buffer: imageBytes },
+  });
+  const imageUploadData = data(imageUpload);
+  const imageOnlyUrl = String(imageUploadData?.imageUrl ?? '');
+  const canonicalImageUrl = /^\/api\/v1\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/content$/.test(imageOnlyUrl);
+  check(
+    'image-upload-fixture',
+    imageUpload.status === 201
+      && imageUploadData?.purpose === 'POST_IMAGE'
+      && imageUploadData?.contentType === 'image/png'
+      && Number(imageUploadData?.size) === imageBytes.length
+      && canonicalImageUrl,
+    'synthetic multipart POST_IMAGE upload returned a canonical content URL and exact byte metadata',
+  );
   const imageOnly = await call('POST', '/api/v1/posts', owner.token, {
     blogId: owner.blogId, title: `M10 image-only ${suffix}`,
     contentJson: { type: 'doc', content: [{ type: 'image', attrs: { src: imageOnlyUrl, alt: 'M10 image' } }] },
     contentHtml: '', categoryId: Number.isInteger(categoryId) ? categoryId : null, visibility: 'PUBLIC', publish: true,
-    thumbnailUrl: imageOnlyUrl, tagNames: [], images: [{ imageUrl: imageOnlyUrl, altText: 'M10 image', displayOrder: 0 }],
+    thumbnailUrl: null, tagNames: [], images: [{ imageUrl: imageOnlyUrl, altText: 'M10 image', displayOrder: 0 }],
   });
   const imageOnlyData = data(imageOnly);
   check(
     'publish-image-only-allowed',
     imageOnly.status === 201
       && Number.isInteger(Number(imageOnlyData?.id))
-      && imageOnlyData?.publishedAt,
-    'publishing an image-only document is allowed when title and image snapshot are valid',
+      && imageOnlyData?.publishedAt
+      && Number(imageOnlyData?.id) > 0
+      && imageOnlyData?.thumbnailUrl == null
+      && imageOnlyData?.contentJson?.content?.[0]?.type === 'image'
+      && imageOnlyData?.contentJson?.content?.[0]?.attrs?.src === imageOnlyUrl
+      && imageOnlyData?.images?.length === 1
+      && imageOnlyData?.images?.[0]?.imageUrl === imageOnlyUrl
+      && canonicalImageUrl,
+    'publishing an image-only document is allowed with the uploaded canonical URL in contentJson and image snapshot, without thumbnail',
   );
   const sanitizeProbe = await call('POST', '/api/v1/posts', owner.token, {
     blogId: owner.blogId, title: `M10 sanitize ${suffix}`,
@@ -757,7 +922,7 @@ async function runHttpAcceptance() {
   const cacheControl = guestRead.headers['cache-control'] ?? '';
   check('private-no-store', /private/i.test(cacheControl) && /no-store/i.test(cacheControl), 'sensitive read has both private and no-store cache directives');
   const invalidBearer = await call('GET', `/api/v1/posts/${post?.id}`, 'not-a-token');
-  check('invalid-bearer-rejected', invalidBearer.status === 401 && invalidBearer.body?.success === false, 'malformed bearer is rejected with the common error envelope');
+  check('invalid-bearer-rejected', invalidBearer.status === 401 && errorCode(invalidBearer) === 'AUTH_004', 'malformed bearer is rejected with AUTH_004');
   const list = await call('GET', `/api/v1/blogs/${owner.blogId}/posts?page=0&size=20`, owner.token);
   const page = data(list);
   const pageKeys = ['items', 'page', 'size', 'totalElements', 'totalPages', 'hasNext', 'hasPrevious'];
@@ -772,20 +937,20 @@ async function runHttpAcceptance() {
     'offset PageResponse contains all canonical fields',
   );
   const bound = await call('GET', `/api/v1/blogs/${owner.blogId}/posts?page=0&size=101`, owner.token);
-  check('paging-bound', bound.status === 400 && bound.body?.success === false, 'page size above the 100-row bound is rejected');
+  check('paging-bound', bound.status === 400 && errorCode(bound) === 'VALIDATION_001', 'page size above the 100-row bound is rejected with VALIDATION_001');
 
   const invalidRegistration = await call('POST', '/api/v1/auth/register', undefined, {});
   const unauthenticatedDrafts = await call('GET', '/api/v1/posts/drafts', undefined);
   const missingPost = await call('GET', '/api/v1/posts/999999999', undefined);
   const duplicateCategory = duplicateGeneral;
   const httpStatusMatrixBase = invalidRegistration.status === 400
-    && invalidRegistration.body?.success === false
+    && errorCode(invalidRegistration) === 'VALIDATION_001'
     && unauthenticatedDrafts.status === 401
-    && unauthenticatedDrafts.body?.success === false
+    && errorCode(unauthenticatedDrafts) === 'AUTH_004'
     && missingPost.status === 404
-    && missingPost.body?.success === false
+    && errorCode(missingPost) === 'POST_001'
     && duplicateCategory.status === 409
-    && duplicateCategory.body?.success === false;
+    && errorCode(duplicateCategory) === 'CAT_005';
 
   // The shared API context intentionally has multiple synthetic sign-ins above;
   // its cookie jar is not a valid rotation fixture. Use isolated contexts so a
@@ -808,8 +973,8 @@ async function runHttpAcceptance() {
   const deniedBeforeAccept = beforeAccept.status === 403;
   check(
     'http-status-matrix',
-    httpStatusMatrixBase && beforeAccept.status === 403 && beforeAccept.body?.success === false,
-    'representative HTTP 400/401/403/404/409 cases returned expected status and common error envelopes',
+    httpStatusMatrixBase && beforeAccept.status === 403 && errorCode(beforeAccept) === 'POST_002',
+    'representative HTTP 400/401/403/404/409 cases returned canonical VALIDATION_001/AUTH_004/POST_002/POST_001/CAT_005 codes',
   );
 
   const request = await call('POST', `/api/v1/universe/requests/${owner.id}`, friend.token);
@@ -1340,19 +1505,39 @@ async function staticSelfCheck() {
     ['function ', 'markRuntimeEvidence', 'NotRun'].join(''),
   ].some((pattern) => source.includes(pattern));
   check('harness-fail-closed-guards', !staleFalsePass, 'runner contains no known false-pass guard patterns', { required: true });
+  const selfCheckRunId = process.env.M10_RUN_ID ?? 'm10-self-check-current';
+  const staleTimestamp = new Date(Date.now() - (attestationSkewMs * 2)).toISOString();
   const negativeFixtures = [
     { schema: 'wrong', status: 'PASS' },
     { schema: runtimeEvidenceSchema, status: 'NOT RUN' },
-    { schema: runtimeEvidenceSchema, status: 'PASS', mysql: { host: '127.0.0.1', port: 13307 } },
+    { schema: runtimeEvidenceSchema, status: 'PASS', mysql: { host: '127.0.0.1', port: 13307, database: 'zeroverse_m10' }, runId: 'm10-stale', attestation: { schema: runtimeAttestationSchema, runId: 'm10-stale' } },
+    { schema: runtimeEvidenceSchema, status: 'PASS', mysql: { host: '127.0.0.1', port: 13320, database: 'wrong_db' }, runId: 'm10-forged', attestation: { schema: runtimeAttestationSchema, runId: 'm10-forged' } },
+    { schema: runtimeEvidenceSchema, status: 'PASS', mysql: { host: approvedMysqlHost, port: approvedMysqlPort, database: 'zeroverse_m10' }, runId: selfCheckRunId, generatedAt: staleTimestamp, attestation: { schema: runtimeAttestationSchema, runId: selfCheckRunId, observedAt: staleTimestamp } },
   ];
   const negativeFixturesRejected = negativeFixtures.every((fixture) => (
     fixture.schema !== runtimeEvidenceSchema
       || fixture.status !== 'PASS'
-      || fixture.mysql?.port === 13307
+      || fixture.mysql?.host !== approvedMysqlHost
+      || fixture.mysql?.port !== approvedMysqlPort
+      || fixture.mysql?.database !== 'zeroverse_m10'
+      || fixture.runId !== selfCheckRunId
+      || fixture.attestation?.schema !== runtimeAttestationSchema
+      || fixture.attestation?.runId !== selfCheckRunId
+      || !withinCurrentRun(fixture.generatedAt)
+      || !withinCurrentRun(fixture.attestation?.observedAt)
   ));
-  check('self-check-negative-fixtures', negativeFixturesRejected, 'synthetic malformed/NOT RUN/user-DB runtime fixtures remain non-pass', { required: true });
+  check('self-check-negative-fixtures', negativeFixturesRejected, 'synthetic malformed/NOT RUN/user-DB/stale-run/forged-database runtime fixtures remain non-pass', { required: true });
   await runProductStaticScan();
   if (canonicalScreens.length !== 13) throw new Error('canonical screen list must contain exactly 13 routes');
+  const requiredPublicOperations = [
+    'get:/api/v1/blogs/slug/{urlSlug}', 'get:/api/v1/blogs/{blogId}/posts',
+    'get:/api/v1/blogs/slug/{urlSlug}/posts', 'get:/api/v1/blogs/{blogId}/categories',
+    'get:/api/v1/posts/{postId}/comments', 'get:/api/v1/posts/{postId}/interactions',
+    'get:/api/v1/feed/public',
+  ];
+  if (!requiredPublicOperations.every((operation) => publicOpenApiOperations.has(operation))) {
+    throw new Error('public OpenAPI operation allowlist is incomplete');
+  }
   if (requiredChecks.length < 50) throw new Error('required M10 checks unexpectedly incomplete');
 }
 
@@ -1361,6 +1546,9 @@ function validateFullRunGuards() {
   if (process.env.M10_SCREENSHOTS === '0') throw new Error('M10 full acceptance cannot disable canonical screenshots');
   if (process.env.M10_MYSQL_HOST !== approvedMysqlHost) {
     throw new Error(`M10_MYSQL_HOST must be explicit loopback ${approvedMysqlHost}`);
+  }
+  if (!process.env.M10_RUN_ID || !/^m10-[A-Za-z0-9_-]+$/.test(process.env.M10_RUN_ID)) {
+    throw new Error('M10_RUN_ID is required and must match the synthetic current run identity');
   }
   const configuredPort = Number(process.env.M10_MYSQL_PORT);
   if (!process.env.M10_MYSQL_PORT) throw new Error('M10_MYSQL_PORT is required for full acceptance');

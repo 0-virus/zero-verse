@@ -5,7 +5,7 @@
 ## 현재 단계
 
 - **M10 테스트·마감 QA — FINAL QA APPROVED / READY TO MERGE**다.
-- 현재 대상은 `feature/M10-closeout` HEAD `75ac4d8bcbfe777e1c1a71dca6283be2344704a3`이며, M9 A-v2는 PR #15로 `dev`에 통합된 COMPLETE 상태다.
+- 최종 acceptance가 실행된 대상은 `feature/M10-closeout` HEAD `75ac4d8bcbfe777e1c1a71dca6283be2344704a3`이며, 이 QA 기록 커밋은 그 이후의 QA-only 문서 변경이다. M9 A-v2는 PR #15로 `dev`에 통합된 COMPLETE 상태다.
 - M10 local MVP closeout은 배포·S3/AWS/U0·실사용 DB·기존 업로드·운영 ADMIN bootstrap·모바일·운영 SLA/peak memory를 포함하지 않는다.
 
 ## 진행 중

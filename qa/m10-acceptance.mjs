@@ -126,7 +126,7 @@ const requiredChecks = [
   'screenshot-setup', 'screenshot-settings', 'screenshot-settings-universe', 'screenshot-settings-posts',
   'screenshot-search', 'screenshot-notifications', 'screenshot-admin', 'screenshot-admin-detail',
   'screenshots-complete',
-  'self-check-negative-fixtures', 'self-check-manifest-ordering', 'self-check-admin-list-shape', 'self-check-browser-signin-form', 'self-check-browser-signin-wait',
+  'self-check-negative-fixtures', 'self-check-manifest-ordering', 'self-check-admin-list-shape', 'self-check-browser-signin-form', 'self-check-browser-signin-wait', 'self-check-keyboard-route-selectors',
 ];
 
 const evidence = {
@@ -1388,7 +1388,7 @@ async function runBrowserAcceptance(accounts) {
     try {
       await ownerPage.goto(`${frontendUrl}/settings/posts`, { waitUntil: 'domcontentloaded' });
       await waitNetwork(ownerPage);
-      const trigger = ownerPage.locator('button[aria-label$="이름 변경"]').first();
+      const trigger = ownerPage.locator('button[aria-label$="이름 변경"]:not([disabled])').first();
       if (await trigger.count() === 0 || !await trigger.isVisible().catch(() => false) || !await trigger.isEnabled().catch(() => false)) {
         notRunKeyboard('keyboard-category-observation', 'enabled GENERAL category rename trigger is absent');
       } else {
@@ -1418,7 +1418,7 @@ async function runBrowserAcceptance(accounts) {
     try {
       await adminPage.goto(`${frontendUrl}/admin`, { waitUntil: 'domcontentloaded' });
       await waitNetwork(adminPage);
-      const input = adminPage.locator('input[aria-label="관리자 사용자 검색"]').first();
+      const input = adminPage.locator('#admin-user-search').first();
       const form = adminPage.locator('form[role="search"]').first();
       if (await input.count() === 0 || !await input.isVisible().catch(() => false) || await form.count() === 0) {
         notRunKeyboard('keyboard-admin-observation', 'admin search form is absent');
@@ -1599,6 +1599,8 @@ async function staticSelfCheck() {
     ['function ', 'markRuntimeEvidence', 'NotRun'].join(''),
     ['Array.isArray(listingData?.items)', 'admin-list-probe'].join(''),
     ['page.locator(\'form button[type="submit"]\')', '.first()'].join(''),
+    ['locator(\'button[aria-label$="이름 변경"]\')', '.first()'].join(''),
+    ['locator(\'input[aria-label="관리자 사용자 검색"]\')', '.first()'].join(''),
   ].some((pattern) => source.includes(pattern));
   check('harness-fail-closed-guards', !staleFalsePass, 'runner contains no known false-pass guard patterns', { required: true });
   const browserSigninFormSelectors = [
@@ -1625,6 +1627,18 @@ async function staticSelfCheck() {
     'self-check-browser-signin-wait',
     browserSigninWaitContract.every((selector) => source.includes(selector)),
     'browser signin waits for route-specific visible email, same-form password, and submit controls with a bounded timeout',
+    { required: true },
+  );
+  const keyboardRouteSelectorContract = [
+    "button[aria-label$=\"이름 변경\"]:not([disabled])",
+    "input[aria-label$=\"이름 편집\"]",
+    "#admin-user-search",
+    "form[role=\"search\"]",
+  ];
+  check(
+    'self-check-keyboard-route-selectors',
+    keyboardRouteSelectorContract.every((selector) => source.includes(selector)),
+    'keyboard category uses an enabled rename control with exact edit input, and admin uses the label-linked search input/form',
     { required: true },
   );
   const selfCheckRunId = process.env.M10_RUN_ID ?? 'm10-self-check-current';
@@ -1847,7 +1861,7 @@ async function writeEvidence() {
   for (const id of missing) evidence.checks.push({ id, ok: false, required: true, detail: 'NOT RUN: runner did not reach this required check' });
   const failures = evidence.checks.filter((item) => item.required && !item.ok);
   const selfCheckFailures = failures.filter((item) => new Set([
-    'harness-fail-closed-guards', 'static-skip-placeholder-scan', 'self-check-negative-fixtures', 'self-check-failure-envelope', 'self-check-manifest-ordering', 'self-check-admin-list-shape', 'self-check-browser-signin-form', 'self-check-browser-signin-wait',
+    'harness-fail-closed-guards', 'static-skip-placeholder-scan', 'self-check-negative-fixtures', 'self-check-failure-envelope', 'self-check-manifest-ordering', 'self-check-admin-list-shape', 'self-check-browser-signin-form', 'self-check-browser-signin-wait', 'self-check-keyboard-route-selectors',
   ]).has(item.id));
   evidence.status = selfCheck
     ? selfCheckFailures.length === 0 && evidence.failures.length === 0 ? 'SELF-CHECK PASS' : 'SELF-CHECK FAIL'

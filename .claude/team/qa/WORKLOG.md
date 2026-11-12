@@ -1257,3 +1257,11 @@
 - self-check: `self-check-browser-signin-wait` required row가 5초 timeout 상수와 네 visible wait selector를 정적으로 확인한다. 기존 `self-check-browser-signin-form`은 ancestor form 및 global-first submit 금지를 계속 확인한다.
 - 검증: `node --check qa/m10-acceptance.mjs` exit `0`; `M10_OUTPUT_DIR=build/m10-selfcheck-browser-wait node qa/m10-acceptance.mjs --self-check` exit `0`, `SELF-CHECK PASS`, browser form/wait·admin shape·manifest/runtime-negative/static guard rows PASS; scoped `git diff --check` exit `0`.
 - 미실행: actual Chrome re-run, frontend dist/API origin, protected notification/admin HTTP, API/MySQL acceptance는 **NOT RUN**이다. 제품 source는 수정하지 않았다.
+
+## 2026-11-12 KST — M10 Task4 keyboard selector mismatch fix
+
+- 배경: fourth actual run은 75/77 PASS 및 13 screenshots를 확보했지만 category/admin keyboard 두 행이 selector mismatch로 NOT RUN이었다. Settings Posts의 첫 rename button은 disabled DEFAULT/LOCKED였고, Admin 검색 input은 aria-label이 아니라 `label[for="admin-user-search"]`로 연결되어 있었다.
+- 수정: category trigger를 `button[aria-label$="이름 변경"]:not([disabled])`로 바꾸어 enabled GENERAL control만 선택하고 기존 exact `input[aria-label$="이름 편집"]` 확인은 유지했다. Admin input은 `#admin-user-search`로, form은 기존 `form[role="search"]`로 선택한다.
+- self-check/정적 근거: `self-check-keyboard-route-selectors` required row가 enabled rename selector·exact edit input·label-linked admin input/form을 확인한다. stale guard는 disabled 필터 없는 category selector와 잘못된 admin aria-label selector를 거부한다.
+- 검증: `node --check qa/m10-acceptance.mjs` exit `0`; `M10_OUTPUT_DIR=build/m10-selfcheck-keyboard-selectors node qa/m10-acceptance.mjs --self-check` exit `0`, `SELF-CHECK PASS`, keyboard selector/browser wait/admin shape/manifest/runtime-negative/static guard rows PASS; scoped `git diff --check` exit `0`.
+- 미실행: actual Chrome keyboard rerun, frontend dist/API origin, API/MySQL acceptance는 **NOT RUN**이다. 제품 source는 수정하지 않았다.

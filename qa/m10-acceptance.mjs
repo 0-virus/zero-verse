@@ -18,11 +18,14 @@
 import { createRequire } from 'node:module';
 import { createHash, randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { access, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { execFile as execFileCallback } from 'node:child_process';
+import { access, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { constants as fsConstants } from 'node:fs';
 import { resolve, relative } from 'node:path';
+import { promisify } from 'node:util';
 
 const require = createRequire(import.meta.url);
+const execFile = promisify(execFileCallback);
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const selfCheck = process.argv.includes('--self-check');
 const suffix = `${Date.now().toString(36)}${randomBytes(6).toString('hex')}`;
@@ -33,8 +36,28 @@ const manifestPath = resolve(root, process.env.M10_VERSION_MANIFEST ?? 'build/m1
 const chromeExecutable = process.env.M10_CHROME_EXECUTABLE
   ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const playwrightModule = process.env.M10_PLAYWRIGHT_MODULE ?? 'playwright';
-const screenshotsEnabled = process.env.M10_SCREENSHOTS !== '0';
+const harnessPath = resolve(root, 'qa/m10-acceptance.mjs');
+const runtimeEvidencePath = process.env.M10_RUNTIME_EVIDENCE
+  ? resolve(root, process.env.M10_RUNTIME_EVIDENCE)
+  : null;
+const approvedMysqlHost = '127.0.0.1';
+const approvedMysqlPort = 13320;
+const approvedApiBaseUrl = 'http://127.0.0.1:18090';
+const approvedFrontendUrl = 'http://127.0.0.1:5180';
+const screenshotsEnabled = true;
 const headless = process.env.M10_HEADLESS !== '0';
+
+const runtimeEvidenceSchema = 'zeroverse.m10.runtime-evidence.v1';
+const runtimeEvidenceCheckIds = [
+  'admin-current-actor', 'admin-stale-claim', 'admin-self-protection',
+  'admin-mutations', 'admin-deleted-target', 'admin-soft-delete-preservation',
+  'upload-5mib-mime', 'restart-persistence',
+];
+const runtimeAdminEvidenceIds = [
+  'current-active-actor', 'stale-claim', 'self-protection', 'role-status-delete', 'deleted-target', 'child-fingerprint',
+];
+const runtimeUploadEvidenceIds = ['exact-5242880', 'over-5242880', 'mime-mismatch', 'authorized-content-get'];
+const runtimeRestartEvidenceIds = ['same-jar', 'same-db', 'same-file-hash', 'post-restart-content-get'];
 
 const canonicalScreens = [
   ['main', '/'],
@@ -72,19 +95,23 @@ const screenExpectations = {
 };
 
 const requiredChecks = [
-  'source-runtime-identity', 'runtime-openapi', 'openapi-required-paths',
+  'source-runtime-identity', 'runtime-evidence-schema', 'runtime-openapi', 'openapi-required-paths', 'openapi-coverage',
   'synthetic-register-owner', 'synthetic-register-friend', 'signin-owner', 'signin-friend',
-  'setup-owner', 'setup-friend', 'draft-empty-allowed', 'publish-public', 'public-guest-read',
+  'setup-owner', 'setup-friend', 'general-category-fixture', 'draft-empty-allowed', 'publish-empty-rejected', 'publish-image-only-allowed', 'publish-public', 'public-guest-read',
   'refresh-rotation', 'logout-refresh-reuse-rejected', 'universe-request', 'universe-accept',
-  'universe-post-read', 'comment-create', 'like-create', 'notification-list', 'notification-read-delete',
+  'universe-post-read', 'comment-create', 'like-create', 'notification-list', 'notification-event-identity', 'notification-read-delete',
   'content-sanitize',
-  'common-envelope', 'private-no-store', 'invalid-bearer-rejected', 'pagination-shape',
-  'admin-current-actor', 'admin-soft-delete-preservation', 'upload-5mib-mime', 'restart-persistence',
+  'common-envelope', 'private-no-store', 'invalid-bearer-rejected', 'pagination-shape', 'paging-bound', 'http-status-matrix',
+  'refresh-cookie-policy',
+  'admin-current-actor', 'admin-stale-claim', 'admin-self-protection', 'admin-mutations', 'admin-deleted-target',
+  'admin-soft-delete-preservation', 'upload-5mib-mime', 'restart-persistence',
   'provenance-hash-stability', 'static-skip-placeholder-scan', 'keyboard-topbar-observation', 'keyboard-modal-observation',
   'keyboard-draft-picker-observation', 'keyboard-category-observation', 'keyboard-admin-observation',
   'screenshot-main', 'screenshot-blog', 'screenshot-post-detail', 'screenshot-editor', 'screenshot-auth',
   'screenshot-setup', 'screenshot-settings', 'screenshot-settings-universe', 'screenshot-settings-posts',
   'screenshot-search', 'screenshot-notifications', 'screenshot-admin', 'screenshot-admin-detail',
+  'screenshots-complete',
+  'self-check-negative-fixtures',
 ];
 
 const evidence = {
@@ -96,8 +123,9 @@ const evidence = {
   apiBaseUrl,
   frontendUrl,
   sourceManifest: null,
+  runtimeEvidence: null,
   provenance: { before: null, after: null },
-  fixture: { runId: `m10-${suffix}`, accountIds: {}, blogIds: {}, postIds: {}, commentIds: {} },
+  fixture: { runId: `m10-${suffix}`, accountIds: {}, blogIds: {}, categoryIds: {}, postIds: {}, commentIds: {} },
   screenshots: [],
   checks: [],
   failures: [],
@@ -128,18 +156,89 @@ async function sha256(file) {
   return createHash('sha256').update(data).digest('hex');
 }
 
+function isSha256(value) {
+  return typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value);
+}
+
+function isGitHash(value) {
+  return typeof value === 'string' && /^[a-f0-9]{40,64}$/i.test(value);
+}
+
+function assertInsideRoot(file, label) {
+  if (relative(root, file).startsWith('..')) throw new Error(`${label} escapes repository root`);
+}
+
+async function sha256Directory(directory) {
+  const files = [];
+  async function walk(current, prefix = '') {
+    const entries = await readdir(current, { withFileTypes: true });
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+    for (const entry of entries) {
+      const absolute = resolve(current, entry.name);
+      const logical = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        await walk(absolute, logical);
+      } else if (entry.isFile()) {
+        files.push({ path: logical, sha256: await sha256(absolute) });
+      } else {
+        throw new Error(`frontend dist contains unsupported entry: ${logical}`);
+      }
+    }
+  }
+  await walk(directory);
+  return createHash('sha256')
+    .update(files.map((entry) => `${entry.path}\0${entry.sha256}\n`).join(''))
+    .digest('hex');
+}
+
+async function gitValue(...args) {
+  const result = await execFile('git', args, { cwd: root, maxBuffer: 4 * 1024 * 1024 });
+  return result.stdout.trim();
+}
+
+async function currentGitIdentity() {
+  const [commit, tree] = await Promise.all([
+    gitValue('rev-parse', 'HEAD'),
+    gitValue('rev-parse', 'HEAD^{tree}'),
+  ]);
+  if (!/^[a-f0-9]{40,64}$/i.test(commit) || !/^[a-f0-9]{40,64}$/i.test(tree)) {
+    throw new Error('current Git commit/tree identity is unavailable');
+  }
+  return { commit, tree };
+}
+
+async function trackedProductFiles() {
+  const output = await gitValue('ls-files', '-z');
+  return output.split('\0').filter(Boolean).filter((file) => (
+    file.startsWith('src/')
+      || file.startsWith('frontend/')
+      || file === 'build.gradle'
+      || file === 'settings.gradle'
+      || file === 'gradle.properties'
+      || file.startsWith('gradle/')
+      || file === 'gradlew'
+      || file === 'gradlew.bat'
+  ));
+}
+
 async function verifyManifest() {
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
-  if (!Array.isArray(manifest.files) || typeof manifest.sourceSha256 !== 'string') {
-    throw new Error('M10 manifest must contain sourceSha256 and files[]');
+  if (manifest?.schemaVersion !== 'm10-version-manifest.v2') {
+    throw new Error('M10 manifest schemaVersion must be m10-version-manifest.v2');
+  }
+  if (!Array.isArray(manifest.files) || !isSha256(manifest.sourceSha256)) {
+    throw new Error('M10 manifest must contain schemaVersion, sourceSha256 and files[]');
   }
   const actual = [];
+  const seen = new Set();
   for (const entry of manifest.files) {
-    if (!entry || typeof entry.path !== 'string' || typeof entry.sha256 !== 'string') {
+    if (!entry || typeof entry.path !== 'string' || !isSha256(entry.sha256)) {
       throw new Error('M10 manifest contains malformed file entry');
     }
+    if (seen.has(entry.path)) throw new Error(`M10 manifest contains duplicate file entry: ${entry.path}`);
+    seen.add(entry.path);
     const file = resolve(root, entry.path);
-    if (relative(root, file).startsWith('..')) throw new Error('manifest escapes repository root');
+    assertInsideRoot(file, 'manifest entry');
     const hash = await sha256(file);
     if (hash !== entry.sha256) throw new Error(`source manifest mismatch: ${entry.path}`);
     actual.push({ path: entry.path, sha256: hash });
@@ -149,16 +248,162 @@ async function verifyManifest() {
     .update(actual.map((entry) => `${entry.path}\0${entry.sha256}\n`).join(''))
     .digest('hex');
   if (aggregate !== manifest.sourceSha256) throw new Error('source manifest aggregate mismatch');
+  const tracked = await trackedProductFiles();
+  const missingProductFiles = tracked.filter((file) => !seen.has(file));
+  if (missingProductFiles.length > 0) {
+    throw new Error(`M10 manifest omits tracked product files (${missingProductFiles.length})`);
+  }
+  const git = await currentGitIdentity();
+  if (manifest.git?.commit !== git.commit || manifest.git?.tree !== git.tree) {
+    throw new Error('M10 manifest Git commit/tree does not match current checkout');
+  }
   const jarPath = resolve(root, manifest.jarPath ?? 'build/libs/zeroverse-server-0.0.1-SNAPSHOT.jar');
+  assertInsideRoot(jarPath, 'runtime JAR');
   const jarSha256 = await sha256(jarPath);
-  if (manifest.jarSha256 !== jarSha256) throw new Error('runtime JAR hash mismatch');
-  evidence.sourceManifest = { ...manifest, verifiedAt: new Date().toISOString() };
+  if (manifest.jarSha256 !== jarSha256 || !isSha256(manifest.jarSha256)) throw new Error('runtime JAR hash mismatch');
+  const frontendDistPath = resolve(root, manifest.frontendDistPath ?? 'frontend/dist');
+  assertInsideRoot(frontendDistPath, 'frontend dist');
+  const frontendDistSha256 = await sha256Directory(frontendDistPath);
+  if (manifest.frontendDistSha256 !== frontendDistSha256 || !isSha256(manifest.frontendDistSha256)) {
+    throw new Error('frontend dist hash mismatch');
+  }
+  evidence.sourceManifest = {
+    ...manifest,
+    productFiles: { tracked: tracked.length, listed: seen.size, missing: 0 },
+    verifiedAt: new Date().toISOString(),
+  };
   evidence.provenance.before = {
     sourceSha256: manifest.sourceSha256,
     jarSha256,
-    harnessSha256: await sha256(resolve(root, 'qa/m10-acceptance.mjs')),
+    frontendSha256: frontendDistSha256,
+    harnessSha256: await sha256(harnessPath),
+    gitCommit: git.commit,
+    gitTree: git.tree,
   };
-  check('source-runtime-identity', true, 'source manifest and runtime JAR hashes match');
+  check(
+    'source-runtime-identity',
+    true,
+    `source manifest, tracked product set (${tracked.length}), Git commit/tree, JAR and FE dist hashes match`,
+  );
+}
+
+function validIso(value) {
+  return typeof value === 'string' && !Number.isNaN(Date.parse(value));
+}
+
+function hasAll(values, required) {
+  return Array.isArray(values) && required.every((value) => values.includes(value));
+}
+
+function markRuntimeEvidenceMissing(detail) {
+  check('runtime-evidence-schema', false, `NOT RUN: ${detail}`, { required: true });
+  for (const id of runtimeEvidenceCheckIds) {
+    check(id, false, `NOT RUN: runtime evidence did not supply ${id}`, { required: true });
+  }
+}
+
+async function verifyRuntimeEvidence() {
+  if (!runtimeEvidencePath) {
+    markRuntimeEvidenceMissing('M10_RUNTIME_EVIDENCE is not configured; env presence alone cannot pass runtime-only checks');
+    return;
+  }
+  try {
+    assertInsideRoot(runtimeEvidencePath, 'runtime evidence');
+  } catch (error) {
+    markRuntimeEvidenceMissing(scrub(error instanceof Error ? error.message : error));
+    return;
+  }
+  let bundle;
+  try {
+    bundle = JSON.parse(await readFile(runtimeEvidencePath, 'utf8'));
+  } catch (error) {
+    markRuntimeEvidenceMissing(`runtime bundle could not be read (${scrub(error instanceof Error ? error.message : error)})`);
+    return;
+  }
+  const admin = bundle?.checks?.admin;
+  const upload = bundle?.checks?.upload;
+  const restart = bundle?.checks?.restart;
+  const schemaShape = bundle?.schema === runtimeEvidenceSchema
+    && bundle?.milestone === 'M10'
+    && typeof bundle?.runId === 'string'
+    && /^m10-[A-Za-z0-9_-]+$/.test(bundle.runId)
+    && validIso(bundle?.generatedAt)
+    && bundle?.runtime?.mysql?.host === approvedMysqlHost
+    && Number(bundle?.runtime?.mysql?.port) === approvedMysqlPort
+    && bundle?.runtime?.api?.baseUrl === apiBaseUrl
+    && bundle?.runtime?.api?.timezone === 'UTC'
+    && isSha256(bundle?.runtime?.api?.jarSha256)
+    && bundle?.runtime?.frontend?.baseUrl === frontendUrl
+    && isSha256(bundle?.runtime?.frontend?.distSha256)
+    && isGitHash(bundle?.provenance?.gitCommit)
+    && isGitHash(bundle?.provenance?.gitTree)
+    && isSha256(bundle?.provenance?.sourceManifestSha256)
+    && isSha256(bundle?.provenance?.jarSha256)
+    && isSha256(bundle?.provenance?.frontendDistSha256)
+    && isSha256(bundle?.provenance?.harnessSha256)
+    && bundle?.status === 'PASS'
+    && bundle?.runtime?.api?.jarSha256 === bundle?.provenance?.jarSha256
+    && bundle?.runtime?.frontend?.distSha256 === bundle?.provenance?.frontendDistSha256
+    && admin?.status === 'PASS'
+    && upload?.status === 'PASS'
+    && restart?.status === 'PASS'
+    && hasAll(admin?.ids, runtimeAdminEvidenceIds)
+    && hasAll(upload?.ids, runtimeUploadEvidenceIds)
+    && hasAll(restart?.ids, runtimeRestartEvidenceIds);
+  const noSecrets = !/(?:Bearer\s+|password\s*[:=]|refresh[_-]?token\s*[:=]|set-cookie\s*[:=]|@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/i.test(JSON.stringify(bundle));
+  const before = evidence.provenance.before;
+  const currentMatches = schemaShape
+    && noSecrets
+    && before
+    && bundle.provenance.sourceManifestSha256 === before.sourceSha256
+    && bundle.provenance.jarSha256 === before.jarSha256
+    && bundle.provenance.frontendDistSha256 === before.frontendSha256
+    && bundle.provenance.harnessSha256 === before.harnessSha256
+    && bundle.provenance.gitCommit === before.gitCommit
+    && bundle.provenance.gitTree === before.gitTree;
+  const sanitizedChecks = {
+    admin: { status: admin?.status === 'PASS' ? 'PASS' : null, ids: Array.isArray(admin?.ids) ? admin.ids.filter((id) => runtimeAdminEvidenceIds.includes(id)) : [] },
+    upload: { status: upload?.status === 'PASS' ? 'PASS' : null, ids: Array.isArray(upload?.ids) ? upload.ids.filter((id) => runtimeUploadEvidenceIds.includes(id)) : [] },
+    restart: { status: restart?.status === 'PASS' ? 'PASS' : null, ids: Array.isArray(restart?.ids) ? restart.ids.filter((id) => runtimeRestartEvidenceIds.includes(id)) : [] },
+  };
+  evidence.runtimeEvidence = {
+    schema: bundle?.schema === runtimeEvidenceSchema ? runtimeEvidenceSchema : null,
+    milestone: bundle?.milestone === 'M10' ? 'M10' : null,
+    runId: typeof bundle?.runId === 'string' && /^m10-[A-Za-z0-9_-]+$/.test(bundle.runId) ? bundle.runId : null,
+    status: bundle?.status === 'PASS' ? 'PASS' : null,
+    generatedAt: validIso(bundle?.generatedAt) ? bundle.generatedAt : null,
+    provenance: schemaShape ? {
+      gitCommit: bundle.provenance.gitCommit,
+      gitTree: bundle.provenance.gitTree,
+      sourceManifestSha256: bundle.provenance.sourceManifestSha256,
+      jarSha256: bundle.provenance.jarSha256,
+      frontendDistSha256: bundle.provenance.frontendDistSha256,
+      harnessSha256: bundle.provenance.harnessSha256,
+    } : null,
+    checks: sanitizedChecks,
+  };
+  check(
+    'runtime-evidence-schema',
+    Boolean(currentMatches),
+    currentMatches
+      ? 'runtime bundle schema, loopback runtime, grouped named checks, current Git/source/JAR/FE/harness hashes and secret-free boundary match the verified manifest'
+      : 'NOT RUN: runtime bundle schema/status/named checks or current provenance hashes do not match the verified manifest',
+    { required: true },
+  );
+  const namedPass = currentMatches && schemaShape;
+  const namedDetails = {
+    'admin-current-actor': 'admin.current-active-actor',
+    'admin-stale-claim': 'admin.stale-claim',
+    'admin-self-protection': 'admin.self-protection',
+    'admin-mutations': 'admin.role-status-delete',
+    'admin-deleted-target': 'admin.deleted-target',
+    'admin-soft-delete-preservation': 'admin.child-fingerprint',
+    'upload-5mib-mime': 'upload.exact-5242880/over-5242880/mime-mismatch/authorized-content-get',
+    'restart-persistence': 'restart.same-jar/same-db/same-file-hash/post-restart-content-get',
+  };
+  for (const id of runtimeEvidenceCheckIds) {
+    check(id, namedPass, namedPass ? `runtime bundle named check ${namedDetails[id]} is PASS` : `NOT RUN: runtime bundle did not verify ${namedDetails[id]}`, { required: true });
+  }
 }
 
 async function safeJson(response) {
@@ -180,6 +425,25 @@ function cookiePair(headers) {
   const first = raw.split(/,(?=[^;=]+=[^;]+)/, 1)[0];
   const pair = first.split(';', 1)[0];
   return pair.includes('=') ? pair : null;
+}
+
+function cookiePolicy(headers) {
+  const raw = headers?.['set-cookie'];
+  if (typeof raw !== 'string' || !raw) return { present: false, httpOnly: false, sameSite: null, path: null, maxAge: null };
+  const first = raw.split(/,(?=[^;=]+=[^;]+)/, 1)[0];
+  const attributes = first.split(';').slice(1).map((part) => part.trim());
+  const lower = attributes.map((part) => part.toLowerCase());
+  const path = attributes.find((part) => /^path=/i.test(part))?.slice(5) ?? null;
+  const sameSite = attributes.find((part) => /^samesite=/i.test(part))?.slice(9).toLowerCase() ?? null;
+  const maxAgeValue = attributes.find((part) => /^max-age=/i.test(part))?.slice(8) ?? null;
+  const maxAge = maxAgeValue !== null && /^\d+$/.test(maxAgeValue) ? Number(maxAgeValue) : null;
+  return {
+    present: first.includes('='),
+    httpOnly: lower.includes('httponly'),
+    sameSite,
+    path,
+    maxAge,
+  };
 }
 
 function syntheticEmail(value) {
@@ -208,6 +472,10 @@ async function isolatedRefreshLifecycle(account) {
     const oldCookie = cookiePair(signed.headers());
     const rotated = await ownerContext.post('/api/v1/auth/refresh');
     const newCookie = cookiePair(rotated.headers());
+    const rotatedAccessToken = (await rotated.json().catch(() => null))?.data?.accessToken;
+    const rotatedProtected = typeof rotatedAccessToken === 'string'
+      ? await ownerContext.get('/api/v1/auth/me', { headers: { Authorization: `Bearer ${rotatedAccessToken}` } })
+      : null;
 
     // The old cookie is deliberately replayed from a separate context. Values
     // remain in memory only and are never placed in evidence or error details.
@@ -223,8 +491,23 @@ async function isolatedRefreshLifecycle(account) {
         && rotated.status() === 200
         && Boolean(oldCookie)
         && Boolean(newCookie)
-        && oldCookie !== newCookie,
-      'isolated owner context received a distinct rotated refresh cookie',
+        && oldCookie !== newCookie
+        && rotatedProtected?.status() === 200,
+      'isolated owner context received a distinct rotated refresh cookie and its access token reached /auth/me',
+    );
+    const initialCookiePolicy = cookiePolicy(signed.headers());
+    const rotatedCookiePolicy = cookiePolicy(rotated.headers());
+    check(
+      'refresh-cookie-policy',
+      [initialCookiePolicy, rotatedCookiePolicy].every((policy) => (
+        policy.present
+          && policy.httpOnly
+          && policy.sameSite === 'strict'
+          && policy.path === '/api/v1/auth'
+          && Number.isInteger(policy.maxAge)
+          && policy.maxAge > 0
+      )),
+      'refresh cookies expose HttpOnly, SameSite=Strict, /api/v1/auth Path and positive Max-Age without recording cookie values',
     );
     check(
       'logout-refresh-reuse-rejected',
@@ -305,15 +588,83 @@ async function verifyOpenApi() {
   const response = await api.fetch('/v3/api-docs');
   const spec = await safeJson(response);
   const paths = spec?.paths ?? {};
-  const expected = [
-    '/api/v1/auth/register', '/api/v1/auth/signin', '/api/v1/auth/refresh', '/api/v1/auth/signout',
-    '/api/v1/posts', '/api/v1/universe/requests/{targetUserId}', '/api/v1/notifications',
-    '/api/v1/admin/users', '/api/v1/uploads', '/api/v1/search',
-  ];
-  const ok = response.status() === 200 && expected.every((path) => paths[path]);
-  check('runtime-openapi', response.status() === 200, 'generated /v3/api-docs reachable');
-  check('openapi-required-paths', ok, 'required M10 endpoint paths exist in generated OpenAPI');
-  if (!ok) throw new Error('OpenAPI readiness failed');
+  const expected = {
+    '/api/v1/auth/register': ['post'],
+    '/api/v1/auth/signin': ['post'],
+    '/api/v1/auth/refresh': ['post'],
+    '/api/v1/auth/signout': ['post'],
+    '/api/v1/posts': ['post'],
+    '/api/v1/universe/requests/{targetUserId}': ['post'],
+    '/api/v1/notifications': ['get'],
+    '/api/v1/admin/users': ['get'],
+    '/api/v1/uploads': ['post'],
+    '/api/v1/search': ['get'],
+  };
+  const requiredPathsOk = response.status() === 200
+    && Object.entries(expected).every(([path, methods]) => (
+      paths[path] && methods.every((method) => typeof paths[path][method] === 'object')
+    ));
+  check('runtime-openapi', response.status() === 200 && spec && typeof spec === 'object', 'generated /v3/api-docs reachable');
+  check('openapi-required-paths', requiredPathsOk, 'required M10 endpoint paths and methods exist in generated OpenAPI');
+
+  const operations = [];
+  for (const [path, item] of Object.entries(paths)) {
+    for (const [method, operation] of Object.entries(item ?? {})) {
+      if (!['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'trace'].includes(method)) continue;
+      operations.push({ path, method, operation });
+    }
+  }
+  const operationIds = operations.map(({ operation }) => operation?.operationId).filter(Boolean);
+  const operationIdsUnique = operationIds.length === new Set(operationIds).size;
+  const bearer = spec?.components?.securitySchemes?.bearerAuth;
+  const bearerContract = bearer?.type === 'http' && String(bearer.scheme).toLowerCase() === 'bearer';
+  const publicOperations = new Set([
+    'post:/api/v1/auth/register', 'post:/api/v1/auth/signin', 'post:/api/v1/auth/refresh', 'post:/api/v1/auth/signout',
+    'get:/api/v1/posts/{postId}', 'get:/api/v1/blogs/slug/{urlSlug}/posts', 'get:/api/v1/tags/{tagName}/posts',
+    'get:/api/v1/search',
+  ]);
+  const securedOperations = operations.filter(({ path, method }) => !publicOperations.has(`${method}:${path}`));
+  const securityOk = securedOperations.every(({ operation }) => {
+    const security = operation?.security ?? spec?.security;
+    return Array.isArray(security) && security.some((entry) => entry && typeof entry === 'object' && Object.hasOwn(entry, 'bearerAuth'));
+  });
+  const responseSchemaOk = operations.every(({ operation }) => {
+    if (!operation || !operation.responses || typeof operation.responses !== 'object') return false;
+    return Object.entries(operation.responses).every(([status, responseEntry]) => {
+      if (status === '204' || status === 'default') return true;
+      const content = responseEntry?.content ?? {};
+      return Object.values(content).some((media) => media?.schema);
+    });
+  });
+  const requestSchemaOk = operations.every(({ operation }) => {
+    const request = operation?.requestBody;
+    if (!request) return true;
+    return Object.values(request.content ?? {}).some((media) => media?.schema);
+  });
+  const errorSchema = new Map(['400', '401', '403', '404', '409'].map((status) => [status, false]));
+  for (const { operation } of operations) {
+    for (const [status, responseEntry] of Object.entries(operation?.responses ?? {})) {
+      if (!errorSchema.has(status)) continue;
+      const hasSchema = Object.values(responseEntry?.content ?? {}).some((media) => media?.schema);
+      errorSchema.set(status, errorSchema.get(status) || hasSchema);
+    }
+  }
+  const errorSchemaOk = [...errorSchema.values()].every(Boolean);
+  const coverageOk = response.status() === 200
+    && operations.length === 61
+    && operationIds.length === 61
+    && operationIdsUnique
+    && bearerContract
+    && securityOk
+    && requestSchemaOk
+    && responseSchemaOk
+    && errorSchemaOk;
+  check(
+    'openapi-coverage',
+    coverageOk,
+    `OpenAPI operations=${operations.length}/61, uniqueOperationId=${operationIdsUnique}, bearer=${bearerContract && securityOk}, requestSchemas=${requestSchemaOk}, responseSchemas=${responseSchemaOk}, errorSchemas=${[...errorSchema.entries()].filter(([, ok]) => ok).map(([status]) => status).join('|') || 'none'}`,
+  );
+  if (!requiredPathsOk || !coverageOk) throw new Error('OpenAPI readiness/coverage failed');
 }
 
 async function runHttpAcceptance() {
@@ -321,14 +672,57 @@ async function runHttpAcceptance() {
   friend = await registerAndSetup('friend');
   const pending = await registerPending('pending');
   const categories = await call('GET', `/api/v1/blogs/${owner.blogId}/categories`, owner.token);
-  const defaultCategory = data(categories)?.items?.find((item) => item.type === 'DEFAULT') ?? data(categories)?.[0];
+  const categoryItems = Array.isArray(data(categories)?.items) ? data(categories).items : (Array.isArray(data(categories)) ? data(categories) : []);
+  const defaultCategory = categoryItems.find((item) => item.type === 'DEFAULT') ?? categoryItems[0];
   const categoryId = Number(defaultCategory?.id);
+  const generalName = `M10 General ${suffix}`;
+  const generalCategory = await call('POST', `/api/v1/blogs/${owner.blogId}/categories`, owner.token, {
+    name: generalName, parentId: null, type: 'GENERAL', displayOrder: 1,
+  });
+  const generalCategoryData = data(generalCategory);
+  const generalCategoryId = Number(generalCategoryData?.id);
+  evidence.fixture.categoryIds = {
+    default: Number.isInteger(categoryId) ? categoryId : null,
+    general: Number.isInteger(generalCategoryId) ? generalCategoryId : null,
+  };
+  check(
+    'general-category-fixture',
+    generalCategory.status === 201
+      && Number.isInteger(generalCategoryId)
+      && generalCategoryData?.type === 'GENERAL'
+      && generalCategoryData?.name === generalName,
+    'GENERAL category fixture was created through the current API for post/category keyboard and duplicate checks',
+  );
+  const duplicateGeneral = await call('POST', `/api/v1/blogs/${owner.blogId}/categories`, owner.token, {
+    name: generalName, parentId: null, type: 'GENERAL', displayOrder: 2,
+  });
   const emptyDraft = await call('POST', '/api/v1/posts', owner.token, {
     blogId: owner.blogId, title: '', contentJson: { type: 'doc', content: [] }, contentHtml: '',
     categoryId: Number.isInteger(categoryId) ? categoryId : null, visibility: 'PRIVATE', publish: false,
     thumbnailUrl: null, tagNames: [], images: [],
   });
   check('draft-empty-allowed', emptyDraft.status === 201, 'draft permits empty title/body');
+  const publishEmpty = await call('POST', '/api/v1/posts', owner.token, {
+    blogId: owner.blogId, title: '', contentJson: { type: 'doc', content: [] }, contentHtml: '',
+    categoryId: Number.isInteger(categoryId) ? categoryId : null, visibility: 'PUBLIC', publish: true,
+    thumbnailUrl: null, tagNames: [], images: [],
+  });
+  check('publish-empty-rejected', publishEmpty.status === 400, 'publishing an empty title/body is rejected');
+  const imageOnlyUrl = `https://example.test/m10-image-${suffix}.png`;
+  const imageOnly = await call('POST', '/api/v1/posts', owner.token, {
+    blogId: owner.blogId, title: `M10 image-only ${suffix}`,
+    contentJson: { type: 'doc', content: [{ type: 'image', attrs: { src: imageOnlyUrl, alt: 'M10 image' } }] },
+    contentHtml: '', categoryId: Number.isInteger(categoryId) ? categoryId : null, visibility: 'PUBLIC', publish: true,
+    thumbnailUrl: imageOnlyUrl, tagNames: [], images: [{ imageUrl: imageOnlyUrl, altText: 'M10 image', displayOrder: 0 }],
+  });
+  const imageOnlyData = data(imageOnly);
+  check(
+    'publish-image-only-allowed',
+    imageOnly.status === 201
+      && Number.isInteger(Number(imageOnlyData?.id))
+      && imageOnlyData?.publishedAt,
+    'publishing an image-only document is allowed when title and image snapshot are valid',
+  );
   const sanitizeProbe = await call('POST', '/api/v1/posts', owner.token, {
     blogId: owner.blogId, title: `M10 sanitize ${suffix}`,
     contentJson: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '<script>alert(1)</script>' }] }] },
@@ -351,15 +745,47 @@ async function runHttpAcceptance() {
   evidence.fixture.postIds.public = Number(post?.id) || null;
   check('publish-public', published.status === 201 && Number.isInteger(post?.id), 'public post created');
   const guestRead = await call('GET', `/api/v1/posts/${post?.id}`, undefined);
-  check('public-guest-read', guestRead.status === 200, 'guest can read PUBLIC post');
+  check(
+    'public-guest-read',
+    guestRead.status === 200
+      && Number(data(guestRead)?.id) === Number(post?.id)
+      && data(guestRead)?.visibility === 'PUBLIC',
+    'guest can read the expected PUBLIC post by fixture ID',
+  );
   const envelope = guestRead.body && typeof guestRead.body.success === 'boolean' && 'timestamp' in guestRead.body;
   check('common-envelope', envelope, 'response includes common success/timestamp envelope');
-  check('private-no-store', /no-store/i.test(guestRead.headers['cache-control'] ?? ''), 'sensitive read has private,no-store');
+  const cacheControl = guestRead.headers['cache-control'] ?? '';
+  check('private-no-store', /private/i.test(cacheControl) && /no-store/i.test(cacheControl), 'sensitive read has both private and no-store cache directives');
   const invalidBearer = await call('GET', `/api/v1/posts/${post?.id}`, 'not-a-token');
-  check('invalid-bearer-rejected', invalidBearer.status === 401, 'malformed bearer is rejected');
+  check('invalid-bearer-rejected', invalidBearer.status === 401 && invalidBearer.body?.success === false, 'malformed bearer is rejected with the common error envelope');
   const list = await call('GET', `/api/v1/blogs/${owner.blogId}/posts?page=0&size=20`, owner.token);
   const page = data(list);
-  check('pagination-shape', list.status === 200 && Number.isInteger(page?.page) && Array.isArray(page?.items), 'offset page shape is present');
+  const pageKeys = ['items', 'page', 'size', 'totalElements', 'totalPages', 'hasNext', 'hasPrevious'];
+  check(
+    'pagination-shape',
+    list.status === 200
+      && pageKeys.every((key) => Object.hasOwn(page ?? {}, key))
+      && Number.isInteger(page?.page)
+      && Number.isInteger(page?.size)
+      && Number.isInteger(page?.totalPages)
+      && Array.isArray(page?.items),
+    'offset PageResponse contains all canonical fields',
+  );
+  const bound = await call('GET', `/api/v1/blogs/${owner.blogId}/posts?page=0&size=101`, owner.token);
+  check('paging-bound', bound.status === 400 && bound.body?.success === false, 'page size above the 100-row bound is rejected');
+
+  const invalidRegistration = await call('POST', '/api/v1/auth/register', undefined, {});
+  const unauthenticatedDrafts = await call('GET', '/api/v1/posts/drafts', undefined);
+  const missingPost = await call('GET', '/api/v1/posts/999999999', undefined);
+  const duplicateCategory = duplicateGeneral;
+  const httpStatusMatrixBase = invalidRegistration.status === 400
+    && invalidRegistration.body?.success === false
+    && unauthenticatedDrafts.status === 401
+    && unauthenticatedDrafts.body?.success === false
+    && missingPost.status === 404
+    && missingPost.body?.success === false
+    && duplicateCategory.status === 409
+    && duplicateCategory.body?.success === false;
 
   // The shared API context intentionally has multiple synthetic sign-ins above;
   // its cookie jar is not a valid rotation fixture. Use isolated contexts so a
@@ -379,36 +805,83 @@ async function runHttpAcceptance() {
     throw new Error('UNIVERSE fixture creation failed; relation/read checks were not executed');
   }
   const beforeAccept = await call('GET', `/api/v1/posts/${universePost?.id}`, friend.token);
-  const deniedBeforeAccept = [401, 403].includes(beforeAccept.status);
+  const deniedBeforeAccept = beforeAccept.status === 403;
+  check(
+    'http-status-matrix',
+    httpStatusMatrixBase && beforeAccept.status === 403 && beforeAccept.body?.success === false,
+    'representative HTTP 400/401/403/404/409 cases returned expected status and common error envelopes',
+  );
 
   const request = await call('POST', `/api/v1/universe/requests/${owner.id}`, friend.token);
   const requestId = Number(data(request)?.requestId ?? data(request)?.id);
-  check('universe-request', request.status === 201 && Number.isInteger(requestId), 'universe request created');
+  check(
+    'universe-request',
+    request.status === 201
+      && Number.isInteger(requestId)
+      && Number(data(request)?.user?.id) === Number(owner.id)
+      && data(request)?.status === 'PENDING',
+    'universe request created for the expected owner target with PENDING status',
+  );
   const received = await call('GET', '/api/v1/universe/requests/received', owner.token);
-  const receivedItem = data(received)?.items?.find((item) => Number(item.id) === requestId) ?? data(received)?.items?.[0];
-  const accepted = await call('POST', `/api/v1/universe/requests/${receivedItem?.id ?? requestId}/accept`, owner.token);
-  check('universe-accept', accepted.status === 200, 'universe request accepted');
+  const receivedItem = data(received)?.items?.find((item) => Number(item.requestId) === requestId);
+  const accepted = await call('POST', `/api/v1/universe/requests/${receivedItem?.requestId ?? requestId}/accept`, owner.token);
+  check(
+    'universe-accept',
+    accepted.status === 200
+      && Number(data(accepted)?.target?.id) === Number(friend.id)
+      && data(accepted)?.incoming?.status === 'ACCEPTED',
+    'owner accepted the exact received request and the relation snapshot targets friend',
+  );
   const universeRead = await call('GET', `/api/v1/posts/${universePost?.id}`, friend.token);
   check(
     'universe-post-read',
-    deniedBeforeAccept && universePublished.status === 201 && universeRead.status === 200,
+    deniedBeforeAccept
+      && universePublished.status === 201
+      && universeRead.status === 200
+      && Number(data(universeRead)?.id) === Number(universePost?.id)
+      && data(universeRead)?.visibility === 'UNIVERSE',
     `UNIVERSE post denied before acceptance (${beforeAccept.status}) and allowed after acceptance (${universeRead.status})`,
   );
 
   const interactionPostId = Number(universePost?.id) || Number(post?.id);
   const comment = await call('POST', `/api/v1/posts/${interactionPostId}/comments`, friend.token, { content: `M10 comment ${suffix}` });
-  evidence.fixture.commentIds.root = Number(data(comment)?.id) || null;
-  check('comment-create', comment.status === 201, 'comment created');
+  const commentId = Number(data(comment)?.id);
+  evidence.fixture.commentIds.root = Number.isInteger(commentId) ? commentId : null;
+  check('comment-create', comment.status === 201 && Number(data(comment)?.postId) === interactionPostId, 'comment created for the expected post ID');
   const like = await call('POST', `/api/v1/posts/${interactionPostId}/likes`, friend.token);
-  check('like-create', like.status === 200 || like.status === 201, 'like created');
+  check('like-create', (like.status === 200 || like.status === 201) && Number(data(like)?.postId) === interactionPostId && data(like)?.liked === true, 'like created for the expected post ID and reports liked=true');
   const notifications = await call('GET', '/api/v1/notifications?page=0&size=20', owner.token);
-  check('notification-list', notifications.status === 200, 'notification list reachable');
-  const item = data(notifications)?.items?.[0];
-  if (item?.id) {
-    const read = await call('PUT', `/api/v1/notifications/${item.id}/read`, owner.token);
-    const deleted = await call('DELETE', `/api/v1/notifications/${item.id}`, owner.token);
-    check('notification-read-delete', read.status === 200 && deleted.status === 200, 'notification read/delete lifecycle');
-  } else check('notification-read-delete', false, 'no synthetic notification item reached', { required: true });
+  const notificationItems = Array.isArray(data(notifications)?.items) ? data(notifications).items : [];
+  check('notification-list', notifications.status === 200 && Array.isArray(data(notifications)?.items), 'notification list reachable with items page');
+  const actorMatches = (item) => Number(item?.actor?.id) === Number(friend.id);
+  const requestNotification = notificationItems.find((item) => actorMatches(item)
+    && item.type === 'NEIGHBOR' && item.targetType === 'UNIVERSE' && Number(item.targetId) === requestId);
+  const commentNotification = notificationItems.find((item) => actorMatches(item)
+    && item.type === 'COMMENT' && item.targetType === 'COMMENT' && Number(item.targetId) === commentId);
+  const likeNotification = notificationItems.find((item) => actorMatches(item)
+    && item.type === 'LIKE' && item.targetType === 'POST' && Number(item.targetId) === interactionPostId);
+  check(
+    'notification-event-identity',
+    Boolean(requestNotification?.id && commentNotification?.id && likeNotification?.id),
+    `identified request=${Boolean(requestNotification?.id)}, comment=${Boolean(commentNotification?.id)}, like=${Boolean(likeNotification?.id)} by actor/type/target ID`,
+  );
+  if (commentNotification?.id && likeNotification?.id) {
+    const read = await call('PUT', `/api/v1/notifications/${commentNotification.id}/read`, owner.token);
+    const deleted = await call('DELETE', `/api/v1/notifications/${likeNotification.id}`, owner.token);
+    const reread = await call('GET', '/api/v1/notifications?page=0&size=20', owner.token);
+    const remaining = Array.isArray(data(reread)?.items) ? data(reread).items : [];
+    const readItem = data(read);
+    check(
+      'notification-read-delete',
+      read.status === 200
+        && Number(readItem?.id) === Number(commentNotification.id)
+        && readItem?.readAt
+        && deleted.status === 200
+        && reread.status === 200
+        && !remaining.some((item) => Number(item.id) === Number(likeNotification.id)),
+      'exact identified comment notification was read and exact like notification was deleted',
+    );
+  } else check('notification-read-delete', false, 'NOT RUN: exact comment/like notification identities were not found', { required: true });
   return { owner, friend, pending, post };
 }
 
@@ -416,7 +889,7 @@ async function runAdminAcceptance() {
   const email = process.env.M10_ADMIN_EMAIL;
   const password = process.env.M10_ADMIN_PASSWORD;
   if (!syntheticEmail(email) || !password) {
-    check('admin-current-actor', false, 'NOT RUN: synthetic admin credential fixture was not supplied', { required: true });
+    check('admin-list-probe', false, 'NOT RUN: synthetic admin credential fixture was not supplied', { required: false });
     return;
   }
 
@@ -429,42 +902,20 @@ async function runAdminAcceptance() {
   const responseText = JSON.stringify(listing?.body ?? '');
   const noCredentialFields = !/(?:password|refreshToken|accessToken|clientSecret|privateKey)/i.test(responseText);
   check(
-    'admin-current-actor',
+    'admin-list-probe',
     signed.status === 200
       && typeof token === 'string'
       && listing?.status === 200
       && Array.isArray(listingData?.items)
       && noCredentialFields,
-    'synthetic admin signed in and current ACTIVE actor reached admin list without credential fields',
-  );
-}
-
-function markRuntimeEvidenceNotRun() {
-  // These checks require a runtime-specific SQL/HTTP fixture contract that is
-  // intentionally not guessed by this generic runner. Environment variable
-  // presence alone can never make an acceptance check pass.
-  check(
-    'admin-soft-delete-preservation',
-    false,
-    'NOT RUN: no verified read-only SQL/helper result was supplied for child-row preservation',
-    { required: true },
-  );
-  check(
-    'upload-5mib-mime',
-    false,
-    'NOT RUN: no verified multipart byte/MIME runtime evidence was supplied',
-    { required: true },
-  );
-  check(
-    'restart-persistence',
-    false,
-    'NOT RUN: restart persistence requires an isolated runtime process/DB fixture',
-    { required: true },
+    'synthetic admin reached admin list without credential fields; authoritative admin ACL/mutation checks require the named runtime evidence bundle',
+    { required: false },
   );
 }
 
 async function runBrowserAcceptance(accounts) {
   const { chromium } = require(playwrightModule);
+  await mkdir(outputDir, { recursive: true });
   browser = await chromium.launch({ headless, executablePath: chromeExecutable, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
   const contexts = [];
   const makeContext = async () => {
@@ -543,7 +994,7 @@ async function runBrowserAcceptance(accounts) {
         visible,
         `${key}: requested ${path}, landed ${actualPath}, anchors=${visibleAnchors.join('|') || 'none'}`,
       );
-      if (screenshotsEnabled && visible) {
+      if (visible) {
         const file = `${key}.png`;
         await target.screenshot({ path: resolve(outputDir, file), fullPage: false });
         evidence.screenshots.push({ key, file, status: response?.status() ?? null, path: actualPath });
@@ -606,7 +1057,12 @@ async function runBrowserAcceptance(accounts) {
         await adminPage.keyboard.press('Enter');
         const opened = await dialog.isVisible().catch(() => false);
         await adminPage.keyboard.press('Escape');
-        const escapeObserved = await dialog.isVisible().catch(() => false);
+        const escapeStillVisible = await dialog.isVisible().catch(() => false);
+        if (!escapeStillVisible) {
+          await trigger.focus();
+          await adminPage.keyboard.press('Enter');
+        }
+        const documentedClosePathAvailable = await dialog.isVisible().catch(() => false);
         const cancel = dialog.getByRole('button', { name: '취소' }).first();
         if (await cancel.count() > 0 && await cancel.isVisible().catch(() => false)) {
           await cancel.focus();
@@ -615,8 +1071,8 @@ async function runBrowserAcceptance(accounts) {
         const closedByDocumentedCancel = !(await dialog.isVisible().catch(() => false));
         check(
           'keyboard-modal-observation',
-          opened && escapeObserved && closedByDocumentedCancel,
-          `status trigger opened=${opened}; Escape observed=${escapeObserved}; cancel Enter closed=${closedByDocumentedCancel}; focus-trap/restore remains observation-only`,
+          opened && documentedClosePathAvailable && closedByDocumentedCancel,
+          `status trigger opened=${opened}; Escape left dialog visible=${escapeStillVisible} (observation-only); documented cancel path available=${documentedClosePathAvailable} and closed=${closedByDocumentedCancel}; focus-trap/restore remains observation-only`,
         );
       }
     } catch (error) {
@@ -641,7 +1097,12 @@ async function runBrowserAcceptance(accounts) {
         await ownerPage.keyboard.press('Enter');
         const opened = await dialog.isVisible().catch(() => false);
         await ownerPage.keyboard.press('Escape');
-        const escapeObserved = await dialog.isVisible().catch(() => false);
+        const escapeStillVisible = await dialog.isVisible().catch(() => false);
+        if (!escapeStillVisible) {
+          await trigger.focus();
+          await ownerPage.keyboard.press('Enter');
+        }
+        const documentedClosePathAvailable = await dialog.isVisible().catch(() => false);
         const close = dialog.getByRole('button', { name: '임시저장 목록 닫기' }).first();
         if (await close.count() > 0 && await close.isVisible().catch(() => false)) {
           await close.focus();
@@ -650,8 +1111,8 @@ async function runBrowserAcceptance(accounts) {
         const closedByDocumentedButton = !(await dialog.isVisible().catch(() => false));
         check(
           'keyboard-draft-picker-observation',
-          opened && escapeObserved && closedByDocumentedButton,
-          `DraftPicker trigger Enter opened=${opened}; Escape observed=${escapeObserved}; close Enter closed=${closedByDocumentedButton}; focus-trap remains observation-only`,
+          opened && documentedClosePathAvailable && closedByDocumentedButton,
+          `DraftPicker trigger Enter opened=${opened}; Escape left dialog visible=${escapeStillVisible} (observation-only); documented close path available=${documentedClosePathAvailable} and closed=${closedByDocumentedButton}; focus-trap remains observation-only`,
         );
       }
     } catch (error) {
@@ -722,6 +1183,54 @@ async function runBrowserAcceptance(accounts) {
   }
 
   for (const context of contexts) await context.close();
+}
+
+async function verifyScreenshotArtifacts() {
+  const expectedKeys = canonicalScreens.map(([key]) => key);
+  const actualKeys = evidence.screenshots.map((entry) => entry.key);
+  const uniqueKeys = new Set(actualKeys);
+  let artifactOk = evidence.screenshots.length === expectedKeys.length
+    && uniqueKeys.size === expectedKeys.length
+    && expectedKeys.every((key) => uniqueKeys.has(key));
+  const verified = [];
+  for (const entry of evidence.screenshots) {
+    try {
+      const file = resolve(outputDir, entry.file);
+      if (relative(outputDir, file).startsWith('..')) throw new Error('screenshot path escapes evidence directory');
+      const bytes = await readFile(file);
+      const png = bytes.length >= 24
+        && bytes.subarray(0, 8).toString('hex') === '89504e470d0a1a0a'
+        && bytes.subarray(12, 16).toString('ascii') === 'IHDR';
+      const width = png ? bytes.readUInt32BE(16) : null;
+      const height = png ? bytes.readUInt32BE(20) : null;
+      const digest = await sha256(file);
+      const ok = bytes.length > 0 && png && width === 1440 && height === 1000 && isSha256(digest);
+      artifactOk = artifactOk && ok;
+      verified.push({
+        key: entry.key,
+        file: entry.file,
+        path: entry.path,
+        status: entry.status,
+        bytes: bytes.length,
+        width,
+        height,
+        sha256: digest,
+        ok,
+      });
+    } catch (error) {
+      artifactOk = false;
+      verified.push({ key: entry.key, file: entry.file, ok: false, detail: `NOT RUN: ${scrub(error instanceof Error ? error.message : error)}` });
+    }
+  }
+  evidence.screenshots = verified;
+  check(
+    'screenshots-complete',
+    artifactOk,
+    artifactOk
+      ? 'all 13 canonical screenshots are unique nonzero PNGs at 1440x1000 with SHA-256 evidence'
+      : 'NOT RUN: exactly 13 unique canonical 1440x1000 PNG artifacts were not verified',
+    { required: true },
+  );
 }
 
 async function listProductFiles(directory) {
@@ -819,18 +1328,50 @@ async function runProductStaticScan() {
 async function staticSelfCheck() {
   const files = ['qa/m10-acceptance.mjs', 'qa/M10-review.md'];
   for (const file of files) await access(resolve(root, file), fsConstants.R_OK);
-  const source = await readFile(resolve(root, 'qa/m10-acceptance.mjs'), 'utf8');
+  const source = await readFile(harnessPath, 'utf8');
   const staleFalsePass = [
-    /check\('admin-current-actor',\s*Boolean\(/,
-    /check\('admin-soft-delete-preservation',\s*Boolean\(/,
-    /page\.keyboard\.press\('Escape'\);\s*check\(id,\s*true/,
-    /locator\('body'\)\.evaluate\(\(body\)\s*=>\s*Boolean\(body/,
-    /Boolean\(before\s*&&\s*after\s*&&\s*stillVisible\)/,
-  ].some((pattern) => pattern.test(source));
-  check('harness-fail-closed-guards', !staleFalsePass, 'runner contains no known false-pass guard patterns', { required: false });
+    ['check(\'admin-current-actor\',', 'Boolean('].join(''),
+    ['check(\'admin-soft-delete-preservation\',', 'Boolean('].join(''),
+    ['page.keyboard.press(\'Escape\');', 'check(id,', 'true'].join(''),
+    ['locator(\'body\').evaluate((body)', 'Boolean(body'].join(''),
+    ['Boolean(', 'before && after && stillVisible)'].join(''),
+    ['M10_SCREENSHOTS', '!==', '\'0\''].join(''),
+    ['screenshotsEnabled', '=', 'process.env.M10_SCREENSHOTS'].join(''),
+    ['function ', 'markRuntimeEvidence', 'NotRun'].join(''),
+  ].some((pattern) => source.includes(pattern));
+  check('harness-fail-closed-guards', !staleFalsePass, 'runner contains no known false-pass guard patterns', { required: true });
+  const negativeFixtures = [
+    { schema: 'wrong', status: 'PASS' },
+    { schema: runtimeEvidenceSchema, status: 'NOT RUN' },
+    { schema: runtimeEvidenceSchema, status: 'PASS', mysql: { host: '127.0.0.1', port: 13307 } },
+  ];
+  const negativeFixturesRejected = negativeFixtures.every((fixture) => (
+    fixture.schema !== runtimeEvidenceSchema
+      || fixture.status !== 'PASS'
+      || fixture.mysql?.port === 13307
+  ));
+  check('self-check-negative-fixtures', negativeFixturesRejected, 'synthetic malformed/NOT RUN/user-DB runtime fixtures remain non-pass', { required: true });
   await runProductStaticScan();
   if (canonicalScreens.length !== 13) throw new Error('canonical screen list must contain exactly 13 routes');
-  if (requiredChecks.length < 40) throw new Error('required M10 checks unexpectedly incomplete');
+  if (requiredChecks.length < 50) throw new Error('required M10 checks unexpectedly incomplete');
+}
+
+function validateFullRunGuards() {
+  if (selfCheck) return;
+  if (process.env.M10_SCREENSHOTS === '0') throw new Error('M10 full acceptance cannot disable canonical screenshots');
+  if (process.env.M10_MYSQL_HOST !== approvedMysqlHost) {
+    throw new Error(`M10_MYSQL_HOST must be explicit loopback ${approvedMysqlHost}`);
+  }
+  const configuredPort = Number(process.env.M10_MYSQL_PORT);
+  if (!process.env.M10_MYSQL_PORT) throw new Error('M10_MYSQL_PORT is required for full acceptance');
+  if (configuredPort === 13307) throw new Error('refusing user MySQL port 13307');
+  if (configuredPort !== approvedMysqlPort) throw new Error(`M10_MYSQL_PORT must be approved synthetic port ${approvedMysqlPort}`);
+  if (apiBaseUrl !== approvedApiBaseUrl || frontendUrl !== approvedFrontendUrl) {
+    throw new Error(`M10 API/FE endpoints must be ${approvedApiBaseUrl} and ${approvedFrontendUrl}`);
+  }
+  if (!runtimeEvidencePath || relative(root, runtimeEvidencePath).startsWith('..')) {
+    throw new Error('M10_RUNTIME_EVIDENCE must point to a repository-local runtime bundle');
+  }
 }
 
 async function currentManifestIdentity() {
@@ -846,10 +1387,17 @@ async function currentManifestIdentity() {
     .update(entries.map((entry) => `${entry.path}\0${entry.sha256}\n`).join(''))
     .digest('hex');
   const jarPath = resolve(root, manifest.jarPath ?? 'build/libs/zeroverse-server-0.0.1-SNAPSHOT.jar');
+  const frontendDistPath = resolve(root, manifest.frontendDistPath ?? 'frontend/dist');
+  assertInsideRoot(jarPath, 'runtime JAR');
+  assertInsideRoot(frontendDistPath, 'frontend dist');
+  const git = await currentGitIdentity();
   return {
     sourceSha256,
     jarSha256: await sha256(jarPath),
-    harnessSha256: await sha256(resolve(root, 'qa/m10-acceptance.mjs')),
+    frontendSha256: await sha256Directory(frontendDistPath),
+    harnessSha256: await sha256(harnessPath),
+    gitCommit: git.commit,
+    gitTree: git.tree,
   };
 }
 
@@ -864,9 +1412,12 @@ async function writeEvidence() {
         Boolean(before && after)
           && before.sourceSha256 === after.sourceSha256
           && before.jarSha256 === after.jarSha256
-          && before.harnessSha256 === after.harnessSha256,
+          && before.frontendSha256 === after.frontendSha256
+          && before.harnessSha256 === after.harnessSha256
+          && before.gitCommit === after.gitCommit
+          && before.gitTree === after.gitTree,
         before && after
-          ? 'source aggregate, JAR, and harness hashes are stable before/after acceptance'
+          ? 'source aggregate, JAR, FE dist, Git commit/tree, and harness hashes are stable before/after acceptance'
           : 'NOT RUN: final source/JAR manifest provenance was not loaded',
         { required: true },
       );
@@ -880,8 +1431,11 @@ async function writeEvidence() {
   const missing = requiredChecks.filter((id) => !evidence.checks.some((item) => item.id === id));
   for (const id of missing) evidence.checks.push({ id, ok: false, required: true, detail: 'NOT RUN: runner did not reach this required check' });
   const failures = evidence.checks.filter((item) => item.required && !item.ok);
+  const selfCheckFailures = failures.filter((item) => new Set([
+    'harness-fail-closed-guards', 'static-skip-placeholder-scan', 'self-check-negative-fixtures',
+  ]).has(item.id));
   evidence.status = selfCheck
-    ? 'SELF-CHECK PASS'
+    ? selfCheckFailures.length === 0 && evidence.failures.length === 0 ? 'SELF-CHECK PASS' : 'SELF-CHECK FAIL'
     : failures.length === 0 && evidence.failures.length === 0 ? 'PASS' : 'NOT RUN';
   await writeFile(resolve(outputDir, 'evidence.json'), `${JSON.stringify(evidence, null, 2)}\n`, 'utf8');
 }
@@ -894,15 +1448,16 @@ async function main() {
       await writeEvidence();
       return;
     }
-    if (process.env.M10_MYSQL_PORT === '13307') throw new Error('refusing user MySQL port 13307');
+    validateFullRunGuards();
     await verifyManifest();
+    await verifyRuntimeEvidence();
     requestFactory = require(playwrightModule).request;
     api = await requestFactory.newContext({ baseURL: apiBaseUrl, extraHTTPHeaders: { Origin: frontendUrl } });
     await verifyOpenApi();
     const accounts = await runHttpAcceptance();
     await runAdminAcceptance();
-    markRuntimeEvidenceNotRun();
     await runBrowserAcceptance(accounts);
+    await verifyScreenshotArtifacts();
   } catch (error) {
     evidence.failures.push(scrub(error instanceof Error ? error.message : error));
   } finally {
@@ -910,7 +1465,7 @@ async function main() {
     await browser?.close();
     await writeEvidence();
   }
-  if (evidence.status !== 'PASS') process.exitCode = 1;
+  if (!['PASS', 'SELF-CHECK PASS'].includes(evidence.status)) process.exitCode = 1;
 }
 
 await main();

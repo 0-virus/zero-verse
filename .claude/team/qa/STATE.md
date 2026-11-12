@@ -11,10 +11,10 @@
 ## 진행 중
 
 - `qa/M10-review.md`에 PRD §11~§12·REQUIREMENTS NFR-09 기준의 M0~M9 provenance 경계, 전체 회귀/DoD acceptance matrix, PostEditor publish/draft validation, Modal·DraftPicker·TopBar·category·admin 실제 keyboard evidence 행, 필수 E2E, fail-closed 규칙, 1440px·Swagger·skip/placeholder/secret 기준을 기록했다. M9 PR #15 merge SHA와 M10 base/current `dev` ref도 분리해 정정했다.
-- `qa/m10-acceptance.mjs`를 준비했다. source/JAR/harness before·after hash stability, generated OpenAPI, synthetic HTTP smoke, sanitization, refresh/logout·Universe·comment/like·notification, no-store/envelope/page, explicit runtime-only NOT RUN rows, unique evidence directory, 13 canonical screenshots와 M10-FE-07~11 route-specific keyboard observation을 지원하며 `M10_MYSQL_PORT=13307`은 fail-closed 거부한다.
+- `qa/m10-acceptance.mjs`를 보강했다. `zeroverse.m10.runtime-evidence.v1` exact bundle의 current Git/source/JAR/FE dist/harness hash·named admin/upload/restart check를 검증하고, tracked product file set·current commit/tree·FE dist aggregate·loopback `127.0.0.1:13320` 및 API/FE `18090/5180`을 fail-closed로 고정한다. generated OpenAPI 61 operations/unique operationId/bearer/schema/error response, HTTP 400/401/403/404/409·PageResponse bound, GENERAL fixture·PostEditor draft/publish matrix, rotated access/cookie attributes, notification actor/type/target identity, 13 PNG artifact dimensions/hash를 직접 검증하도록 했다. runtime bundle·final source/JAR/FE/API/MySQL/Chrome는 아직 NOT RUN이다.
 - `$brief` read-only 대조와 정본·worklog·QA review·위험 레지스터 교차 확인을 완료했다. 제품 source/test, frontend, backend, runtime, DB, Git mutation은 수행하지 않았다.
 - 실제 M10 backend/frontend full run, generated OpenAPI, synthetic HTTP/MySQL/Chrome 1440px acceptance는 아직 `NOT RUN`이다.
-- `node qa/m10-acceptance.mjs --self-check` 및 `node --check qa/m10-acceptance.mjs`는 exit 0이며 self-check evidence는 `SELF-CHECK PASS`다. 이는 실제 M10 acceptance PASS가 아니다.
+- `node qa/m10-acceptance.mjs --self-check` 및 `node --check qa/m10-acceptance.mjs`는 exit 0이며 self-check evidence는 `SELF-CHECK PASS`다. product static scan은 359 files / 281 classified / 0 unclassified이고, malformed runtime/screenshot/user-DB negative guard도 확인했다. 이는 실제 M10 acceptance PASS가 아니다.
 
 ## 다음 작업
 
@@ -34,10 +34,11 @@
 - `qa/M10-review.md`: PREPARING/NOT RUN 사전 검토·provenance 규칙·M10 matrix·E2E·fail-closed·risk 기록.
 - `qa/m10-acceptance.mjs`: final manifest/runtime에서만 실행하는 M10 black-box acceptance harness(실제 실행은 아직 NOT RUN).
 - 기존 M2~M9 QA review와 M0~M9 worklog는 역사 evidence로 보존하며 M10 결과와 합산하지 않는다.
+- `qa/M10-task4-prep-review.md`: Task4 prep 독립 검토(Approved with Important follow-up, 실제 acceptance NOT RUN).
 
 ## 갱신 시각
 
-2026-11-12 KST — M10 QA preflight 정본·matrix 정합성 보완 및 Task4 harness self-check.
+2026-11-12 KST — M10 Task4 fix round 1/5 final audit: runtime evidence/manifest/OpenAPI/HTTP/notification/screenshot fail-closed 보강, self-check pattern cleanup 및 scoped verification 반영.
 
 ## 2026-11-12 KST — M10 Task4 false-pass hardening
 

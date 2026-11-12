@@ -245,6 +245,16 @@ export function PostEditor({
   const save = async (publish: boolean) => {
     if (!editor || isSaving || isUploading) return;
     setSaveError(null);
+    const trimmedTitle = title.trim();
+    const snapshotImages = collectImageInputs(editor, images);
+    if (publish && (trimmedTitle.length === 0 || trimmedTitle.length > 200)) {
+      setSaveError('발행 제목은 1~200자여야 합니다.');
+      return;
+    }
+    if (publish && editor.state.doc.textContent.trim().length === 0 && snapshotImages.length === 0) {
+      setSaveError('발행할 본문 또는 이미지가 필요합니다.');
+      return;
+    }
     setIsSaving(true);
     const snapshot: PostSnapshot = {
       title,
@@ -255,7 +265,7 @@ export function PostEditor({
       publish,
       thumbnailUrl,
       tagNames: flattenText(tags),
-      images: collectImageInputs(editor, images),
+      images: snapshotImages,
     };
     try {
       const saved = mode === 'create'

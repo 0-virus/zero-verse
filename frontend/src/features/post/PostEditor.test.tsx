@@ -70,6 +70,112 @@ function renderEditor(overrides: Partial<React.ComponentProps<typeof PostEditor>
 }
 
 describe('PostEditor', () => {
+  it('임시저장은 빈 제목과 본문을 허용한다', async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderEditor();
+
+    await user.click(screen.getByRole('button', { name: '임시저장' }));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(onSave.mock.calls[0][0]).toMatchObject({ publish: false, title: '' });
+  });
+
+  it('발행은 빈 제목을 차단하고 서버와 같은 안내를 표시한다', async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderEditor();
+
+    await user.click(screen.getByRole('button', { name: '발행하기 ✦' }));
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('발행 제목은 1~200자여야 합니다.'));
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('발행은 공백 제목과 200자 초과 제목을 차단한다', async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderEditor();
+    const title = screen.getByRole('textbox', { name: '제목' });
+
+    await user.type(title, '   ');
+    await user.click(screen.getByRole('button', { name: '발행하기 ✦' }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('발행 제목은 1~200자여야 합니다.'));
+    expect(onSave).not.toHaveBeenCalled();
+
+    await user.clear(title);
+    await user.type(title, 'a'.repeat(201));
+    await user.click(screen.getByRole('button', { name: '발행하기 ✦' }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('발행 제목은 1~200자여야 합니다.'));
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('발행 제목이 정확히 200자면 저장한다', async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderEditor();
+    const title = 'a'.repeat(200);
+
+    await user.type(screen.getByRole('textbox', { name: '제목' }), title);
+    const editor = screen.getByTestId('post-editor-surface');
+    await user.click(editor);
+    await user.type(editor, '200자 제목 본문');
+    await user.click(screen.getByRole('button', { name: '발행하기 ✦' }));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(onSave.mock.calls[0][0]).toMatchObject({ publish: true, title });
+  });
+
+  it('발행은 본문 text와 image가 모두 없으면 차단한다', async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderEditor();
+
+    await user.type(screen.getByRole('textbox', { name: '제목' }), '본문 없는 글');
+    await user.click(screen.getByRole('button', { name: '발행하기 ✦' }));
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('발행할 본문 또는 이미지가 필요합니다.'));
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('대표 이미지만 있으면 본문 없는 발행을 허용하지 않는다', async () => {
+    const user = userEvent.setup();
+    const uploadImage = vi.fn().mockResolvedValue({
+      id: 'thumbnail-only',
+      imageUrl: '/api/v1/uploads/thumbnail-only/content',
+      contentType: 'image/png',
+      size: 4,
+      purpose: 'POST_THUMBNAIL',
+    });
+    const { onSave } = renderEditor({ uploadImage });
+
+    await user.type(screen.getByRole('textbox', { name: '제목' }), '대표 이미지만 있는 글');
+    const input = screen.getByLabelText('대표 이미지 업로드');
+    fireEvent.change(input, { target: { files: [new File(['png'], 'thumbnail.png', { type: 'image/png' })] } });
+    await waitFor(() => expect(uploadImage).toHaveBeenCalledWith(expect.any(File), 'POST_THUMBNAIL'));
+    await user.click(screen.getByRole('button', { name: '발행하기 ✦' }));
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('발행할 본문 또는 이미지가 필요합니다.'));
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('본문 image만 있어도 발행할 수 있다', async () => {
+    const user = userEvent.setup();
+    const uploadImage = vi.fn().mockResolvedValue({
+      id: 'image-only',
+      imageUrl: '/api/v1/uploads/image-only/content',
+      contentType: 'image/png',
+      size: 4,
+      purpose: 'POST_IMAGE',
+    });
+    const { onSave } = renderEditor({ uploadImage });
+
+    await user.type(screen.getByRole('textbox', { name: '제목' }), '이미지 로그');
+    const input = screen.getByLabelText('본문 이미지 업로드');
+    fireEvent.change(input, { target: { files: [new File(['png'], 'body.png', { type: 'image/png' })] } });
+    await waitFor(() => expect(uploadImage).toHaveBeenCalledTimes(1));
+    await user.click(screen.getByRole('button', { name: '발행하기 ✦' }));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(onSave.mock.calls[0][0]).toMatchObject({ publish: true, title: '이미지 로그' });
+    expect(JSON.stringify(onSave.mock.calls[0][0])).toContain('/api/v1/uploads/image-only/content');
+  });
+
   it('실제 DEFAULT 카테고리가 있으면 null fallback 미분류를 중복 렌더하지 않는다', () => {
     renderEditor({
       categories: [
@@ -307,6 +413,9 @@ describe('PostEditor', () => {
     renderEditor({ onSave });
     const title = screen.getByRole('textbox', { name: '제목' });
     await user.type(title, '사라지면 안 되는 입력');
+    const editor = screen.getByTestId('post-editor-surface');
+    await user.click(editor);
+    await user.type(editor, '저장 실패 재시도 본문');
     const publish = screen.getByRole('button', { name: '발행하기 ✦' });
     await user.click(publish);
     await user.click(publish);

@@ -2,26 +2,29 @@
 
 > 덮어쓰기 스냅샷. 시간순 이력은 `WORKLOG.md`, 마일스톤 이력은 `docs/worklog/**`를 본다.
 
-마지막 갱신: 2026-11-12 10:42:41 KST
+마지막 갱신: 2026-11-12 13:09:31 KST
 
 ## 현재 단계
 
-- M9 관리자 기능과 final-review Minor M1 수정이 PR #15로 `dev`에 병합되어 frontend 역할 기준 **DEV INTEGRATED/COMPLETE**다.
-- 병합 SHA는 `c0df2d33d0dce5ac71f1b358672606f717e739ae`, tested head는 `e3efa6b`, merge tree는 `409c084b2189f13fb5f44a5ffb375726475becaf`다. PR/통합/Git 작업은 root가 수행했으며 이 기록 갱신에서는 Git 명령을 실행하지 않았다.
-- 사용자 승인 A-v2, REQUIREMENTS §6.13-A, M9 회의 §5·§10/10.1·§11, ADR-0008 및 final-review Minor M1을 따른다. M10·배포·사용자 DB 적용은 제외한다.
+- M10 closeout Task3 **구현·자체 검증 완료(GREEN)**다. 이 역할의 범위는 `PostEditor` 발행/임시저장 입력 검증과 해당 회귀 테스트이며, M10 전체 PASS/complete가 아니다.
+- 근거 정본은 REQUIREMENTS NFR-09, PRD §11~§12, 승인 회의 `docs/governance/meetings/M10-20261112-closeout.md`, `docs/design/AGENTS.md` 및 `DESIGN-SYSTEM.md`다. 새 dependency, API/server contract, 디자인 정본, bundle optimization은 추가하지 않았다.
 
-## 진행 중
+## 구현·테스트
 
-- `normalizeAdminKeyword`는 양끝만 `trim`하고 내부 whitespace를 그대로 보존한다. `adminApi.list`의 수동 literal 회귀가 `Kim  Lee`를 `keyword=Kim%20%20Lee`로 확인하며, 기존 UTF-16 100자·page/size/role/status 검증은 유지한다. `AdminPage`의 URL 입력·검색 제출도 같은 helper를 소비하므로 별도 소비 경로 테스트 파일은 추가하지 않았다.
-- root가 통합 전 검증한 frontend는 **51 files/465 tests PASS**, lint/build exit 0이며 런타임 정리까지 완료했다. 기존 JS 958.14 kB 및 500 kB 초과 chunk warning은 비차단 경고로 남는다.
-- M9 frontend의 이전 실제 인수·1440px·source/JAR 증거와 Minor M1 수정/독립 재검토 결과는 WORKLOG 및 final report에 보존되어 있으며 PR #15 통합으로 현재 branch 기준 완료됐다.
+- `frontend/src/features/post/PostEditor.tsx`: 임시저장은 빈 제목/본문을 허용하고, 발행 시 `title.trim()` 길이 1~200 및 TipTap 본문 `textContent` 또는 본문 이미지 존재를 검사한다. 실패하면 visible `role="alert"` 문구를 표시하고 `onSave`를 호출하지 않는다. 이미지 판정은 thumbnail이 아닌 TipTap 본문 image node 수집 결과다.
+- `frontend/src/features/post/PostEditor.test.tsx`: 빈 draft 허용, 빈/공백/201자 제목 차단, 정확히 200자 제목 허용, 빈 text+image 본문 차단, 본문 image-only 발행 허용을 실제 컴포넌트 동작으로 검증했다. 새 검증 때문에 기존 저장 실패 경로가 막히지 않도록 해당 회귀에 본문 입력을 추가했다.
+- TDD RED: `cd frontend && npm test -- --run src/features/post/PostEditor.test.tsx --maxWorkers=1` → exit 1, 16 tests 중 3 failed/13 passed. 실패는 구현 전 빈 제목, 공백·201자 제목, 빈 본문 안내 부재였다.
+- Focused GREEN: 같은 명령 → exit 0, 1 file / 17/17 passed(정확히 200자 positive boundary 보강 포함).
+- Full GREEN: `cd frontend && npm test -- --run --maxWorkers=1` → exit 0, 51 test files / 471 tests passed.
+- Lint/build: `cd frontend && npm run lint && npm run build` → exit 0. Oxlint 통과, Vite 149 modules. JS 958.38 kB(gzip 288.87 kB) 및 500 kB 초과 chunk warning은 기존 비차단 경고로 남겼고 code splitting은 구현하지 않았다.
 
-## 다음 작업
+## 인계·남은 위험
 
-- M9 후속 작업은 없다. 다음 마일스톤은 별도 사용자 지시와 root 배정 후에만 시작한다.
-- `.superpowers/sdd/M9-admin/task-4-final-m1-report.md`에 Minor M1의 RED/GREEN·최종 검증·남은 당시 gate를 보존한다.
+- Task4/root/독립 QA 인계: 1440px에서 13개 canonical 화면(Main, Blog, Post Detail, Write/Edit, Signin/Signup, Setup, Settings Basic/Universe/Posts, Search, Notifications, Admin List/Detail)의 실제 route/API 상태·screenshot을 최종 source 기준으로 확인한다. 이 Task3에서는 browser screenshot을 실행하지 않았다.
+- 같은 인계에서 TopBar profile/notification popover, category ArrowUp/ArrowDown, editor/DraftPicker, admin role/status/delete confirmation의 기존 명시 동작을 키보드로 관찰한다. 새 focus-trap 계약을 추가하지 않았으므로 Modal/DraftPicker/TopBar/category/admin keyboard 제품 코드는 수정하지 않았다.
+- 남은 concern은 browser/13-screen evidence 미실행과 958.38 kB bundle warning이며, 둘 다 이 Task3 구현의 테스트 실패는 아니다. 타 역할 dirty 변경과 사용자 파일/DB/upload는 보존했다.
 
-## 차단 요인
+## 소유권·통합
 
-- M9 frontend 통합 gate와 역할 기록 갱신에 남은 차단 요인은 없다.
-- 기존 bundle chunk warning은 비차단 이력으로 유지한다. 사용자 파일·기존 DB·업로드와 타 역할 dirty 변경은 보존한다.
+- 변경한 제품 파일은 위 frontend 두 파일뿐이고 역할 기록은 이 `STATE.md`와 `WORKLOG.md`다. SDD Task3 보고서는 부모가 지정한 `.superpowers/sdd/M10-closeout/task-3-report.md`에 기록했다.
+- child는 Git stage/commit/branch/push/merge를 하지 않았다. root가 원자 커밋·독립 review package를 수행한다.

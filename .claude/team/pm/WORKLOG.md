@@ -538,3 +538,11 @@
 - **검증 명령·출력**: `git status --short --branch` → `## feature/M10-closeout`; `git rev-parse HEAD`; `git log -1 --oneline --decorate`; `git show-ref --heads --dereference`로 ref 정합을 확인했다. `rg`/`sed`로 PRD §10~§12, NFR-09, governance 조건·위험, M0~M9 worklog/role STATE를 읽었다. PM preflight에서는 제품 테스트·build·runtime·DB를 실행하지 않았고, historical 숫자를 fresh PASS로 재집계하지 않았다.
 - **산출물·소유권**: `.claude/team/pm/STATE.md`를 M10 PLANNING/PREFLIGHT 스냅샷으로 덮어쓰고 이 WORKLOG 항목을 append했다. `docs/PRD.md`, REQUIREMENTS, governance, 마일스톤 worklog, backend/frontend/qa 산출물, 제품 소스, QA harness, runtime, DB, Git은 편집·조작하지 않았다.
 - **미해결**: root의 M10 통합 계획·심의 소집, 현재 source fresh BE/FE/integration/visual/DoD 실행, 독립 QA 판정, open risk별 local MVP/production 경계 확정이 남아 있다. M10 완료·PASS를 주장하지 않는다.
+
+## 2026-11-12 13:43 KST — M10 Task4 runtime evidence 실행 설계 권고
+
+- **근거 대조**: `.claude/CONSTITUTION.md`·루트 `AGENTS.md`·PM 지침/STATE, `docs/PRD.md` §10 M10·§11·§12, REQUIREMENTS NFR-09, `docs/worklog/M10-closeout.md`, backend/frontend/qa STATE와 `qa/M10-task4-prep-review.md`를 직접 읽었다. backend Task2/independent review는 Approved(Critical 0/Important 0/Minor 1), frontend Task3/independent review는 Approved이며 QA Task4 prep은 Important follow-up/actual NOT RUN이다.
+- **산출물**: PM 소유 `docs/PM-M10-runtime-plan.md`에 `zeroverse.m10.runtime-evidence.v1` provenance bundle, M10 전용 MySQL `127.0.0.1:13320`·API `18090`·FE `5180`, UTC JAR, synthetic secret/upload directory, admin/ACL·upload 5MiB/MIME·restart·OpenAPI·notification·13 PNG·keyboard 실행 순서와 종료/보존 경계를 권고(미확정)으로 기록했다.
+- **핵심 ruling**: M9 historical evidence를 M10 fresh PASS로 재사용하지 않는다. runtime-only 3행은 exact named checks와 현재 source/JAR/FE/harness hash를 갖춘 실제 bundle 없이는 NOT RUN이며, env 변수 존재만으로 통과시키지 않는다. 사용자 DB `13307`, `.local-data`, 기존 container/업로드, 배포/S3/U0/운영 bootstrap은 접근·완료 범위에서 제외한다.
+- **검증**: 계획 문서와 PM STATE/WORKLOG를 재독하고 PM 소유 파일 `git diff --check` 및 trailing whitespace 검사를 수행한다. 제품·QA source, runtime, DB, Git은 수정·실행하지 않았다.
+- **미해결**: QA 원작성자의 Important 1~7 fix round와 scoped re-review, root의 실제 runtime/evidence 실행, whole-branch review가 남아 있다. 이 권고는 제품 계약 확정이나 M10 PASS 선언이 아니다.

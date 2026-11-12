@@ -1265,3 +1265,16 @@
 - self-check/정적 근거: `self-check-keyboard-route-selectors` required row가 enabled rename selector·exact edit input·label-linked admin input/form을 확인한다. stale guard는 disabled 필터 없는 category selector와 잘못된 admin aria-label selector를 거부한다.
 - 검증: `node --check qa/m10-acceptance.mjs` exit `0`; `M10_OUTPUT_DIR=build/m10-selfcheck-keyboard-selectors node qa/m10-acceptance.mjs --self-check` exit `0`, `SELF-CHECK PASS`, keyboard selector/browser wait/admin shape/manifest/runtime-negative/static guard rows PASS; scoped `git diff --check` exit `0`.
 - 미실행: actual Chrome keyboard rerun, frontend dist/API origin, API/MySQL acceptance는 **NOT RUN**이다. 제품 source는 수정하지 않았다.
+
+## 2026-11-12 KST — M10 final review wave: runtime gate, logout replay, exact received ID, keyboard coverage boundary
+
+- 범위: final reviewer I-1/I-2/I-3와 safe M-1만 QA 소유 파일에서 반영했다. 제품 backend/frontend/source/test, `build/**`, runtime/DB/user DB `13307`, root governance/worklog 및 타 역할 파일은 수정하지 않았다.
+- I-1 fail-closed: `verifyRuntimeEvidence()`가 모든 missing/malformed/stale/hash/DB mismatch 경로에서 `false`를 반환하고, `main()`은 `canStartHttpWorkflow()`가 true가 아니면 request factory/API context 생성 전에 예외로 중단한다. evidence에 `httpWorkflowStarted=false`를 기록하며 self-check가 blocked/allowed state와 source ordering을 함께 검증한다.
+- I-2 logout replay: rotation으로 받은 `newCookie`를 메모리에만 보존하고 signout 뒤 별도 `postLogoutContext`에 정확한 Cookie header로 재생한다. old-cookie와 post-logout rotated-cookie 양쪽 모두 exact 401 + `AUTH_003` + common failure envelope를 요구하고 모든 context를 dispose한다. raw cookie/token/password는 evidence에 기록하지 않는다.
+- M-1: Universe received list에서 exact `requestId`를 찾은 뒤에만 accept를 호출하며, 누락·불일치 시 required `universe-received-request`를 NOT RUN하고 예외로 중단한다. 기존 `receivedItem?.requestId ?? requestId` fallback은 제거했다.
+- I-3 정직한 범위: `qa/M10-review.md` M10-FE-07~11을 Chrome hard checks(현재 5 route-specific checks의 실제 `Tab`/reverse focus, open/close/query), 기존 FE unit/integration/API coverage, observation-only focus-trap/restore 및 미실행 selection/mutation 경계로 분리했다. runner는 각 5개에서 `focusDescriptor`, Tab round-trip, close 후 `focusReturnedAfterClose`를 detail에 기록하되 정본에 없는 focus return 부재를 hard FAIL로 만들지 않는다. DraftPicker 선택→`/edit/:id`, category create/delete/reorder, admin select/confirm/paging은 frontend test/runtime evidence mapping으로 남기고 prep runner가 durable fixture mutation을 강제하지 않는다.
+- 검증:
+  - `node --check qa/m10-acceptance.mjs` → exit `0`.
+  - `M10_OUTPUT_DIR=build/m10-final-review-selfcheck2 node qa/m10-acceptance.mjs --self-check` → exit `0`, `SELF-CHECK PASS`; runtime gate, refresh-cookie replay, exact received ID, failure-envelope, manifest ordering, admin-shape, browser selector/wait, static `359/281/0` required rows PASS; `httpWorkflowStarted=false`.
+  - full-run invalid evidence probe with explicit synthetic `M10_RUN_ID`, loopback `13320`, current manifest, missing runtime bundle → exit `1`, `STATUS=NOT RUN`, `HTTP_WORKFLOW=false`, failure `runtime evidence gate blocked HTTP/browser workflow before request context creation`; `runtime-openapi`/HTTP workflow was not reached.
+- 실제 final runtime/JAR/FE/API/MySQL/Chrome acceptance, 13 PNG, actual cookie/notification/admin/upload/restart checks는 여전히 **NOT RUN**이며 M10 PASS/COMPLETE/release-ready가 아니다.

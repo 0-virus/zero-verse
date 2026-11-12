@@ -113,7 +113,7 @@ const requiredChecks = [
   'source-runtime-identity', 'runtime-evidence-schema', 'runtime-attestation-schema', 'runtime-openapi', 'openapi-required-paths', 'openapi-coverage',
   'synthetic-register-owner', 'synthetic-register-friend', 'signin-owner', 'signin-friend',
   'setup-owner', 'setup-friend', 'general-category-fixture', 'image-upload-fixture', 'draft-empty-allowed', 'publish-empty-rejected', 'publish-image-only-allowed', 'publish-public', 'public-guest-read',
-  'refresh-rotation', 'logout-refresh-reuse-rejected', 'universe-request', 'universe-accept',
+  'refresh-rotation', 'logout-refresh-reuse-rejected', 'universe-request', 'universe-received-request', 'universe-accept',
   'universe-post-read', 'comment-create', 'like-create', 'notification-list', 'notification-event-identity', 'notification-read-delete',
   'content-sanitize',
   'common-envelope', 'private-no-store', 'invalid-bearer-rejected', 'pagination-shape', 'paging-bound', 'http-status-matrix',
@@ -126,7 +126,8 @@ const requiredChecks = [
   'screenshot-setup', 'screenshot-settings', 'screenshot-settings-universe', 'screenshot-settings-posts',
   'screenshot-search', 'screenshot-notifications', 'screenshot-admin', 'screenshot-admin-detail',
   'screenshots-complete',
-  'self-check-negative-fixtures', 'self-check-manifest-ordering', 'self-check-admin-list-shape', 'self-check-browser-signin-form', 'self-check-browser-signin-wait', 'self-check-keyboard-route-selectors',
+  'self-check-negative-fixtures', 'self-check-failure-envelope', 'self-check-manifest-ordering', 'self-check-admin-list-shape', 'self-check-browser-signin-form', 'self-check-browser-signin-wait', 'self-check-keyboard-route-selectors',
+  'self-check-runtime-evidence-gate', 'self-check-refresh-logout-cookie-replay', 'self-check-universe-received-exact',
 ];
 
 const evidence = {
@@ -139,6 +140,7 @@ const evidence = {
   frontendUrl,
   sourceManifest: null,
   runtimeEvidence: null,
+  httpWorkflowStarted: false,
   provenance: { before: null, after: null },
   fixture: { runId, accountIds: {}, blogIds: {}, categoryIds: {}, postIds: {}, commentIds: {} },
   screenshots: [],
@@ -457,20 +459,20 @@ async function verifyRuntimeAttestation(bundle) {
 async function verifyRuntimeEvidence() {
   if (!runtimeEvidencePath) {
     markRuntimeEvidenceMissing('M10_RUNTIME_EVIDENCE is not configured; env presence alone cannot pass runtime-only checks');
-    return;
+    return false;
   }
   try {
     assertInsideRoot(runtimeEvidencePath, 'runtime evidence');
   } catch (error) {
     markRuntimeEvidenceMissing(scrub(error instanceof Error ? error.message : error));
-    return;
+    return false;
   }
   let bundle;
   try {
     bundle = JSON.parse(await readFile(runtimeEvidencePath, 'utf8'));
   } catch (error) {
     markRuntimeEvidenceMissing(`runtime bundle could not be read (${scrub(error instanceof Error ? error.message : error)})`);
-    return;
+    return false;
   }
   const admin = bundle?.checks?.admin;
   const upload = bundle?.checks?.upload;
@@ -572,6 +574,16 @@ async function verifyRuntimeEvidence() {
   for (const id of runtimeEvidenceCheckIds) {
     check(id, namedPass, namedPass ? `runtime bundle named check ${namedDetails[id]} and attestation evidence are PASS` : `NOT RUN: runtime bundle did not verify ${namedDetails[id]} with current attestation`, { required: true });
   }
+  return namedPass;
+}
+
+// The runtime bundle is an authoritative precondition for every HTTP/browser
+// mutation. A missing or stale bundle must stop before Playwright is required,
+// so an invalid evidence file cannot accidentally create synthetic fixtures.
+function canStartHttpWorkflow(runtimeEvidenceReady, state = evidence) {
+  if (runtimeEvidenceReady !== true) return false;
+  state.httpWorkflowStarted = true;
+  return true;
 }
 
 async function safeJson(response) {
@@ -678,6 +690,7 @@ async function isolatedRefreshLifecycle(account) {
     baseURL: apiBaseUrl,
     extraHTTPHeaders: { Origin: frontendUrl },
   });
+  let postLogoutContext;
   try {
     const signed = await ownerContext.post('/api/v1/auth/signin', {
       data: { email: account.email, password: account.password },
@@ -696,7 +709,21 @@ async function isolatedRefreshLifecycle(account) {
       ? await oldCookieContext.post('/api/v1/auth/refresh', { headers: { Cookie: oldCookie } })
       : null;
     const signedOut = await ownerContext.post('/api/v1/auth/signout');
-    const afterLogout = await ownerContext.post('/api/v1/auth/refresh');
+    // Signout clears the owner's cookie jar. Replay the exact rotated cookie
+    // from a fresh context so the server-side revocation is actually tested.
+    postLogoutContext = await requestFactory.newContext({
+      baseURL: apiBaseUrl,
+      extraHTTPHeaders: { Origin: frontendUrl },
+    });
+    const afterLogout = newCookie
+      ? await postLogoutContext.post('/api/v1/auth/refresh', { headers: { Cookie: newCookie } })
+      : null;
+    const oldReuseResult = oldReuse
+      ? { status: oldReuse.status(), headers: oldReuse.headers(), body: await safeJson(oldReuse) }
+      : null;
+    const afterLogoutResult = afterLogout
+      ? { status: afterLogout.status(), headers: afterLogout.headers(), body: await safeJson(afterLogout) }
+      : null;
 
     check(
       'refresh-rotation',
@@ -725,14 +752,15 @@ async function isolatedRefreshLifecycle(account) {
     check(
       'logout-refresh-reuse-rejected',
       signedOut.status() === 200
-        && oldReuse !== null
-        && [401, 403].includes(oldReuse.status())
-        && [401, 403].includes(afterLogout.status()),
-      'old-cookie replay and post-logout refresh were rejected in isolated contexts',
+        && Boolean(newCookie)
+        && failureEnvelopeMatches(oldReuseResult, 401, 'AUTH_003')
+        && failureEnvelopeMatches(afterLogoutResult, 401, 'AUTH_003'),
+      'old-cookie replay and the exact rotated cookie after logout returned full 401/AUTH_003 envelopes in separate contexts',
     );
   } finally {
     await ownerContext.dispose();
     await oldCookieContext.dispose();
+    await postLogoutContext?.dispose();
   }
 }
 
@@ -909,6 +937,8 @@ async function runHttpAcceptance() {
     categoryId: Number.isInteger(categoryId) ? categoryId : null, visibility: 'PRIVATE', publish: false,
     thumbnailUrl: null, tagNames: [], images: [],
   });
+  const emptyDraftData = data(emptyDraft);
+  evidence.fixture.postIds.draft = Number(emptyDraftData?.id) || null;
   check('draft-empty-allowed', emptyDraft.status === 201, 'draft permits empty title/body');
   const publishEmpty = await call('POST', '/api/v1/posts', owner.token, {
     blogId: owner.blogId, title: '', contentJson: { type: 'doc', content: [] }, contentHtml: '',
@@ -1062,8 +1092,22 @@ async function runHttpAcceptance() {
     'universe request created for the expected owner target with PENDING status',
   );
   const received = await call('GET', '/api/v1/universe/requests/received', owner.token);
-  const receivedItem = data(received)?.items?.find((item) => Number(item.requestId) === requestId);
-  const accepted = await call('POST', `/api/v1/universe/requests/${receivedItem?.requestId ?? requestId}/accept`, owner.token);
+  const receivedItems = Array.isArray(data(received)?.items) ? data(received).items : [];
+  const receivedItem = receivedItems.find((item) => Number(item.requestId) === requestId);
+  const receivedRequestId = Number(receivedItem?.requestId);
+  const exactReceivedRequest = received.status === 200
+    && Number.isInteger(requestId)
+    && Number.isInteger(receivedRequestId)
+    && receivedRequestId === requestId;
+  check(
+    'universe-received-request',
+    exactReceivedRequest,
+    exactReceivedRequest
+      ? 'received list contains the exact synthetic requestId before accept'
+      : 'NOT RUN: received list did not expose the exact synthetic requestId; accept was not attempted',
+  );
+  if (!exactReceivedRequest) throw new Error('received list exact requestId fixture missing; accept not executed');
+  const accepted = await call('POST', `/api/v1/universe/requests/${receivedRequestId}/accept`, owner.token);
   check(
     'universe-accept',
     accepted.status === 200
@@ -1127,7 +1171,7 @@ async function runHttpAcceptance() {
       'exact identified comment notification was read and exact like notification was deleted',
     );
   } else check('notification-read-delete', false, 'NOT RUN: exact comment/like notification identities were not found', { required: true });
-  return { owner, friend, pending, post };
+  return { owner, friend, pending, post, draft: emptyDraftData };
 }
 
 async function runAdminAcceptance() {
@@ -1267,6 +1311,26 @@ async function runBrowserAcceptance(accounts) {
   const waitNetwork = async (page) => {
     await page.waitForLoadState('networkidle', { timeout: 12000 }).catch(() => {});
   };
+  const focusDescriptor = async (page) => page.evaluate(() => {
+    const active = document.activeElement;
+    if (!active) return { tag: null, role: null, ariaLabel: null, id: null };
+    return {
+      tag: active.tagName,
+      role: active.getAttribute('role'),
+      ariaLabel: active.getAttribute('aria-label'),
+      id: active.id || null,
+    };
+  }).catch(() => ({ tag: null, role: null, ariaLabel: null, id: null }));
+  const isFocused = async (page, locator) => locator.evaluate((node) => document.activeElement === node).catch(() => false);
+  const tabRoundTrip = async (page, locator) => {
+    await locator.focus();
+    const before = await isFocused(page, locator);
+    await page.keyboard.press('Tab');
+    const afterTab = await focusDescriptor(page);
+    await page.keyboard.press('Shift+Tab');
+    const afterReverse = await isFocused(page, locator);
+    return { before, afterTab, afterReverse };
+  };
 
   // TopBar: open the actual notification popover with the semantic link and
   // verify the documented Escape close behavior. Focus return/trapping is only
@@ -1282,15 +1346,16 @@ async function runBrowserAcceptance(accounts) {
       if (await trigger.count() === 0 || !await trigger.isVisible()) {
         notRunKeyboard('keyboard-topbar-observation', 'TopBar notification trigger is absent');
       } else {
-        await trigger.focus();
+        const focusTrace = await tabRoundTrip(ownerPage, trigger);
         await ownerPage.keyboard.press('Enter');
         const opened = await dialog.isVisible().catch(() => false);
         await ownerPage.keyboard.press('Escape');
         const closed = !(await dialog.isVisible().catch(() => false));
+        const focusReturnedAfterClose = await isFocused(ownerPage, trigger);
         check(
           'keyboard-topbar-observation',
-          opened && closed,
-          `TopBar notification trigger Enter opened=${opened} and Escape closed=${closed}; focus-trap/restore remains observation-only`,
+          focusTrace.before && focusTrace.afterReverse && opened && closed,
+          `TopBar notification Tab target=${focusTrace.afterTab.tag ?? 'none'} reverseToTrigger=${focusTrace.afterReverse} Enter opened=${opened} Escape closed=${closed} focusReturnedAfterClose=${focusReturnedAfterClose}; focus-trap/restore remains observation-only`,
         );
       }
     } catch (error) {
@@ -1305,14 +1370,14 @@ async function runBrowserAcceptance(accounts) {
     notRunKeyboard('keyboard-modal-observation', 'synthetic admin browser session was not established');
   } else {
     try {
-      await adminPage.goto(`${frontendUrl}/admin/users/${accounts.owner.id}`, { waitUntil: 'domcontentloaded' });
+      await adminPage.goto(`${frontendUrl}/admin/users/${accounts.friend.id}`, { waitUntil: 'domcontentloaded' });
       await waitNetwork(adminPage);
       const trigger = adminPage.getByRole('button', { name: /일시 정지|정지 해제/ }).first();
       const dialog = adminPage.locator('[role="dialog"]').first();
       if (await trigger.count() === 0 || !await trigger.isVisible().catch(() => false) || !await trigger.isEnabled().catch(() => false)) {
         notRunKeyboard('keyboard-modal-observation', 'admin status modal trigger is absent or disabled');
       } else {
-        await trigger.focus();
+        const focusTrace = await tabRoundTrip(adminPage, trigger);
         await adminPage.keyboard.press('Enter');
         const opened = await dialog.isVisible().catch(() => false);
         await adminPage.keyboard.press('Escape');
@@ -1328,10 +1393,11 @@ async function runBrowserAcceptance(accounts) {
           await adminPage.keyboard.press('Enter');
         }
         const closedByDocumentedCancel = !(await dialog.isVisible().catch(() => false));
+        const focusReturnedAfterClose = await isFocused(adminPage, trigger);
         check(
           'keyboard-modal-observation',
-          opened && documentedClosePathAvailable && closedByDocumentedCancel,
-          `status trigger opened=${opened}; Escape left dialog visible=${escapeStillVisible} (observation-only); documented cancel path available=${documentedClosePathAvailable} and closed=${closedByDocumentedCancel}; focus-trap/restore remains observation-only`,
+          focusTrace.before && focusTrace.afterReverse && opened && documentedClosePathAvailable && closedByDocumentedCancel,
+          `status trigger Tab target=${focusTrace.afterTab.tag ?? 'none'} reverseToTrigger=${focusTrace.afterReverse} opened=${opened}; Escape left dialog visible=${escapeStillVisible} (observation-only); documented cancel path available=${documentedClosePathAvailable} closed=${closedByDocumentedCancel} focusReturnedAfterClose=${focusReturnedAfterClose}; focus-trap/restore remains observation-only`,
         );
       }
     } catch (error) {
@@ -1352,7 +1418,7 @@ async function runBrowserAcceptance(accounts) {
       if (await trigger.count() === 0 || !await trigger.isVisible().catch(() => false) || !await trigger.isEnabled().catch(() => false)) {
         notRunKeyboard('keyboard-draft-picker-observation', 'DraftPicker trigger is absent or disabled');
       } else {
-        await trigger.focus();
+        const focusTrace = await tabRoundTrip(ownerPage, trigger);
         await ownerPage.keyboard.press('Enter');
         const opened = await dialog.isVisible().catch(() => false);
         await ownerPage.keyboard.press('Escape');
@@ -1368,10 +1434,11 @@ async function runBrowserAcceptance(accounts) {
           await ownerPage.keyboard.press('Enter');
         }
         const closedByDocumentedButton = !(await dialog.isVisible().catch(() => false));
+        const focusReturnedAfterClose = await isFocused(ownerPage, trigger);
         check(
           'keyboard-draft-picker-observation',
-          opened && documentedClosePathAvailable && closedByDocumentedButton,
-          `DraftPicker trigger Enter opened=${opened}; Escape left dialog visible=${escapeStillVisible} (observation-only); documented close path available=${documentedClosePathAvailable} and closed=${closedByDocumentedButton}; focus-trap remains observation-only`,
+          focusTrace.before && focusTrace.afterReverse && opened && documentedClosePathAvailable && closedByDocumentedButton,
+          `DraftPicker Tab target=${focusTrace.afterTab.tag ?? 'none'} reverseToTrigger=${focusTrace.afterReverse} Enter opened=${opened}; Escape left dialog visible=${escapeStillVisible} (observation-only); documented close path available=${documentedClosePathAvailable} closed=${closedByDocumentedButton} focusReturnedAfterClose=${focusReturnedAfterClose}; focus-trap remains observation-only`,
         );
       }
     } catch (error) {
@@ -1392,16 +1459,17 @@ async function runBrowserAcceptance(accounts) {
       if (await trigger.count() === 0 || !await trigger.isVisible().catch(() => false) || !await trigger.isEnabled().catch(() => false)) {
         notRunKeyboard('keyboard-category-observation', 'enabled GENERAL category rename trigger is absent');
       } else {
-        await trigger.focus();
+        const focusTrace = await tabRoundTrip(ownerPage, trigger);
         await ownerPage.keyboard.press('Enter');
         const editor = ownerPage.locator('input[aria-label$="이름 편집"]').first();
         const opened = await editor.isVisible().catch(() => false);
         await ownerPage.keyboard.press('Escape');
         const cancelled = !(await editor.isVisible().catch(() => false));
+        const focusReturnedAfterClose = await isFocused(ownerPage, trigger);
         check(
           'keyboard-category-observation',
-          opened && cancelled,
-          `category rename Enter opened=${opened}; Escape cancelled=${cancelled}; focus-trap remains observation-only`,
+          focusTrace.before && focusTrace.afterReverse && opened && cancelled,
+          `category rename Tab target=${focusTrace.afterTab.tag ?? 'none'} reverseToTrigger=${focusTrace.afterReverse} Enter opened=${opened} Escape cancelled=${cancelled} focusReturnedAfterClose=${focusReturnedAfterClose}; focus-trap remains observation-only`,
         );
       }
     } catch (error) {
@@ -1423,6 +1491,7 @@ async function runBrowserAcceptance(accounts) {
       if (await input.count() === 0 || !await input.isVisible().catch(() => false) || await form.count() === 0) {
         notRunKeyboard('keyboard-admin-observation', 'admin search form is absent');
       } else {
+        const focusTrace = await tabRoundTrip(adminPage, input);
         await input.fill(`m10-${suffix.slice(-6)}`);
         await input.focus();
         await adminPage.keyboard.press('Enter');
@@ -1432,8 +1501,8 @@ async function runBrowserAcceptance(accounts) {
         const listAnchor = await adminPage.locator('section[aria-label="관리자 콘솔"]').isVisible().catch(() => false);
         check(
           'keyboard-admin-observation',
-          queryChanged && listAnchor,
-          `admin search Enter changed keyword query=${queryChanged} and retained visible console=${listAnchor}; focus-trap/restore remains observation-only`,
+          focusTrace.before && focusTrace.afterReverse && queryChanged && listAnchor,
+          `admin search Tab target=${focusTrace.afterTab.tag ?? 'none'} reverseToInput=${focusTrace.afterReverse} Enter changed keyword query=${queryChanged} and retained visible console=${listAnchor}; focus-trap/restore remains observation-only`,
         );
       }
     } catch (error) {
@@ -1634,11 +1703,55 @@ async function staticSelfCheck() {
     "input[aria-label$=\"이름 편집\"]",
     "#admin-user-search",
     "form[role=\"search\"]",
+    'const focusDescriptor = async (page)',
+    "page.keyboard.press('Tab')",
+    'focusReturnedAfterClose',
   ];
   check(
     'self-check-keyboard-route-selectors',
     keyboardRouteSelectorContract.every((selector) => source.includes(selector)),
-    'keyboard category uses an enabled rename control with exact edit input, and admin uses the label-linked search input/form',
+    'keyboard checks use route-specific controls plus real Tab/focus observations; close focus return remains detail-only',
+    { required: true },
+  );
+  const blockedGateState = { httpWorkflowStarted: false };
+  const allowedGateState = { httpWorkflowStarted: false };
+  const gateSourceIndex = source.indexOf('if (!canStartHttpWorkflow(runtimeEvidenceReady))');
+  const requestFactorySourceIndex = source.indexOf('requestFactory = require(playwrightModule).request');
+  const runtimeEvidenceGateSelfCheck = !canStartHttpWorkflow(false, blockedGateState)
+    && blockedGateState.httpWorkflowStarted === false
+    && canStartHttpWorkflow(true, allowedGateState)
+    && allowedGateState.httpWorkflowStarted === true
+    && gateSourceIndex >= 0
+    && requestFactorySourceIndex > gateSourceIndex;
+  check(
+    'self-check-runtime-evidence-gate',
+    runtimeEvidenceGateSelfCheck,
+    'missing/invalid runtime evidence blocks workflow start and the request factory is reached only after the authoritative gate',
+    { required: true },
+  );
+  const refreshLogoutContract = [
+    'let postLogoutContext;',
+    'postLogoutContext = await requestFactory.newContext',
+    'headers: { Cookie: newCookie }',
+    'const oldReuseResult = oldReuse',
+    "failureEnvelopeMatches(oldReuseResult, 401, 'AUTH_003')",
+    "failureEnvelopeMatches(afterLogoutResult, 401, 'AUTH_003')",
+    'await postLogoutContext?.dispose();',
+  ];
+  check(
+    'self-check-refresh-logout-cookie-replay',
+    refreshLogoutContract.every((fragment) => source.includes(fragment))
+      && !source.includes(['const afterLogout = await ownerContext', '.post'].join('')),
+    'logout replay preserves the rotated cookie, uses a separate disposed context, and requires full 401/AUTH_003 envelopes',
+    { required: true },
+  );
+  check(
+    'self-check-universe-received-exact',
+    source.includes('const receivedRequestId = Number(receivedItem?.requestId);')
+      && source.includes('receivedRequestId === requestId')
+      && source.includes('received list exact requestId fixture missing; accept not executed')
+      && !source.includes(['receivedItem?.requestId', ' ?? ', 'requestId'].join('')),
+    'accept is attempted only after the received list exposes the exact synthetic requestId',
     { required: true },
   );
   const selfCheckRunId = process.env.M10_RUN_ID ?? 'm10-self-check-current';
@@ -1861,7 +1974,7 @@ async function writeEvidence() {
   for (const id of missing) evidence.checks.push({ id, ok: false, required: true, detail: 'NOT RUN: runner did not reach this required check' });
   const failures = evidence.checks.filter((item) => item.required && !item.ok);
   const selfCheckFailures = failures.filter((item) => new Set([
-    'harness-fail-closed-guards', 'static-skip-placeholder-scan', 'self-check-negative-fixtures', 'self-check-failure-envelope', 'self-check-manifest-ordering', 'self-check-admin-list-shape', 'self-check-browser-signin-form', 'self-check-browser-signin-wait', 'self-check-keyboard-route-selectors',
+    'harness-fail-closed-guards', 'static-skip-placeholder-scan', 'self-check-negative-fixtures', 'self-check-failure-envelope', 'self-check-manifest-ordering', 'self-check-admin-list-shape', 'self-check-browser-signin-form', 'self-check-browser-signin-wait', 'self-check-keyboard-route-selectors', 'self-check-runtime-evidence-gate', 'self-check-refresh-logout-cookie-replay', 'self-check-universe-received-exact',
   ]).has(item.id));
   evidence.status = selfCheck
     ? selfCheckFailures.length === 0 && evidence.failures.length === 0 ? 'SELF-CHECK PASS' : 'SELF-CHECK FAIL'
@@ -1879,7 +1992,10 @@ async function main() {
     }
     validateFullRunGuards();
     await verifyManifest();
-    await verifyRuntimeEvidence();
+    const runtimeEvidenceReady = await verifyRuntimeEvidence();
+    if (!canStartHttpWorkflow(runtimeEvidenceReady)) {
+      throw new Error('runtime evidence gate blocked HTTP/browser workflow before request context creation');
+    }
     requestFactory = require(playwrightModule).request;
     api = await requestFactory.newContext({ baseURL: apiBaseUrl, extraHTTPHeaders: { Origin: frontendUrl } });
     await verifyOpenApi();

@@ -12,9 +12,10 @@
 
 - `qa/M10-review.md`에 PRD §11~§12·REQUIREMENTS NFR-09 기준의 M0~M9 provenance 경계, 전체 회귀/DoD acceptance matrix, PostEditor publish/draft validation, Modal·DraftPicker·TopBar·category·admin 실제 keyboard evidence 행, 필수 E2E, fail-closed 규칙, 1440px·Swagger·skip/placeholder/secret 기준을 기록했다. M9 PR #15 merge SHA와 M10 base/current `dev` ref도 분리해 정정했다.
 - `qa/m10-acceptance.mjs`를 보강했다. `zeroverse.m10.runtime-evidence.v1` exact bundle의 current Git/source/JAR/FE dist/harness hash·database `zeroverse_m10`·exact `M10_RUN_ID`·repository-local `zeroverse.m10.runtime-attestation.v1`(attestation SHA, bounded timestamps, per-check ok/artifact paths/raw artifact hashes)을 검증하고, tracked product file set·current commit/tree·FE dist aggregate·loopback `127.0.0.1:13320` 및 API/FE `18090/5180`을 fail-closed로 고정한다. generated OpenAPI 61 operations와 현재 public `security:[]` allowlist/unique operationId/bearer/schema/error response, canonical HTTP error codes 및 공통 실패 envelope(`success=false`, `data=null`, structured error와 valid timestamp), actual multipart POST_IMAGE image-only fixture, PageResponse bound, rotated access/cookie attributes, notification actor/type/target identity, 13 PNG artifact dimensions/hash를 직접 검증하도록 했다. manifest files[]는 runtime generator와 같은 deterministic ASCII/code-unit ascending 순서·중복 없음으로 검증하고 그 순서를 그대로 source aggregate에 사용한다. required `private-no-store`는 guest PUBLIC post가 아닌 protected notification list의 `Cache-Control: private, no-store`를 확인하며, admin list probe는 canonical `data.users` PageResponse+`summary` shape와 no-credential fields를 확인한다. browser signin은 email field의 ancestor form 안 password와 `접속하기` accessible submit을 선택하고, route-specific visible controls를 bounded timeout으로 기다려 React 초기 렌더 경합에서도 전역 검색 submit을 오인하지 않는다. keyboard category는 disabled DEFAULT/LOCKED를 건너뛰고 enabled GENERAL rename selector를 사용하며, admin search는 label-linked `#admin-user-search`와 `form[role="search"]`를 사용한다. runtime bundle·final source/JAR/FE/API/MySQL/Chrome는 아직 NOT RUN이다.
+- 최종 review wave를 반영했다. `verifyRuntimeEvidence()`의 false 반환과 `canStartHttpWorkflow()` gate가 request factory/API context보다 먼저 실행되어 invalid/missing runtime evidence에서는 `httpWorkflowStarted=false`로 HTTP workflow를 시작하지 않는다. logout은 signout 후 별도 context에서 보존된 rotated cookie를 replay하고 old/new replay 모두 full 401/AUTH_003 envelope를 요구한다. Universe accept는 received list의 exact `requestId`가 확인될 때만 실행한다. `qa/M10-review.md`의 FE-07~11은 현재 5개 route-specific Chrome hard observation, 기존 FE unit/integration/API coverage, observation-only focus-trap/restore와 미실행 selection/mutation을 분리했으며 실제 Tab/reverse-focus 및 close 후 activeElement를 detail에 기록한다.
 - `$brief` read-only 대조와 정본·worklog·QA review·위험 레지스터 교차 확인을 완료했다. 제품 source/test, frontend, backend, runtime, DB, Git mutation은 수행하지 않았다.
 - 실제 M10 backend/frontend full run, generated OpenAPI, synthetic HTTP/MySQL/Chrome 1440px acceptance는 아직 `NOT RUN`이다.
-- `node qa/m10-acceptance.mjs --self-check` 및 `node --check qa/m10-acceptance.mjs`는 exit 0이며 self-check evidence는 `SELF-CHECK PASS`다. product static scan은 359 files / 281 classified / 0 unclassified이고, malformed runtime/screenshot/user-DB negative guard도 확인했다. 이는 실제 M10 acceptance PASS가 아니다.
+- `node qa/m10-acceptance.mjs --self-check` 및 `node --check qa/m10-acceptance.mjs`는 exit 0이며 self-check evidence는 `SELF-CHECK PASS`다. product static scan은 359 files / 281 classified / 0 unclassified이고, malformed runtime/screenshot/user-DB negative guard, runtime gate, logout cookie replay, exact received ID fixture도 확인했다. invalid runtime full-run probe는 exit 1, `STATUS=NOT RUN`, `HTTP_WORKFLOW=false`로 request context 이전 fail-closed를 확인했다. 이는 실제 M10 acceptance PASS가 아니다.
 
 ## 다음 작업
 
@@ -27,6 +28,7 @@
 
 - M10 필수 acceptance 전부가 `NOT RUN`이며, 따라서 M10 PASS·COMPLETE·release-ready를 주장할 수 없다.
 - source manifest↔JAR↔HTTP/DB/Chrome evidence provenance, current full BE/FE 회귀, generated Swagger, synthetic E2E, actual 1440px screenshots가 필요하다.
+- FE-07~11의 actual Chrome rows는 final runtime에서 fresh rerun 전까지 `NOT RUN`이다. 현재 runner가 hard-check하는 것은 route-specific open/close/query와 Tab/focus 관찰이며 DraftPicker selection→`/edit/:id`, category create/delete/reorder, admin select/confirm/paging은 기존 FE unit/integration/API/runtime evidence mapping으로만 기록하고 Chrome PASS로 부르지 않는다.
 - 배포/S3·AWS/U0 전환/실사용 DB·기존 업로드 적용/운영 bootstrap·모바일은 M10 범위 밖이다. RISK-0010/0012/0013/0021과 RISK-0005/0007 등 운영 위험은 별도로 OPEN/잔여로 유지한다.
 
 ## 산출물
@@ -38,7 +40,7 @@
 
 ## 갱신 시각
 
-2026-11-12 KST — M10 Task4 keyboard-selector fix final audit: enabled GENERAL rename와 label-linked admin search selector 및 route-specific keyboard self-check 반영. 실제 runtime acceptance는 NOT RUN.
+2026-11-12 KST — M10 final review wave: runtime gate·logout cookie replay·exact received requestId·Tab/focus observation·FE-07~11 coverage boundary 반영 및 self-check/invalid-runtime probe 완료. 실제 runtime acceptance는 NOT RUN.
 
 2026-11-12 KST — M10 runtime implementation handoff: QA 역할 소유권은 `qa/**`와 `.claude/team/qa/**`로 한정되어 `build/m10-*` 편집을 수행하지 않았다. root가 별도 소유자로 runtime orchestrator를 배정해야 한다.
 

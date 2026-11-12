@@ -588,3 +588,9 @@
 - 실제 최종 후보 `build/m9-acceptance-20261111-174413`은396PASS/0FAIL/0NOTRUN/exit0, BE109suites637·FE51files464 자동검증과 구분해 기록한다. source424/current hash 일치 및117 artifact의 전후·현재 hash/JARc6f381…을 root와 backend 기록 담당이 직접 확인했다. 실제 조회SQL5/5/3·delta0, 비어있지 않은 target 하위 row/파일hash 보존·1440px controls/같은SPA stale 결과 모두 통과.
 - static QA 초기 5회 loop와 후속 actual integration의 원인/수정/실패 run은 M9 worklog·QA 기록·SDD ledger에 보존했다. 실패 DB는 삭제 없이 archive-container로 보관, 사용자 데이터는 미접근. 제품 source/JAR은6a8763d 후 불변이며 QA 현재3a2752e다.
 - 새 가장 강한 독립 컨텍스트 `m9_final_review`가848d272..3a2752e 전체 diff·정본·실제 raw evidence·original/product PNG를 검토한다. backend/frontend/QA/PM 기록은 actualPASS와 최종 독립/PR/dev대기를 구분해 역할 소유자로 동기화 중이다. final review 및 통합 전 M9 완료 선언은 보류한다.
+
+## 2026-11-12 KST — M9 final Minor 수정·READY TO MERGE
+
+- 독립 M9 whole/visual review는 새 보안·주요 기능 차단 없이 FE 검색 내부 whitespace 축약 Minor 1건만 발견해 `NEEDS FIX`로 판정했다. 원 frontend 소유 경계의 새 컨텍스트가 실제 query RED(1 failed/3 passed) 후 trim-only 최소 수정과 회귀를 적용했고 root가 frontend 51 files/465 tests, lint/build exit 0을 재검증했다.
+- 별도 QA 컨텍스트의 scoped 재검토는 literal 내부 공백·`+`·`%_\\` 및 기존 query validation을 대조해 Critical/Important/Minor 0, `CLEAN / READY TO MERGE`로 판정했다. 수정 commit은 `5df2db0`, 최종 source manifest는 424 files / `ababaa1c00610e6a12b8ef1ec7cd876f1a3ab81fba57ba537c630e6484530ef3`; backend JAR `c6f381…d9c52`는 불변이다.
+- QA/PM이 각 소유 기록을 최종 review PASS·PR 대기로 동기화한다. root는 M9 worklog/governance/Git/runtime를 소유하며, 기록 검증 뒤 feature branch push·`dev` PR/merge·tree 동일성 확인과 M9 전용 API/Vite/MySQL 정리를 이어간다. M10·배포·사용자 DB13307 적용은 계속 제외한다.

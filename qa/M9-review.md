@@ -1,8 +1,8 @@
-# M9 — 관리자 독립 QA 준비 및 인수 기준
+# M9 — 관리자 QA 인수 증거와 독립 검토 상태
 
-> **현재 상태: A-v2 APPROVED / audit-3 R1~R5 FIX3 HARNESS STATIC-FROZEN / ACCEPTANCE NOT RUN**
+> **현재 상태: A-v2 APPROVED / M9 독립 QA PASS · READY TO MERGE / PR·dev 통합 대기**
 >
-> 사용자의 `A-v2 전체 승인`으로 회의 §5·§10·§10.1·§11, REQUIREMENTS §6.13-A, ADR-0008이 현재 계약이 됐다. 승인은 제품 PASS가 아니며, 구현 freeze·격리 runtime·실제 HTTP/Chrome/DB 증거 전에는 인수 완료를 주장하지 않는다.
+> 사용자의 `A-v2 전체 승인`으로 회의 §5·§10·§10.1·§11, REQUIREMENTS §6.13-A, ADR-0008이 현재 계약이 됐다. run7의 396/0/0 실제 HTTP·Chrome·격리 DB 증거는 M1 수정 전 source에 대한 역사 증거로 보존한다. `final-review.md`의 Minor M1은 `5df2db0`에서 수정됐고, root fresh FE 51 files/465 tests·lint/build exit0와 독립 scoped 재검토 `CLEAN / READY TO MERGE`로 닫혔다. 현재 source manifest는 424 files / `ababaa1c00610e6a12b8ef1ec7cd876f1a3ab81fba57ba537c630e6484530ef3`, backend JAR SHA는 `c6f381f72bf94528f54e3bb805403d23a0e119673c6183c9aff66af3ac0d9c52`로 불변이다. PR/dev merge는 아직 하지 않았다.
 
 ## 1. 검토 경계와 정본
 
@@ -28,104 +28,106 @@
 
 ## 3. API·공통 응답·인증 인수 매트릭스
 
+§3~8의 check ID는 `build/m9-acceptance-20261111-174413/evidence.json`의 실제 PASS를 가리킨다. 이 run7 매트릭스의 396 checks는 M1 수정 전 source에 대한 역사적 runtime evidence다. `AUTO PASS`는 관측된 자동 검사 범위이며 현재 M1 closure나 merge 완료를 뜻하지 않는다. M1은 FE 검색 query serialization만 바꿨고, 현재 판정은 아래 최신 FE 검증과 독립 scoped 재검토를 함께 대조한다. 세부 BE/FE source·testcase·artifact hash 연결은 같은 JSON의 `fixture.testArtifacts`에 보존한다.
+
 | 기준 | 독립 확인 방법 | 기대 증거 | 상태 |
 |---|---|---|---|
-| 공통 envelope | 모든 admin 성공/실패 응답의 `success/data/error/timestamp` 검사 | `ApiResponse` 형식과 오류 payload 일치 | NOT RUN |
-| 목록 endpoint | `GET /api/v1/admin/users` | ADMIN만 접근, `PageResponse` offset 필드와 summary 계약 | NOT RUN |
-| 상세 endpoint | `GET /api/v1/admin/users/{id}` | ADMIN만 접근, canonical 상세 DTO | NOT RUN |
-| role mutation | `PUT /api/v1/admin/users/{id}/role` | body enum 검증, 성공 canonical 상세 | NOT RUN |
-| status mutation | `PUT /api/v1/admin/users/{id}/status` | `ACTIVE/SUSPENDED`, 성공 canonical 상세 | NOT RUN |
-| soft delete | `DELETE /api/v1/admin/users/{id}` | `users.deleted_at`만 설정, empty success, 하위 이력·파일 보존 | NOT RUN |
-| missing auth | 5 admin method에 Authorization 없음/빈 값 | `401 AUTH_004`, private/no-store, envelope | NOT RUN |
-| malformed auth | Basic, malformed Bearer, bad signature, wrong token type | `401 AUTH_004`, private/no-store, envelope | NOT RUN |
-| expired access | 서명된 만료 ACCESS | `401 AUTH_002`; refresh 재시도 여부는 기존 apiClient 계약대로 | NOT RUN |
-| non-admin | 유효 USER ACCESS로 모든 endpoint 호출 | `403 ADMIN_001`; 목록·상세·mutation 데이터 미노출 | NOT RUN |
-| current role 재평가 | ADMIN token 발급 후 DB role을 USER로 변경하고 재호출 | 기존 claim만으로 통과하지 않고 `403 ADMIN_001`; 반대로 current ADMIN 승격은 허용 | NOT RUN |
-| current status/delete 재평가 | actor SUSPENDED 또는 deleted 후 기존 ACCESS 재호출 | 승인된 `USER_003`/`USER_001` 경계, 쓰기·관리 API 차단 | NOT RUN |
-| validation | 음수 page, size 0/101, 100/101자 keyword, 잘못된 role/status body·enum/id/query | `400 VALIDATION_001`, no-store, 내부 SQL/stacktrace 미노출; 100자는 허용 | NOT RUN |
-| OpenAPI | `/v3/api-docs`와 Swagger | 5 endpoint method/security/request/response/error 문서 | NOT RUN |
-| cache policy | 성공·401·403·404·400 모두 header 검사 | `Cache-Control: private, no-store` | NOT RUN |
-| signed claim shape | root synthetic runtime의 `M9_MISSING_ROLE_TOKEN`·`M9_MISSING_SUBJECT_TOKEN` 및 invalid role/subject | 5개 method 모두 `AUTH_004/401`·private/no-store, 정상 인증 계약 보존 | NOT RUN |
+| 공통 envelope | 모든 admin 성공/실패 응답의 `success/data/error/timestamp` 검사 | `ApiResponse` 형식과 오류 payload 일치 | AUTO PASS — `http-admin-list-envelope`, `http-admin-detail-envelope`, `auth-missing-admin-endpoints`, `validation-admin-bodies` |
+| 목록 endpoint | `GET /api/v1/admin/users` | ADMIN만 접근, `PageResponse` offset 필드와 summary 계약 | AUTO PASS — `http-admin-list-status`, `http-admin-list-shape` |
+| 상세 endpoint | `GET /api/v1/admin/users/{id}` | ADMIN만 접근, canonical 상세 DTO | AUTO PASS — `http-admin-detail-status`, `http-admin-detail-shape` |
+| role mutation | `PUT /api/v1/admin/users/{id}/role` | body enum 검증, 성공 canonical 상세 | AUTO PASS — `mutation-role-canonical`, `validation-admin-bodies` |
+| status mutation | `PUT /api/v1/admin/users/{id}/status` | `ACTIVE/SUSPENDED`, 성공 canonical 상세 | AUTO PASS — `mutation-status-canonical`, `validation-admin-bodies` |
+| soft delete | `DELETE /api/v1/admin/users/{id}` | `users.deleted_at`만 설정, empty success, 하위 이력·파일 보존 | AUTO PASS — `mutation-soft-delete`, `post-mutation-subgraph-fingerprint`, `http-deleted-image-preservation` |
+| missing auth | 5 admin method에 Authorization 없음/빈 값 | `401 AUTH_004`, private/no-store, envelope | AUTO PASS — `auth-missing-admin-endpoints` |
+| malformed auth | Basic, malformed Bearer, bad signature, wrong token type | `401 AUTH_004`, private/no-store, envelope | AUTO PASS — `auth-malformed-admin-endpoints`, `auth-bad-signature-admin-endpoints`, `auth-wrong-type-admin-endpoints` |
+| expired access | 서명된 만료 ACCESS | `401 AUTH_002`; refresh 재시도 여부는 기존 apiClient 계약대로 | AUTO PASS — `auth-expired-admin-endpoints`, `browser-auth-final-failure-boundary` |
+| non-admin | 유효 USER ACCESS로 모든 endpoint 호출 | `403 ADMIN_001`; 목록·상세·mutation 데이터 미노출 | AUTO PASS — `auth-user-admin-endpoints` |
+| current role 재평가 | ADMIN token 발급 후 DB role을 USER로 변경하고 재호출 | 기존 claim만으로 통과하지 않고 `403 ADMIN_001`; 반대로 current ADMIN 승격은 허용 | AUTO PASS — `mutation-role-promote-current-token`, `mutation-role-demote`, `backend-state-policy-evidence` |
+| current status/delete 재평가 | actor SUSPENDED 또는 deleted 후 기존 ACCESS 재호출 | 승인된 `USER_003`/`USER_001` 경계, 쓰기·관리 API 차단 | AUTO PASS — `auth-suspended-admin-endpoints`, `auth-deleted-admin-endpoints`, `mutation-deleted-admin-claim-recheck` |
+| validation | 음수 page, size 0/101, 100/101자 keyword, 잘못된 role/status body·enum/id/query | `400 VALIDATION_001`, no-store, 내부 SQL/stacktrace 미노출; 100자는 허용 | AUTO PASS — `validation-admin-queries`, `validation-admin-keyword-boundary`, `validation-admin-bodies` |
+| OpenAPI | `/v3/api-docs`와 Swagger | 5 endpoint method/security/request/response/error 문서 | AUTO PASS — `runtime-api-openapi`, `openapi-m9-paths`; method 노출 확인, final review 추가 finding 없음 |
+| cache policy | 성공·401·403·404·400 모두 header 검사 | `Cache-Control: private, no-store` | AUTO PASS — `http-admin-list-no-store`, `http-admin-detail-no-store`, `auth-user-admin-endpoints`, `validation-admin-queries`, `mutation-missing-target` |
+| signed claim shape | root synthetic runtime의 `M9_MISSING_ROLE_TOKEN`·`M9_MISSING_SUBJECT_TOKEN` 및 invalid role/subject | 5개 method 모두 `AUTH_004/401`·private/no-store, 정상 인증 계약 보존 | AUTO PASS — `auth-missing-role-admin-endpoints`, `auth-missing-subject-admin-endpoints`, `auth-invalid-role-admin-endpoints`, `auth-invalid-subject-admin-endpoints` |
 
 ## 4. 목록·summary·상세 데이터 매트릭스
 
 | 기준 | 독립 확인 방법 | 기대 증거 | 상태 |
 |---|---|---|---|
-| 검색 범위 | email/nickname/name keyword trim/max100·대소문자·`%_\\` | OR 부분검색, wildcard literal, 응답 사용자 집합 정확 | NOT RUN |
-| role/status 조건 | 승인된 `role`, `status` query를 조합 | 조건과 count/list가 일치. 화면에는 디자인대로 상태 filter를 만들지 않음 | NOT RUN |
-| offset paging | 0/1/큰 offset, size 경계, 마지막 빈 page | 정상 `totalElements/totalPages/hasNext`, 중복·누락 없음 | NOT RUN |
-| 안정 정렬 | 동일 createdAt fixture | 승인된 deterministic sort(기본 createdAt DESC,id DESC) | NOT RUN |
-| deleted 제외 | soft-deleted 대상과 활성 대상 혼합 | 목록·summary·통계에서 deleted 계정 제외 | NOT RUN |
-| 전체 사용자 카드 | 검색·페이지와 무관한 summary 대조 | 삭제 사용자 제외 생존 전체 기준 `totalUsers` | NOT RUN |
-| 이번 주 가입 | Asia/Seoul 월요일 00:00 주경계 fixture, 요청시각 단일 Clock | UTC audit 변환 후 `joinedThisWeek` 정확 | NOT RUN |
-| 정지 계정 | ACTIVE/SUSPENDED/deleted 혼합 | deleted 제외, SUSPENDED count 정확 | NOT RUN |
-| 목록 privacy | 응답 JSON과 SQL projection 대조 | password/hash/token·민감 본문·승인되지 않은 birthDate 미노출 | NOT RUN |
-| blog/post count | 다중 blog·draft·deleted blog/post fixture | 생존 blog/post, draft·모든 visibility 포함, 기본 blog는 활성 최소 id | NOT RUN |
-| 상세 기본 정보 | 활성·정지·없는·삭제 대상 요청 | 승인된 상태/삭제 오류와 개인정보 최소 DTO | NOT RUN |
-| 상세 통계 | post/comment/universe fixture | post `total=published+draft`, 본인 미삭제 댓글/답글, 생존 상대 ACCEPTED 방향 distinct·교집합 distinct | NOT RUN |
-| last access | 응답·화면·source 대조 | 수집하지 않은 `null`/`마지막 접속 기록 없음`; `updatedAt` 대용 금지 | NOT RUN |
+| 검색 범위 | email/nickname/name keyword trim/max100·대소문자·`%_\\` | OR 부분검색, wildcard literal, 응답 사용자 집합 정확 | AUTO PASS — `list-email-search-exact`, `list-nickname-search-exact`, `list-name-search-exact`, `list-literal-wildcard-search-exact`, `validation-admin-keyword-boundary` |
+| role/status 조건 | 승인된 `role`, `status` query를 조합 | 조건과 count/list가 일치. 화면에는 디자인대로 상태 filter를 만들지 않음 | AUTO PASS — `list-role-filter-exact`, `list-status-filter-exact` |
+| offset paging | 0/1/큰 offset, size 경계, 마지막 빈 page | 정상 `totalElements/totalPages/hasNext`, 중복·누락 없음 | AUTO PASS — `list-page-shape`, `list-page-size-boundary`, `list-same-created-at-pages`, `list-large-offset-empty-exact` |
+| 안정 정렬 | 동일 createdAt fixture | 승인된 deterministic sort(기본 createdAt DESC,id DESC) | AUTO PASS — `list-stable-sort`, `list-same-created-at-global-order` |
+| deleted 제외 | soft-deleted 대상과 활성 대상 혼합 | 목록·summary·통계에서 deleted 계정 제외 | AUTO PASS — `list-live-id-set-exact`, `list-summary-no-deleted` |
+| 전체 사용자 카드 | 검색·페이지와 무관한 summary 대조 | 삭제 사용자 제외 생존 전체 기준 `totalUsers` | AUTO PASS — `list-summary-exact` |
+| 이번 주 가입 | Asia/Seoul 월요일 00:00 주경계 fixture, 요청시각 단일 Clock | UTC audit 변환 후 `joinedThisWeek` 정확 | AUTO PASS — `http-admin-summary-kst-boundary` |
+| 정지 계정 | ACTIVE/SUSPENDED/deleted 혼합 | deleted 제외, SUSPENDED count 정확 | AUTO PASS — `list-summary-exact`, `list-status-filter-exact` |
+| 목록 privacy | 응답 JSON과 SQL projection 대조 | password/hash/token·민감 본문·승인되지 않은 birthDate 미노출 | AUTO PASS — `http-admin-list-privacy` |
+| blog/post count | 다중 blog·draft·deleted blog/post fixture | 생존 blog/post, draft·모든 visibility 포함, 기본 blog는 활성 최소 id | AUTO PASS — `fixture-native-subgraph`, `http-admin-detail-exact-aggregates` |
+| 상세 기본 정보 | 활성·정지·없는·삭제 대상 요청 | 승인된 상태/삭제 오류와 개인정보 최소 DTO | AUTO PASS — `http-admin-detail-shape`, `http-admin-detail-privacy`, `mutation-missing-target` |
+| 상세 통계 | post/comment/universe fixture | post `total=published+draft`, 본인 미삭제 댓글/답글, 생존 상대 ACCEPTED 방향 distinct·교집합 distinct | AUTO PASS — `http-admin-detail-post-stats`, `http-admin-detail-exact-aggregates` |
+| last access | 응답·화면·source 대조 | 수집하지 않은 `null`/`마지막 접속 기록 없음`; `updatedAt` 대용 금지 | AUTO PASS — `http-admin-detail-last-access-null`, `browser-admin-detail-last-access` |
 
 ## 5. 변경·삭제·권한 상실 매트릭스
 
 | 기준 | 독립 확인 방법 | 기대 증거 | 상태 |
 |---|---|---|---|
-| role USER→ADMIN | ADMIN actor가 대상 role 변경 | 다음 인증/관리 요청에서 DB current role 반영 | NOT RUN |
-| role ADMIN→USER | 대상이 다른 ADMIN인 경우 | 승인된 정책대로 변경, 기존 target token 권한 재평가 | NOT RUN |
-| self ADMIN 회수 | actor==target, ADMIN→USER | `ADMIN_002`(기존 ErrorCode HTTP 400) 또는 승인된 코드, role 유지 | NOT RUN |
-| self delete | actor==target DELETE | 자기 삭제 거부, 계정·refresh·기존 데이터 보존 | NOT RUN |
-| self suspend | actor==target, `ACTIVE→SUSPENDED` | `ADMIN_002/400`, 승인 메시지, 상태 불변 | NOT RUN |
-| status ACTIVE↔SUSPENDED | 대상 로그인·기존 access·각 작성 mutation을 상태 전후 호출 | 로그인/새 글·댓글·좋아요·유니버스 신청 차단, 기존 PUBLIC 가시성은 FR 정책과 일치 | NOT RUN |
-| repeated status/role | 동일 body를 반복 호출 | 승인된 idempotence, 불필요 audit/updatedAt 변경 없음 | NOT RUN |
-| target missing/deleted | 없는 ID·이미 deleted ID·race 대상 | `USER_001` 등 승인 오류, 다른 사용자 변경 없음 | NOT RUN |
-| soft delete effect | 삭제 전후 root helper fingerprint/API/기존 공개 글·댓글·알림·이미지 ACL 대조 | `deleted_at`만 설정, 하위 행·파일 보존, blog/post/image 차단·댓글 placeholder·알림 actor/target masking | NOT RUN |
-| failed mutation | validation/권한/DB 오류 주입 | actor·target·role/status/deleted_at 부분 변경 없음 | NOT RUN |
-| canonical refresh | 성공 mutation 뒤 목록·상세 재조회 | 서버 현재 상태로 UI 동기화, stale 이전 값 복귀 없음 | NOT RUN |
-| audit/privacy | 응답·로그·DB diff 검사 | raw token/password/hash 및 불필요 개인정보 미출력 | NOT RUN |
+| role USER→ADMIN | ADMIN actor가 대상 role 변경 | 다음 인증/관리 요청에서 DB current role 반영 | AUTO PASS — `mutation-role-promote-current-token`, `mutation-role-canonical` |
+| role ADMIN→USER | 대상이 다른 ADMIN인 경우 | 승인된 정책대로 변경, 기존 target token 권한 재평가 | AUTO PASS — `mutation-role-demote`, `mutation-role-demote-canonical` |
+| self ADMIN 회수 | actor==target, ADMIN→USER | `ADMIN_002`(기존 ErrorCode HTTP 400) 또는 승인된 코드, role 유지 | AUTO PASS — `mutation-self-protect`, `backend-noop-audit-evidence` |
+| self delete | actor==target DELETE | 자기 삭제 거부, 계정·refresh·기존 데이터 보존 | AUTO PASS — `mutation-self-protect`, `backend-noop-audit-evidence` |
+| self suspend | actor==target, `ACTIVE→SUSPENDED` | `ADMIN_002/400`, 승인 메시지, 상태 불변 | AUTO PASS — `mutation-self-protect`, `backend-noop-audit-evidence` |
+| status ACTIVE↔SUSPENDED | 대상 로그인·기존 access·각 작성 mutation을 상태 전후 호출 | 로그인/새 글·댓글·좋아요·유니버스 신청 차단, 기존 PUBLIC 가시성은 FR 정책과 일치 | AUTO PASS — `mutation-suspend-boundary`, `mutation-suspended-signin-and-writes`, `refresh-reactivated-existing-accepted`, `backend-state-policy-evidence` |
+| repeated status/role | 동일 body를 반복 호출 | 승인된 idempotence, 불필요 audit/updatedAt 변경 없음 | AUTO PASS — `mutation-same-value-audit-immutable`, `mutation-status-idempotence`, `backend-noop-audit-evidence` |
+| target missing/deleted | 없는 ID·이미 deleted ID·race 대상 | `USER_001` 등 승인 오류, 다른 사용자 변경 없음 | AUTO PASS — `mutation-missing-target`, `mutation-delete-idempotence-contract` |
+| soft delete effect | 삭제 전후 root helper fingerprint/API/기존 공개 글·댓글·알림·이미지 ACL 대조 | `deleted_at`만 설정, 하위 행·파일 보존, blog/post/image 차단·댓글 placeholder·알림 actor/target masking | AUTO PASS — `post-mutation-subgraph-fingerprint`, `http-target-image-after-delete`, `http-deleted-post-acl`, `http-deleted-blog-acl`, `http-target-comment-placeholder`, `http-target-reply-placeholder`, `http-target-actor-notification-mask` |
+| failed mutation | validation/권한/DB 오류 주입 | actor·target·role/status/deleted_at 부분 변경 없음 | AUTO PASS — `validation-admin-bodies`, `mutation-self-protect`, `backend-noop-audit-evidence`, `browser-mutation-error-retry`; DB 장애 주입 실측은 주장하지 않음 |
+| canonical refresh | 성공 mutation 뒤 목록·상세 재조회 | 서버 현재 상태로 UI 동기화, stale 이전 값 복귀 없음 | AUTO PASS — `browser-role-confirm-canonical`, `browser-status-confirm-canonical`, `browser-delete-confirm-canonical` |
+| audit/privacy | 응답·로그·DB diff 검사 | raw token/password/hash 및 불필요 개인정보 미출력 | AUTO PASS — `http-admin-list-privacy`, `http-admin-detail-privacy`, `mutation-same-value-audit-immutable`; final review 추가 finding 없음 |
 
 ## 6. 동시성·선형화 매트릭스
 
 | 기준 | 독립 확인 방법 | 기대 증거 | 상태 |
 |---|---|---|---|
-| actor/target lock | 두 ADMIN이 상호 대상 role/status/delete mutation을 MySQL barrier로 실행 | deleted 포함 actor/target ID 오름차순 lock, lock 후 current 재검증, 권한 우회 없음 | NOT RUN |
-| actor demotion race | A request와 B의 A role/status 변경을 root barrier로 동시 시작 | DB current actor 검증 시점에 따른 성공/거부, 후행 무권한 작업 차단 | NOT RUN |
-| target mutation race | status↔delete, role↔delete 동시 실행 | 한 선형화 결과, partial field/복구 불가 상태 없음 | NOT RUN |
-| stale ACCESS | role/status/delete 후 기존 JWT를 동시에 사용 | JWT claim만으로 admin/쓰기 권한 유지되지 않음 | NOT RUN |
-| list snapshot | summary/list/detail 동시 mutation | 명시 RR 동일 snapshot, count/list 불일치·dirty read 없음 | NOT RUN |
-| query bound | synthetic query-count helper/sql, size 1/100, 14 SELECT bound | 실제 HTTP 200 request 전후 counter, 양쪽 1~14·delta 0, N+1 없음 | NOT RUN |
+| actor/target lock | 두 ADMIN이 상호 대상 role/status/delete mutation을 MySQL barrier로 실행 | deleted 포함 actor/target ID 오름차순 lock, lock 후 current 재검증, 권한 우회 없음 | AUTO PASS — `concurrency-physical-barrier-evidence` |
+| actor demotion race | A request와 B의 A role/status 변경을 root barrier로 동시 시작 | DB current actor 검증 시점에 따른 성공/거부, 후행 무권한 작업 차단 | AUTO PASS — `concurrency-actor-demotion-exact`, `concurrency-actor-demotion-race`, `concurrency-physical-barrier-evidence` |
+| target mutation race | status↔delete, role↔delete 동시 실행 | 한 선형화 결과, partial field/복구 불가 상태 없음 | AUTO PASS — `concurrency-target-mutation-exact`, `concurrency-target-mutation-race` |
+| stale ACCESS | role/status/delete 후 기존 JWT를 동시에 사용 | JWT claim만으로 admin/쓰기 권한 유지되지 않음 | AUTO PASS — `concurrency-stale-access`, `backend-state-policy-evidence` |
+| list snapshot | summary/list/detail 동시 mutation | 명시 RR 동일 snapshot, count/list 불일치·dirty read 없음 | AUTO PASS — `backend-rr-writer-evidence` |
+| query bound | synthetic query-count helper/sql, size 1/100, 14 SELECT bound | 실제 HTTP 200 request 전후 counter, 양쪽 1~14·delta 0, N+1 없음 | AUTO PASS — `admin-query-bound` |
 
 ## 7. Frontend·1440px 브라우저 매트릭스
 
 | 기준 | 독립 확인 방법 | 기대 증거 | 상태 |
 |---|---|---|---|
-| AdminRoute loading | auth restore/current admin probe 지연 | 판단 전 대기, pending 중 민감 화면·보호 데이터 미표시 | NOT RUN |
-| guest guard | 비로그인 `/admin`, `/admin/users/:id` | `/signin` 이동, admin API 미호출 | NOT RUN |
-| USER guard | 로그인 USER가 직접 URL 접근 | 승인된 비관리자 화면/403 처리, admin 데이터 미표시 | NOT RUN |
-| ADMIN entry | 프로필 메뉴에서 관리자 진입 | ADMIN에게만 링크, 상단 전용 버튼/사이드바 Admin 항목 없음 | NOT RUN |
-| list layout | 1440×1000 screenshot | 1100px 단일 컬럼, `ADMIN CONSOLE`, `ROLE: ADMIN`, 검색, 통계 3카드, 테이블 정본 일치 | NOT RUN |
-| detail layout | 1440×1000 screenshot | 860px, breadcrumb, header/stats/actions/copy/token 정본 일치 | NOT RUN |
-| loading/empty/error | 목록·상세 200/empty/500/403/404 | 빈 상태·오류·retry가 명확하고 기존 행/입력 보존 | NOT RUN |
-| search/paging URL | keyword/query/page/back/reload | URL 및 결과 복원, 오래된 검색 응답이 최신 결과를 덮지 않음 | NOT RUN |
-| role mutation UI | select→confirm→success/error | canonical 재조회, 실패 시 선택/행 보존, 중복 클릭 dedupe | NOT RUN |
-| status UI | suspend/activate confirm→success/error | warning 상태·캡션과 API 결과 일치, 자기 대상 정책 표시 | NOT RUN |
-| delete UI | danger confirm→success/error | 승인 카피·대상/행동 확인, 성공 후 목록 복귀, 실패 retry | NOT RUN |
-| account/session stale | 실제 SPA ADMIN A→USER B 전환 중 list/detail/mutation 지연 | A 데이터·retry·navigation이 B 화면에 복귀하지 않음, current probe로 재평가 | NOT RUN |
-| auth final failure | 401→refresh 실패 | 민감한 목록·상세·mutation retry 제거, signin 경계 | NOT RUN |
-| visual tokens | screenshot/source direct comparison | radius 0, ink/paper/accent/warning/danger, hard shadow, 폰트·카피 일치 | NOT RUN |
+| AdminRoute loading | auth restore/current admin probe 지연 | 판단 전 대기, pending 중 민감 화면·보호 데이터 미표시 | AUTO PASS — `browser-admin-list-pending-sensitive`, `browser-stale-list-pending-sensitive`, `browser-stale-detail-pending-sensitive`, `frontend-matrix-evidence` |
+| guest guard | 비로그인 `/admin`, `/admin/users/:id` | `/signin` 이동, admin API 미호출 | AUTO PASS — `browser-guest-admin-guard`, `browser-guest-detail-guard` |
+| USER guard | 로그인 USER가 직접 URL 접근 | 승인된 비관리자 화면/403 처리, admin 데이터 미표시 | AUTO PASS — `browser-user-admin-guard` |
+| ADMIN entry | 프로필 메뉴에서 관리자 진입 | ADMIN에게만 링크, 상단 전용 버튼/사이드바 Admin 항목 없음 | AUTO PASS — `browser-admin-entry-menu` |
+| list layout | 1440×1000 screenshot | 1100px 단일 컬럼, `ADMIN CONSOLE`, `ROLE: ADMIN`, 검색, 통계 3카드, 테이블 정본 일치 | AUTO PASS — `browser-admin-list-width`, `browser-admin-heading`, `browser-admin-role-label`, `browser-screenshot-evidence`, `design-admin-reference`; final review visual 추가 finding 없음 |
+| detail layout | 1440×1000 screenshot | 860px, breadcrumb, header/stats/actions/copy/token 정본 일치 | AUTO PASS — `browser-admin-detail-width`, `browser-admin-detail-last-access`, `browser-screenshot-evidence`, `design-admin-reference`; final review visual 추가 finding 없음 |
+| loading/empty/error | 목록·상세 200/empty/500/403/404 | 빈 상태·오류·retry가 명확하고 기존 행/입력 보존 | AUTO PASS — `browser-list-empty-state`, `browser-list-transient-retry-result`, `browser-detail-transient-retry-result`, `browser-target-404`, `browser-admin-denied-reentry` |
+| search/paging URL | keyword/query/page/back/reload | URL 및 결과 복원, 오래된 검색 응답이 최신 결과를 덮지 않음 | AUTO PASS — `browser-search-url-state`, `browser-search-paging-history`, `frontend-matrix-evidence` |
+| role mutation UI | select→confirm→success/error | canonical 재조회, 실패 시 선택/행 보존, 중복 클릭 dedupe | AUTO PASS — `browser-role-confirm-canonical`, `browser-mutation-duplicate-submit`, `browser-mutation-error-retry` |
+| status UI | suspend/activate confirm→success/error | warning 상태·캡션과 API 결과 일치, 자기 대상 정책 표시 | AUTO PASS — `browser-status-confirm-canonical`, `frontend-matrix-evidence` |
+| delete UI | danger confirm→success/error | 승인 카피·대상/행동 확인, 성공 후 목록 복귀, 실패 retry | AUTO PASS — `browser-delete-copy`, `browser-delete-confirm-canonical`, `frontend-matrix-evidence` |
+| account/session stale | 실제 SPA ADMIN A→USER B 전환 중 list/detail/mutation 지연 | A 데이터·retry·navigation이 B 화면에 복귀하지 않음, current probe로 재평가 | AUTO PASS — `browser-stale-list`, `browser-stale-detail`, `browser-stale-mutation`, `browser-account-switch-stale` |
+| auth final failure | 401→refresh 실패 | 민감한 목록·상세·mutation retry 제거, signin 경계 | AUTO PASS — `browser-auth-final-failure-boundary` |
+| visual tokens | screenshot/source direct comparison | radius 0, ink/paper/accent/warning/danger, hard shadow, 폰트·카피 일치 | AUTO PASS — `browser-screenshot-evidence`, `design-admin-reference`; final review visual 추가 finding 없음 |
 
 ## 8. DB·회귀·artifact gate
 
 | Gate | 기준 | 상태 |
 |---|---|---|
-| backend unit/controller | role/status/self-protect/validation/error/no-store 테스트 | NOT RUN |
-| repository/JPA | aggregate count, soft delete, auditing, lock, paging projection | NOT RUN |
-| backend full | Gradle `test bootJar`, failures/errors/skips `0/0/0` | NOT RUN |
-| frontend full | test(`--maxWorkers=1`), lint, build | NOT RUN |
-| migration | 신규 migration 여부 확인. 기존 V1~V6/schema/data fingerprint 보존 | NOT RUN |
-| M4~M8 regression | auth/refresh, posts/ACL, universe, comments/likes, feed/search, notifications | NOT RUN |
-| source/JAR identity | tested source manifest와 immutable runtime JAR hash 일치 | NOT RUN |
-| HTTP/API | 격리 MySQL runtime, OpenAPI, 모든 auth/status/delete matrix | NOT RUN |
-| Chrome | 1440px 목록·상세·guest/USER/ADMIN/stale/error screenshots | NOT RUN |
-| independent review | 구현자와 다른 컨텍스트에서 diff·정본·출력 대조 | NOT RUN |
+| backend unit/controller | role/status/self-protect/validation/error/no-store 테스트 | PASS — `backend-final-2/test-results/`의 AdminControllerTest 및 `backend-state-policy-evidence` |
+| repository/JPA | aggregate count, soft delete, auditing, lock, paging projection | PASS — `backend-final-2/test-results/`의 AdminQuery/MySql·Mutation·Concurrency XML, `backend-noop-audit-evidence` |
+| backend full | Gradle `test bootJar`, failures/errors/skips `0/0/0` | PASS — `build/m9-evidence/backend-final-2/summary.json`: 109 suites / 637 tests, failure/error/skip 0, exit0 |
+| frontend full | test(`--maxWorkers=1`), lint, build | PASS — M1 수정 후 root fresh revalidation: 51 files / 465 tests; lint/build exit0 (`task-4-final-m1-report.md`, `final-m1-rereview.md`) |
+| migration | 신규 migration 여부 확인. 기존 V1~V6/schema/data fingerprint 보존 | 기존 migration 회귀 PASS — final BE XML 및 whole-branch review 대조; merged tree 재확인은 PR/dev 통합 후 |
+| M4~M8 regression | auth/refresh, posts/ACL, universe, comments/likes, feed/search, notifications | PASS — backend 637 및 M1 수정 후 FE 51 files/465 tests; run7 FE464는 수정 전 역사 수치로 합산하지 않음 |
+| source/JAR identity | tested source manifest와 immutable runtime JAR hash 일치 | PASS — 최신 source manifest 424 files / `ababaa1c00610e6a12b8ef1ec7cd876f1a3ab81fba57ba537c630e6484530ef3`; backend JAR `c6f381f72bf94528f54e3bb805403d23a0e119673c6183c9aff66af3ac0d9c52` 불변. run7의 `63d720de69a286736f77406cf3a33019ef4871b09cd6632ec7f483ce15b9602c`는 역사 manifest |
+| HTTP/API | 격리 MySQL runtime, OpenAPI, 모든 auth/status/delete matrix | AUTO PASS — run7 `evidence.json`의 역사 runtime evidence, `required-matrix-complete`; M1 수정 후 API 재실행은 하지 않음 |
+| Chrome | 1440px 목록·상세·guest/USER/ADMIN/stale/error screenshots | AUTO PASS — run7 browser checks·1440px screenshot 2개라는 역사 evidence; M1은 시각 변경이 없어 Chrome 재실행은 하지 않음 |
+| independent review | 구현자와 다른 컨텍스트에서 diff·정본·출력 대조 | PASS — `final-m1-rereview.md`: Critical/Important/Minor 0, `CLEAN / READY TO MERGE`; PR/dev merge는 별도 gate |
 
 ## 9. A-v2 실행 순서와 잔여 위험
 
@@ -135,14 +137,16 @@
 4. 사용자 DB `13307`, 기존 업로드, `.env.local`, 제품 코드/타 역할 테스트는 읽거나 수정하지 않는다.
 5. 최대 fan-out/운영 SLA를 측정하지 않았다면 PASS로 표현하지 않는다. `lastAccessAt` 수집·제품 bootstrap·전역 refresh revoke·새 migration·M10은 검사 대상이 아니다.
 
-잔여 위험은 계약 미확정이 아니라 구현·실측 증거 부재다: DB current auth와 JWT claim 불일치, sorted lock/refresh 경합, 하위 데이터 보존과 ACL masking, RR count/list snapshot, 14 SELECT bound, 1440px/SPA stale, source/JAR identity가 아직 실제로 닫히지 않았다.
+run7은 M1 수정 전 source에서 current auth, lock/refresh 경합, 하위 데이터 보존·ACL masking, RR snapshot, query bound, 1440px/SPA stale 및 source/JAR identity 자동 gate를 통과했다. 이후 Minor M1은 FE focused/full 검증과 독립 scoped 재검토에서 닫혔고, 현재 QA 판정은 **M9 독립 QA PASS / READY TO MERGE**다. 남은 gate는 리더의 PR/dev 통합과 merged tree 대조다. 최대 fan-out·운영 SLA 및 DB 장애 주입까지 검증했다는 주장은 하지 않는다.
 
 ## 10. 현재 판정
 
-- **판정: NOT RUN / A-v2 APPROVED / HARNESS PREPARED / WAITING FOR SOURCE FREEZE + ISOLATED RUNTIME**
-- `qa/m9-acceptance.mjs`는 실제 합성 HTTP·Chrome runner로 준비됐지만, 현재 턴에서는 `node --check`와 정적 검증만 수행한다.
-- 현재 증거가 없는 항목은 전부 `NOT RUN`이다. 구현자의 자체 테스트·승인 기록·환경변수만으로 PASS를 완화하지 않는다.
-- 제품 코드·타 역할 테스트·사용자 DB `13307`·업로드·Git은 이 준비에서 수정하지 않았다.
+- **M9 독립 QA PASS / READY TO MERGE.** `final-review.md`의 Minor M1 1건은 `5df2db0`에서 검색어 양끝 trim-only 및 내부 whitespace 보존으로 수정됐다. `final-m1-rereview.md`는 Critical/Important/Minor 각 0, `CLEAN / READY TO MERGE`다.
+- 최신 FE 근거는 focused `adminApi.test.ts` 1 file/4 tests PASS, root fresh full 51 files/465 tests PASS, lint/build exit0다. backend는 109 suites/637 tests, failure/error/skip 0이며 JAR SHA `c6f381f72bf94528f54e3bb805403d23a0e119673c6183c9aff66af3ac0d9c52`가 유지됐다.
+- 최신 source manifest는 424 files / SHA-256 `ababaa1c00610e6a12b8ef1ec7cd876f1a3ab81fba57ba537c630e6484530ef3`다. run7의 396 acceptance checks / 0 FAIL / 0 NOT RUN, FE 464 및 source SHA `63d720de69a286736f77406cf3a33019ef4871b09cd6632ec7f483ce15b9602c`는 수정 전 source에 대한 역사 evidence이며 현재 FE465와 합산하지 않는다.
+- 실제 실행자는 root, harness 보완·artifact 대조는 QA `/root/m9_qa_fix5`, 최종 review와 scoped re-review는 구현자와 분리된 컨텍스트였다. 초기 실패/NOT RUN run과 run7 원시 증거는 삭제하지 않았다.
+- 현재 판정에서 남은 외부 gate는 root의 PR/dev 통합·merged tree/source identity 대조뿐이다. 이번 M1 수정 뒤 API/DB/Chrome acceptance를 다시 실행했다는 주장은 하지 않으며, 해당 runtime 증거는 run7 역사 evidence로 한정한다.
+- 현재 기록 갱신은 QA 문서만 변경했다. main harness/helper·제품·runtime·사용자 DB/환경/업로드·Git mutation은 수행하지 않았다.
 
 ## 11. A-v2 runtime handoff — root exact contract
 
@@ -211,7 +215,7 @@ M9_RUNTIME_SQL_HELPER=build/m9-runtime.py \
 node qa/m9-acceptance.mjs
 ```
 
-현재 준비 명령은 `node --check qa/m9-acceptance.mjs`뿐이다. 실제 HTTP·DB·Chrome·source/JAR acceptance는 아직 실행하지 않았고, 본 문서의 모든 매트릭스 행은 `NOT RUN`이다.
+위 명령은 runtime handoff 계약이다. 현재는 root의 run7 실행과 실제 artifact 대조가 완료되어 §3~8에 결과를 연결했다. 아래 과거 정적 보완 기록의 NOT RUN은 해당 시점의 판정이며 최신 상태를 뜻하지 않는다.
 
 ## 12. Audit-1 I1~I9 fix1 closure (역사 기록; §13 fix2가 현재 기준)
 
@@ -328,3 +332,25 @@ Fix1 범위의 정적 검증은 `node --check qa/m9-acceptance.mjs`와 whitespac
 - 보존: holder 변경은 ready metadata의 숫자 ID 추출뿐이며 actual delivery/expiry/dispose/B stable/same-document/late-response 부재 gate를 유지한다. stdout 마지막 출력만 경로·건수로 줄이고 전체 fixture/hash/evidence 데이터는 JSON에 남긴다.
 - 검증: `node --check qa/m9-acceptance.mjs`, Node/browser 환경의 기존 oxlint scoped no-undef, scoped git diff --check 모두 exit0. `node /private/tmp/m9-route-protocol-focused.mjs`는 actual 함수의 numeric IDs 필터·중복body/expiry/delivery/disposal/failure 경로를 재검증해 exit0이었다. 변경 파일·diff·기록을 재독했다.
 - 경계: QA는 API/browser/DB/Gradle/Git mutation 및 frozen helper를 실행·변경하지 않았다. 제품 source/JAR·디자인 정본도 변경하지 않았다. root fresh run7와 최종 whole-branch/시각/실제 artifact gate가 남아 있으며 순수 검사로 실제 GREEN/PASS를 주장하지 않는다.
+
+## 2026-11-11 KST — Task4 Step3 run7 실제 자동 인수 PASS / 독립 최종 gate 대기
+
+- 실제 증거: `build/m9-acceptance-20261111-174413/evidence.json` status PASS, **396 acceptance checks PASS / 0 FAIL / 0 NOT RUN**. `build/m9-evidence/acceptance-diagnostic-7.log`의 마지막 summary도 396/0/0, screenshot 2개이며 root 실행 exit0 인계와 일치한다. 초기 실패 run은 보존했고 당시 부분 PASS를 최종 결과로 바꾸지 않았다.
+- source/JAR: source `3a2752e`, `source-after.json`의 424 files/match=true, `runner-provenance.json`과 `runner-provenance-after.json` 117개 동등 및 현재 파일 SHA-256 전부 일치를 QA가 직접 확인했다. source manifest SHA-256 `63d720de69a286736f77406cf3a33019ef4871b09cd6632ec7f483ce15b9602c`, immutable runtime JAR SHA-256 `c6f381f72bf94528f54e3bb805403d23a0e119673c6183c9aff66af3ac0d9c52`.
+- SQL 실측: 실제 HTTP200 list size1=5 SELECT, size100=5 SELECT, detail=3 SELECT. list 증분0이며 세 요청 모두 승인 bound 1..14 이내다. 하위 row/file fingerprint·이미지 bytes/삭제후 UPLOAD_003·canonical 집계·current actor·동시성·SPA stale gate가 모두 PASS다.
+- 별도 제품 회귀: `build/m9-evidence/backend-final-2/summary.json` 109 suites/637 tests, failure/error/skip0, exit0; `frontend-final-result.json` 및 `frontend-final-test.log` 51 files/464 tests, 실패/skip0. 396 acceptance checks와 합산하지 않는다. `qa-helper-final.log`는 parser focused 13/13 PASS이며 `route-protocol-focused.log`는 body 격리·한번 fulfillment·A만 expiry/B 통과·실제 delivery·유한 cleanup·취소 failure/noUnhandled의 순수 검사 PASS다.
+- helper closure: physical barrier 7 mappings, RR writer 2, no-op/audit 4, state policy 6, FE 25가 실제 named test/source와 연결됐다. 다섯 helper check의 missing/unresolved는 모두 빈 배열이다. `fixture.testArtifacts`에 backend19/frontend25 mappings 및 artifact hashes123개를 보존했다. FE uncovered6/state uncovered3은 아래 direct PASS로 닫혔다.
+  - FE pending: `browser-admin-list-pending-sensitive`; 같은 Provider 전환: `browser-stale-list`, `browser-stale-detail`, `browser-stale-mutation`, `browser-account-switch-stale`; 복귀 probe 상태: `browser-admin-focus-suspended`, `browser-admin-visible-deleted`, `browser-admin-denied-reentry`.
+  - FE empty/error/retry: `browser-list-empty-state`, `browser-list-transient-retry`, `browser-list-transient-retry-result`, `browser-detail-transient-retry`, `browser-detail-transient-retry-result`, `browser-mutation-error-retry`; 중복 제출: `browser-mutation-duplicate-submit`; URL/실측: `browser-admin-list-width`, `browser-admin-detail-width`, `browser-search-url-state`, `browser-search-paging-history`, `browser-screenshot-evidence`, `browser-admin-entry-menu`, `browser-admin-heading`, `browser-admin-role-label`.
+  - 상태정책: `mutation-suspend-boundary`, `mutation-deleted-signin-and-writes`, `refresh-reactivated-existing-accepted`. required matrix도 `required-matrix-complete` PASS이며 미실행/실패 required ID가 없다.
+- 화면 증거: run7 `admin-list-1440.png`/`admin-detail-1440.png`, 실제 visible 디자인 관리자/상세 폭1100/860, 목록·상세·retry·삭제카피·stale 자동 검사 PASS. 디자인 소스 선택과 크기 검사는 최종 시각 정합성 심사를 대신하지 않는다.
+- 저자/판정 경계: QA harness 보완은 `/root/m9_qa_fix5`, 실제 runtime 실행은 root, 최종 whole-branch/시각 검토는 별도 `/root/m9_final_review`다. 현재는 **자동 인수 PASS / 독립 최종 verdict 및 PR/dev merge 대기**다. QA 매트릭스의 최신 상태를 실제 check ID로 연결했고 과거 append-only 실패 기록은 보존했다. 이번 변경은 QA 기록만이며 main/helper/product/runtime/Git은 변경하지 않았다.
+- 기록 검증: QA 4개 문서 대상 `git diff --check` exit0, 최신 매트릭스71행의 실제 PASS ID115개 대조·미실행 상태 잔존 없음, WORKLOG/report append 동일성·117개 frozen provenance 재대조 PASS. 기존 report는 Git 제외 경로이므로 별도 append 내용/후행 공백도 검사했다. main/helper/product/runtime 재실행은 하지 않았다.
+
+## 16. 2026-11-12 KST — final-review Minor M1 수정·독립 scoped 재검토 종료
+
+- `final-review.md`는 Critical 0 / Important 0 / Minor 1로, `frontend/src/features/admin/adminApi.ts`의 keyword 내부 whitespace 축약을 Minor M1로 지적했다. `task-4-final-m1-brief.md`의 계약과 REQUIREMENTS §6.13-A·ADR-0008을 다시 대조했고, `5df2db0`에서 양끝 `trim`만 적용하고 내부 whitespace를 보존하는 수정과 회귀를 확인했다. URL wire 표현과 literal `+`·`%_\\` 의미 보존도 보고·재검토 원문에 연결된다.
+- TDD/검증 근거는 `task-4-final-m1-report.md`와 `final-m1-rereview.md`에 있다: 수정 전 focused RED(1 failed/3 passed), 수정 후 focused 1 file/4 tests PASS, root fresh full FE 51 files/465 tests PASS, `npm run lint`·`npm run build` exit0. 기존 build chunk warning은 비차단 경고로 분리됐다.
+- 최종 source manifest는 424 files / SHA-256 `ababaa1c00610e6a12b8ef1ec7cd876f1a3ab81fba57ba537c630e6484530ef3`이며 backend 109 suites/637 tests와 immutable JAR SHA-256 `c6f381f72bf94528f54e3bb805403d23a0e119673c6183c9aff66af3ac0d9c52`는 변하지 않았다. run7의 source SHA `63d720de69a286736f77406cf3a33019ef4871b09cd6632ec7f483ce15b9602c`, FE464 및 396/0/0 acceptance는 M1 수정 전 역사 evidence다.
+- 독립 `final-m1-rereview.md`는 Critical/Important/Minor 0, **CLEAN / READY TO MERGE**로 판정했다. 이 재검토는 제품 2개 파일·frontend 기록 diff와 focused 경로를 범위로 하며, 기존 run7 API/DB/Chrome evidence를 수정 후 재실행한 결과로 표현하지 않는다.
+- 현재 QA 판정은 **M9 독립 QA PASS / READY TO MERGE**다. 미해결 gate는 root의 PR/dev 통합·merged tree/source identity 대조이며, 아직 PR/dev merge는 수행되지 않았다. 과거 실패·NOT RUN 기록과 run7 실제 396 evidence는 append-only로 보존한다.

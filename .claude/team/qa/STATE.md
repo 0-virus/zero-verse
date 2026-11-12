@@ -40,6 +40,8 @@
 
 2026-11-12 KST — M10 Task4 fix round 1/5 final audit: runtime evidence/manifest/OpenAPI/HTTP/notification/screenshot fail-closed 보강, self-check pattern cleanup 및 scoped verification 반영.
 
+2026-11-12 KST — M10 runtime implementation handoff: QA 역할 소유권은 `qa/**`와 `.claude/team/qa/**`로 한정되어 `build/m10-*` 편집을 수행하지 않았다. root가 별도 소유자로 runtime orchestrator를 배정해야 한다.
+
 ## 2026-11-12 KST — M10 Task4 false-pass hardening
 
 - `qa/m10-acceptance.mjs`를 보강했다. PUBLIC fixture로 UNIVERSE read를 통과시키던 경로를 실제 UNIVERSE 생성→수락 전 거부→수락 후 허용으로 바꾸고, comment/like도 accepted UNIVERSE post에서 실행한다.

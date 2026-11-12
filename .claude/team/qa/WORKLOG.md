@@ -1200,3 +1200,10 @@
 ## 2026-11-12 KST — M10 Task4 fix round 1/5 evidence serialization hardening
 
 - malformed runtime bundles cannot echo arbitrary status/runId/check IDs into evidence: runtime evidence serialization now retains only the exact schema/status, safe `m10-*` run ID, approved named IDs, and hash fields. This preserves the token/cookie/password/email non-output boundary while remaining fail-closed on schema mismatch.
+
+## 2026-11-12 KST — M10 Task4 runtime implementation ownership conflict
+
+- 배정 내용: root가 `build/m10-runtime.py`, `build/m10-vite.mjs` 및 runtime report 구현을 요청했다. 해당 도구는 M10 전용 MySQL/API/FE 기동·재기동·증거 bundle 생성까지 포함한다.
+- 정본 경계: 헌법 제1조 소유권 표와 QA 역할 지침에 따라 QA는 `qa/**`와 `.claude/team/qa/**`만 편집할 수 있다. `build/**`는 QA 소유가 아니며 build runtime 도구 편집은 수행하지 않았다.
+- 결과: runtime 도구 구현은 blocked by ownership; root가 리더 소유 파일로 직접 구현하거나 소유권을 명시한 다른 역할에 재배정해야 한다. 사용자 DB `13307`, 기존 runtime/container/upload에는 접근하지 않았다.
+- 인계: 현재 QA harness는 `zeroverse.m10.runtime-evidence.v1` bundle의 exact schema·hash·named check를 fail-closed 검증한다. root runtime은 `docs/PM-M10-runtime-plan.md`와 `.superpowers/sdd/M10-closeout/task-4-runtime-brief.md`를 따라 bundle을 공급해야 한다. actual runtime acceptance는 NOT RUN이다.

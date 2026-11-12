@@ -2,11 +2,11 @@
 
 > 덮어쓰기 스냅샷. 시간순 이력은 `WORKLOG.md`, 마일스톤 이력은 `docs/worklog/**`를 본다.
 
-마지막 갱신: 2026-11-12 14:05:00 KST
+마지막 갱신: 2026-11-12 14:58:16 KST
 
 ## 현재 단계
 
-- M10 closeout Task3 **구현·자체 검증 완료(GREEN)**다. 브라우저 인수 실패 원인을 현재 격리 런타임에서 추가 진단했으며, 제품 소스 변경 없이 root/QA에 런타임·하네스 수정 근거를 인계했다. M10 전체 PASS/complete가 아니다.
+- M10 closeout Task3 **구현·자체 검증 완료(GREEN)**다. 브라우저 인수 실패 원인을 현재 격리 런타임에서 추가 진단했으며, 제품 소스 변경 없이 root/QA에 런타임·하네스 수정 근거를 인계했다. 로그인 실패의 최종 원인은 React hydration race로 확정했다. M10 전체 PASS/complete가 아니다.
 - 근거 정본은 REQUIREMENTS NFR-09, PRD §11~§12, 승인 회의 `docs/governance/meetings/M10-20261112-closeout.md`, `docs/design/AGENTS.md` 및 `DESIGN-SYSTEM.md`다. 새 dependency, API/server contract, 디자인 정본, bundle optimization은 추가하지 않았다.
 
 ## 구현·테스트
@@ -35,3 +35,9 @@
 - 현재 `frontend/dist` 번들은 `frontend/src/lib/apiClient.ts`의 기본값 `http://localhost:8080`으로 빌드되어 있다. M10 FE static server는 `127.0.0.1:5180`에서 dist만 제공하므로 API `18090`으로 연결되지 않고, 실제 browser request가 `http://localhost:8080/api/v1/... net::ERR_CONNECTION_REFUSED`를 기록했다. runtime plan §2.1/§2.2의 explicit `VITE_API_BASE_URL=http://127.0.0.1:18090`로 M10 전용 FE build를 다시 만들 책임은 root runtime에 있다. 기존 FE tests와 local default 계약은 변경하지 않는다.
 - 검증: Playwright headless 1440×1000에서 `/signin`, `/blog/m10-owner-301b5f83`, `/blog/m10-owner-301b5f83/8`, `/`를 확인했다. FE source/dist/role files 외 제품 파일은 편집하지 않았고 사용자 DB `13307`, `.local-data`, 기존 업로드에 접근하지 않았다.
 - 다음: root가 QA selector fix와 explicit runtime FE rebuild/provenance 재생성 후 13개 화면·keyboard 인수를 재실행한다. frontend 역할의 제품 코드 수정은 현재 필요하지 않다.
+
+## M10 hydration race 최종 진단 (2026-11-12 14:58 KST)
+
+- 새 dist/API origin(`127.0.0.1:18090`)에서 올바른 synthetic owner/admin 자격으로 수동 브라우저 로그인은 정상이다. owner는 `POST /api/v1/auth/signin=200` → `/api/v1/auth/me=200` → `/`; admin도 signin/me `200` → `/blog/setup`이며 DOM error가 없다.
+- 로그인 직전 익명 `POST /api/v1/auth/refresh=401`은 AuthContext 초기 복원 요청으로 정상이며 로그인 실패 원인이 아니다.
+- QA `browserSignIn`의 `domcontentloaded` 직후 즉시 `email.count()` 검사가 React hydration보다 앞서 실행되는 race를 반복 관찰했다. 동일 흐름에서 `email-count-zero`로 즉시 false가 되는 실행과 정상 signin이 교차했다. 최소 수정은 QA 소유 `email.waitFor({ state: 'visible', timeout: 10000 })` 후 ancestor form/`접속하기` selector를 평가하는 것이다. frontend 제품 source 변경은 필요하지 않다.

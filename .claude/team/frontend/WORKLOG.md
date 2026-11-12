@@ -646,3 +646,11 @@
 - QA selector 결함: 실제 `/signin` DOM에는 상단 검색 form submit과 인증 form submit이 모두 있다. `qa/m10-acceptance.mjs`의 `browserSignIn`이 `page.locator('form button[type="submit"]').first()`를 사용해 검색 버튼을 클릭하므로 owner/pending/admin browser session이 모두 수립되지 않는다. 인증 버튼 이름은 `접속하기 ✦`이며 QA 역할에 명시 selector 수정안을 인계했다.
 - 런타임 build 결함: `frontend/dist/assets/*.js`의 API base가 `http://localhost:8080`으로 고정되어 있어 static FE `5180`에서 M10 API `18090`으로 연결하지 못한다. `/blog/m10-owner-301b5f83`, `/blog/m10-owner-301b5f83/8`, `/`에서 실제 `net::ERR_CONNECTION_REFUSED`와 로딩 실패/anchor 부재를 관찰했다. `frontend/src/lib/apiClient.ts`의 local default와 기존 FE tests는 정합하므로 제품 소스 수정 대신 runtime plan §2.1/§2.2대로 root가 `VITE_API_BASE_URL=http://127.0.0.1:18090 npm --prefix frontend run build` 후 dist hash/provenance를 갱신해야 한다.
 - 검증/잔여: Playwright 진단 command는 exit 0이며 browser console/request event와 DOM text/selector 결과를 보존했다. frontend 역할 제품 변경은 필요하지 않다. root/QA가 selector 수정, explicit FE build, runtime evidence 갱신 후 13 screenshots·keyboard를 재실행한다.
+
+## 2026-11-12 14:58:16 KST — M10 hydration race 최종 진단·QA 인계
+
+- 범위: 부모가 배정한 third-run 로그인 실패 재현. 새 dist의 API origin과 QA ancestor-form selector를 확인한 뒤 격리 M10 runtime에서 synthetic owner/admin 브라우저 흐름을 추적했다. frontend 제품 source/test/dependency는 변경하지 않았다.
+- owner 정확한 자격증명으로 수동 로그인은 `POST /api/v1/auth/signin 200`, `GET /api/v1/auth/me 200`, 최종 `/` 및 오류 없는 DOM을 반환했다. admin도 signin/me `200`, 최종 `/blog/setup`, 오류 없는 DOM을 반환했다. 두 흐름 모두 익명 초기 `POST /api/v1/auth/refresh 401` 후 정상 인증이며 이는 AuthContext 초기 복원 경계다.
+- QA `browserSignIn` 로직을 반복 관찰한 결과 `page.goto(..., {waitUntil:'domcontentloaded'})` 직후 `input[type="email"].count()`가 React hydration보다 먼저 평가되어 `0`이 되는 실행이 간헐적으로 발생했다. 반복 실행에서 `email-count-zero` 즉시 false와 정상 signin이 교차했다. 제품 결함이나 CORS/cookie 결함이 아니다.
+- 최소 QA 수정안: email locator에 `waitFor({state:'visible', timeout:10000})`를 먼저 적용하고, 이후 ancestor form 및 `접속하기` 버튼을 조회한다. 이미 수정된 ancestor-form selector는 유지한다. QA/root에 인계했으며 이 역할은 제품 코드를 변경하지 않는다.
+- 검증: Playwright headless 1440×1000, API response/route/DOM/console/request-failure 수집; 비밀값은 출력·기록하지 않았다. 사용자 DB `13307`, `.local-data`, 기존 업로드에는 접근하지 않았다.

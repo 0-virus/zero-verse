@@ -1135,3 +1135,34 @@
 - 산출물: `.claude/team/qa/STATE.md`를 **DEV INTEGRATED / COMPLETE**로 갱신했다. M9 QA PASS/READY TO MERGE, Minor M1 closure, source/JAR 및 과거 run7 경계를 유지하고 PR/dev 통합 gate를 종료했다.
 - 검증: 편집 후 `sed -n`으로 STATE/WORKLOG를 재독하고 `rg -n`으로 `DEV INTEGRATED`, `COMPLETE`, PR #15, merge SHA, tested tree, BE637, FE465, `396/0/0`, `CLEAN / READY TO MERGE`, `runtime stopped/preserved` 핵심 문자열을 확인했다. 이번 closeout에서는 Git 명령을 금지받아 Git diff/status/check와 테스트/runtime 재실행을 하지 않았다.
 - 미해결: M9 QA 차단 요인은 없다. M10·배포·실사용 DB 적용 및 운영 범위는 이번 완료에 포함하지 않는다.
+
+## 2026-11-12 12:54 KST — M10 테스트·마감 QA preflight / acceptance matrix 준비
+
+- 한 일: `.claude/CONSTITUTION.md` → `AGENTS.md` → `.claude/team/qa/CLAUDE.md` → `STATE.md` → `qa/AGENTS.md`를 순서대로 읽고, `$brief` 스킬 지침에 따라 branch/status/log·역할 STATE/WORKLOG·M0~M9 worklog·QA review·PRD §9~§12·REQUIREMENTS NFR-09·ADR-0003~0008·위험 레지스터를 읽기 전용으로 교차 대조했다. M9 `dev` 통합 COMPLETE와 M10 미착수/NOT RUN 경계를 확인했다.
+- 산출물: `qa/M10-review.md`를 생성해 PREPARING/NOT RUN 상태, M0~M9 역사 evidence와 M10 fresh rerun의 provenance 경계, BE/FE/API/Swagger/ACL/refresh·logout/category/Universe/comments/likes/notifications/admin/DB·concurrency/1440px/DoD matrix, 가입→설정→글→관계→UNIVERSE→상호작용→알림→관리자 및 refresh/logout E2E, skip/placeholder/stub/secret·사용자 DB fail-closed 규칙, 기존 RISK-0001/0003~0013/0017/0019/0020/0021의 잔여 상태를 기록했다. QA `STATE.md`는 M10 preflight snapshot으로 갱신했다.
+- 검증: `git branch --show-current`, `git status --short`, `git log --oneline -10`은 읽기 전용으로 수행했다. branch는 `feature/M10-closeout`이고 당시 QA 소유 변경 전 작업 트리는 깨끗했다. `qa/M10-review.md` 재독·marker 검색과 `STATE.md` 재독으로 `PREPARING / NOT RUN`, required matrix, `RISK-0021`, 1440px/Swagger/skip 경계를 확인했다. 제품 Gradle/npm/HTTP/DB/Chrome/runtime 및 Git mutation은 실행하지 않았다.
+- 미해결: 현재 M10 BE/FE full test·lint/build·bootJar, generated OpenAPI, synthetic isolated HTTP/MySQL, refresh/logout·Universe·notification·admin E2E, source/JAR provenance, visible 1440px screenshots, 실제 skip/placeholder/secret scan은 모두 **NOT RUN**이다. 과거 PASS를 합산하거나 M10 PASS/COMPLETE/release-ready로 승격하지 않는다. 배포·S3/AWS/U0·실사용 DB 적용과 RISK-0010/0012/0013/0021은 별도 잔여 범위다.
+
+## 2026-11-12 KST — M10 Task4 acceptance harness 준비
+
+- 한 일: M10 승인 회의와 root task brief를 재독하고, `qa/m10-acceptance.mjs`를 신규 작성했다. QA runner는 current source/JAR manifest 및 aggregate hash, generated `/v3/api-docs`, synthetic-only HTTP smoke(가입/설정/draft·publish/PUBLIC/refresh·logout/Universe/comment/like/notification), 공통 envelope·no-store·page, optional isolated SQL helper hooks, Playwright 1440×1000 실제 visible DOM과 Main/Blog/Post/Editor/Auth/Setup/Settings×3/Search/Notifications/Admin×2 **정확히 13 canonical screenshot**을 준비한다.
+- 보안/실패 경계: `M10_MYSQL_PORT=13307`은 즉시 거부한다. access/refresh token·cookie·password/email raw 값은 evidence에 쓰지 않고 scrub된 오류·합성 ID·hash만 남긴다. manifest/runtime/browser/필수 check가 없으면 `NOT RUN`으로 fail-closed한다. M10-FE-07~11 keyboard observation은 실제 경로를 실행하되 명시된 기존 interaction/HTML semantic 회귀만 FAIL로 판정하며 정본에 없는 focus-trap/initial-focus/restore는 잔여 UX로 기록한다.
+- 검증: `node --check qa/m10-acceptance.mjs` exit `0`; `node qa/m10-acceptance.mjs --self-check` exit `0`, evidence status `SELF-CHECK PASS`, exactly13 route guard·skip/only guard 통과; `git diff --check -- qa/m10-acceptance.mjs qa/M10-review.md .claude/team/qa/STATE.md .claude/team/qa/WORKLOG.md` exit `0`.
+- 산출물: `qa/m10-acceptance.mjs`, `qa/M10-review.md`, QA STATE/WORKLOG만 편집했다. root worklog/governance, backend/frontend, runtime, DB, 사용자 파일·업로드, Git은 건드리지 않았다.
+- 미해결: final backend JAR/source manifest, running isolated API/FE/Chrome/MySQL, admin SQL fixture/fingerprint, upload 5MiB/MIME/restart, actual HTTP/DB/13 screenshot and keyboard evidence는 아직 **NOT RUN**이다. self-check는 실제 M10 PASS가 아니며 부모 root가 final artifact 이후 full runner를 실행해야 한다.
+
+## 2026-11-12 13:01 KST — M10 QA 문서 정합성 보완
+
+- 한 일: `qa/M10-review.md`의 M9/M10 ref 표현을 정정했다. M9 PR #15 merge SHA는 `c0df2d33d0dce5ac71f1b358672606f717e739ae`로, M10 base/current `dev` reference는 `ce7d037`로 분리해 기록했다.
+- 산출물: M10 FE matrix에 publish 시 빈 제목·빈 text-or-image 본문 client 차단과 draft empty 허용을 검증하는 `M10-FE-06`을 추가했다. Modal, DraftPicker, TopBar, category, admin의 실제 Chrome keyboard evidence를 각각 `M10-FE-07`~`M10-FE-11` 필수 `NOT RUN` 행으로 추가하고 QA `STATE.md` 설명을 동기화했다.
+- 검증: 수정 문서·STATE·WORKLOG를 재독하고 M9 merge/base ref, `M10-FE-06`~`M10-FE-11`, `NOT RUN` marker를 검색한다. `git diff --check -- qa/M10-review.md .claude/team/qa/STATE.md .claude/team/qa/WORKLOG.md`를 실행한다. 제품 파일·타 역할 파일·runtime·DB·Git mutation은 수행하지 않는다.
+- 미해결: 실제 M10 full regression, PostEditor/keyboard browser evidence, HTTP/MySQL/OpenAPI/1440px acceptance는 계속 **NOT RUN**이다. 이번 보완은 문서 기준을 추가한 것이며 M10 PASS/COMPLETE를 의미하지 않는다.
+## 2026-11-12 KST — M10 Task4 harness false-pass hardening
+
+- 범위: `qa/m10-acceptance.mjs`의 six false-pass 경로만 QA 소유로 보강. 제품 backend/frontend·타 역할 테스트·사용자 DB·runtime·Git은 건드리지 않았다.
+- Universe: synthetic UNIVERSE post를 만든 뒤 friend의 수락 전 detail 거부와 수락 후 허용을 모두 확인하고, accepted post에서 comment/like를 생성한다. PUBLIC fixture detail을 UNIVERSE evidence로 재사용하지 않는다. rendered content sanitize probe도 executable `<script>`가 남지 않는지 확인한다.
+- Auth cookie: owner/friend가 섞이는 shared API jar를 rotation gate에서 배제하고 isolated request context를 사용한다. old `set-cookie` replay, distinct rotated cookie, signout 후 refresh 거부를 status boolean으로 확인하며 값 자체는 evidence에 남기지 않는다.
+- Admin/upload/restart: synthetic `.test` admin credential이 있는 경우에만 signin→admin list 실제 HTTP를 확인한다. child-row soft-delete preservation, upload 5MiB/MIME, restart persistence는 검증된 SQL/helper/runtime 결과가 없으므로 required `NOT RUN`; env variable 존재는 PASS 근거로 쓰지 않는다.
+- Browser: canonical 13 route마다 expected pathname·route-specific visible selector·2xx 응답을 요구한다. body nonempty/redirect/guest/placeholder는 PASS가 아니다. keyboard 5행은 generic control이 아니라 TopBar notification popover, admin Modal status trigger/cancel, DraftPicker open/close, GENERAL category rename/Escape, admin search Enter/query라는 실제 route-specific outcome을 요구하고, fixture 미존재 시 required `NOT RUN`으로 남긴다. 정본에 없는 focus-trap/initial-focus/restore는 새 hard blocker로 만들지 않는다.
+- Static: `src/main`, `src/test`, `frontend/src`를 실제 순회하여 359개 파일을 검사하고 skip/only/disabled/TODO/secret/mock/placeholder findings를 분류한다. 281건 허용 분류·0건 미분류로 확인했으며 evidence에는 source line/token을 기록하지 않는다.
+- 검증: `node --check qa/m10-acceptance.mjs` exit 0; `node qa/m10-acceptance.mjs --self-check` exit 0 / `SELF-CHECK PASS`; product static required row PASS; scoped `git diff --check` exit 0. 실제 final source/JAR/API/MySQL/Chrome acceptance는 실행하지 않았고 M10 판정은 계속 `PREPARING / NOT RUN`이다.

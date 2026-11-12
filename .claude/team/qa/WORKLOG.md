@@ -1224,3 +1224,11 @@
 - self-check: malformed failure fixtures(success=true, non-null data, missing message/details, invalid timestamp)를 추가해 helper가 false-pass하지 않는지 확인한다. `self-check-failure-envelope`는 required이며 self-check 판정에 포함한다.
 - 검증: `node --check qa/m10-acceptance.mjs` exit `0`; `M10_OUTPUT_DIR=build/m10-selfcheck-fix3 node qa/m10-acceptance.mjs --self-check` exit `0`, `SELF-CHECK PASS`, failure-envelope/runtime negative/static guard rows PASS; scoped `git diff --check` exit `0`.
 - 경계: actual generated OpenAPI/HTTP/MySQL/Chrome/JAR/FE runtime 및 대표 실패 응답 실측은 여전히 **NOT RUN**이다. 이번 결과는 harness fail-closed 준비이며 M10 PASS/COMPLETE/release-ready가 아니다.
+
+## 2026-11-12 KST — M10 Task4 manifest-order blocker fix
+
+- 배경: root의 첫 실제 M10 acceptance가 제품 API에 도달하기 전에 `source manifest aggregate mismatch`로 fail-closed되었다. runtime generator(`build/m10-runtime.py`)는 Python `sorted()`로 files[]를 생성·집계하지만 QA harness가 `localeCompare()`로 재정렬해 `src/Z`/`src/a` 등 순서가 달라지는 원인이었다.
+- TDD 보강: `isCanonicalManifestOrder()` fixture를 먼저 정의해 locale-sensitive 순서, 중복, unsafe path는 거부하고 Python-compatible `['src/Z','src/a']` 순서는 허용하도록 required `self-check-manifest-ordering`을 추가했다.
+- 구현: `canonicalPathCompare()`를 locale 독립 relational comparator로 도입하고, manifest files[]를 printable-ASCII relative path·unique·canonical ascending으로 검증한다. source aggregate와 before/after identity는 manifest 자체의 검증된 순서를 그대로 사용한다. FE dist directory hash도 동일 comparator를 사용해 runtime Python ordering과 정합시켰다.
+- 검증: `node --check qa/m10-acceptance.mjs` exit `0`; `M10_OUTPUT_DIR=build/m10-selfcheck-manifest-order node qa/m10-acceptance.mjs --self-check` exit `0`, `SELF-CHECK PASS`, `self-check-manifest-ordering` 및 static `359/281/0` PASS. 기존 manifest probe에서 `source-runtime-identity`가 PASS하여 aggregate 정합을 확인했으며, missing runtime evidence 때문에 전체 실행은 `NOT RUN`으로 종료했다.
+- 변경 경계: `qa/m10-acceptance.mjs`, `.claude/team/qa/STATE.md`, `.claude/team/qa/WORKLOG.md`만 수정했다. 제품/build/runtime/Git 내용은 수정하지 않았고, 실제 API/MySQL/Chrome acceptance는 여전히 **NOT RUN**이다.

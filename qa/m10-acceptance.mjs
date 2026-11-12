@@ -125,7 +125,7 @@ const requiredChecks = [
   'screenshot-setup', 'screenshot-settings', 'screenshot-settings-universe', 'screenshot-settings-posts',
   'screenshot-search', 'screenshot-notifications', 'screenshot-admin', 'screenshot-admin-detail',
   'screenshots-complete',
-  'self-check-negative-fixtures',
+  'self-check-negative-fixtures', 'self-check-manifest-ordering',
 ];
 
 const evidence = {
@@ -178,6 +178,34 @@ function isGitHash(value) {
   return typeof value === 'string' && /^[a-f0-9]{40,64}$/i.test(value);
 }
 
+// build/m10-runtime.py uses Python's deterministic code-point ordering for
+// manifest/FE paths. Product paths are ASCII, so JS relational comparison is
+// the equivalent byte/code-unit comparator and does not depend on locale.
+function canonicalPathCompare(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function isCanonicalManifestPath(value) {
+  return typeof value === 'string'
+    && value.length > 0
+    && /^[\x20-\x7e]+$/.test(value)
+    && !value.startsWith('/')
+    && !value.includes('\\')
+    && !value.split('/').some((segment) => segment === '' || segment === '.' || segment === '..');
+}
+
+function isCanonicalManifestOrder(paths) {
+  if (!Array.isArray(paths)) return false;
+  const seen = new Set();
+  for (let index = 0; index < paths.length; index += 1) {
+    const path = paths[index];
+    if (!isCanonicalManifestPath(path) || seen.has(path)) return false;
+    if (index > 0 && canonicalPathCompare(paths[index - 1], path) >= 0) return false;
+    seen.add(path);
+  }
+  return true;
+}
+
 function assertInsideRoot(file, label) {
   if (relative(root, file).startsWith('..')) throw new Error(`${label} escapes repository root`);
 }
@@ -186,7 +214,6 @@ async function sha256Directory(directory) {
   const files = [];
   async function walk(current, prefix = '') {
     const entries = await readdir(current, { withFileTypes: true });
-    entries.sort((a, b) => a.name.localeCompare(b.name));
     for (const entry of entries) {
       const absolute = resolve(current, entry.name);
       const logical = prefix ? `${prefix}/${entry.name}` : entry.name;
@@ -200,6 +227,7 @@ async function sha256Directory(directory) {
     }
   }
   await walk(directory);
+  files.sort((a, b) => canonicalPathCompare(a.path, b.path));
   return createHash('sha256')
     .update(files.map((entry) => `${entry.path}\0${entry.sha256}\n`).join(''))
     .digest('hex');
@@ -245,6 +273,10 @@ async function verifyManifest() {
   }
   const actual = [];
   const seen = new Set();
+  const manifestPaths = manifest.files.map((entry) => entry?.path);
+  if (!isCanonicalManifestOrder(manifestPaths)) {
+    throw new Error('M10 manifest files[] paths must be unique printable-ASCII relative paths in canonical ascending order');
+  }
   for (const entry of manifest.files) {
     if (!entry || typeof entry.path !== 'string' || !isSha256(entry.sha256)) {
       throw new Error('M10 manifest contains malformed file entry');
@@ -257,7 +289,6 @@ async function verifyManifest() {
     if (hash !== entry.sha256) throw new Error(`source manifest mismatch: ${entry.path}`);
     actual.push({ path: entry.path, sha256: hash });
   }
-  actual.sort((a, b) => a.path.localeCompare(b.path));
   const aggregate = createHash('sha256')
     .update(actual.map((entry) => `${entry.path}\0${entry.sha256}\n`).join(''))
     .digest('hex');
@@ -1623,6 +1654,21 @@ async function staticSelfCheck() {
     'representative failure fixtures require success=false, data=null, structured error, and a valid timestamp',
     { required: true },
   );
+  const manifestOrderingFixtures = [
+    { paths: ['src/a', 'src/Z'], expected: false },
+    { paths: ['src/Z', 'src/a'], expected: true },
+    { paths: ['src/Z', 'src/Z'], expected: false },
+    { paths: ['src/../a', 'src/Z'], expected: false },
+  ];
+  const manifestOrderingSelfCheck = manifestOrderingFixtures.every(({ paths, expected }) => (
+    isCanonicalManifestOrder(paths) === expected
+  ));
+  check(
+    'self-check-manifest-ordering',
+    manifestOrderingSelfCheck,
+    'manifest ordering fixtures reject locale-sensitive/duplicate/unsafe order and accept Python-compatible canonical order',
+    { required: true },
+  );
   await runProductStaticScan();
   if (canonicalScreens.length !== 13) throw new Error('canonical screen list must contain exactly 13 routes');
   const requiredPublicOperations = [
@@ -1666,7 +1712,6 @@ async function currentManifestIdentity() {
     const file = resolve(root, entry.path);
     entries.push({ path: entry.path, sha256: await sha256(file) });
   }
-  entries.sort((a, b) => a.path.localeCompare(b.path));
   const sourceSha256 = createHash('sha256')
     .update(entries.map((entry) => `${entry.path}\0${entry.sha256}\n`).join(''))
     .digest('hex');
@@ -1716,7 +1761,7 @@ async function writeEvidence() {
   for (const id of missing) evidence.checks.push({ id, ok: false, required: true, detail: 'NOT RUN: runner did not reach this required check' });
   const failures = evidence.checks.filter((item) => item.required && !item.ok);
   const selfCheckFailures = failures.filter((item) => new Set([
-    'harness-fail-closed-guards', 'static-skip-placeholder-scan', 'self-check-negative-fixtures', 'self-check-failure-envelope',
+    'harness-fail-closed-guards', 'static-skip-placeholder-scan', 'self-check-negative-fixtures', 'self-check-failure-envelope', 'self-check-manifest-ordering',
   ]).has(item.id));
   evidence.status = selfCheck
     ? selfCheckFailures.length === 0 && evidence.failures.length === 0 ? 'SELF-CHECK PASS' : 'SELF-CHECK FAIL'

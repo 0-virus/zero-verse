@@ -2,6 +2,8 @@ package com.zeroverse.domain.post;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.reset;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -19,6 +21,8 @@ import com.zeroverse.domain.post.service.PostService;
 import com.zeroverse.domain.user.entity.User;
 import com.zeroverse.domain.user.repository.UserRepository;
 import com.zeroverse.support.MySqlTestSupport;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -29,10 +33,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -41,16 +47,25 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("test")
 class PostConcurrencyTest extends MySqlTestSupport {
 
+    private static final Instant FIXED_NOW = Instant.parse("2026-11-12T03:00:00Z");
+
     @Autowired private PostService postService;
     @Autowired private UserRepository userRepository;
     @Autowired private BlogRepository blogRepository;
     @Autowired private CategoryRepository categoryRepository;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private JdbcTemplate jdbcTemplate;
+    @SpyBean private Clock clock;
+
+    @AfterEach
+    void restoreClock() {
+        reset(clock);
+    }
 
     @Test
     @DisplayName("동시 anonymous 10회는 1회만 증가하고 23:59:59/24h 및 bounded cleanup을 지킨다")
     void concurrentReadsAndRetentionBoundary() throws Exception {
+        doReturn(FIXED_NOW).when(clock).instant();
         User owner = createUser("post-concurrent-owner@zeroverse.test", "post-concurrent-owner");
         Blog blog = createBlog(owner, "post-concurrent-blog");
         Category category = categoryRepository.saveAndFlush(Category.createDefault(blog));
@@ -62,13 +77,13 @@ class PostConcurrencyTest extends MySqlTestSupport {
         assertThat(postService.get(post.id(), null, anonymousKey).viewCount()).isEqualTo(1);
         assertThat(postService.get(post.id(), null, anonymousKey).viewCount()).isEqualTo(1);
 
-        LocalDateTime boundaryBase = LocalDateTime.now(ZoneOffset.UTC).withNano(0);
+        LocalDateTime boundaryBase = LocalDateTime.ofInstant(FIXED_NOW, ZoneOffset.UTC);
         jdbcTemplate.update("UPDATE post_view_records SET last_viewed_at = ? WHERE post_id = ?",
                 boundaryBase.minusHours(24).plusSeconds(1), post.id());
         assertThat(postService.get(post.id(), null, anonymousKey).viewCount()).isEqualTo(1);
 
         jdbcTemplate.update("UPDATE post_view_records SET last_viewed_at = ? WHERE post_id = ?",
-                LocalDateTime.now(ZoneOffset.UTC).withNano(0).minusHours(24), post.id());
+                boundaryBase.minusHours(24), post.id());
         assertThat(postService.get(post.id(), null, anonymousKey).viewCount()).isEqualTo(2);
 
         ExecutorService executor = Executors.newFixedThreadPool(10);
@@ -97,7 +112,7 @@ class PostConcurrencyTest extends MySqlTestSupport {
                 "SELECT COUNT(*) FROM post_view_records WHERE post_id = ?", Integer.class, post.id());
         assertThat(ledgerRows).isEqualTo(2);
 
-        LocalDateTime stale = LocalDateTime.now(ZoneOffset.UTC).withNano(0).minusHours(49);
+        LocalDateTime stale = boundaryBase.minusHours(49);
         List<Object[]> staleRows = new ArrayList<>();
         for (int i = 0; i < 501; i++) {
             staleRows.add(new Object[] {post.id(), "stale-viewer-" + i, stale});
@@ -109,7 +124,7 @@ class PostConcurrencyTest extends MySqlTestSupport {
 
         Integer remainingStale = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM post_view_records WHERE post_id = ? AND last_viewed_at < ?",
-                Integer.class, post.id(), LocalDateTime.now(ZoneOffset.UTC).withNano(0).minusHours(48));
+                Integer.class, post.id(), boundaryBase.minusHours(48));
         assertThat(remainingStale).isLessThanOrEqualTo(1);
 
         List<String> persistedKeys = jdbcTemplate.query(

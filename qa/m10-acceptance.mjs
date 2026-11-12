@@ -47,6 +47,7 @@ const approvedApiBaseUrl = 'http://127.0.0.1:18090';
 const approvedFrontendUrl = 'http://127.0.0.1:5180';
 const screenshotsEnabled = true;
 const headless = process.env.M10_HEADLESS !== '0';
+const browserSigninWaitTimeoutMs = 5000;
 
 const runtimeEvidenceSchema = 'zeroverse.m10.runtime-evidence.v1';
 const runtimeAttestationSchema = 'zeroverse.m10.runtime-attestation.v1';
@@ -125,7 +126,7 @@ const requiredChecks = [
   'screenshot-setup', 'screenshot-settings', 'screenshot-settings-universe', 'screenshot-settings-posts',
   'screenshot-search', 'screenshot-notifications', 'screenshot-admin', 'screenshot-admin-detail',
   'screenshots-complete',
-  'self-check-negative-fixtures', 'self-check-manifest-ordering', 'self-check-admin-list-shape', 'self-check-browser-signin-form',
+  'self-check-negative-fixtures', 'self-check-manifest-ordering', 'self-check-admin-list-shape', 'self-check-browser-signin-form', 'self-check-browser-signin-wait',
 ];
 
 const evidence = {
@@ -1187,18 +1188,19 @@ async function runBrowserAcceptance(accounts) {
     if (!page || !account?.email || !account?.password) return false;
     try {
       await page.goto(`${frontendUrl}/signin`, { waitUntil: 'domcontentloaded' });
-      const email = page.locator('input[type="email"]').first();
-      if (await email.count() === 0) return false;
+      const email = page.locator('[data-onboarding-card="true"] input[type="email"]').first();
+      await email.waitFor({ state: 'visible', timeout: browserSigninWaitTimeoutMs });
       const authForm = email.locator('xpath=ancestor::form[1]');
+      await authForm.waitFor({ state: 'visible', timeout: browserSigninWaitTimeoutMs });
       const password = authForm.locator('input[type="password"]').first();
-      if (await authForm.count() === 0 || await password.count() === 0) return false;
+      await password.waitFor({ state: 'visible', timeout: browserSigninWaitTimeoutMs });
       await email.fill(account.email);
       await password.fill(account.password);
       const namedSubmit = authForm.getByRole('button', { name: /접속하기/ }).first();
       const submit = await namedSubmit.count() > 0
         ? namedSubmit
         : authForm.locator('button[type="submit"]').first();
-      if (await submit.count() === 0) return false;
+      await submit.waitFor({ state: 'visible', timeout: browserSigninWaitTimeoutMs });
       const routeChange = page
         .waitForURL((url) => !/^\/signin\/?$/.test(url.pathname), { timeout: 12000 })
         .then(() => true)
@@ -1600,6 +1602,7 @@ async function staticSelfCheck() {
   ].some((pattern) => source.includes(pattern));
   check('harness-fail-closed-guards', !staleFalsePass, 'runner contains no known false-pass guard patterns', { required: true });
   const browserSigninFormSelectors = [
+    "page.locator('[data-onboarding-card=\"true\"] input[type=\"email\"]')",
     "locator('xpath=ancestor::form[1]')",
     "getByRole('button', { name: /접속하기/ })",
     "authForm.locator('button[type=\"submit\"]')",
@@ -1609,6 +1612,19 @@ async function staticSelfCheck() {
     browserSigninFormSelectors.every((selector) => source.includes(selector))
       && !source.includes("page.locator('form button[type=\"submit\"]')"),
     'browser signin submits within the email field ancestor form and prefers the 접속하기 accessible name, never a global first submit',
+    { required: true },
+  );
+  const browserSigninWaitContract = [
+    'const browserSigninWaitTimeoutMs = 5000;',
+    "email.waitFor({ state: 'visible', timeout: browserSigninWaitTimeoutMs })",
+    "authForm.waitFor({ state: 'visible', timeout: browserSigninWaitTimeoutMs })",
+    "password.waitFor({ state: 'visible', timeout: browserSigninWaitTimeoutMs })",
+    "submit.waitFor({ state: 'visible', timeout: browserSigninWaitTimeoutMs })",
+  ];
+  check(
+    'self-check-browser-signin-wait',
+    browserSigninWaitContract.every((selector) => source.includes(selector)),
+    'browser signin waits for route-specific visible email, same-form password, and submit controls with a bounded timeout',
     { required: true },
   );
   const selfCheckRunId = process.env.M10_RUN_ID ?? 'm10-self-check-current';
@@ -1831,7 +1847,7 @@ async function writeEvidence() {
   for (const id of missing) evidence.checks.push({ id, ok: false, required: true, detail: 'NOT RUN: runner did not reach this required check' });
   const failures = evidence.checks.filter((item) => item.required && !item.ok);
   const selfCheckFailures = failures.filter((item) => new Set([
-    'harness-fail-closed-guards', 'static-skip-placeholder-scan', 'self-check-negative-fixtures', 'self-check-failure-envelope', 'self-check-manifest-ordering', 'self-check-admin-list-shape', 'self-check-browser-signin-form',
+    'harness-fail-closed-guards', 'static-skip-placeholder-scan', 'self-check-negative-fixtures', 'self-check-failure-envelope', 'self-check-manifest-ordering', 'self-check-admin-list-shape', 'self-check-browser-signin-form', 'self-check-browser-signin-wait',
   ]).has(item.id));
   evidence.status = selfCheck
     ? selfCheckFailures.length === 0 && evidence.failures.length === 0 ? 'SELF-CHECK PASS' : 'SELF-CHECK FAIL'

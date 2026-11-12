@@ -1249,3 +1249,11 @@
 - self-check/근거: `self-check-browser-signin-form` required row가 ancestor form·`접속하기` role selector·form-scoped fallback selector를 확인하고 legacy global-first selector를 거부한다. stale false-pass guard에도 기존 전역 selector를 추가했다.
 - 검증: `node --check qa/m10-acceptance.mjs` exit `0`; `M10_OUTPUT_DIR=build/m10-selfcheck-contract-browser node qa/m10-acceptance.mjs --self-check` exit `0`, `SELF-CHECK PASS`, browser selector/admin shape/manifest/runtime-negative/static guard rows PASS; scoped `git diff --check` exit `0`.
 - 미실행: actual Chrome signin, frontend dist/API origin, protected notification/admin HTTP, API/MySQL acceptance는 **NOT RUN**이다. 이번 수정은 QA selector/contract alignment이며 M10 PASS/COMPLETE/release-ready가 아니다.
+
+## 2026-11-12 KST — M10 Task4 browser signin bounded wait fix
+
+- 배경: 세 번째 actual run에서 frontend login 자체는 정상인데 `domcontentloaded` 직후 React form이 아직 mount되지 않아 `email.count() === 0`으로 browserSignIn이 간헐적으로 false가 되었다.
+- 수정: email selector를 `[data-onboarding-card="true"] input[type="email"]`로 route-specific하게 좁히고, email·ancestor form·동일 form password·submit 각각에 `browserSigninWaitTimeoutMs=5000` bounded `waitFor({state:'visible'})`를 적용했다. 기존 same-form/`접속하기` 선택과 submit fallback은 유지했다.
+- self-check: `self-check-browser-signin-wait` required row가 5초 timeout 상수와 네 visible wait selector를 정적으로 확인한다. 기존 `self-check-browser-signin-form`은 ancestor form 및 global-first submit 금지를 계속 확인한다.
+- 검증: `node --check qa/m10-acceptance.mjs` exit `0`; `M10_OUTPUT_DIR=build/m10-selfcheck-browser-wait node qa/m10-acceptance.mjs --self-check` exit `0`, `SELF-CHECK PASS`, browser form/wait·admin shape·manifest/runtime-negative/static guard rows PASS; scoped `git diff --check` exit `0`.
+- 미실행: actual Chrome re-run, frontend dist/API origin, protected notification/admin HTTP, API/MySQL acceptance는 **NOT RUN**이다. 제품 source는 수정하지 않았다.

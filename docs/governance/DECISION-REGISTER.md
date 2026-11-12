@@ -42,3 +42,9 @@ M4 현재 실행 판단에는 마지막 `M4-20261003-local`을 적용한다. 이
 |---|---|---|---|---|---|---|
 | M9-20261111-admin | 2026-11-11 | 관리자 현재권한·목록/통계·역할/상태·user soft delete·화면/인수 | HIGH | APPROVED | 사용자 `A-v2 전체 승인`; 독립3인 보완 A-v2 §10/10.1 및 Task1~5 실행 | [회의 §11](meetings/M9-20261111-admin.md), [계획](../worklog/M9-admin.md) |
 | ADR-0008 | 2026-11-11 | M9 관리자 현재권한·조회/통계·self보호·soft delete·검증 계약 | HIGH | ACCEPTED | 사용자 A-v2 전체 승인 | [ADR-0008](decisions/ADR-0008-admin-contract.md) |
+
+## 2026-11-12 M10 테스트·마감
+
+| ID | 날짜 | 안건 | 등급 | 상태 | 결정 근거 | 문서 |
+|---|---|---|---|---|---|---|
+| M10-20261112-closeout | 2026-11-12 | current source 전체 회귀·결정성/wrapper/발행 폼 최소 수정·격리 실제 인수·독립 QA | MEDIUM | APPROVED | 사용자가 직전 제시된 로컬 M10 전체 DoD closeout·발견 결함 TDD 수정·배포/S3/U0/실사용 DB 제외 범위에 `착수하라`고 명시; 독립 3인 모두 APPROVE_WITH_CHANGES | [회의록](meetings/M10-20261112-closeout.md), [계획](../worklog/M10-closeout.md) |

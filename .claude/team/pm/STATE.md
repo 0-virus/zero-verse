@@ -2,37 +2,38 @@
 
 > 덮어쓰기 스냅샷. 시간순 이력은 `WORKLOG.md`, 마일스톤 이력은 `docs/worklog/**`와 `docs/governance/**`를 본다.
 
-마지막 갱신: 2026-11-12 10:42:58 KST
+마지막 갱신: 2026-11-12 12:51:52 KST
 
 ## 현재 단계
 
-- M0~M8은 구현·자동검증·독립 QA·실제 인수·`dev` 통합까지 완료된 상태이며, M8 closeout은 `2cc4ff9`와 `56ea133`에 기록된 선행 이력이다.
-- 사용자의 `A-v2 전체 승인`으로 M9는 **Task1~5 및 최종 독립 review PASS / CLEAN / READY TO MERGE·PR #15 `dev` 통합·runtime 정리 완료 — DEV INTEGRATED / COMPLETE** 상태다. M10은 미착수·이번 범위 밖이다.
-- PR #15(`https://github.com/0-virus/zero-verse/pull/15`)는 merge SHA `c0df2d33d0dce5ac71f1b358672606f717e739ae`로 `dev`에 병합됐다. tested head `e3efa6b`와 merge tree `409c084b2189f13fb5f44a5ffb375726475becaf`가 일치하며 PM은 root의 Git/runtime 작업을 수정·되돌리지 않았다.
+- M10 `테스트 & 마감` **PLANNING / PREFLIGHT**다. 사용자 지시는 전체 MVP의 로컬 테스트·DoD closeout이며, 배포·S3 전환·U0 해소·실사용 DB 적용·운영 ADMIN bootstrap은 범위 밖이다.
+- PM preflight 기준 Git은 `feature/M10-closeout`의 `ce7d037cc6779be5144c15474607000280673cc4`다. `main`, `dev`, `origin/main`, `origin/dev`, `origin/HEAD`도 같은 ref이며, preflight 시작 시 작업 트리는 clean이었다.
+- M9는 PR #15 merge SHA `c0df2d33d0dce5ac71f1b358672606f717e739ae`, tested head `e3efa6b5c81291c006fc824e064d90d42cb6e0af`, tested/merge tree `409c084b2189f13fb5f44a5ffb375726475becaf`로 `dev`에 통합되어 COMPLETE다. M9 runtime은 종료되었고 합성 증거는 보존됐다.
+- M0~M9의 worklog/역할 STATE에 기록된 마지막 증거는 역사 기준선일 뿐 M10 fresh PASS가 아니다. 기록된 기준선은 M0 BE36/FE152, M1 BE138/FE186, M2 BE348/FE250, M3 BE370/FE273, M4 BE426·FE311(+R7 영향 40), M5 BE457/FE338, M6 BE77 suites/490·FE34 files/369·실제 인수 52, M7 BE91/538·FE41/405·실제 인수 259, M8 BE102 suites/599·FE47/439·실제 인수 323, M9 BE109/637·FE51/465·실제 인수 396이다. M9의 396은 FE M1 수정 전 run7 역사 증거로, 현재 FE465와 합산하지 않는다.
 
 ## 진행 중
 
-- M9 기준 정본은 `docs/worklog/M9-admin.md`, 회의 §11~§12, `docs/governance/decisions/ADR-0008-admin-contract.md`, REQUIREMENTS §6.13-A, PRD §5.13·§9.12·§10 M9·§11·§13.5다. §12/ADR-0008의 UTC 실행 전제와 `DATETIME(0)` 초 정밀도는 승인 계약의 구현 보완으로 반영했으며 새로운 §9 사용자 결정을 만들지 않았다.
-- **Backend Task2**: `9a4d03f`의 `107 suites/632 tests`, failures/errors/skips `0/0/0`, `bootJar` 성공은 UTC 보완 전 baseline이다. KST 가입 audit RED와 UTC `DATETIME(0)` 정밀도 RED를 보완한 뒤 `build/m9-evidence/backend-final-2/summary.json`에서 `109 suites/637 tests`, failures/errors/skips `0/0/0`, exit 0, `bootJar` 성공, JAR SHA-256 `c6f381f72bf94528f54e3bb805403d23a0e119673c6183c9aff66af3ac0d9c52`를 확인했고 PR #15 `dev` 통합까지 완료했다.
-- **Frontend Task3**: `5df2db0`에서 final-review Minor M1(관리자 keyword 내부 whitespace 축약)을 TDD로 수정했다. 수정 후 root fresh full은 `51 files/465 tests PASS`, lint/build exit 0이다. `build/m9-evidence/frontend-final-result.json`의 `51/464`와 run7 FE 464는 M1 수정 전 baseline으로 보존하며, `task-4-final-m1-report.md`의 focused/full 근거와 `final-m1-rereview.md`의 scoped 독립 판정은 `CLEAN / READY TO MERGE`다.
-- **QA/Task4/Task5**: 이전 audit-2의 `CHANGES REQUIRED`(Critical 0 / Important 9 / Minor 1)와 394/2 diagnostic 등 failed runs는 당시 판정 이력으로 보존한다. run7 `build/m9-acceptance-20261111-174413/evidence.json`은 M1 수정 전 소스에서 `status=PASS`, `396 checks/0 fail/0 NOTRUN`, 1440×1000·screenshot 2개로 종료됐고, FE465는 M1 수정 후 focused/full 검증과 scoped final review로 닫았다. source manifest는 424 files/SHA `ababaa1c00610e6a12b8ef1ec7cd876f1a3ab81fba57ba537c630e6484530ef3`, backend JAR SHA `c6f381…d9c52`는 불변이다. 최종 `CLEAN / READY TO MERGE`, PR #15 merge/tree 대조 및 M9 runtime 정리는 완료됐다.
-- 역사 `DATETIME` 값은 timezone provenance가 없으므로 자동 해석·±9시간 보정하지 않는다. M9 검증은 격리 합성 DB만 사용하며 실사용 사용자 DB·기존 행 적용은 RISK-0021로 별도 추적한다.
+- PRD §10 M10의 한 줄 명세를 §11, §12, REQUIREMENTS NFR-09와 대조했다. `전체 통과`가 M0~M9 모든 테스트의 현재 소스 재실행인지, 기존 merge 증거의 재사용인지, M8/M9 상세 acceptance까지 포함하는지 명시하지 않은 모호성이 있다.
+- 권고(미확정): M10은 현재 통합 소스에서 NFR-09 필수 항목과 PRD §11의 M5~M9 특수 매트릭스를 모두 mapping하고, BE/FE/통합/실제 인수/시각/보안/문서 증거를 fresh provenance로 수집한다. 과거 PASS는 회귀·범위 설명 자료로만 인용하고 fresh 실행을 대체하지 않는다.
+- 권고 Task 분해는 PM WORKLOG에 기록했다: (1) 정본·source freeze와 coverage matrix, (2) backend full test/bootJar/OpenAPI/security, (3) frontend full test/lint/build/1440px evidence, (4) 합성 local HTTP/MySQL/Chrome smoke, (5) DoD·보안·placeholder/skip/stub·secret·envelope/paging audit, (6) 독립 QA whole-repo review와 수정 loop, (7) 최종 manifest/tree/증거 보존 및 runtime 정리.
+- PM preflight 자체에서는 제품 테스트·build·runtime·DB를 실행하지 않았다. M10 실제 PASS/FAIL/NOT RUN 판정은 root가 현재 소스의 명령 출력과 독립 QA를 대조한 뒤에만 갱신한다.
 
 ## 다음 작업
 
-1. M10은 사용자 지시 전 착수하지 않고 이번 M9 범위 밖으로 유지한다.
-2. RISK-0021을 open으로 유지하며 기존 사용자 DB·행·파일·업로드에 적용하지 않는다.
-3. M9 closeout 산출물과 merge tree를 보존하고 후속 범위 확장은 사용자 입력을 기다린다.
+1. root가 이 preflight와 backend/frontend/QA 결과를 종합해 M10 실행계획·worklog를 확정한다.
+2. M10은 BE·FE·QA와 다수 도메인에 걸친 대형 마일스톤이므로 구현/수정 전에 독립 Product·Architecture·Delivery & Risk 심의를 소집한다.
+3. 심의 후 승인된 범위에서 fresh backend/frontend/integration/visual/DoD evidence를 수집하고, 각 필수 항목을 PASS·FAIL·NOT RUN으로 명시한다.
+4. open risk는 해소했다고 가정하지 말고 local MVP 완료와 production/deployment readiness를 분리해 최종 보고한다.
 
 ## 차단 요인
 
-- M9 Task5 PR/`dev` merge/tree 대조와 runtime 정리는 완료됐으며 M9 차단 요인은 없다. RISK-0021은 역사 `DATETIME` provenance와 실사용 DB 적용을 다루는 open risk다.
-- 사용자 DB `13307`, 기존 파일·업로드·환경은 보존 대상이며 이번 실행에서 접근·적용하지 않는다. 운영 bootstrap·M10·배포·전역 session revoke 확대는 범위 밖이다.
+- 현재 계획 단계의 제품 차단은 없다. 다만 M10 필수 fresh evidence는 아직 **NOT RUN**이며, 이를 실행하지 않고 MVP DoD 완료를 주장할 수 없다.
+- RISK-0001(V1/ORM 정합), RISK-0003(V1 forward migration), RISK-0004(UI/API freeze), RISK-0008(active unique downgrade), RISK-0009(Post-category lock), RISK-0011(view ledger), RISK-0013(local file/DB backup)은 M10 회귀·보존·마이그레이션 점검에서 실제 범위와 잔여 수준을 다시 확인해야 한다.
+- RISK-0005(SameSite 배포), RISK-0006(refresh global revoke), RISK-0007(old slug redirect), RISK-0010(S3 private access), RISK-0012(LocalStack/SeaweedFS U0), RISK-0021(역사 DATETIME provenance·실사용 DB·운영 ADMIN bootstrap)은 승인된 M10 비목표 또는 운영 전제다. 이 위험을 닫지 않은 상태에서는 local MVP DoD를 넘어서 배포/운영 준비 완료라고 보고하지 않는다.
+- 구현 중 공개 API·DB·권한·보안·외부 의존성·PRD/REQUIREMENTS/디자인 변경이 필요하다는 증거가 나오면 현재 preflight 권고로 진행하지 않고 해당 작업을 보류한다. governance 기준상 최소 MEDIUM, 계약·보안·DB 변경이면 HIGH 및 사용자 승인이 필요하다.
 
 ## 주요 산출물
 
-- PM 정본: `docs/PRD.md` §5.13·§9.12·§10 M9·§11·§13.5
-- 승인·기술 보완 정본: `docs/governance/meetings/M9-20261111-admin.md` §11~§12, `docs/governance/decisions/ADR-0008-admin-contract.md`, `README.md` 서버 시각 기준, `docs/governance/RISK-REGISTER.md` RISK-0021
-- Backend 증거: `build/m9-evidence/task2/recovery-admin-final-1*`(UTC 보완 전 baseline), `recovery-signup-audit-kst-1*`, `recovery-runtime-utc-red-1*`, `build/m9-evidence/backend-final-2/summary.json`, `.superpowers/sdd/M9-admin/task-2-report.md`
-- Frontend/QA/acceptance/integration 증거: `build/m9-evidence/tested-version.json`(424 files/current source SHA), `build/m9-evidence/frontend-final-test.log`·`frontend-final-result.json`(M1 이전 464 baseline), frontend fresh 465 보고, `.superpowers/sdd/M9-admin/task-4-final-m1-report.md`, `.superpowers/sdd/M9-admin/final-m1-rereview.md`, `build/m9-acceptance-20261111-174413/evidence.json`, `build/m9-acceptance-20261111-174413/acceptance-diagnostic-7.log`, `qa/M9-review.md`, `qa/m9-acceptance.mjs`, PR #15 merge SHA/tree 대조 기록
-- PM은 `docs/PRD.md`, `.claude/team/pm/STATE.md`, `.claude/team/pm/WORKLOG.md`만 수정하며, M9 최종 review·PR #15 `dev` 통합·runtime 정리 완료를 동기화했다. M10과 RISK-0021 후속 적용은 범위 밖/open으로 유지한다.
+- 정본: `docs/PRD.md` §10 M10, §11, §12; `docs/REQUIREMENTS.md` NFR-09; `docs/governance/README.md`; `docs/governance/RISK-REGISTER.md`.
+- 교차 대조: `docs/worklog/M0-scaffold.md`~`M9-admin.md`, backend/frontend/qa STATE와 M9 final review/acceptance 증거.
+- 이번 preflight 편집 파일: `.claude/team/pm/STATE.md`, `.claude/team/pm/WORKLOG.md`만. `docs/PRD.md`, REQUIREMENTS, governance, 제품·QA 소스, runtime, DB, Git은 변경하지 않았다.

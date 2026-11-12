@@ -601,3 +601,12 @@
 - [PR #15](https://github.com/0-virus/zero-verse/pull/15)는 mergeable 상태, 등록 CI/workflow/review thread 0을 확인한 뒤 merge commit으로 `dev`에 통합했다. merge `c0df2d33d0dce5ac71f1b358672606f717e739ae`; tested head와 merge tree는 `409c084b2189f13fb5f44a5ffb375726475becaf`로 동일하고 diff는 비어 있다.
 - M9 API18089·MySQL `zeroverse-m9-mysql84`·전용 Lima VM을 삭제 없이 정상 종료했다. 합성 DB/업로드/증거는 보존했고 사용자 DB13307·환경·업로드는 미접근이다.
 - M9는 **COMPLETE / DEV INTEGRATED**다. M10·배포·실사용 DB 적용은 미착수이며 RISK-0021은 운영 적용 전 확인 대상으로 OPEN 유지한다.
+
+## 2026-11-12 KST — M10 착수·독립 심의 승인
+
+- 사용자 `착수하라` 지시에 따라 `dev=ce7d037`에서 `feature/M10-closeout`을 생성하고, 로컬 MVP 전체 테스트/DoD 마감·발견 결함 TDD 수정·독립 QA·dev 통합을 시작했다. 배포·S3/U0·실사용 DB·운영 ADMIN bootstrap은 제외한다.
+- backend/frontend/PM/QA preflight를 역할별로 분할했다. current source는 backend mapping/@Operation 61/61, test source83, frontend51 files/465 tests·lint/build PASS다. 과거 M0~M9 PASS는 M10 fresh PASS에 합산하지 않는다.
+- root fresh backend baseline은 637 tests 중 `PostConcurrencyTest` 24h 경계 1건이 expected1/actual2로 실패했고 focused rerun은 PASS했다. 제품은 주입 Clock을 쓰지만 test는 별도 system time+1초 여유를 써 간헐성이 확인됐다. tracked `gradlew`는 mode100644와 비표준 getopt로 `Task '-l' not found`가 나는 deterministic build defect다.
+- frontend preflight는 NFR-09의 publish form client validation 공백과 keyboard evidence 공백을 확인했다. draft empty는 유지하고 publish만 title1~200/text-or-image를 서버와 같은 카피로 TDD한다. focus-trap은 명시 근거 없는 hard blocker로 확대하지 않는다.
+- Product91 LOW, Architecture92 MEDIUM(계약불변 실행 자체 LOW), Delivery87 MEDIUM 모두 APPROVE_WITH_CHANGES. 전체 evidence 전달 비용으로 최종 MEDIUM이며, 직전 제시 범위에 대한 사용자 `착수하라`를 실행 승인으로 적용했다. wrapper provenance/Clock context격리/단일 Gradle 실행자/final-fix후manifest·JAR/13 actual screenshots/static false-positive분류를 계획에 반영했다.
+- 회의 `M10-20261112-closeout.md`는 APPROVED, 결정 레지스터에 M10 행을 추가했다. 새 공개 API·schema·보안/제품정책·정본·dependency 변경이 필요하면 영향 작업만 보류하고 재심의한다. 사용자 DB13307·기존 업로드는 미접근이다.

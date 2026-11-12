@@ -517,3 +517,24 @@
 - **소유권**: 이번 턴은 `docs/PRD.md`, `.claude/team/pm/STATE.md`, `.claude/team/pm/WORKLOG.md`만 편집했다. 제품·QA·governance·마일스톤 worklog·Git/runtime 파일은 수정하지 않았다.
 - **검증**: PRD M9/§13.5, PM STATE/WORKLOG 및 M9 final review·M1 report를 재독하고, merge SHA/tree·BE637/FE465/run7 396·M10 제외·RISK-0021 open 참조를 검색한다. Git 명령은 실행하지 않으며 편집 파일 재독과 `git diff --check`는 root가 허용하는 범위에서 수행한다.
 - **미해결**: M9 자체 gate는 없다. M10 착수, RISK-0021 해소, 사용자 DB·배포·후속 범위는 사용자 지시 전 대기한다.
+
+## 2026-11-12 12:51:52 KST — M10 테스트·마감 PM preflight
+
+- **한 일**: `.claude/CONSTITUTION.md` → `AGENTS.md` → `.claude/team/pm/CLAUDE.md` → `.claude/team/pm/STATE.md`를 순서대로 읽고, `docs/PRD.md` §10 M10·§11·§12, `docs/REQUIREMENTS.md` NFR-09, `docs/governance/README.md`, `docs/governance/RISK-REGISTER.md`, `docs/worklog/M0-scaffold.md`~`M9-admin.md`, backend/frontend/qa STATE를 직접 대조했다.
+- **Git 현실**: read-only 확인 결과 branch는 `feature/M10-closeout`, `HEAD=ce7d037cc6779be5144c15474607000280673cc4`, `main/dev/origin/main/origin/dev/origin/HEAD`도 `ce7d037`였고 `git status --short --branch`는 clean이었다. M9 PR #15 merge `c0df2d33d0dce5ac71f1b358672606f717e739ae`, tested head `e3efa6b`, merge/tested tree `409c084b2189f13fb5f44a5ffb375726475becaf`를 현재 정합 기준으로 확인했다.
+- **M0~M9 대조 결과**: 최종 worklog에 기록된 역사 기준선은 M0 BE36/FE152, M1 BE138/FE186, M2 BE348/FE250, M3 BE370/FE273, M4 BE426·FE311(+R7 영향 40), M5 BE457·FE338, M6 BE77 suites/490·FE34 files/369·실제 인수52, M7 BE91/538·FE41/405·실제 인수259, M8 BE102 suites/599·FE47/439·실제 인수323, M9 BE109/637·FE51/465·실제 인수396이다. 이는 각 마일스톤의 당시 source/provenance에 귀속하며 M10 fresh PASS로 재사용하지 않는다. M9 run7의 실제 인수396은 FE M1 수정 전이고, 현재 FE465와 합산하지 않는다.
+- **M10 명세 모호성**: PRD §10의 `§11 전체 통과, §12 DoD 충족`만으로는 (a) M0~M9 전체 suite를 현재 통합 source에서 재실행할지, (b) historical evidence를 어느 범위에서 인정할지, (c) §11의 M5~M9 특수 매트릭스·실제 인수·1440px/Swagger/보안 evidence를 모두 포함할지, (d) PASS와 NOT RUN/비목표 위험을 어떻게 구분할지 정의되지 않는다. M10 계획에서 이 네 항목을 acceptance 언어로 고정해야 한다. 이는 **권고(미확정)**이며 새로운 제품 결정으로 확정하지 않는다.
+- **권고 Task 분해(미확정)**:
+  1. 정본/source freeze·coverage matrix: NFR-09와 PRD §11 필수 항목을 M0~M9 산출물·현재 테스트 ID·fresh 명령·증거 경로에 매핑하고, source/JAR/manifest identity를 고정한다.
+  2. Backend closeout: 격리 MySQL에서 전체 JUnit XML·`bootJar`·Flyway/ORM·공통 envelope/error/paging·OpenAPI/security를 실행·집계한다. failures/errors/skips와 명령 exit를 별도 보고한다.
+  3. Frontend closeout: 전체 tests·lint·build, AuthContext/apiClient/route guard·각 도메인 UI 회귀와 1440px `docs/design` evidence를 현재 소스에서 수집한다.
+  4. 합성 local acceptance: 가입→로그인→setup→post/public, refresh→logout→failure, universe→UNIVERSE, comment→notification→read, admin current-actor/ACL·stale/error 흐름을 실제 HTTP/MySQL/Chrome으로 검증한다. 실사용 DB·업로드는 건드리지 않는다.
+  5. DoD/security audit: placeholder/`skip`/stub, secret, sanitize, 권한, no-store, Swagger, response envelope/page shape, M7 cache/migration 보존/rollback, M8/M9 특수 계약을 독립 evidence로 감사한다.
+  6. 독립 QA whole-repo review: 구현자와 다른 컨텍스트에서 diff·coverage·실행 provenance·시각 PNG를 대조하고 Critical/Important finding은 원 소유자의 RED→GREEN 후 재검토한다.
+  7. 최종 closeout: current source/테스트/JAR/tree/증거를 맞추고, 미해소 open risk와 비목표를 분리해 보고한 뒤 runtime·합성 자원을 보존/정리한다.
+- **Acceptance 언어 권고(미확정)**: “현재 통합 source에서 NFR-09와 PRD §11의 해당 테스트/인수 항목이 모두 명시적으로 mapping되고, 실행된 필수 명령이 exit 0이며 failures/errors/skips/NOT RUN이 0이고, PRD §12 각 DoD 증거와 독립 검토가 같은 source/JAR provenance로 연결될 때만 M10 local MVP closeout PASS. 과거 마일스톤 PASS는 provenance가 현재 tree와 동일할 때만 회귀 참고로 인용하며 fresh 실행을 대체하지 않는다. 제외된 S3/U0·배포·실사용 DB·운영 ADMIN bootstrap·운영 SLA는 PASS가 아니라 범위 밖으로 표시한다.”
+- **Open risk 영향**: RISK-0001/0003/0004/0008/0009/0011/0013은 M10에서 회귀·스키마·보존·백업 경계를 재확인해야 하며 실제 미검증이면 전체 local DoD 완료를 보류할 수 있다. RISK-0005/0006/0007/0010/0012/0021은 배포·보안 확장·S3/U0·실사용 DB/역사 DATETIME·운영 bootstrap 영역의 잔여 위험으로, 현재 승인된 M10 비목표와 일치하지만 이를 닫지 않은 상태에서 production/deployment ready를 주장할 수 없다. M9 RISK-0019는 CLOSED, RISK-0020은 실사용 DB 적용 전까지 MITIGATED, RISK-0021은 OPEN으로 역할 STATE·레지스터와 일치한다.
+- **심의 소집 판정**: M10은 backend·frontend·QA를 동시에 포함하고 3개 이상 도메인과 인증/접근제어·DB/마이그레이션·실제 인수·시각/보안 DoD를 함께 검증하므로 governance의 대형 마일스톤 조건을 둘 이상 충족한다. 따라서 계획 직후 Product/Architecture/Delivery & Risk 세 독립 Codex 심의를 소집할 것을 권고한다. 새 API/DB/권한/의존성/정본 변경이 발견되면 최소 `MEDIUM`, 계약·보안·DB 변경이면 `HIGH` 및 사용자 승인 전 해당 작업 보류가 필요하다. 현재 preflight만으로 새 사용자 결정은 만들지 않았다.
+- **검증 명령·출력**: `git status --short --branch` → `## feature/M10-closeout`; `git rev-parse HEAD`; `git log -1 --oneline --decorate`; `git show-ref --heads --dereference`로 ref 정합을 확인했다. `rg`/`sed`로 PRD §10~§12, NFR-09, governance 조건·위험, M0~M9 worklog/role STATE를 읽었다. PM preflight에서는 제품 테스트·build·runtime·DB를 실행하지 않았고, historical 숫자를 fresh PASS로 재집계하지 않았다.
+- **산출물·소유권**: `.claude/team/pm/STATE.md`를 M10 PLANNING/PREFLIGHT 스냅샷으로 덮어쓰고 이 WORKLOG 항목을 append했다. `docs/PRD.md`, REQUIREMENTS, governance, 마일스톤 worklog, backend/frontend/qa 산출물, 제품 소스, QA harness, runtime, DB, Git은 편집·조작하지 않았다.
+- **미해결**: root의 M10 통합 계획·심의 소집, 현재 source fresh BE/FE/integration/visual/DoD 실행, 독립 QA 판정, open risk별 local MVP/production 경계 확정이 남아 있다. M10 완료·PASS를 주장하지 않는다.

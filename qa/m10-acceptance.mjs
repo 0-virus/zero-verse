@@ -562,7 +562,23 @@ async function callMultipart(path, token, multipart) {
 
 function data(result) { return result?.body?.data ?? null; }
 
-function errorCode(result) { return result?.body?.error?.code ?? null; }
+function failureEnvelopeMatches(result, expectedStatus, expectedCode) {
+  const body = result?.body;
+  const error = body?.error;
+  const timestamp = body?.timestamp;
+  return result?.status === expectedStatus
+    && body?.success === false
+    && body?.data === null
+    && error !== null
+    && typeof error === 'object'
+    && !Array.isArray(error)
+    && error.code === expectedCode
+    && typeof error.message === 'string'
+    && error.message.trim().length > 0
+    && Array.isArray(error.details)
+    && typeof timestamp === 'string'
+    && Number.isFinite(Date.parse(timestamp));
+}
 
 function cookiePair(headers) {
   const raw = headers?.['set-cookie'];
@@ -847,7 +863,11 @@ async function runHttpAcceptance() {
     categoryId: Number.isInteger(categoryId) ? categoryId : null, visibility: 'PUBLIC', publish: true,
     thumbnailUrl: null, tagNames: [], images: [],
   });
-  check('publish-empty-rejected', publishEmpty.status === 400 && errorCode(publishEmpty) === 'VALIDATION_001', 'publishing an empty title/body is rejected with VALIDATION_001');
+  check(
+    'publish-empty-rejected',
+    failureEnvelopeMatches(publishEmpty, 400, 'VALIDATION_001'),
+    'publishing an empty title/body returns the full failure envelope with VALIDATION_001',
+  );
   const imageBytes = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
     'base64',
@@ -922,7 +942,11 @@ async function runHttpAcceptance() {
   const cacheControl = guestRead.headers['cache-control'] ?? '';
   check('private-no-store', /private/i.test(cacheControl) && /no-store/i.test(cacheControl), 'sensitive read has both private and no-store cache directives');
   const invalidBearer = await call('GET', `/api/v1/posts/${post?.id}`, 'not-a-token');
-  check('invalid-bearer-rejected', invalidBearer.status === 401 && errorCode(invalidBearer) === 'AUTH_004', 'malformed bearer is rejected with AUTH_004');
+  check(
+    'invalid-bearer-rejected',
+    failureEnvelopeMatches(invalidBearer, 401, 'AUTH_004'),
+    'malformed bearer returns the full failure envelope with AUTH_004',
+  );
   const list = await call('GET', `/api/v1/blogs/${owner.blogId}/posts?page=0&size=20`, owner.token);
   const page = data(list);
   const pageKeys = ['items', 'page', 'size', 'totalElements', 'totalPages', 'hasNext', 'hasPrevious'];
@@ -937,20 +961,20 @@ async function runHttpAcceptance() {
     'offset PageResponse contains all canonical fields',
   );
   const bound = await call('GET', `/api/v1/blogs/${owner.blogId}/posts?page=0&size=101`, owner.token);
-  check('paging-bound', bound.status === 400 && errorCode(bound) === 'VALIDATION_001', 'page size above the 100-row bound is rejected with VALIDATION_001');
+  check(
+    'paging-bound',
+    failureEnvelopeMatches(bound, 400, 'VALIDATION_001'),
+    'page size above the 100-row bound returns the full failure envelope with VALIDATION_001',
+  );
 
   const invalidRegistration = await call('POST', '/api/v1/auth/register', undefined, {});
   const unauthenticatedDrafts = await call('GET', '/api/v1/posts/drafts', undefined);
   const missingPost = await call('GET', '/api/v1/posts/999999999', undefined);
   const duplicateCategory = duplicateGeneral;
-  const httpStatusMatrixBase = invalidRegistration.status === 400
-    && errorCode(invalidRegistration) === 'VALIDATION_001'
-    && unauthenticatedDrafts.status === 401
-    && errorCode(unauthenticatedDrafts) === 'AUTH_004'
-    && missingPost.status === 404
-    && errorCode(missingPost) === 'POST_001'
-    && duplicateCategory.status === 409
-    && errorCode(duplicateCategory) === 'CAT_005';
+  const httpStatusMatrixBase = failureEnvelopeMatches(invalidRegistration, 400, 'VALIDATION_001')
+    && failureEnvelopeMatches(unauthenticatedDrafts, 401, 'AUTH_004')
+    && failureEnvelopeMatches(missingPost, 404, 'POST_001')
+    && failureEnvelopeMatches(duplicateCategory, 409, 'CAT_005');
 
   // The shared API context intentionally has multiple synthetic sign-ins above;
   // its cookie jar is not a valid rotation fixture. Use isolated contexts so a
@@ -973,8 +997,8 @@ async function runHttpAcceptance() {
   const deniedBeforeAccept = beforeAccept.status === 403;
   check(
     'http-status-matrix',
-    httpStatusMatrixBase && beforeAccept.status === 403 && errorCode(beforeAccept) === 'POST_002',
-    'representative HTTP 400/401/403/404/409 cases returned canonical VALIDATION_001/AUTH_004/POST_002/POST_001/CAT_005 codes',
+    httpStatusMatrixBase && failureEnvelopeMatches(beforeAccept, 403, 'POST_002'),
+    'representative HTTP 400/401/403/404/409 cases returned exact status/code and the full failure envelope',
   );
 
   const request = await call('POST', `/api/v1/universe/requests/${owner.id}`, friend.token);
@@ -1527,6 +1551,78 @@ async function staticSelfCheck() {
       || !withinCurrentRun(fixture.attestation?.observedAt)
   ));
   check('self-check-negative-fixtures', negativeFixturesRejected, 'synthetic malformed/NOT RUN/user-DB/stale-run/forged-database runtime fixtures remain non-pass', { required: true });
+  const validFailureTimestamp = new Date().toISOString();
+  const failureEnvelopeFixtures = [
+    {
+      result: {
+        status: 400,
+        body: {
+          success: false,
+          data: null,
+          error: { code: 'VALIDATION_001', message: 'invalid request', details: [] },
+          timestamp: validFailureTimestamp,
+        },
+      },
+      expected: true,
+    },
+    {
+      result: {
+        status: 401,
+        body: {
+          success: true,
+          data: null,
+          error: { code: 'AUTH_004', message: 'authentication required', details: [] },
+          timestamp: validFailureTimestamp,
+        },
+      },
+      expected: false,
+    },
+    {
+      result: {
+        status: 403,
+        body: {
+          success: false,
+          data: {},
+          error: { code: 'POST_002', message: 'forbidden', details: [] },
+          timestamp: validFailureTimestamp,
+        },
+      },
+      expected: false,
+    },
+    {
+      result: {
+        status: 404,
+        body: {
+          success: false,
+          data: null,
+          error: { code: 'POST_001' },
+          timestamp: validFailureTimestamp,
+        },
+      },
+      expected: false,
+    },
+    {
+      result: {
+        status: 409,
+        body: {
+          success: false,
+          data: null,
+          error: { code: 'CAT_005', message: 'duplicate', details: [] },
+          timestamp: 'not-a-timestamp',
+        },
+      },
+      expected: false,
+    },
+  ];
+  const failureEnvelopeSelfCheck = failureEnvelopeFixtures.every(({ result, expected }) => (
+    failureEnvelopeMatches(result, result.status, result.body.error.code) === expected
+  ));
+  check(
+    'self-check-failure-envelope',
+    failureEnvelopeSelfCheck,
+    'representative failure fixtures require success=false, data=null, structured error, and a valid timestamp',
+    { required: true },
+  );
   await runProductStaticScan();
   if (canonicalScreens.length !== 13) throw new Error('canonical screen list must contain exactly 13 routes');
   const requiredPublicOperations = [
@@ -1620,7 +1716,7 @@ async function writeEvidence() {
   for (const id of missing) evidence.checks.push({ id, ok: false, required: true, detail: 'NOT RUN: runner did not reach this required check' });
   const failures = evidence.checks.filter((item) => item.required && !item.ok);
   const selfCheckFailures = failures.filter((item) => new Set([
-    'harness-fail-closed-guards', 'static-skip-placeholder-scan', 'self-check-negative-fixtures',
+    'harness-fail-closed-guards', 'static-skip-placeholder-scan', 'self-check-negative-fixtures', 'self-check-failure-envelope',
   ]).has(item.id));
   evidence.status = selfCheck
     ? selfCheckFailures.length === 0 && evidence.failures.length === 0 ? 'SELF-CHECK PASS' : 'SELF-CHECK FAIL'

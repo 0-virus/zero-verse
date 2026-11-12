@@ -1216,3 +1216,11 @@
 - 정본 경계: 헌법 제1조 소유권 표와 QA 역할 지침에 따라 QA는 `qa/**`와 `.claude/team/qa/**`만 편집할 수 있다. `build/**`는 QA 소유가 아니며 build runtime 도구 편집은 수행하지 않았다.
 - 결과: runtime 도구 구현은 blocked by ownership; root가 리더 소유 파일로 직접 구현하거나 소유권을 명시한 다른 역할에 재배정해야 한다. 사용자 DB `13307`, 기존 runtime/container/upload에는 접근하지 않았다.
 - 인계: 현재 QA harness는 `zeroverse.m10.runtime-evidence.v1` bundle의 exact schema·hash·named check를 fail-closed 검증한다. root runtime은 `docs/PM-M10-runtime-plan.md`와 `.superpowers/sdd/M10-closeout/task-4-runtime-brief.md`를 따라 bundle을 공급해야 한다. actual runtime acceptance는 NOT RUN이다.
+
+## 2026-11-12 KST — M10 Task4 fix round 3/5 — I-4 closure
+
+- 범위: `task-4-fix2-rereview.md`의 Important I-4만 반영했다. I-1~I-3와 deferred Minor M-1/M-2는 유지했으며 제품 backend/frontend/source/test, root governance/worklog, runtime/DB, Git은 변경하지 않았다.
+- 보강: `failureEnvelopeMatches()` 공통 helper가 대표 400/401/403/404/409 negative 응답의 exact HTTP status와 canonical `error.code`를 동시에 확인하고, `success === false`, `data === null`, 구조화된 `error.code/message/details`, 유효한 ISO 파싱 timestamp를 요구한다. publish-empty, invalid-bearer, paging-bound 및 HTTP matrix의 validation/auth/UNIVERSE/category/post 실패 경로를 모두 helper로 연결했다.
+- self-check: malformed failure fixtures(success=true, non-null data, missing message/details, invalid timestamp)를 추가해 helper가 false-pass하지 않는지 확인한다. `self-check-failure-envelope`는 required이며 self-check 판정에 포함한다.
+- 검증: `node --check qa/m10-acceptance.mjs` exit `0`; `M10_OUTPUT_DIR=build/m10-selfcheck-fix3 node qa/m10-acceptance.mjs --self-check` exit `0`, `SELF-CHECK PASS`, failure-envelope/runtime negative/static guard rows PASS; scoped `git diff --check` exit `0`.
+- 경계: actual generated OpenAPI/HTTP/MySQL/Chrome/JAR/FE runtime 및 대표 실패 응답 실측은 여전히 **NOT RUN**이다. 이번 결과는 harness fail-closed 준비이며 M10 PASS/COMPLETE/release-ready가 아니다.

@@ -1232,3 +1232,20 @@
 - 구현: `canonicalPathCompare()`를 locale 독립 relational comparator로 도입하고, manifest files[]를 printable-ASCII relative path·unique·canonical ascending으로 검증한다. source aggregate와 before/after identity는 manifest 자체의 검증된 순서를 그대로 사용한다. FE dist directory hash도 동일 comparator를 사용해 runtime Python ordering과 정합시켰다.
 - 검증: `node --check qa/m10-acceptance.mjs` exit `0`; `M10_OUTPUT_DIR=build/m10-selfcheck-manifest-order node qa/m10-acceptance.mjs --self-check` exit `0`, `SELF-CHECK PASS`, `self-check-manifest-ordering` 및 static `359/281/0` PASS. 기존 manifest probe에서 `source-runtime-identity`가 PASS하여 aggregate 정합을 확인했으며, missing runtime evidence 때문에 전체 실행은 `NOT RUN`으로 종료했다.
 - 변경 경계: `qa/m10-acceptance.mjs`, `.claude/team/qa/STATE.md`, `.claude/team/qa/WORKLOG.md`만 수정했다. 제품/build/runtime/Git 내용은 수정하지 않았고, 실제 API/MySQL/Chrome acceptance는 여전히 **NOT RUN**이다.
+
+## 2026-11-12 KST — M10 Task4 contract mismatch fix
+
+- 범위: actual acceptance에서 드러난 두 QA 계약 불일치만 수정했다. browser/frontend/runtime origin diagnosis는 건드리지 않았고 제품 backend/frontend/source/test, runtime/DB, Git history는 수정하지 않았다.
+- `private-no-store`: guest PUBLIC post의 `Cache-Control: no-cache, no-store`를 required private check로 오인하던 경로를 제거했다. required `private-no-store`는 이미 실행되는 인증된 notification list 응답의 `Cache-Control`에서 `private`와 `no-store`를 모두 요구한다. PUBLIC guest read는 common envelope/target read만 유지한다.
+- admin list: `data.items` false assumption을 canonical `data.users` PageResponse와 `data.summary(totalUsers/joinedThisWeek/suspendedUsers)` shape assertion으로 교체했다. synthetic admin signin/list status 200과 credential field 부재 확인은 유지하며 probe는 nonrequired로 남겼다.
+- focused fixture/self-check: `hasAdminListShape()` canonical fixture는 통과하고 legacy `data.items` fixture는 거부하는 `self-check-admin-list-shape` required row 및 stale `listingData.items` guard를 추가했다.
+- 검증: `node --check qa/m10-acceptance.mjs` exit `0`; `M10_OUTPUT_DIR=build/m10-selfcheck-contract-fix node qa/m10-acceptance.mjs --self-check` exit `0`, `SELF-CHECK PASS`, static `359/281/0`, admin-shape/manifest/runtime-negative/guard rows PASS; scoped `git diff --check` exit `0`.
+- 미실행: actual protected notification header, admin HTTP list, browser/runtime origin, API/MySQL/Chrome acceptance는 **NOT RUN**이다. 이번 수정은 QA contract alignment이며 M10 PASS/COMPLETE/release-ready가 아니다.
+
+## 2026-11-12 KST — M10 Task4 browser signin selector fix
+
+- 배경: actual browser acceptance에서 `form button[type="submit"]`의 전역 첫 요소가 TopBar 검색 submit으로 선택되어 signin이 실패할 수 있음을 확인했다. frontend 제품 소스는 정상이며 dist API origin 문제는 root 별도 진단 경계로 유지한다.
+- 수정: `browserSignIn`은 email input의 `xpath=ancestor::form[1]`을 먼저 잡고 그 동일 form 안 password를 채운다. submit은 해당 form의 accessible name `/접속하기/`를 우선 사용하고, 없을 때만 동일 form 내부 `button[type="submit"]`로 fallback한다. 전역 `page.locator('form button[type="submit"]')` 선택은 제거했다.
+- self-check/근거: `self-check-browser-signin-form` required row가 ancestor form·`접속하기` role selector·form-scoped fallback selector를 확인하고 legacy global-first selector를 거부한다. stale false-pass guard에도 기존 전역 selector를 추가했다.
+- 검증: `node --check qa/m10-acceptance.mjs` exit `0`; `M10_OUTPUT_DIR=build/m10-selfcheck-contract-browser node qa/m10-acceptance.mjs --self-check` exit `0`, `SELF-CHECK PASS`, browser selector/admin shape/manifest/runtime-negative/static guard rows PASS; scoped `git diff --check` exit `0`.
+- 미실행: actual Chrome signin, frontend dist/API origin, protected notification/admin HTTP, API/MySQL acceptance는 **NOT RUN**이다. 이번 수정은 QA selector/contract alignment이며 M10 PASS/COMPLETE/release-ready가 아니다.

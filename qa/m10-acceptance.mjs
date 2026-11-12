@@ -125,7 +125,7 @@ const requiredChecks = [
   'screenshot-setup', 'screenshot-settings', 'screenshot-settings-universe', 'screenshot-settings-posts',
   'screenshot-search', 'screenshot-notifications', 'screenshot-admin', 'screenshot-admin-detail',
   'screenshots-complete',
-  'self-check-negative-fixtures', 'self-check-manifest-ordering',
+  'self-check-negative-fixtures', 'self-check-manifest-ordering', 'self-check-admin-list-shape', 'self-check-browser-signin-form',
 ];
 
 const evidence = {
@@ -611,6 +611,26 @@ function failureEnvelopeMatches(result, expectedStatus, expectedCode) {
     && Number.isFinite(Date.parse(timestamp));
 }
 
+function hasAdminListShape(result) {
+  const payload = result?.body?.data;
+  const users = payload?.users;
+  const summary = payload?.summary;
+  const pageKeys = ['items', 'page', 'size', 'totalElements', 'totalPages', 'hasNext', 'hasPrevious'];
+  const summaryKeys = ['totalUsers', 'joinedThisWeek', 'suspendedUsers'];
+  return payload !== null
+    && typeof payload === 'object'
+    && users !== null
+    && typeof users === 'object'
+    && Array.isArray(users.items)
+    && pageKeys.every((key) => Object.hasOwn(users, key))
+    && Number.isInteger(users.page)
+    && Number.isInteger(users.size)
+    && Number.isInteger(users.totalPages)
+    && summary !== null
+    && typeof summary === 'object'
+    && summaryKeys.every((key) => Number.isInteger(summary[key]));
+}
+
 function cookiePair(headers) {
   const raw = headers?.['set-cookie'];
   if (typeof raw !== 'string' || !raw) return null;
@@ -970,8 +990,6 @@ async function runHttpAcceptance() {
   );
   const envelope = guestRead.body && typeof guestRead.body.success === 'boolean' && 'timestamp' in guestRead.body;
   check('common-envelope', envelope, 'response includes common success/timestamp envelope');
-  const cacheControl = guestRead.headers['cache-control'] ?? '';
-  check('private-no-store', /private/i.test(cacheControl) && /no-store/i.test(cacheControl), 'sensitive read has both private and no-store cache directives');
   const invalidBearer = await call('GET', `/api/v1/posts/${post?.id}`, 'not-a-token');
   check(
     'invalid-bearer-rejected',
@@ -1073,6 +1091,12 @@ async function runHttpAcceptance() {
   const notifications = await call('GET', '/api/v1/notifications?page=0&size=20', owner.token);
   const notificationItems = Array.isArray(data(notifications)?.items) ? data(notifications).items : [];
   check('notification-list', notifications.status === 200 && Array.isArray(data(notifications)?.items), 'notification list reachable with items page');
+  const protectedCacheControl = notifications.headers['cache-control'] ?? '';
+  check(
+    'private-no-store',
+    notifications.status === 200 && /private/i.test(protectedCacheControl) && /no-store/i.test(protectedCacheControl),
+    'authenticated notification list has both private and no-store cache directives',
+  );
   const actorMatches = (item) => Number(item?.actor?.id) === Number(friend.id);
   const requestNotification = notificationItems.find((item) => actorMatches(item)
     && item.type === 'NEIGHBOR' && item.targetType === 'UNIVERSE' && Number(item.targetId) === requestId);
@@ -1118,17 +1142,25 @@ async function runAdminAcceptance() {
   const listing = token
     ? await call('GET', '/api/v1/admin/users?page=0&size=1', token)
     : null;
-  const listingData = data(listing);
   const responseText = JSON.stringify(listing?.body ?? '');
   const noCredentialFields = !/(?:password|refreshToken|accessToken|clientSecret|privateKey)/i.test(responseText);
+  const adminListShape = hasAdminListShape(listing);
+  check(
+    'admin-list-shape',
+    adminListShape,
+    adminListShape
+      ? 'admin list uses canonical data.users PageResponse plus summary fields'
+      : 'NOT RUN: admin list did not expose canonical data.users PageResponse plus summary',
+    { required: false },
+  );
   check(
     'admin-list-probe',
     signed.status === 200
       && typeof token === 'string'
       && listing?.status === 200
-      && Array.isArray(listingData?.items)
+      && adminListShape
       && noCredentialFields,
-    'synthetic admin reached admin list without credential fields; authoritative admin ACL/mutation checks require the named runtime evidence bundle',
+    'synthetic admin reached admin list with canonical users/summary shape and without credential fields; authoritative admin ACL/mutation checks require the named runtime evidence bundle',
     { required: false },
   );
 }
@@ -1156,11 +1188,16 @@ async function runBrowserAcceptance(accounts) {
     try {
       await page.goto(`${frontendUrl}/signin`, { waitUntil: 'domcontentloaded' });
       const email = page.locator('input[type="email"]').first();
-      const password = page.locator('input[type="password"]').first();
-      if (await email.count() === 0 || await password.count() === 0) return false;
+      if (await email.count() === 0) return false;
+      const authForm = email.locator('xpath=ancestor::form[1]');
+      const password = authForm.locator('input[type="password"]').first();
+      if (await authForm.count() === 0 || await password.count() === 0) return false;
       await email.fill(account.email);
       await password.fill(account.password);
-      const submit = page.locator('form button[type="submit"]').first();
+      const namedSubmit = authForm.getByRole('button', { name: /접속하기/ }).first();
+      const submit = await namedSubmit.count() > 0
+        ? namedSubmit
+        : authForm.locator('button[type="submit"]').first();
       if (await submit.count() === 0) return false;
       const routeChange = page
         .waitForURL((url) => !/^\/signin\/?$/.test(url.pathname), { timeout: 12000 })
@@ -1558,8 +1595,22 @@ async function staticSelfCheck() {
     ['M10_SCREENSHOTS', '!==', '\'0\''].join(''),
     ['screenshotsEnabled', '=', 'process.env.M10_SCREENSHOTS'].join(''),
     ['function ', 'markRuntimeEvidence', 'NotRun'].join(''),
+    ['Array.isArray(listingData?.items)', 'admin-list-probe'].join(''),
+    ['page.locator(\'form button[type="submit"]\')', '.first()'].join(''),
   ].some((pattern) => source.includes(pattern));
   check('harness-fail-closed-guards', !staleFalsePass, 'runner contains no known false-pass guard patterns', { required: true });
+  const browserSigninFormSelectors = [
+    "locator('xpath=ancestor::form[1]')",
+    "getByRole('button', { name: /접속하기/ })",
+    "authForm.locator('button[type=\"submit\"]')",
+  ];
+  check(
+    'self-check-browser-signin-form',
+    browserSigninFormSelectors.every((selector) => source.includes(selector))
+      && !source.includes("page.locator('form button[type=\"submit\"]')"),
+    'browser signin submits within the email field ancestor form and prefers the 접속하기 accessible name, never a global first submit',
+    { required: true },
+  );
   const selfCheckRunId = process.env.M10_RUN_ID ?? 'm10-self-check-current';
   const staleTimestamp = new Date(Date.now() - (attestationSkewMs * 2)).toISOString();
   const negativeFixtures = [
@@ -1669,6 +1720,25 @@ async function staticSelfCheck() {
     'manifest ordering fixtures reject locale-sensitive/duplicate/unsafe order and accept Python-compatible canonical order',
     { required: true },
   );
+  const canonicalAdminListFixture = {
+    body: {
+      data: {
+        users: {
+          items: [], page: 0, size: 1, totalElements: 0, totalPages: 0, hasNext: false, hasPrevious: false,
+        },
+        summary: { totalUsers: 0, joinedThisWeek: 0, suspendedUsers: 0 },
+      },
+    },
+  };
+  const legacyAdminListFixture = {
+    body: { data: { items: [], summary: { totalUsers: 0, joinedThisWeek: 0, suspendedUsers: 0 } } },
+  };
+  check(
+    'self-check-admin-list-shape',
+    hasAdminListShape(canonicalAdminListFixture) && !hasAdminListShape(legacyAdminListFixture),
+    'admin shape fixture requires data.users PageResponse and summary, rejecting legacy data.items',
+    { required: true },
+  );
   await runProductStaticScan();
   if (canonicalScreens.length !== 13) throw new Error('canonical screen list must contain exactly 13 routes');
   const requiredPublicOperations = [
@@ -1761,7 +1831,7 @@ async function writeEvidence() {
   for (const id of missing) evidence.checks.push({ id, ok: false, required: true, detail: 'NOT RUN: runner did not reach this required check' });
   const failures = evidence.checks.filter((item) => item.required && !item.ok);
   const selfCheckFailures = failures.filter((item) => new Set([
-    'harness-fail-closed-guards', 'static-skip-placeholder-scan', 'self-check-negative-fixtures', 'self-check-failure-envelope', 'self-check-manifest-ordering',
+    'harness-fail-closed-guards', 'static-skip-placeholder-scan', 'self-check-negative-fixtures', 'self-check-failure-envelope', 'self-check-manifest-ordering', 'self-check-admin-list-shape', 'self-check-browser-signin-form',
   ]).has(item.id));
   evidence.status = selfCheck
     ? selfCheckFailures.length === 0 && evidence.failures.length === 0 ? 'SELF-CHECK PASS' : 'SELF-CHECK FAIL'

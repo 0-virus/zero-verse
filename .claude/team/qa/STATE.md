@@ -4,54 +4,42 @@
 
 ## 현재 단계
 
-- **M10 테스트·마감 QA preflight — PREPARING / NOT RUN**이다.
-- M9 A-v2는 `REQUIREMENTS §6.13-A`·`ADR-0008`에 따라 독립 QA `PASS / READY TO MERGE`와 최종 scoped review `CLEAN`을 거쳐 PR #15로 `dev`에 통합된 `COMPLETE` 상태다.
-- M9 통합 근거는 backend 109 suites/637 tests, failures/errors/skips `0/0/0`, `bootJar`, frontend 51 files/465 tests·lint/build, 역사 run7 `396 PASS / 0 FAIL / 0 NOT RUN`이다. run7은 FE M1 수정 전 source의 역사 evidence이며 현재 FE465와 합산하지 않는다.
+- **M10 테스트·마감 QA — FINAL QA APPROVED / READY TO MERGE**다.
+- 현재 대상은 `feature/M10-closeout` HEAD `75ac4d8bcbfe777e1c1a71dca6283be2344704a3`이며, M9 A-v2는 PR #15로 `dev`에 통합된 COMPLETE 상태다.
+- M10 local MVP closeout은 배포·S3/AWS/U0·실사용 DB·기존 업로드·운영 ADMIN bootstrap·모바일·운영 SLA/peak memory를 포함하지 않는다.
 
 ## 진행 중
 
-- `qa/M10-review.md`에 PRD §11~§12·REQUIREMENTS NFR-09 기준의 M0~M9 provenance 경계, 전체 회귀/DoD acceptance matrix, PostEditor publish/draft validation, Modal·DraftPicker·TopBar·category·admin 실제 keyboard evidence 행, 필수 E2E, fail-closed 규칙, 1440px·Swagger·skip/placeholder/secret 기준을 기록했다. M9 PR #15 merge SHA와 M10 base/current `dev` ref도 분리해 정정했다.
-- `qa/m10-acceptance.mjs`를 보강했다. `zeroverse.m10.runtime-evidence.v1` exact bundle의 current Git/source/JAR/FE dist/harness hash·database `zeroverse_m10`·exact `M10_RUN_ID`·repository-local `zeroverse.m10.runtime-attestation.v1`(attestation SHA, bounded timestamps, per-check ok/artifact paths/raw artifact hashes)을 검증하고, tracked product file set·current commit/tree·FE dist aggregate·loopback `127.0.0.1:13320` 및 API/FE `18090/5180`을 fail-closed로 고정한다. generated OpenAPI 61 operations와 현재 public `security:[]` allowlist/unique operationId/bearer/schema/error response, canonical HTTP error codes 및 공통 실패 envelope(`success=false`, `data=null`, structured error와 valid timestamp), actual multipart POST_IMAGE image-only fixture, PageResponse bound, rotated access/cookie attributes, notification actor/type/target identity, 13 PNG artifact dimensions/hash를 직접 검증하도록 했다. manifest files[]는 runtime generator와 같은 deterministic ASCII/code-unit ascending 순서·중복 없음으로 검증하고 그 순서를 그대로 source aggregate에 사용한다. required `private-no-store`는 guest PUBLIC post가 아닌 protected notification list의 `Cache-Control: private, no-store`를 확인하며, admin list probe는 canonical `data.users` PageResponse+`summary` shape와 no-credential fields를 확인한다. browser signin은 email field의 ancestor form 안 password와 `접속하기` accessible submit을 선택하고, route-specific visible controls를 bounded timeout으로 기다려 React 초기 렌더 경합에서도 전역 검색 submit을 오인하지 않는다. keyboard category는 disabled DEFAULT/LOCKED를 건너뛰고 enabled GENERAL rename selector를 사용하며, admin search는 label-linked `#admin-user-search`와 `form[role="search"]`를 사용한다. runtime bundle·final source/JAR/FE/API/MySQL/Chrome는 아직 NOT RUN이다.
-- 최종 review wave를 반영했다. `verifyRuntimeEvidence()`의 false 반환과 `canStartHttpWorkflow()` gate가 request factory/API context보다 먼저 실행되어 invalid/missing runtime evidence에서는 `httpWorkflowStarted=false`로 HTTP workflow를 시작하지 않는다. logout은 signout 후 별도 context에서 보존된 rotated cookie를 replay하고 old/new replay 모두 full 401/AUTH_003 envelope를 요구한다. Universe accept는 received list의 exact `requestId`가 확인될 때만 실행한다. `qa/M10-review.md`의 FE-07~11은 현재 5개 route-specific Chrome hard observation, 기존 FE unit/integration/API coverage, observation-only focus-trap/restore와 미실행 selection/mutation을 분리했으며 실제 Tab/reverse-focus 및 close 후 activeElement를 detail에 기록한다.
-- `$brief` read-only 대조와 정본·worklog·QA review·위험 레지스터 교차 확인을 완료했다. 제품 source/test, frontend, backend, runtime, DB, Git mutation은 수행하지 않았다.
-- 실제 M10 backend/frontend full run, generated OpenAPI, synthetic HTTP/MySQL/Chrome 1440px acceptance는 아직 `NOT RUN`이다.
-- `node qa/m10-acceptance.mjs --self-check` 및 `node --check qa/m10-acceptance.mjs`는 exit 0이며 self-check evidence는 `SELF-CHECK PASS`다. product static scan은 359 files / 281 classified / 0 unclassified이고, malformed runtime/screenshot/user-DB negative guard, runtime gate, logout cookie replay, exact received ID fixture도 확인했다. invalid runtime full-run probe는 exit 1, `STATUS=NOT RUN`, `HTTP_WORKFLOW=false`로 request context 이전 fail-closed를 확인했다. 이는 실제 M10 acceptance PASS가 아니다.
+- `qa/M10-review.md`는 현재 source의 fresh BE/FE 회귀, isolated HTTP/MySQL/Chrome acceptance, 13개 1440×1000 PNG, fail-closed·provenance 규칙과 최종 독립 QA verdict를 기록한다.
+- 최종 acceptance evidence는 `build/m10-evidence/m10-20261112053726-e37fa5d0/acceptance-20261112T063315284522Z-e23298bb/evidence.json`이다: `PASS`, 82 checks/82 ok/78 required/0 failures, evidence SHA-256 `52ef66fcffc0a9f14e8fbf3e84fe1435258ef2efd27d49c12f5695ba7cb0c536`.
+- Runtime evidence는 동일 run의 unique runtime attempt에서 `PASS`다. MySQL `127.0.0.1:13320`/`zeroverse_m10`/`mysql:8.4`, API `18090`, FE `5180`, admin·upload·restart named checks가 모두 PASS다.
+- Acceptance provenance는 source manifest `a188b0dcc6278010b9298300d15474be98450035ca846948e5a44382ea717c27`, acceptance JAR `1ade616199bd0da11daa5856dcd5d88fe8fae4042c0ee8ab66725baa01188b21`, FE dist `992d0e1dc72c094afb13754473d07dd3944c1209f3cb0b3331addd83ffb802ef`, harness `9864b13181cab9e3563f5effc1f951546f9e30bb5a8597363d4989e4c5af9ecb`, Git tree `90e7657a6ccd6e101abcfa46ffee22c375c6e9c8`이며 before/after가 일치한다.
+- QA는 현재 431-file manifest를 재계산해 missing/mismatch `0/0`, PNG 13개를 재계산해 모두 고유·nonzero·1440×1000임을 확인했다. backend XML은 109 suites/637 tests/failures/errors/skips `0/0/0`으로 재집계했고, frontend는 51 files/472 tests, lint/build exit 0 기록을 대조했다.
+- 최종 whole-branch scoped review는 I-1~I-4 `ADDRESSED`, 새 Critical/Important `0`, `Ready to merge: Yes`로 판정했다. Chrome에서 실행하지 않은 DraftPicker 선택·TopBar profile/search mutation·category mutation·admin select/confirm/paging은 Chrome PASS로 확대하지 않고 unit/API/source/runtime mapping으로 남겼다.
 
 ## 다음 작업
 
-1. root가 현재 M10 source/JAR/tree provenance와 사용자 DB 미접근 경계를 고정한다.
-2. backend/frontend 역할의 현재 source full test·lint·build·bootJar 결과를 받고, source/JAR identity를 독립 대조한다.
-3. 합성 계정·격리 DB·UTC runtime에서 가입→설정→글→관계→UNIVERSE→댓글/좋아요→알림→관리자, refresh/logout 및 1440px 화면을 실제로 검증한다.
-4. 실패·미도달·skip·placeholder·secret·OpenAPI·시각 결과를 숨기지 않고 원 소유 역할 수정 후 scoped 재검토한다.
+1. root가 QA verdict·역할 기록·M10 worklog/JOURNAL을 반영하고 PR 생성·CI/review 상태를 확인한다.
+2. 승인 gate 후 root가 `dev`에 merge하고 merge tree/provenance 및 runtime 정상 종료를 기록한다.
+3. 배포/S3/U0/실사용 DB/운영 bootstrap·모바일은 후속 범위로 남긴다.
 
 ## 남은 gate / 차단 요인
 
-- M10 필수 acceptance 전부가 `NOT RUN`이며, 따라서 M10 PASS·COMPLETE·release-ready를 주장할 수 없다.
-- source manifest↔JAR↔HTTP/DB/Chrome evidence provenance, current full BE/FE 회귀, generated Swagger, synthetic E2E, actual 1440px screenshots가 필요하다.
-- FE-07~11의 actual Chrome rows는 final runtime에서 fresh rerun 전까지 `NOT RUN`이다. 현재 runner가 hard-check하는 것은 route-specific open/close/query와 Tab/focus 관찰이며 DraftPicker selection→`/edit/:id`, category create/delete/reorder, admin select/confirm/paging은 기존 FE unit/integration/API/runtime evidence mapping으로만 기록하고 Chrome PASS로 부르지 않는다.
-- 배포/S3·AWS/U0 전환/실사용 DB·기존 업로드 적용/운영 bootstrap·모바일은 M10 범위 밖이다. RISK-0010/0012/0013/0021과 RISK-0005/0007 등 운영 위험은 별도로 OPEN/잔여로 유지한다.
+- M10 branch의 QA gate는 차단되지 않았다. 남은 것은 root 소유의 Git PR·`dev` 통합·마일스톤 기록이다.
+- 비차단 Minor: archive copy 원자성, FE origin 문자열 검사, 추적되지 않은 listener에 대한 `stop-fe` 상태 문구, attempt parent symlink/동시 실행 방어, 일부 artifact 상수 기록, 958.38 kB bundle warning, 선택적 trim-positive 테스트.
+- RISK-0010/0012/0013/0021 및 운영·배포 관련 기존 위험은 local MVP PASS로 닫지 않는다.
 
 ## 산출물
 
-- `qa/M10-review.md`: PREPARING/NOT RUN 사전 검토·provenance 규칙·M10 matrix·E2E·fail-closed·risk 기록.
-- `qa/m10-acceptance.mjs`: final manifest/runtime에서만 실행하는 M10 black-box acceptance harness(실제 실행은 아직 NOT RUN).
-- 기존 M2~M9 QA review와 M0~M9 worklog는 역사 evidence로 보존하며 M10 결과와 합산하지 않는다.
-- `qa/M10-task4-prep-review.md`: Task4 prep 독립 검토(Approved with Important follow-up, 실제 acceptance NOT RUN).
+- `qa/M10-review.md`: 최종 독립 QA APPROVED/READY TO MERGE와 evidence/provenance/범위 경계.
+- `qa/m10-acceptance.mjs`: fail-closed M10 black-box acceptance harness; 현재 최종 evidence hash와 결속.
+- `qa/M10-task4-prep-review.md`: Task4 사전 검토와 수정 wave 이력.
+- M0~M9 QA review/worklog와 역사 evidence는 보존하되 M10 현재 수치에 합산하지 않는다.
 
 ## 갱신 시각
 
-2026-11-12 KST — M10 final review wave: runtime gate·logout cookie replay·exact received requestId·Tab/focus observation·FE-07~11 coverage boundary 반영 및 self-check/invalid-runtime probe 완료. 실제 runtime acceptance는 NOT RUN.
-
-2026-11-12 KST — M10 runtime implementation handoff: QA 역할 소유권은 `qa/**`와 `.claude/team/qa/**`로 한정되어 `build/m10-*` 편집을 수행하지 않았다. root가 별도 소유자로 runtime orchestrator를 배정해야 한다.
-
-## 2026-11-12 KST — M10 Task4 false-pass hardening
-
-- `qa/m10-acceptance.mjs`를 보강했다. PUBLIC fixture로 UNIVERSE read를 통과시키던 경로를 실제 UNIVERSE 생성→수락 전 거부→수락 후 허용으로 바꾸고, comment/like도 accepted UNIVERSE post에서 실행한다.
-- refresh 검사는 shared cookie jar를 사용하지 않는 격리 request context에서 rotation·old-cookie replay·logout reuse를 상태만으로 검증한다. admin current actor는 synthetic `.test` credential의 실제 signin/admin-list HTTP probe만 허용하며, admin child-row preservation/upload 5MiB-MIME/restart는 helper/env 존재만으로 통과하지 않고 required `NOT RUN`으로 남긴다.
-- 13개 screenshot 행은 expected pathname·route-specific visible selector·HTTP success를 모두 요구한다. keyboard 5개는 generic control이 아니라 TopBar notification popover, admin Modal status trigger/cancel, DraftPicker open/close, GENERAL category rename/Escape, admin search Enter/query라는 실제 route-specific trigger/state outcome을 관찰하고 fixture 미존재 시 required `NOT RUN`으로 남긴다. focus-trap/initial-focus/restore 미구현은 새 hard blocker로 승격하지 않는다.
-- static scan은 `src/main`, `src/test`, `frontend/src` 359개 파일을 읽고 findings를 명시 분류한다. 전 product findings 281건은 허용 분류, 미분류 0건이며 evidence에 source line/token은 쓰지 않는다.
-- 재검증: `node --check` exit 0, `--self-check` exit 0 / `SELF-CHECK PASS`, scoped `git diff --check` exit 0. 실제 source/JAR/API/MySQL/Chrome acceptance 및 runtime-only rows는 여전히 `NOT RUN`이다.
+2026-11-12 KST — 독립 최종 M10 QA audit: 82/82 acceptance PASS, backend 109/637/0, frontend 51/472·lint/build PASS, provenance/PNG/manifest 재대조, final scoped review CLEAN/READY TO MERGE.
 
 ## 소유권 준수
 
-이번 수정은 `qa/M10-review.md`, `.claude/team/qa/STATE.md`, `.claude/team/qa/WORKLOG.md`만 대상으로 한다. 제품 source/test·frontend·backend·governance·마일스톤 worklog·runtime·DB·사용자 데이터·업로드는 수정하지 않고, Git 조작·commit·push·merge도 수행하지 않는다.
+이번 갱신은 `qa/M10-review.md`, `.claude/team/qa/STATE.md`, `.claude/team/qa/WORKLOG.md`만 대상으로 한다. 제품 source/test·frontend·backend·governance·마일스톤 worklog·runtime·DB·사용자 데이터·업로드는 수정하지 않는다.

@@ -1,14 +1,14 @@
-# M10 — MVP 전체 테스트·마감 QA 사전 검토
+# M10 — MVP 전체 테스트·마감 QA 독립 인수 검토
 
-> **현재 상태: PREPARING / NOT RUN**
+> **현재 상태: FINAL QA APPROVED / READY TO MERGE**
 >
-> 이 문서는 M10 실제 인수 전의 독립 QA 계획과 acceptance matrix다. M9는 `dev`에 통합된 COMPLETE 상태지만, M10 새 source/테스트/런타임/브라우저 인수는 이 기록 시점에 실행되지 않았다. 아래의 역사적 PASS는 M10 PASS로 합산하지 않는다.
+> 2026-11-12 KST 독립 최종 인수가 완료됐다. M9의 역사적 PASS는 M10 수치에 합산하지 않았고, 아래 최종 증거는 현재 `feature/M10-closeout` HEAD와 고유 격리 런타임에 직접 결속된다.
 
 ## 1. 현재 판정과 범위
 
 - `$brief` read-only 대조에서 현재 branch는 `feature/M10-closeout`이다. M9 PR #15의 실제 merge SHA는 `c0df2d33d0dce5ac71f1b358672606f717e739ae`이고, M10의 base/current `dev` reference는 `ce7d037`이다. 두 ref를 혼동하지 않으며, M9의 실제 merge·tree·runtime 정리는 `docs/worklog/M9-admin.md`, `.claude/team/qa/STATE.md`, `qa/M9-review.md`와 일치한다.
 - M10의 목표는 PRD §11 테스트 전략과 §12 DoD를 M0~M9 통합 제품에 적용하는 **전체 회귀·마감 gate**다. 결함이 발견되면 해당 소유 역할이 TDD로 수정하고 QA가 독립 재검증한다. QA는 제품 코드나 타 역할 테스트를 직접 수정하지 않는다.
-- 이 문서의 상태값은 `NOT RUN`을 유지한다. 구현자 자체 테스트, 과거 artifact 재독, source 정적 검색만으로 M10 PASS/완료를 주장하지 않는다.
+- 이 문서의 최종 상태는 독립 QA `APPROVED / READY TO MERGE`다. 구현자 자체 테스트나 과거 artifact만으로 승격하지 않았으며, 현재 source의 fresh 회귀·고유 runtime/API/MySQL/Chrome evidence·최종 scoped review를 함께 대조했다.
 - 이번 M10 범위에서 제외하는 항목은 배포·운영 프로비저닝, S3/LocalStack/U0 전환, 실제 AWS, 실사용 사용자 DB·기존 업로드 적용/보정, 운영 관리자 bootstrap, 모바일/반응형, 운영 fan-out·SLA·peak memory, DB 장애 주입이다. 제외 항목은 DoD를 몰래 통과시킨 것으로 취급하지 않고 잔여 위험으로 보고한다.
 
 ## 2. 정본과 독립성 기준
@@ -51,9 +51,9 @@ M10 결과는 다음 provenance 묶음 없이는 PASS가 될 수 없다.
 
 source manifest와 JAR가 서로 다르거나, 결과 JSON이 덮어써졌거나, HTTP가 실제 200/오류 body를 전달하지 못하거나, 필수 check가 `skip`/`pending`/`NOT RUN`이면 해당 gate는 FAIL 또는 NOT RUN으로 fail-closed 처리한다. 과거 성공 artifact의 hash만 현재 결과로 재라벨링하지 않는다.
 
-## 4. M10 전체 acceptance matrix 초안
+## 4. M10 전체 acceptance matrix (초안 보존)
 
-상태는 사전 점검 시점의 상태이며 모두 `NOT RUN`이다. `과거 참고`는 이전 마일스톤 evidence의 위치일 뿐 현재 M10 PASS를 의미하지 않는다.
+아래 표의 `NOT RUN`은 초기 사전 점검 시점의 값을 보존한 것이다. 최종 판정은 §9.1의 고유 evidence 매핑으로 대체하며, 역사적 참고 수치는 M10 현재 수치에 합산하지 않는다.
 
 | ID | 요구사항·검증 축 | M10 필수 증거·기대 결과 | 상태 |
 |---|---|---|---|
@@ -188,8 +188,30 @@ source manifest와 JAR가 서로 다르거나, 결과 JSON이 덮어써졌거나
 4. backend/frontend의 수정이 발생하면 source/JAR manifest를 새로 만들고 영향을 받은 unit/controller/repository/integration/FE/HTTP/visual 행을 처음부터 재검증한다.
 5. 마지막으로 QA가 정본·diff·test XML·OpenAPI·HTTP/DB·screenshots·risk 경계를 직접 대조한 뒤에만 M10 verdict를 갱신한다. 모든 필수 gate가 닫히기 전 `PASS`, `COMPLETE`, `release-ready`를 쓰지 않는다.
 
-## 9. 현재 사전 판정
+## 9. 최종 독립 QA 판정
 
-**M10 QA: PREPARING / NOT RUN.**
+### 9.1 실제 evidence와 matrix 결속
 
-현재 확보된 것은 정본·역사 evidence·재실행 matrix뿐이다. 남은 필수 증거는 현재 M10 source의 BE/FE fresh 회귀, generated OpenAPI, synthetic HTTP/MySQL E2E, 알림·관리자·refresh/logout 연결, source/JAR provenance, 실제 visible 1440px screenshots, skip/placeholder/secret scan이다. 이 항목들이 도착하기 전에는 M10 완료나 제품 결함 부재를 주장하지 않는다.
+최종 acceptance는 다음 고유 evidence를 사용했다.
+
+- Acceptance: `build/m10-evidence/m10-20261112053726-e37fa5d0/acceptance-20261112T063315284522Z-e23298bb/evidence.json`, SHA-256 `52ef66fcffc0a9f14e8fbf3e84fe1435258ef2efd27d49c12f5695ba7cb0c536`, `status=PASS`, `82 checks: 82 ok / 78 required / 0 failures`, `httpWorkflowStarted=true`.
+- Runtime: `build/m10-evidence/m10-20261112053726-e37fa5d0/runtime-20261112T063307134422Z-ef26b501/runtime-evidence.json`, `status=PASS`; isolated MySQL `127.0.0.1:13320`, API `18090`, FE `5180`, exact image `mysql:8.4`.
+- Provenance: HEAD `75ac4d8bcbfe777e1c1a71dca6283be2344704a3`, tree `90e7657a6ccd6e101abcfa46ffee22c375c6e9c8`, source manifest `a188b0dcc6278010b9298300d15474be98450035ca846948e5a44382ea717c27`, acceptance JAR `1ade616199bd0da11daa5856dcd5d88fe8fae4042c0ee8ab66725baa01188b21`, FE dist `992d0e1dc72c094afb13754473d07dd3944c1209f3cb0b3331addd83ffb802ef`, harness `9864b13181cab9e3563f5effc1f951546f9e30bb5a8597363d4989e4c5af9ecb`. Before/after hashes are identical and the 431-file manifest has 0 missing/mismatch against the current tree.
+- Backend fresh gate (root-owned command, QA independently re-aggregated XML): `test check bootJar --rerun-tasks --no-daemon --max-workers=1`, exit 0, 109 suites / 637 tests / failures 0 / errors 0 / skipped 0. The rerun produced a new archive hash because Boot JAR packaging is time-sensitive; it is not substituted for the acceptance JAR above.
+- Frontend fresh gate: 51 test files / 472 tests, lint exit 0, build exit 0; the 958.38 kB bundle warning is recorded as non-blocking.
+- Visual: exactly 13 unique PNGs, all `1440×1000`, nonzero and hash-bound; route/path and visible selector checks passed. Root performed the visual inspection; QA independently verified dimensions, uniqueness, hashes and provenance.
+
+The required matrix groups are all `PASS`: `M10-BASE-01..06`, `M10-API-01..04`, `M10-AUTH-01..04`, `M10-SETUP-01`, `M10-ACL-01..02`, `M10-CAT-01`, `M10-UNI-01..02`, `M10-COM-01`, `M10-LIKE-01`, `M10-NOT-01..02`, `M10-FE-01..11`, `M10-REPO-01`, `M10-DB-01`, `M10-CONC-01`, `M10-ADMIN-01..02`, `M10-DESIGN-01..02`, `M10-OPS-01`, and `M10-DOD-01`. The draft `NOT RUN` values in §4 are retained only for audit history.
+
+### 9.2 독립 재리뷰·범위 경계
+
+- 최종 whole-branch scoped reviewer는 I-1~I-4를 모두 `ADDRESSED`로 판정했고 새 Critical/Important는 0, `Ready to merge: Yes`다. I-1은 current unique runtime attempt와 legacy pointer 거부를 실제 negative probe로 확인했다. I-2는 정확한 rotated cookie old/new replay가 모두 `401/AUTH_003`임을 확인했다. I-3은 bounded Chrome observations와 unit/API/source mapping을 분리했다. I-4는 unique evidence 경로·manifest snapshot·before/after 안정성을 확인했다.
+- 실제 Chrome에서 새로 hard-assert하지 않은 DraftPicker 선택→`/edit/:id`, TopBar profile/search mutation, category create/delete/reorder, admin select/confirm/paging은 existing frontend unit/integration/API coverage와 runtime contract로 매핑했으며 Chrome mutation 전부를 실행했다고 주장하지 않는다. Modal/DraftPicker focus-trap, initial-focus, restore 및 Escape 동작은 observation-only 잔여다.
+- 남은 Minor는 archive copy 원자성, FE origin 문자열 검사, 추적되지 않은 listener에 대한 `stop-fe` 상태 문구, attempt parent symlink/동시 실행 방어, raw response 대신 assertion 상수를 기록하는 일부 artifact 필드, bundle warning 및 선택적 trim-positive 테스트다. 모두 이번 local MVP closeout의 Critical/Important gate를 막지 않는다.
+- 배포·S3/AWS/U0, 실사용 DB `13307`, 기존 업로드, 운영 ADMIN bootstrap, 모바일/반응형, 운영 SLA·peak memory·DB 장애 주입은 범위 밖이며 관련 위험을 닫지 않았다.
+
+### 9.3 최종 verdict
+
+**M10 QA: APPROVED / READY TO MERGE.**
+
+현재 branch의 local MVP closeout은 정본·현재 source/JAR/FE·fresh backend/frontend 회귀·고유 HTTP/MySQL/Chrome evidence·독립 final review가 같은 provenance로 연결되어 PASS다. 이는 배포 준비 완료나 실사용 DB 적용 승인이 아니다.

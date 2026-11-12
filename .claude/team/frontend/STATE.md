@@ -2,11 +2,11 @@
 
 > 덮어쓰기 스냅샷. 시간순 이력은 `WORKLOG.md`, 마일스톤 이력은 `docs/worklog/**`를 본다.
 
-마지막 갱신: 2026-11-12 14:58:16 KST
+마지막 갱신: 2026-11-12 15:54:30 KST
 
 ## 현재 단계
 
-- M10 closeout Task3 **구현·자체 검증 완료(GREEN)**다. 브라우저 인수 실패 원인을 현재 격리 런타임에서 추가 진단했으며, 제품 소스 변경 없이 root/QA에 런타임·하네스 수정 근거를 인계했다. 로그인 실패의 최종 원인은 React hydration race로 확정했다. M10 전체 PASS/complete가 아니다.
+- M10 closeout frontend 역할은 **DEV INTEGRATED / COMPLETE**다. Task3의 PostEditor 검증 구현·독립 review·fresh 자동검증과 Task4의 실제 acceptance/시각 evidence를 root·독립 QA가 확인했고, PR #16이 `dev`에 병합됐다.
 - 근거 정본은 REQUIREMENTS NFR-09, PRD §11~§12, 승인 회의 `docs/governance/meetings/M10-20261112-closeout.md`, `docs/design/AGENTS.md` 및 `DESIGN-SYSTEM.md`다. 새 dependency, API/server contract, 디자인 정본, bundle optimization은 추가하지 않았다.
 
 ## 구현·테스트
@@ -20,14 +20,15 @@
 
 ## 인계·남은 위험
 
-- Task4/root/독립 QA 인계: 1440px에서 13개 canonical 화면(Main, Blog, Post Detail, Write/Edit, Signin/Signup, Setup, Settings Basic/Universe/Posts, Search, Notifications, Admin List/Detail)의 실제 route/API 상태·screenshot을 최종 source 기준으로 확인한다. 이 Task3에서는 browser screenshot을 실행하지 않았다.
-- 같은 인계에서 TopBar profile/notification popover, category ArrowUp/ArrowDown, editor/DraftPicker, admin role/status/delete confirmation의 기존 명시 동작을 키보드로 관찰한다. 새 focus-trap 계약을 추가하지 않았으므로 Modal/DraftPicker/TopBar/category/admin keyboard 제품 코드는 수정하지 않았다.
-- 남은 concern은 browser/13-screen evidence 미실행과 958.38 kB bundle warning이며, 둘 다 이 Task3 구현의 테스트 실패는 아니다. 타 역할 dirty 변경과 사용자 파일/DB/upload는 보존했다.
+- 최종 frontend 자동 gate는 `npm test -- --run --maxWorkers=1` 51 files/472 tests PASS, `npm run lint`와 `npm run build` exit 0, Vite 149 modules다. JS 958.38 kB(gzip 288.87 kB) 및 500 kB 초과 chunk warning은 비차단으로 유지했다.
+- 실제 M10 acceptance는 82/82 PASS, failures 0, 13개 고유 1440×1000 PNG와 provenance/manifest hash 일치를 기록했다. 실제 Chrome hard evidence는 bounded keyboard observation이며 DraftPicker 선택→edit, TopBar profile/search, category mutation, admin select/confirm/paging 전부를 Chrome에서 실행했다고 확대하지 않는다.
+- 실제 acceptance는 실행 당시 frontend dist `992d0e1dc72c094afb13754473d07dd3944c1209f3cb0b3331addd83ffb802ef`, tested head `b5843743c5b86f84cb0bb045e60dc063aa8cccae`에 결속됐다. 이후 QA/PM/root 문서 커밋은 frontend 제품/harness diff를 만들지 않았고, merge commit `288f29cffef0671c20a365921f087fe02d4dfcdb`의 tree `23ce12bc28c1613c04537587692b89ed9f1922e8`가 tested tree와 동일하다.
+- 운영 배포·S3/U0·실사용 DB·모바일·브라우저 파일 선택 자동화는 M10 범위 밖이며, 사용자 파일/DB/upload는 보존했다.
 
 ## 소유권·통합
 
 - 변경한 제품 파일은 위 frontend 두 파일뿐이고 역할 기록은 이 `STATE.md`와 `WORKLOG.md`다. SDD Task3 보고서는 부모가 지정한 `.superpowers/sdd/M10-closeout/task-3-report.md`에 기록했다.
-- child는 Git stage/commit/branch/push/merge를 하지 않았다. root가 원자 커밋·독립 review package를 수행한다.
+- frontend 역할은 Git stage/commit/branch/push/merge를 수행하지 않았고, root가 PR #16·`dev` 통합을 완료했다. 현재 다음 작업은 별도 사용자 지시 전 대기다.
 
 ## M10 실제 브라우저 인수 진단 인계 (2026-11-12 14:05 KST)
 

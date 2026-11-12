@@ -654,3 +654,12 @@
 - QA `browserSignIn` 로직을 반복 관찰한 결과 `page.goto(..., {waitUntil:'domcontentloaded'})` 직후 `input[type="email"].count()`가 React hydration보다 먼저 평가되어 `0`이 되는 실행이 간헐적으로 발생했다. 반복 실행에서 `email-count-zero` 즉시 false와 정상 signin이 교차했다. 제품 결함이나 CORS/cookie 결함이 아니다.
 - 최소 QA 수정안: email locator에 `waitFor({state:'visible', timeout:10000})`를 먼저 적용하고, 이후 ancestor form 및 `접속하기` 버튼을 조회한다. 이미 수정된 ancestor-form selector는 유지한다. QA/root에 인계했으며 이 역할은 제품 코드를 변경하지 않는다.
 - 검증: Playwright headless 1440×1000, API response/route/DOM/console/request-failure 수집; 비밀값은 출력·기록하지 않았다. 사용자 DB `13307`, `.local-data`, 기존 업로드에는 접근하지 않았다.
+
+## 2026-11-12 15:54:30 KST — M10 PR #16 dev 통합·frontend 역할 완료
+
+- 담당/범위: 부모가 배정한 M10 통합 후 frontend 기록 정합화다. `.claude/team/frontend/STATE.md`와 본 `WORKLOG.md`만 편집했으며 제품 source/test, QA/root/PM 파일, runtime, 사용자 DB·업로드는 건드리지 않았다.
+- 통합 근거: PR #16 `https://github.com/0-virus/zero-verse/pull/16`이 `dev`에 병합됐다. tested head `b5843743c5b86f84cb0bb045e60dc063aa8cccae`, merge SHA `288f29cffef0671c20a365921f087fe02d4dfcdb`, tested/merge tree `23ce12bc28c1613c04537587692b89ed9f1922e8`, head→merge diff empty다.
+- 최종 frontend 자동검증: `npm test -- --run --maxWorkers=1` exit 0, 51 files/472 tests; `npm run lint` exit 0; `npm run build` exit 0, Vite 149 modules. JS 958.38 kB(gzip 288.87 kB) 및 기존 chunk warning은 비차단이다.
+- 실제 인수 연결: 고유 acceptance `82/82 PASS`, failures 0, 13개 unique `1440×1000` PNG와 frontend dist SHA-256 `992d0e1dc72c094afb13754473d07dd3944c1209f3cb0b3331addd83ffb802ef`를 독립 QA/root가 대조했다. Chrome coverage는 다섯 bounded keyboard observation과 기존 unit/API/source 매핑의 결합이며 모든 mutation을 Chrome에서 실행했다고 주장하지 않는다.
+- 상태: M10 frontend는 **DEV INTEGRATED / COMPLETE**다. 배포/S3/U0·실사용 DB·모바일·브라우저 파일 선택 자동화는 범위 밖이며, 다음 작업은 별도 사용자 지시 전 대기한다.
+- 기록 검증: 편집 후 `sed -n`으로 STATE 최신 snapshot과 이 append 항목을 재독하고 `git diff --check -- .claude/team/frontend/STATE.md .claude/team/frontend/WORKLOG.md`를 실행한다. Git stage/commit/push/merge는 부모 root 소유로 남긴다.

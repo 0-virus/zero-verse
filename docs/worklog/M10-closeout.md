@@ -1,6 +1,6 @@
 # M10 — 테스트 & 마감
 
-> 2026-11-12 KST: 사용자 `착수하라` 지시에 따라 M10 완료를 목표로 계획·독립 심의·승인된 수정·전체 검증·독립 QA·`dev` 통합을 시작했다. 현재 상태는 **LOCAL CLOSEOUT PASS / DEV INTEGRATION PREPARING**이다. 배포, S3 전환/U0 해소, 실사용 DB 적용, 운영 ADMIN bootstrap은 포함하지 않는다.
+> 2026-11-12 KST: 사용자 `착수하라` 지시에 따라 M10 완료를 목표로 계획·독립 심의·승인된 수정·전체 검증·독립 QA·`dev` 통합을 수행했다. 현재 상태는 **LOCAL MVP CLOSEOUT COMPLETE / DEV INTEGRATED**다. 배포, S3 전환/U0 해소, 실사용 DB 적용, 운영 ADMIN bootstrap은 포함하지 않는다.
 
 ## [계획]
 
@@ -72,8 +72,8 @@ Files: QA `qa/M10-review.md` 및 M10 acceptance harness/evidence, root의 ignore
 ### Task 6 — closeout·PR·`dev` 통합 (root/역할/PM)
 
 - [x] 역할 STATE/WORKLOG, QA review, JOURNAL, worklog를 최종 evidence와 동기화하고 `git diff --check`·추적/비밀 경계를 재검증한다.
-- [ ] 명시 파일만 원자적 커밋하고 `dev` 대상 PR을 생성한다. 등록 CI/check/review thread 상태를 확인하고 검증 head와 merge tree 동일성을 대조한다.
-- [ ] 승인·독립 QA gate 충족 시 `dev`에 merge하고 `[머지]` 기록, 최종 ref/tree를 확인한다.
+- [x] 명시 파일만 원자적 커밋하고 `dev` 대상 PR을 생성한다. 등록 CI/check/review thread 상태를 확인하고 검증 head와 merge tree 동일성을 대조한다.
+- [x] 승인·독립 QA gate 충족 시 `dev`에 merge하고 `[머지]` 기록, 최종 ref/tree를 확인한다.
 - [x] M10 runtime은 정상 종료하되 합성 DB·업로드·evidence는 임의 삭제하지 않는다. 잔여 운영 위험과 후속 배포 범위를 분리해 인계한다.
 
 ## [개발 기록]
@@ -108,10 +108,15 @@ Files: QA `qa/M10-review.md` 및 M10 acceptance harness/evidence, root의 ignore
 - 대형 마일스톤 독립 심의 완료. 회의록 `M10-20261112-closeout.md`의 필수 보완을 계획에 반영했으며 승인 범위 실행 준비 중이다.
 - backend/frontend 구현은 각각 별도 독립 review에서 Approved(Critical0/Important0)를 받았다. 최종 backend 강제 회귀 109/637/0, frontend 51/472·lint/build PASS를 root가 재확인했다.
 - 실제 인수 evidence `build/m10-evidence/m10-20261112053726-e37fa5d0/acceptance-20261112T063315284522Z-e23298bb/evidence.json`은 82/82 PASS, failures 0이다. 독립 reviewer가 431 source files, JAR/FE/harness/runtime runner, attestation 원본 4개, PNG 13개 hash와 before=after를 직접 대조했다.
-- whole-branch single fix wave scoped 재검토는 I-1~I-4를 모두 ADDRESSED로 판정했고 새 Critical/Important 0, `Ready to merge Yes`다. 최종 QA 역할 기록과 PR/dev 통합만 남았다.
+- whole-branch single fix wave scoped 재검토는 I-1~I-4를 모두 ADDRESSED로 판정했고 새 Critical/Important 0, `Ready to merge Yes`다. 당시 남았던 최종 QA 역할 기록과 PR/dev 통합도 아래 `[머지]` 단계에서 완료했다.
 - 독립 QA 최종 판정은 `APPROVED / READY TO MERGE`다. acceptance 후 QA/PM이 추가한 커밋 `e95d313`, `4bc25a7`은 역할 기록만 바꾸며, `git diff --exit-code 75ac4d8..HEAD -- gradlew build.gradle settings.gradle src frontend qa/m10-acceptance.mjs`는 빈 출력이다. 따라서 실행 당시 commit/tree를 사후 기록 commit으로 재라벨링하지 않고 product/harness provenance 불변을 근거로 사용한다.
 - M10 runtime stop 후 포트 `13320/18090/5180`, API PID `16948`, FE PID `47634`가 모두 종료됐고 합성 uploads/evidence는 보존됐다.
 
 ## [머지]
 
-- 미실행.
+- 2026-11-12 KST — feature 최종 head `b5843743c5b86f84cb0bb045e60dc063aa8cccae`를 origin에 push하고 [PR #16](https://github.com/0-virus/zero-verse/pull/16)을 `dev` 대상으로 생성했다. 원격 compare는 base/merge-base `ce7d037`, ahead 21, behind 0이었다.
+- 등록 combined status/check와 PR-triggered workflow run은 0건, 제출 review와 review thread도 0건이었다. 저장소의 독립 local review·QA gate를 근거로 expected head SHA를 고정해 merge했다.
+- GitHub merge 결과는 `merged=true`, merge SHA `288f29cffef0671c20a365921f087fe02d4dfcdb`다. 로컬 `dev`를 `origin/dev`로 fast-forward한 뒤 feature tested head와 merge commit의 tree가 모두 `23ce12bc28c1613c04537587692b89ed9f1922e8`이고 `git diff --exit-code b584374 288f29c --`가 빈 출력임을 확인했다.
+- 최종 gate는 backend 109 suites/637 tests/failures0/errors0/skips0와 bootJar, frontend 51 files/472 tests·lint/build PASS, 격리 실제 인수 82/82 PASS·13개 1440x1000 PNG, 독립 QA `APPROVED / READY TO MERGE`, whole-branch Critical0/Important0이다.
+- M10 runtime은 merge 전에 정상 종료했고 포트 `13320/18090/5180`과 API/FE PID가 내려갔다. 합성 DB·업로드·evidence는 보존했으며 사용자 DB `13307`·기존 업로드는 접근하지 않았다.
+- M10은 **LOCAL MVP CLOSEOUT COMPLETE / DEV INTEGRATED**다. 배포, S3/U0, 실사용 DB 적용·역사 시간 보정, 운영 ADMIN bootstrap/SLA, 모바일, 브라우저 파일 선택 자동화는 완료 범위가 아니며 별도 사용자 결정 전 자동 확장하지 않는다.

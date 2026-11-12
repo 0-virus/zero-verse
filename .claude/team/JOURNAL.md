@@ -619,3 +619,10 @@
 - whole-branch 독립 review의 Important I-1~I-4(runtime fail-closed, exact rotated-cookie logout replay, Chrome/unit/API/source 경계, unique evidence/legacy pointer 거부)를 한 차례 fix wave로 수정했다. scoped 재검토는 모두 ADDRESSED, Critical0/Important0, `Ready to merge Yes`다. focus return이 false인 관찰과 Chrome에서 직접 실행하지 않은 mutation을 숨기거나 확대하지 않는다.
 - 최종 강제 backend 재패키징 JAR `9dedd8...`는 동일 source의 별도 gate 산출물이며, 82/82 실제 인수가 실행한 `1ade616...`으로 재라벨링하지 않는다. 역할 QA/PM 기록 동기화 뒤 feature PR과 `dev` 통합을 진행한다.
 - 추가 실제 run은 없어 M10 API/FE/MySQL을 정상 종료했다. 포트13320/18090/5180과 PID가 모두 종료됐고 합성 DB·업로드·고유 evidence는 보존했다. 배포·S3/U0·실사용 DB·운영 bootstrap·모바일·브라우저 파일 선택은 완료 범위가 아니다.
+
+## 2026-11-12 KST — M10 PR #16 dev 통합·완료
+
+- feature 최종 head `b584374`를 push해 [PR #16](https://github.com/0-virus/zero-verse/pull/16)을 `dev` 대상으로 생성했다. 원격 compare는 ahead21/behind0, 등록 status·PR workflow·review·thread는 모두 0건이었다.
+- expected head를 고정해 merge했고 GitHub merge SHA는 `288f29cffef0671c20a365921f087fe02d4dfcdb`다. 로컬 dev fast-forward 후 tested head와 merge tree는 `23ce12bc28c1613c04537587692b89ed9f1922e8`로 동일하고 diff는 비어 있다.
+- 최종 근거는 backend 109 suites/637 tests 0/0/0, frontend 51 files/472 tests·lint/build PASS, 격리 acceptance 82/82 PASS·13 PNG, 독립 QA APPROVED 및 whole-branch Critical0/Important0이다. 실행 JAR과 후속 강제 재패키징 JAR의 hash는 서로 바꾸어 기록하지 않았다.
+- M10은 **LOCAL MVP CLOSEOUT COMPLETE / DEV INTEGRATED**다. 합성 runtime은 종료하고 데이터·업로드·증거를 보존했다. 사용자 DB13307·기존 업로드·배포/S3/U0/운영 bootstrap은 건드리지 않았으며, 다음 범위를 자동 시작하지 않는다.

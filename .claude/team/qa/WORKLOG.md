@@ -1289,3 +1289,12 @@
 - 최종 독립 scoped review: I-1 runtime legacy pointer reuse, I-2 logout cookie replay, I-3 keyboard coverage honesty, I-4 unique evidence/manifest binding이 모두 `ADDRESSED`; 새 Critical/Important `0`, `Ready to merge: Yes`다. 남은 archive atomicity·origin string check·stop-fe unknown listener·symlink/concurrency·bundle warning·trim-positive 등 Minor는 비차단으로 명시했다.
 - 판정: **M10 QA APPROVED / READY TO MERGE.** local MVP closeout의 required gate는 PASS지만 배포/S3/AWS/U0, 실사용 DB/기존 업로드, 운영 bootstrap/SLA, 모바일은 범위 밖으로 유지한다. root의 PR·`dev` 통합·runtime 종료 기록을 대기한다.
 - 검증: `git diff --check -- qa/M10-review.md .claude/team/qa/STATE.md .claude/team/qa/WORKLOG.md` 무출력 exit `0`; 편집 파일을 재독하고 stale `PREPARING/NOT RUN` 문구가 최종 section/STATE에 남지 않았음을 확인했다.
+
+## 2026-11-12 KST — M10 PR #16 dev 통합·QA 완료
+
+- 범위/소유: root가 명시한 post-merge QA 인계에 따라 `.claude/team/qa/STATE.md`와 이 WORKLOG만 갱신했다. `qa/M10-review.md`는 최종 승인 문서로 보존했고 제품 source/test, runtime/DB, 사용자 DB `13307`, 기존 업로드와 타 역할 파일은 편집하지 않았다.
+- Git 통합 대조: PR #16 `https://github.com/0-virus/zero-verse/pull/16`이 `feature/M10-closeout` tested head `b5843743c5b86f84cb0bb045e60dc063aa8cccae`에서 `dev` merge SHA `288f29cffef0671c20a365921f087fe02d4dfcdb`로 병합됐다. tested tree와 merge tree는 `23ce12bc28c1613c04537587692b89ed9f1922e8`로 동일하고 `git diff --exit-code`는 빈 출력이다.
+- QA 판정 유지: 실제 acceptance `82/82 PASS`/failures0, backend `109 suites/637 tests/0/0/0`, frontend `51 files/472 tests`·lint/build PASS, PNG 13개·provenance/manifest hash 일치, whole-branch scoped review Critical/Important0·`Ready to merge Yes`다. acceptance 실행 commit/tree는 `75ac4d8` provenance로 유지하며 이후 record-only commit으로 재라벨링하지 않는다.
+- 런타임 인계: M10 API/FE/MySQL은 정상 종료됐고 포트 `13320/18090/5180` 및 API/FE PID가 내려갔다. 합성 DB·uploads·evidence는 보존됐다. 배포/S3/U0/실사용 DB/운영 bootstrap/모바일/운영 SLA는 완료 범위가 아니다.
+- 최종 상태: **M10 QA COMPLETE / DEV INTEGRATED**. 잔여 Minor와 RISK-0010/0012/0013/0021은 local MVP PASS로 닫지 않고 후속 범위로 유지한다.
+- 검증: 편집 후 STATE/WORKLOG를 재독했고 `git diff --check -- .claude/team/qa/STATE.md .claude/team/qa/WORKLOG.md` 무출력 exit `0`이다. Git stage/commit/push는 수행하지 않았다.

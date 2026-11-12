@@ -569,3 +569,12 @@
 - 실제 관측: 사용자 DB `13307`이 아닌 M10 전용 API `127.0.0.1:18090`, 합성 post `8`의 guest `GET /api/v1/posts/8` 응답은 `200`, `Cache-Control: no-cache, no-store, max-age=0, must-revalidate`, `X-Content-Type-Options: nosniff`였고 `private`는 없었다. 응답은 PUBLIC 발행 글 상세였다.
 - 판정: REQUIREMENTS FR-POST-05는 PUBLIC 발행 글의 guest 상세 조회를 허용하지만 `private,no-store`를 요구하지 않는다. `private,no-store`는 개인화/보호 endpoint(관계 snapshot, interactions, notifications, admin 등)에 명시된다. 따라서 QA 하네스가 PUBLIC guest post 상세에 두 directive를 동시에 요구하는 것은 계약 불일치이며 backend 제품 수정 대상이 아니다.
 - 인계: `qa/m10-acceptance.mjs` 소유자에게 해당 check를 `no-store` 계약으로 완화하거나 보호 endpoint 대상으로 이동하도록 root를 통해 전달한다. backend `src/**`·Gradle·API/DB/security 계약은 변경하지 않았고, 비밀·사용자 DB·기존 업로드를 건드리지 않았다.
+
+## 2026-11-12 KST — M10 backend dev 통합·최종 closeout
+
+- 한 일/소유: root의 PR #16 merge 결과를 전달받아 backend `STATE.md`를 `COMPLETE / DEV INTEGRATED`로 갱신했다. PR은 `https://github.com/0-virus/zero-verse/pull/16`, merge SHA는 `288f29cffef0671c20a365921f087fe02d4dfcdb`다. 검증된 feature head `b5843743c5b86f84cb0bb045e60dc063aa8cccae`와 merge tree `23ce12bc28c1613c04537587692b89ed9f1922e8`가 동일하고 head→merge diff가 비어 있음을 root가 확인했다.
+- backend 최종 fresh gate는 격리 JDK21/Colima Docker socket/`JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=/private/tmp` 조건에서 `test check bootJar --rerun-tasks --no-daemon --max-workers=1` exit0, `BUILD SUCCESSFUL`이었다. JUnit XML 109개를 직접 합산해 `637 tests / failures 0 / errors 0 / skipped 0`을 확인했다. request-mapping annotation 75개(class-level 포함), `@Operation` 61개, mapping files 14개도 기존 증거와 일치한다.
+- JAR provenance는 분리 보존한다. 실제 82/82 acceptance가 실행한 immutable runtime JAR는 `1ade616199bd0da11daa5856dcd5d88fe8fae4042c0ee8ab66725baa01188b21`이고, 최종 강제 backend 재패키징 산출물 `9dedd8...`는 별도 gate 결과다. 새 archive hash를 실제 acceptance JAR로 재라벨링하지 않았다.
+- frontend 최종 gate `51 files / 472 tests`, lint/build PASS와 QA `82/82 PASS`, 13개 `1440×1000` PNG, 독립 review `Critical0 / Important0 / Ready to merge Yes`를 backend 역할에서 인계받았다. acceptance의 실행 commit/tree는 역할 문서 후속 커밋과 구분하며 product/harness 파일 불변을 근거로 provenance를 유지한다.
+- 런타임·범위: M10 API/FE/MySQL은 종료됐고 합성 DB·업로드·evidence는 보존됐다. 사용자 DB `13307`, 기존 업로드, S3/배포, 운영 ADMIN bootstrap, 모바일은 접근·적용·완료 주장하지 않는다. RISK-0021 및 운영/S3/U0 위험은 별도 결정 전 OPEN으로 유지한다.
+- 검증: 갱신한 `.claude/team/backend/STATE.md`와 이 append 항목을 재독하고 `git diff --check -- .claude/team/backend/STATE.md .claude/team/backend/WORKLOG.md` 무출력 exit0을 확인한다. 이 기록 동기화에서는 backend 제품·테스트·Gradle·DB·runtime과 Git stage/commit/push를 수행하지 않는다.

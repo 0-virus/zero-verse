@@ -4,8 +4,8 @@
 
 ## 현재 단계
 
-- **M10 테스트·마감 QA — FINAL QA APPROVED / READY TO MERGE**다.
-- 최종 acceptance가 실행된 대상은 `feature/M10-closeout` HEAD `75ac4d8bcbfe777e1c1a71dca6283be2344704a3`이며, 이 QA 기록 커밋은 그 이후의 QA-only 문서 변경이다. M9 A-v2는 PR #15로 `dev`에 통합된 COMPLETE 상태다.
+- **M10 테스트·마감 QA — COMPLETE / DEV INTEGRATED**다.
+- 최종 acceptance는 `feature/M10-closeout` tested head `b5843743c5b86f84cb0bb045e60dc063aa8cccae`의 product/harness 상태에서 실행됐고, PR #16으로 `dev` merge SHA `288f29cffef0671c20a365921f087fe02d4dfcdb`에 통합됐다. tested tree `23ce12bc28c1613c04537587692b89ed9f1922e8`와 merge tree가 동일하며 diff는 비어 있다. acceptance의 실행 commit/tree는 기록 commit으로 재표기하지 않는다. M9 A-v2는 PR #15로 `dev`에 통합된 COMPLETE 상태다.
 - M10 local MVP closeout은 배포·S3/AWS/U0·실사용 DB·기존 업로드·운영 ADMIN bootstrap·모바일·운영 SLA/peak memory를 포함하지 않는다.
 
 ## 진행 중
@@ -19,13 +19,12 @@
 
 ## 다음 작업
 
-1. root가 QA verdict·역할 기록·M10 worklog/JOURNAL을 반영하고 PR 생성·CI/review 상태를 확인한다.
-2. 승인 gate 후 root가 `dev`에 merge하고 merge tree/provenance 및 runtime 정상 종료를 기록한다.
-3. 배포/S3/U0/실사용 DB/운영 bootstrap·모바일은 후속 범위로 남긴다.
+1. M10은 추가 QA 작업 없이 사용자 후속 지시를 대기한다.
+2. 배포/S3/U0/실사용 DB/운영 bootstrap·모바일은 후속 범위로 남긴다.
 
 ## 남은 gate / 차단 요인
 
-- M10 branch의 QA gate는 차단되지 않았다. 남은 것은 root 소유의 Git PR·`dev` 통합·마일스톤 기록이다.
+- M10 QA gate와 dev 통합은 차단되지 않았다. PR #16이 `dev`에 병합됐고 root가 마일스톤/JOURNAL 기록을 완료하는 단계까지 닫혔다.
 - 비차단 Minor: archive copy 원자성, FE origin 문자열 검사, 추적되지 않은 listener에 대한 `stop-fe` 상태 문구, attempt parent symlink/동시 실행 방어, 일부 artifact 상수 기록, 958.38 kB bundle warning, 선택적 trim-positive 테스트.
 - RISK-0010/0012/0013/0021 및 운영·배포 관련 기존 위험은 local MVP PASS로 닫지 않는다.
 
@@ -38,7 +37,7 @@
 
 ## 갱신 시각
 
-2026-11-12 KST — 독립 최종 M10 QA audit: 82/82 acceptance PASS, backend 109/637/0, frontend 51/472·lint/build PASS, provenance/PNG/manifest 재대조, final scoped review CLEAN/READY TO MERGE.
+2026-11-12 KST — 독립 최종 M10 QA audit 82/82 PASS, backend 109/637/0, frontend 51/472·lint/build PASS, provenance/PNG/manifest 재대조, final scoped review CLEAN/READY TO MERGE 후 PR #16 `dev` merge 및 runtime stopped/preserved를 확인해 COMPLETE/DEV INTEGRATED로 갱신.
 
 ## 소유권 준수
 

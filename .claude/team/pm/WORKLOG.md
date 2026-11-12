@@ -558,3 +558,21 @@
 - **산출물**: `.claude/team/pm/STATE.md`를 최신 closeout snapshot으로 덮어썼다. `docs/PRD.md`와 governance/제품/QA source는 편집하지 않았다. PR·merge·runtime stop은 root의 다음 Task6 절차로 남긴다.
 - **검증**: PM STATE/WORKLOG 재독, HEAD·evidence 경로·backend/frontend 수치·범위 검색 및 PM 소유 파일 `git diff --check`/trailing-whitespace 검사를 수행한다. PM 역할에서는 제품 테스트·build·runtime·DB를 재실행하지 않았고 Git 조작을 하지 않았다.
 - **미해결**: 독립 QA가 최종 `qa/M10-review.md`·QA STATE/WORKLOG를 커밋하고, root가 QA 기록을 직접 재검증한 뒤 PR 생성·`dev` merge/tree 대조·runtime 정상 종료를 수행해야 한다. RISK-0005/0006/0007/0010/0012/0021은 open 또는 범위 밖으로 유지한다.
+## 2026-11-12 15:54 KST — M10 PR #16 dev 통합·PM closeout
+
+- 한 일: root의 PR #16 병합 결과와 현재 Git/dev를 직접 대조했다. `feature/M10-closeout` tested head `b5843743c5b86f84cb0bb045e60dc063aa8cccae`가 `dev` merge `288f29cffef0671c20a365921f087fe02d4dfcdb`로 통합됐고, merge tree `23ce12bc28c1613c04537587692b89ed9f1922e8`는 tested head tree와 동일하며 diff가 없다.
+- 근거: backend 최종 강제 gate `109 suites / 637 tests / failures 0 / errors 0 / skipped 0`, frontend `51 files / 472 tests`와 lint/build PASS, 실제 isolated acceptance `82/82 PASS`, 13개 `1440×1000` PNG, 독립 whole-branch scoped review Critical/Important `0/0`, QA `APPROVED / READY TO MERGE`를 대조했다.
+- 결과: PM 상태를 `M10 LOCAL MVP CLOSEOUT COMPLETE / DEV INTEGRATED`로 갱신했다. PR #16(`https://github.com/0-virus/zero-verse/pull/16`)의 등록 CI/check/review thread는 0개였다. runtime 포트 `13320/18090/5180`은 정상 종료됐고 합성 DB·업로드·evidence는 보존됐다.
+- 범위: 배포·S3/AWS/U0·실사용 DB `13307`·기존 업로드·운영 ADMIN bootstrap·모바일·브라우저 파일 선택은 M10에서 닫지 않았다. 다음 마일스톤은 자동 착수하지 않고 사용자 지시를 기다린다.
+- 검증: `git diff --check -- .claude/team/pm/STATE.md .claude/team/pm/WORKLOG.md`를 실행하며 PM 소유 파일만 편집했다. PRD·REQUIREMENTS·governance·제품 source는 변경하지 않았다.
+
+## 2026-11-12 15:56 KST — PRD M10 현재 상태 동기화
+
+- 한 일: `docs/PRD.md`의 M9 현행 문구가 남긴 “M10 미착수” 역사 표현을 현재 실행 결과와 충돌하지 않도록 정정하고, M10 섹션에 `dev` 통합·fresh gate·82/82 acceptance·provenance·범위 밖 경계를 추가했다.
+- 근거: 실제 Git `dev=288f29cffef0671c20a365921f087fe02d4dfcdb`, tested head/tree 동일, `docs/worklog/M10-closeout.md`, QA `APPROVED / READY TO MERGE`, backend/frontend 수치 및 isolated evidence를 대조했다. 새 제품 결정·API/DB/security/의존성 변경은 없다.
+- 검증: PRD 변경 구간을 재독하고 `git diff --check -- docs/PRD.md .claude/team/pm/STATE.md .claude/team/pm/WORKLOG.md`를 수행해 무출력을 확인했다. 수정 경로는 PM 소유 파일뿐이다.
+
+## 2026-11-12 15:58 KST — M10 상태 문구 현재형 보완
+
+- 한 일: PM STATE의 미래형 dev 병합 문구를 현재형 완료 문구로 고쳤고, PRD §10 M9 상태의 M10 범위 표현을 “M9 당시 미착수·현재 M10 별도 완료·dev 통합” 역사 문맥으로 보완했다.
+- 검증: PM STATE/PRD 변경 구간을 재독하고 `git diff --check -- .claude/team/pm/STATE.md .claude/team/pm/WORKLOG.md docs/PRD.md` 무출력을 확인했다. 새 제품 결정은 추가하지 않았다.

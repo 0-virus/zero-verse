@@ -610,3 +610,12 @@
 - frontend preflight는 NFR-09의 publish form client validation 공백과 keyboard evidence 공백을 확인했다. draft empty는 유지하고 publish만 title1~200/text-or-image를 서버와 같은 카피로 TDD한다. focus-trap은 명시 근거 없는 hard blocker로 확대하지 않는다.
 - Product91 LOW, Architecture92 MEDIUM(계약불변 실행 자체 LOW), Delivery87 MEDIUM 모두 APPROVE_WITH_CHANGES. 전체 evidence 전달 비용으로 최종 MEDIUM이며, 직전 제시 범위에 대한 사용자 `착수하라`를 실행 승인으로 적용했다. wrapper provenance/Clock context격리/단일 Gradle 실행자/final-fix후manifest·JAR/13 actual screenshots/static false-positive분류를 계획에 반영했다.
 - 회의 `M10-20261112-closeout.md`는 APPROVED, 결정 레지스터에 M10 행을 추가했다. 새 공개 API·schema·보안/제품정책·정본·dependency 변경이 필요하면 영향 작업만 보류하고 재심의한다. 사용자 DB13307·기존 업로드는 미접근이다.
+
+## 2026-11-12 KST — M10 로컬 closeout PASS·통합 준비
+
+- backend는 표준 Gradle 8.10 wrapper와 실행 비트를 복구하고 시간 경계 테스트를 고정 Clock으로 결정화했다. 제품 24시간 정책·API·DB·보안·의존성은 바꾸지 않았다. root 최종 강제 gate `test check bootJar --rerun-tasks --no-daemon --max-workers=1`은 격리 Docker/temp 조건에서 109 suites/637 tests/failures0/errors0/skips0으로 PASS했다.
+- frontend는 publish 시 trim 제목 1~200자와 text 또는 본문 image를 요구하는 검증을 TDD로 추가했다. 빈 draft와 image-only publish는 허용하고 thumbnail-only는 거부한다. 최종 51 files/472 tests, lint/build PASS; 958.38 kB warning은 비차단으로 남겼다.
+- 격리 M10 runtime MySQL13320/API18090/FE5180의 고유 실제 evidence는 82/82 PASS, failures0, 13개 고유 1440x1000 PNG다. HEAD `75ac4d8`, tree `90e7657`, source manifest `a188b0d...`, 실제 runtime JAR `1ade616...`, FE dist `992d0e1...`, harness `9864b13...` 및 before/after가 일치한다. 사용자 DB13307·기존 업로드는 접근하지 않았다.
+- whole-branch 독립 review의 Important I-1~I-4(runtime fail-closed, exact rotated-cookie logout replay, Chrome/unit/API/source 경계, unique evidence/legacy pointer 거부)를 한 차례 fix wave로 수정했다. scoped 재검토는 모두 ADDRESSED, Critical0/Important0, `Ready to merge Yes`다. focus return이 false인 관찰과 Chrome에서 직접 실행하지 않은 mutation을 숨기거나 확대하지 않는다.
+- 최종 강제 backend 재패키징 JAR `9dedd8...`는 동일 source의 별도 gate 산출물이며, 82/82 실제 인수가 실행한 `1ade616...`으로 재라벨링하지 않는다. 역할 QA/PM 기록 동기화 뒤 feature PR과 `dev` 통합을 진행한다.
+- 추가 실제 run은 없어 M10 API/FE/MySQL을 정상 종료했다. 포트13320/18090/5180과 PID가 모두 종료됐고 합성 DB·업로드·고유 evidence는 보존했다. 배포·S3/U0·실사용 DB·운영 bootstrap·모바일·브라우저 파일 선택은 완료 범위가 아니다.

@@ -607,3 +607,10 @@
 - 최종 검증: `cd frontend && npm test -- --run --maxWorkers=1` → exit 0, **51 files/465 tests PASS**; `npm run lint` → exit 0 (`oxlint`); `npm run build` → exit 0 (`tsc -b`, Vite 149 modules). build의 JS 958.14 kB 및 기존 500 kB 초과 chunk warning은 비차단 경고로 분리했다. 시각 변경 없는 query 수정이므로 1440px 화면 검증은 재실행하지 않았다.
 - 변경/무결성: 변경된 제품 파일은 `adminApi.ts`와 `adminApi.test.ts`이며 STATE/WORKLOG/report는 역할 기록이다. 최종 report에 source hash가 아닌 scoped `git diff` 범위와 `git diff --check` 결과를 기록한다. 수정 전 root 실제 인수 396 PASS/source hash는 보존하되 수정 후 source/hash 독립 scoped 재확인 전에는 현재 소스의 증거로 재사용하지 않는다.
 - 남은 gate: root의 독립 scoped 재검토, 수정 후 source/hash 대조, Task5 기록과 PR/dev 통합이 남았다. 사용자 파일·기존 DB·업로드와 QA/PM dirty 변경은 계속 보존한다.
+
+## 2026-11-12 10:42:41 KST — M9 PR #15 dev 통합·frontend 역할 완료
+
+- 담당/범위: 부모가 전달한 root 통합 결과를 frontend 역할의 `STATE.md`와 이 `WORKLOG.md`에만 반영했다. 제품 소스·테스트·report·타 역할 파일은 수정하지 않았고, Git 명령·commit·branch·push·merge도 실행하지 않았다.
+- 통합: M9 PR #15가 `dev`에 병합됐다. merge SHA는 `c0df2d33d0dce5ac71f1b358672606f717e739ae`, tested head는 `e3efa6b`, tested head tree/merge tree는 `409c084b2189f13fb5f44a5ffb375726475becaf`다. root가 PR/통합 및 런타임 정리를 완료했다.
+- 최종 frontend 증거: **51 files / 465 tests PASS**, lint exit 0, build exit 0이며 기존 958.14 kB JS 및 500 kB 초과 chunk warning은 비차단 경고로 남는다. Minor M1의 `Kim  Lee` 내부 공백 보존 회귀와 RED/GREEN 근거는 직전 항목 및 `.superpowers/sdd/M9-admin/task-4-final-m1-report.md`에 보존한다.
+- 상태: M9 frontend는 **DEV INTEGRATED/COMPLETE**다. 다음 마일스톤·추가 제품 수정은 별도 사용자 지시와 root 배정 전에는 시작하지 않는다. 사용자 파일·기존 DB·업로드 및 타 역할 변경은 보존한다.

@@ -1127,3 +1127,11 @@
 - 검증: `git rev-parse HEAD` → `5df2db03866a1257ac69e6bf7f8109487b01a1ef`; 편집 파일 재독(`sed -n`/`tail`), `git diff --check -- qa/M9-review.md .claude/team/qa/STATE.md .claude/team/qa/WORKLOG.md` exit0, 핵심 문자열 검색에서 `M9 독립 QA PASS`, `READY TO MERGE`, `465`, `ababaa1c...`, `CLEAN / READY TO MERGE`, `PR/dev` 경계를 확인했다.
 - 실행 경계: M1 수정 후 root 보고의 focused 1 file/4 tests, full FE 51/465, lint/build exit0와 독립 `final-m1-rereview.md`의 Critical/Important/Minor 0을 근거로 삼았다. QA는 이번 동기화에서 runtime/API/DB/Chrome/Gradle 테스트를 재실행하지 않았고 Git commit/branch/push/merge도 하지 않았다.
 - 미해결: root의 PR/dev 통합·merged tree/source identity 대조만 대기한다. M9 완료·배포·M10·실사용 DB 적용은 주장하지 않는다.
+
+## 2026-11-12 KST — M9 PR #15 dev 통합 closeout
+
+- 한 일: root가 전달한 PR #15(`https://github.com/0-virus/zero-verse/pull/15`) merge handoff를 QA 상태에 반영했다. merge SHA는 `c0df2d33d0dce5ac71f1b358672606f717e739ae`, tested head는 `e3efa6b`, tested head tree와 merge tree는 `409c084b2189f13fb5f44a5ffb375726475becaf`로 기록했다.
+- 근거: backend 109 suites/637 tests, failure/error/skip/exit 0/0/0/0 및 frontend 51 files/465 tests + lint/build PASS, run7 396/0/0 역사 evidence, final independent `CLEAN / READY TO MERGE`, M9 runtime stopped/preserved handoff를 대조했다.
+- 산출물: `.claude/team/qa/STATE.md`를 **DEV INTEGRATED / COMPLETE**로 갱신했다. M9 QA PASS/READY TO MERGE, Minor M1 closure, source/JAR 및 과거 run7 경계를 유지하고 PR/dev 통합 gate를 종료했다.
+- 검증: 편집 후 `sed -n`으로 STATE/WORKLOG를 재독하고 `rg -n`으로 `DEV INTEGRATED`, `COMPLETE`, PR #15, merge SHA, tested tree, BE637, FE465, `396/0/0`, `CLEAN / READY TO MERGE`, `runtime stopped/preserved` 핵심 문자열을 확인했다. 이번 closeout에서는 Git 명령을 금지받아 Git diff/status/check와 테스트/runtime 재실행을 하지 않았다.
+- 미해결: M9 QA 차단 요인은 없다. M10·배포·실사용 DB 적용 및 운영 범위는 이번 완료에 포함하지 않는다.

@@ -508,3 +508,12 @@
 - **PM 정본 변경**: `docs/PRD.md` §10 M9·§13.5에서 상태를 `Task1~4 및 최종 독립 review PASS / READY TO MERGE / Task5 PR·dev 통합 대기`로 갱신하고 FE465·새 source hash·기존 JAR 불변·run7 역사 경계를 반영했다. `.claude/team/pm/STATE.md`도 같은 상태로 갱신했으며 통합 완료 또는 merge 완료를 쓰지 않았다. 새 사용자 결정은 만들지 않았다.
 - **검증**: backend/frontend/qa STATE와 role worklog, PRD §5.13·§9.12·§10 M9·§11·§13.5, REQUIREMENTS §6.13-A, ADR-0008, M9 worklog 및 final review 보고서를 재독했다. manifest 424건/개별 hash·JAR SHA를 직접 확인하고 PM 편집 파일 재독·핵심 참조 검색·`git diff --check`를 수행한다. QA/제품/Git/PR/runtime 파일은 수정하지 않았다.
 - **미해결**: Task5의 명시 파일 PR, `dev` merge/tree 대조, M9 runtime 정리만 남아 있다. 사용자 DB·기존 업로드·M10·배포는 계속 범위 밖이다.
+
+## 2026-11-12 10:42:58 KST — M9 PR #15 `dev` 통합·완료 정합화
+
+- **직접 근거 대조**: root가 전달한 PR #15(`https://github.com/0-virus/zero-verse/pull/15`)의 `dev` 병합 결과를 반영했다. merge SHA는 `c0df2d33d0dce5ac71f1b358672606f717e739ae`, tested head는 `e3efa6b`, tested head tree와 merge tree는 `409c084b2189f13fb5f44a5ffb375726475becaf`로 일치하며 M9 runtime 정리가 완료됐다.
+- **완료 수치·경계**: backend `109 suites/637 tests`, failures/errors/skips `0/0/0`, bootJar 및 JAR SHA `c6f381f72bf94528f54e3bb805403d23a0e119673c6183c9aff66af3ac0d9c52`; frontend M1 수정 후 `51 files/465 tests PASS`, lint/build exit 0; run7은 수정 전 소스의 `396/0/0` 실제 인수 역사 증거다. final review와 M1 scoped 재검토는 `CLEAN / READY TO MERGE`로 종료됐고 FE465는 focused/full 검증으로 닫혔다.
+- **PM 정본 변경**: `docs/PRD.md` §10 M9·§13.5를 `Task1~5 완료 / DEV INTEGRATED / COMPLETE`로 갱신하고 PR #15 merge SHA·tested head/tree·runtime 정리 완료를 기록했다. `.claude/team/pm/STATE.md`도 같은 상태로 갱신했다. M10은 미착수·범위 밖, RISK-0021은 open으로 유지했으며 새 사용자 결정은 만들지 않았다.
+- **소유권**: 이번 턴은 `docs/PRD.md`, `.claude/team/pm/STATE.md`, `.claude/team/pm/WORKLOG.md`만 편집했다. 제품·QA·governance·마일스톤 worklog·Git/runtime 파일은 수정하지 않았다.
+- **검증**: PRD M9/§13.5, PM STATE/WORKLOG 및 M9 final review·M1 report를 재독하고, merge SHA/tree·BE637/FE465/run7 396·M10 제외·RISK-0021 open 참조를 검색한다. Git 명령은 실행하지 않으며 편집 파일 재독과 `git diff --check`는 root가 허용하는 범위에서 수행한다.
+- **미해결**: M9 자체 gate는 없다. M10 착수, RISK-0021 해소, 사용자 DB·배포·후속 범위는 사용자 지시 전 대기한다.

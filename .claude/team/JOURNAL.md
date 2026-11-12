@@ -594,3 +594,10 @@
 - 독립 M9 whole/visual review는 새 보안·주요 기능 차단 없이 FE 검색 내부 whitespace 축약 Minor 1건만 발견해 `NEEDS FIX`로 판정했다. 원 frontend 소유 경계의 새 컨텍스트가 실제 query RED(1 failed/3 passed) 후 trim-only 최소 수정과 회귀를 적용했고 root가 frontend 51 files/465 tests, lint/build exit 0을 재검증했다.
 - 별도 QA 컨텍스트의 scoped 재검토는 literal 내부 공백·`+`·`%_\\` 및 기존 query validation을 대조해 Critical/Important/Minor 0, `CLEAN / READY TO MERGE`로 판정했다. 수정 commit은 `5df2db0`, 최종 source manifest는 424 files / `ababaa1c00610e6a12b8ef1ec7cd876f1a3ab81fba57ba537c630e6484530ef3`; backend JAR `c6f381…d9c52`는 불변이다.
 - QA/PM이 각 소유 기록을 최종 review PASS·PR 대기로 동기화한다. root는 M9 worklog/governance/Git/runtime를 소유하며, 기록 검증 뒤 feature branch push·`dev` PR/merge·tree 동일성 확인과 M9 전용 API/Vite/MySQL 정리를 이어간다. M10·배포·사용자 DB13307 적용은 계속 제외한다.
+
+## 2026-11-12 KST — M9 PR #15 dev 통합·완료
+
+- 최종 feature head `e3efa6b`에서 backend 109 suites/637 tests 0 failure/error/skip + bootJar, frontend 51 files/465 tests + lint/build를 다시 통과했다. 최종 source manifest 424 files `ababaa1c…ef3`, run7 실제 인수 396/0/0, 독립 whole/scoped review `CLEAN / READY TO MERGE`를 함께 근거로 사용했다.
+- [PR #15](https://github.com/0-virus/zero-verse/pull/15)는 mergeable 상태, 등록 CI/workflow/review thread 0을 확인한 뒤 merge commit으로 `dev`에 통합했다. merge `c0df2d33d0dce5ac71f1b358672606f717e739ae`; tested head와 merge tree는 `409c084b2189f13fb5f44a5ffb375726475becaf`로 동일하고 diff는 비어 있다.
+- M9 API18089·MySQL `zeroverse-m9-mysql84`·전용 Lima VM을 삭제 없이 정상 종료했다. 합성 DB/업로드/증거는 보존했고 사용자 DB13307·환경·업로드는 미접근이다.
+- M9는 **COMPLETE / DEV INTEGRATED**다. M10·배포·실사용 DB 적용은 미착수이며 RISK-0021은 운영 적용 전 확인 대상으로 OPEN 유지한다.

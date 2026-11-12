@@ -521,3 +521,10 @@
 - 동일성 대조: tested-version.json의 source SHA-256 `63d720de69a286736f77406cf3a33019ef4871b09cd6632ec7f483ce15b9602c` 및 424개 파일의 현재 개별 hash mismatch0, runtime JAR hash 일치를 직접 확인했다. `source-after.json`의 files424/match=true, runner-provenance.json와 runner-provenance-after.json의 117개 artifact hash 동일 및 현재 파일 hash 일치도 확인했다. 인수 evidence.version의 source/actualSource·JAR/actualJAR와 동일하다.
 - 한계/미해결: UTC 지원 실행과 audit 초 truncate는 미래 신규/수정 audit의 정밀도 수정이며 기존 DATETIME의 기록 시간대를 복구하지 않는다. RISK-0021(역사 DATETIME provenance·기존 DB/실환경 적용 전 별도 조사)은 OPEN으로 유지한다. 사용자 DB/기존행/schema 시간 보정·S3/M10/배포를 검증/완료했다고 주장하지 않는다. 다음 단계는 최종 독립 판정 및 root PR/dev 통합뿐이며 merge SHA는 완료 뒤 별도 append한다.
 - 기록 검증: 편집한 STATE/WORKLOG 재독, scoped diff-check 및 최신 대기 표현·637/396/424/117/RISK-0021 참조 검색으로 내용과 범위를 확인한다. 제품 source freeze를 유지한다.
+
+## 2026-11-12 10:43 KST — M9 backend dev 통합·최종 closeout
+
+- 한 일: root가 PR #15를 `dev`에 병합한 뒤 backend 역할 상태를 통합 완료로 동기화했다. PR은 `https://github.com/0-virus/zero-verse/pull/15`, merge SHA는 `c0df2d33d0dce5ac71f1b358672606f717e739ae`다. 테스트한 head `e3efa6b5c81291c006fc824e064d90d42cb6e0af`와 merge commit tree `409c084b2189f13fb5f44a5ffb375726475becaf`가 동일하고, head→merge `git diff --exit-code`도 통과했다.
+- 검증: 격리 JDK21/Gradle/Colima 환경의 `test bootJar --rerun-tasks`가 `BUILD SUCCESSFUL`로 종료됐다. JUnit XML 109개를 직접 집계해 `637 tests / failures 0 / errors 0 / skipped 0`을 확인했다. frontend는 `51 files / 465 tests PASS`, lint/build PASS, 최종 독립 M1 재검토는 `CLEAN / READY TO MERGE`였다. 실제 M9 인수는 `396 PASS / 0 FAIL / 0 NOT_RUN`이다.
+- 런타임: M9 API `18089`, `zeroverse-m9-mysql84`, 전용 Lima/Colima VM을 정상 중지했다. 컨테이너·합성 DB·업로드·증거는 삭제하지 않았고 사용자 DB `13307`과 기존 환경은 건드리지 않았다.
+- 미해결/범위: M9 backend 차단 실패는 없다. RISK-0021(기존 DATETIME provenance·실사용 DB 시간대 전환·운영 ADMIN bootstrap)은 별도 결정 전 OPEN으로 유지한다. M10·배포·사용자 DB 적용·S3 운영 전환은 시작하지 않는다.

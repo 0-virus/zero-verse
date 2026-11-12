@@ -2,7 +2,7 @@
 
 > 덮어쓰기 스냅샷. 시간순 이력은 `WORKLOG.md`, 마일스톤 이력은 `docs/worklog/**`를 본다.
 
-마지막 갱신: 2026-11-12 13:09:31 KST
+마지막 갱신: 2026-11-12 13:15:35 KST
 
 ## 현재 단계
 
@@ -12,10 +12,10 @@
 ## 구현·테스트
 
 - `frontend/src/features/post/PostEditor.tsx`: 임시저장은 빈 제목/본문을 허용하고, 발행 시 `title.trim()` 길이 1~200 및 TipTap 본문 `textContent` 또는 본문 이미지 존재를 검사한다. 실패하면 visible `role="alert"` 문구를 표시하고 `onSave`를 호출하지 않는다. 이미지 판정은 thumbnail이 아닌 TipTap 본문 image node 수집 결과다.
-- `frontend/src/features/post/PostEditor.test.tsx`: 빈 draft 허용, 빈/공백/201자 제목 차단, 정확히 200자 제목 허용, 빈 text+image 본문 차단, 본문 image-only 발행 허용을 실제 컴포넌트 동작으로 검증했다. 새 검증 때문에 기존 저장 실패 경로가 막히지 않도록 해당 회귀에 본문 입력을 추가했다.
+- `frontend/src/features/post/PostEditor.test.tsx`: 빈 draft 허용, 빈/공백/201자 제목 차단, 정확히 200자 제목 허용, 빈 text+image 본문 차단, 대표 이미지-only 차단, 본문 image-only 발행 허용을 실제 컴포넌트 동작으로 검증했다. 새 검증 때문에 기존 저장 실패 경로가 막히지 않도록 해당 회귀에 본문 입력을 추가했다.
 - TDD RED: `cd frontend && npm test -- --run src/features/post/PostEditor.test.tsx --maxWorkers=1` → exit 1, 16 tests 중 3 failed/13 passed. 실패는 구현 전 빈 제목, 공백·201자 제목, 빈 본문 안내 부재였다.
-- Focused GREEN: 같은 명령 → exit 0, 1 file / 17/17 passed(정확히 200자 positive boundary 보강 포함).
-- Full GREEN: `cd frontend && npm test -- --run --maxWorkers=1` → exit 0, 51 test files / 471 tests passed.
+- Focused GREEN: 같은 명령 → exit 0, 1 file / 18/18 passed(정확히 200자 positive boundary와 thumbnail-only negative 보강 포함).
+- Full GREEN: `cd frontend && npm test -- --run --maxWorkers=1` → exit 0, 51 test files / 472 tests passed.
 - Lint/build: `cd frontend && npm run lint && npm run build` → exit 0. Oxlint 통과, Vite 149 modules. JS 958.38 kB(gzip 288.87 kB) 및 500 kB 초과 chunk warning은 기존 비차단 경고로 남겼고 code splitting은 구현하지 않았다.
 
 ## 인계·남은 위험

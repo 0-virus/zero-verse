@@ -2,11 +2,11 @@
 
 > 덮어쓰기 스냅샷. 시간순 이력은 `WORKLOG.md`, 마일스톤 이력은 `docs/worklog/**`를 본다.
 
-마지막 갱신: 2026-11-12 13:15:35 KST
+마지막 갱신: 2026-11-12 14:05:00 KST
 
 ## 현재 단계
 
-- M10 closeout Task3 **구현·자체 검증 완료(GREEN)**다. 이 역할의 범위는 `PostEditor` 발행/임시저장 입력 검증과 해당 회귀 테스트이며, M10 전체 PASS/complete가 아니다.
+- M10 closeout Task3 **구현·자체 검증 완료(GREEN)**다. 브라우저 인수 실패 원인을 현재 격리 런타임에서 추가 진단했으며, 제품 소스 변경 없이 root/QA에 런타임·하네스 수정 근거를 인계했다. M10 전체 PASS/complete가 아니다.
 - 근거 정본은 REQUIREMENTS NFR-09, PRD §11~§12, 승인 회의 `docs/governance/meetings/M10-20261112-closeout.md`, `docs/design/AGENTS.md` 및 `DESIGN-SYSTEM.md`다. 새 dependency, API/server contract, 디자인 정본, bundle optimization은 추가하지 않았다.
 
 ## 구현·테스트
@@ -28,3 +28,10 @@
 
 - 변경한 제품 파일은 위 frontend 두 파일뿐이고 역할 기록은 이 `STATE.md`와 `WORKLOG.md`다. SDD Task3 보고서는 부모가 지정한 `.superpowers/sdd/M10-closeout/task-3-report.md`에 기록했다.
 - child는 Git stage/commit/branch/push/merge를 하지 않았다. root가 원자 커밋·독립 review package를 수행한다.
+
+## M10 실제 브라우저 인수 진단 인계 (2026-11-12 14:05 KST)
+
+- 격리 런타임 `127.0.0.1:5180`에서 합성 관리자 로그인 DOM에 상단 검색 submit과 로그인 submit이 함께 존재한다. QA `browserSignIn`의 `page.locator('form button[type="submit"]').first()`가 첫 번째 검색 버튼을 클릭해 로그인 세션을 만들지 못한다. 이는 frontend 제품 결함이 아니라 `qa/m10-acceptance.mjs` selector 결함이며 QA 역할에 수정 제안했다.
+- 현재 `frontend/dist` 번들은 `frontend/src/lib/apiClient.ts`의 기본값 `http://localhost:8080`으로 빌드되어 있다. M10 FE static server는 `127.0.0.1:5180`에서 dist만 제공하므로 API `18090`으로 연결되지 않고, 실제 browser request가 `http://localhost:8080/api/v1/... net::ERR_CONNECTION_REFUSED`를 기록했다. runtime plan §2.1/§2.2의 explicit `VITE_API_BASE_URL=http://127.0.0.1:18090`로 M10 전용 FE build를 다시 만들 책임은 root runtime에 있다. 기존 FE tests와 local default 계약은 변경하지 않는다.
+- 검증: Playwright headless 1440×1000에서 `/signin`, `/blog/m10-owner-301b5f83`, `/blog/m10-owner-301b5f83/8`, `/`를 확인했다. FE source/dist/role files 외 제품 파일은 편집하지 않았고 사용자 DB `13307`, `.local-data`, 기존 업로드에 접근하지 않았다.
+- 다음: root가 QA selector fix와 explicit runtime FE rebuild/provenance 재생성 후 13개 화면·keyboard 인수를 재실행한다. frontend 역할의 제품 코드 수정은 현재 필요하지 않다.

@@ -2,7 +2,7 @@
 
 ## 현재 단계
 
-- M10 `IMPLEMENTATION / TASK2 DONE · ROOT REVIEW PENDING` 단계다. M9 A-v2 backend는 PR #15로 `dev`에 통합되어 완료 상태이며, 현재 branch는 `feature/M10-closeout`이다.
+- M10 `IMPLEMENTATION / TASK2 DONE · RUNTIME CONTRACT DIAGNOSIS HANDED OFF · ROOT REVIEW PENDING` 단계다. M9 A-v2 backend는 PR #15로 `dev`에 통합되어 완료 상태이며, 현재 branch는 `feature/M10-closeout`이다.
 - M9 merge SHA는 `c0df2d33d0dce5ac71f1b358672606f717e739ae`, tested head는
   `e3efa6b5c81291c006fc824e064d90d42cb6e0af`, 통합 tree는
   `409c084b2189f13fb5f44a5ffb375726475becaf`다.
@@ -18,8 +18,8 @@
 
 ## 다음 작업
 
-- root가 Task2 report·diff·검증 증거를 독립 review에 넘기고, FE/QA current artifact 및 M10 전체 HTTP/Chrome/manifest gate와 함께 최종 판단한다.
-- backend는 추가 제품 수정·API/DB/security 계약·dependency·migration·배포/S3·실사용 DB 적용을 하지 않는다. 새 실패가 관찰될 때만 root의 명시 배정으로 backend 소유 범위를 재개한다.
+- root가 Task2 report·diff·검증 증거와 실제 `FR-POST-05` 캐시 헤더 판정을 독립 review에 넘기고, FE/QA current artifact 및 M10 전체 HTTP/Chrome/manifest gate와 함께 최종 판단한다. QA는 PUBLIC guest 상세 `private` 오판을 수정해야 한다.
+- backend는 추가 제품 수정·API/DB/security 계약·dependency·migration·배포/S3·실사용 DB 적용을 하지 않는다. 새 backend 제품 실패가 관찰될 때만 root의 명시 배정으로 backend 소유 범위를 재개한다. 이번 `private-no-store` 실패는 QA 계약 불일치로 판정했다.
 
 ## 차단 요인
 
@@ -30,4 +30,4 @@
 
 ## 갱신 시각
 
-2026-11-12 13:27 KST · `/root/m10_backend_task2` (M10 Task2 deterministic test·Gradle 8.10 wrapper·fresh full gate)
+2026-11-12 13:48 KST · `/root/m10_cache_header_fix` (M10 실제 guest post cache header 계약 대조·root 인계)

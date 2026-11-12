@@ -33,6 +33,18 @@ describe('adminApi', () => {
     );
   });
 
+  it('목록 query는 양끝 공백만 제거하고 내부 두 공백을 보존한다', async () => {
+    const fetchMock = vi.fn(async (_url: string, _options?: RequestInit) => ok({ users: { items: [] }, summary: { totalUsers: 0, joinedThisWeek: 0, suspendedUsers: 0 } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await adminApi.list({ keyword: '  Kim  Lee  ', page: 0, size: 20 });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:8080/api/v1/admin/users?keyword=Kim%20%20Lee&page=0&size=20',
+      expect.objectContaining({ method: 'GET' }),
+    );
+  });
+
   it('역할·상태 변경은 승인된 endpoint와 payload를 사용한다', async () => {
     const fetchMock = vi.fn(async (_url: string, _options?: RequestInit) => ok({ id: 7 }));
     vi.stubGlobal('fetch', fetchMock);

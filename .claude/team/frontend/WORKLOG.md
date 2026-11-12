@@ -597,3 +597,13 @@
 - provenance: evidence의 manifest source/JAR hash가 실제 runtime과 일치하고 `source-after.json`은 424 files/match true다. `runner-provenance.json`과 `runner-provenance-after.json`의 117개 artifact hash는 동일하다. 이 실측/자료 조회를 이번 역할의 직접 브라우저 실행이나 최종 독립 승인으로 표현하지 않는다.
 - 미해결/인계: fresh `m9_final_review` whole-branch·시각 독립 리뷰는 진행 중이며 판정 전이다. PR/dev merge는 root 통합 게이트이고 아직 완료를 주장하지 않는다. 다음 작업은 해당 결과와 실제 merge SHA를 반영하는 소규모 기록 갱신뿐이다. M10·배포·사용자 DB 적용은 제외하고 사용자 자료·업로드 보존 및 source freeze를 유지한다.
 - 기록 검증: STATE의 구현별 세부/초기 검증/Fix round1 섹션은 최종 상태 스냅샷의 진행 중·다음 작업·차단 요인으로 요약 교체했다. 교체 이유는 최종 464건·실제 인수 PASS와 이전 대기 상태의 충돌 해소이며 원래 구현·RED/GREEN·실패/수정 근거는 본 WORKLOG의 14:37:55·14:56:29·15:04:17 항목에 그대로 보존한다. 편집 후 STATE/append 재독·관련 수치/잔여게이트 rg 검색·`git diff --check -- .claude/team/frontend/STATE.md .claude/team/frontend/WORKLOG.md` exit 0을 확인했고 WORKLOG는 삭제 0줄이다.
+
+## 2026-11-12 10:09:00 KST — M9 final-review Minor M1 frontend 검색어 공백 수정
+
+- 담당/범위: 부모가 배정한 final-review Minor M1 단일 frontend 구현자로서 `frontend/src/features/admin/adminApi.ts`, `frontend/src/test/adminApi.test.ts`, `.claude/team/frontend/STATE.md`, 이 `WORKLOG.md`, `.superpowers/sdd/M9-admin/task-4-final-m1-report.md`만 수정했다. 현재 dirty QA/PM 5개 파일과 backend/root docs/governance/worklog/runtime/Git은 건드리지 않았다.
+- 근거/원인: REQUIREMENTS §6.13-A, M9 회의 §5.1·§10/10.1·§11, ADR-0008 및 final-review Minor M1을 대조했다. 서버는 trim-only literal 부분검색인데 FE `normalizeAdminKeyword`의 `.trim().replace(/\\s+/gu, ' ')`가 `Kim  Lee`를 `Kim Lee`로 축약했다. `AdminPage` URL 입력·검색 제출은 동일 helper를 소비하는 것으로 확인해 추가 소비 경로 테스트는 만들지 않았다.
+- TDD RED: 수동 literal URL 회귀를 먼저 추가하고 `cd frontend && npm test -- --run src/test/adminApi.test.ts`를 실행했다. exit 1, 1 failed/3 passed. 기존 구현의 수신 URL은 `keyword=Kim+Lee`였고 기대한 `keyword=Kim%20%20Lee`와 달라 내부 두 공백 축약을 재현했다.
+- 최소 GREEN: `normalizeAdminKeyword`에서 내부 whitespace 치환만 제거했다. brief가 요구한 `%20%20` wire literal을 유지하기 위해 URLSearchParams 결과의 공백 표현 `+`만 `%20`으로 직렬화했으며 `%`, `_`, `\\`의 기존 escaping과 UTF-16/page/size/role/status 검증은 변경하지 않았다. focused 재실행은 exit 0, 1 file/4 tests PASS였다.
+- 최종 검증: `cd frontend && npm test -- --run --maxWorkers=1` → exit 0, **51 files/465 tests PASS**; `npm run lint` → exit 0 (`oxlint`); `npm run build` → exit 0 (`tsc -b`, Vite 149 modules). build의 JS 958.14 kB 및 기존 500 kB 초과 chunk warning은 비차단 경고로 분리했다. 시각 변경 없는 query 수정이므로 1440px 화면 검증은 재실행하지 않았다.
+- 변경/무결성: 변경된 제품 파일은 `adminApi.ts`와 `adminApi.test.ts`이며 STATE/WORKLOG/report는 역할 기록이다. 최종 report에 source hash가 아닌 scoped `git diff` 범위와 `git diff --check` 결과를 기록한다. 수정 전 root 실제 인수 396 PASS/source hash는 보존하되 수정 후 source/hash 독립 scoped 재확인 전에는 현재 소스의 증거로 재사용하지 않는다.
+- 남은 gate: root의 독립 scoped 재검토, 수정 후 source/hash 대조, Task5 기록과 PR/dev 통합이 남았다. 사용자 파일·기존 DB·업로드와 QA/PM dirty 변경은 계속 보존한다.

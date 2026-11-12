@@ -36,7 +36,7 @@ function requireSize(size: number | undefined): number {
 }
 
 export function normalizeAdminKeyword(keyword: string | undefined): string {
-  const value = (keyword ?? '').trim().replace(/\s+/gu, ' ');
+  const value = (keyword ?? '').trim();
   if (value.length > MAX_ADMIN_KEYWORD_UTF16) {
     throw new Error('검색어는 UTF-16 기준 100자 이하로 입력해 주세요.');
   }
@@ -59,7 +59,7 @@ function query(params: AdminUserListParams = {}): string {
   }
   search.set('page', String(page));
   search.set('size', String(size));
-  return search.toString();
+  return search.toString().replace(/\+/gu, '%20');
 }
 
 async function list(params: AdminUserListParams = {}): Promise<AdminUserListResponse> {

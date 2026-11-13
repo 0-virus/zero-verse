@@ -576,3 +576,12 @@
 
 - 한 일: PM STATE의 미래형 dev 병합 문구를 현재형 완료 문구로 고쳤고, PRD §10 M9 상태의 M10 범위 표현을 “M9 당시 미착수·현재 M10 별도 완료·dev 통합” 역사 문맥으로 보완했다.
 - 검증: PM STATE/PRD 변경 구간을 재독하고 `git diff --check -- .claude/team/pm/STATE.md .claude/team/pm/WORKLOG.md docs/PRD.md` 무출력을 확인했다. 새 제품 결정은 추가하지 않았다.
+
+## 2026-11-13 KST — X-deployment A-v2 승인·PRD 정본 동기화
+
+- 한 일: 사용자의 async 응답 `A-v2 전체 승인 (권장)`을 확인하고, 승인된 `docs/governance/meetings/X-20261113-deployment.md` §10을 제품 정본에 반영했다. 기존 M4/M10 local 저장·U0·M10 범위의 역사 기록은 삭제하거나 소급 변경하지 않았다.
+- 직접 대조: `.claude/CONSTITUTION.md` → `AGENTS.md` → PM `CLAUDE.md`/`STATE.md`를 순서대로 읽었다. backend/frontend/qa STATE, 현재 Git `main` HEAD `8c297537c4b2997accaa2793c723169c5fee4b9c`, X-deployment 회의 §5·§8·§10·§11, `docs/REQUIREMENTS.md` §6.12/NFR-09, M10 worklog를 교차 확인했다. M10은 local MVP closeout/dev integrated로 유지되고 X-deployment는 별도 후속이다.
+- 산출물: `docs/PRD.md`에 §9.13 사용자 확정 결정, §10 X-deployment 실행 경계, §13.1 A-v2 현행 S3 후속 상태를 append했다. 내용은 신규 Aiven DB 준비·기존 local 데이터 보존·private S3 direct presigned PUT(5분)→server complete bounded bytes/MIME/checksum 검증→canonical URL/current ACL proxy read, V7 additive intent/provider metadata, UPLOAD_005~008, 24시간 cleanup, prod fail-fast/same-origin FE, T0~T5와 T6 외부 운영 gate 분리다.
+- 상태: PM 정본 동기화는 완료했다. backend/frontend 구현·자동검증·독립 QA·개발 AWS/browser gate는 진행 중이며 실제 운영 자원·실사용 DB·기존 파일 이관·도메인/TLS 인수는 완료로 보고하지 않는다.
+- 검증: 변경 구간·절 번호·정본 링크를 재독하고 `git diff --check -- docs/PRD.md .claude/team/pm/STATE.md .claude/team/pm/WORKLOG.md`를 실행한다. PM 소유 파일만 편집했으며 제품 source, REQUIREMENTS, governance, AWS, DB, Git ref는 수정하지 않았다.
+- 미해결: backend T1/T2·frontend T3 구현, T4 배포 산출물, QA T5 독립 검토와 개발 AWS/browser 실측이 남아 있다. 실제 운영 T6은 대상 값·별도 gate가 필요하다.

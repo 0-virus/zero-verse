@@ -34,6 +34,10 @@ src/
 └─ test/                    # Vitest + RTL
 ```
 
+배포 API base 규칙은 `lib/apiBase.ts`가 소유하고, `test/apiBase.test.ts`·`test/apiClientEnvironment.test.ts`가 환경별 상대 URL·production guard 회귀를 검증한다.
+
+업로드 transport 규칙은 `features/upload/uploadTransport.ts`가 소유한다. presigned S3 URL은 backend가 발급한 HTTPS S3 URL과 반환된 signed headers만 소비하며, transport 선택·빌드 경계 회귀도 frontend가 검증한다.
+
 ## 레이아웃 규칙
 
 - **앱 셸 = 상단바.** 전 화면 공통(PRD §9-L).

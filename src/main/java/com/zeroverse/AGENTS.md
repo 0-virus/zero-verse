@@ -17,7 +17,7 @@ com/zeroverse/
 │  ├─ entity/    BaseEntity, BaseSoftDeleteEntity
 │  ├─ exception/ ErrorCode, BusinessException, GlobalExceptionHandler
 │  └─ response/  ApiResponse, ErrorResponse, PageResponse
-└─ config/       SecurityConfig, CorsProperties, OpenApiConfig
+└─ config/       SecurityConfig, CorsProperties, OpenApiConfig, prod preflight/readiness
 ```
 
 도메인 패키지(`user`, `blog`, `post`, ...)는 각 마일스톤에서 `controller → service → repository` 레이어로 추가한다(PRD §2.2).
@@ -52,6 +52,7 @@ com/zeroverse/
 - **공개 경로는 HTTP method까지 제한**한다. 경로만 열면 나중에 같은 경로에 쓰기 API가 붙는 순간 인증 없이 노출된다.
 - 새 API를 추가할 때 **기본값은 인증 필요**다. 공개가 필요하면 method까지 명시해 allowlist에 넣고, `SecurityAccessControlTest`에 401/403 회귀 케이스를 함께 추가한다.
 - 필터 체인의 401/403은 `GlobalExceptionHandler`를 타지 않는다 — `SecurityErrorResponder`가 공통 응답 계약(`AUTH_004`/`ADMIN_001`)으로 직접 JSON을 쓴다.
+- 유지보수 CLI는 `WebApplicationType.NONE`으로 기동한다. `SecurityConfig.filterChain`은 Servlet 웹 애플리케이션에서만 생성하고, CLI에서 필요한 `PasswordEncoder`와 설정 bean은 유지한다. 운영 설정은 `ProdConfigurationInitializer`가 context refresh 전 `META-INF/spring.factories`에서 fail-fast 검증한다.
 
 ## 테스트
 

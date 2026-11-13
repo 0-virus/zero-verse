@@ -29,6 +29,10 @@ dependencies {
 
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.17'
 
+    // X-deployment S3 direct upload/read. Keep the version aligned with the approved U0 SDK.
+    implementation platform('software.amazon.awssdk:bom:2.49.6')
+    implementation 'software.amazon.awssdk:s3'
+
     // M4 content safety/upload byte detection. Versions are pinned to published
     // Maven Central releases; product code does not use the independent U0 project.
     implementation 'com.googlecode.owasp-java-html-sanitizer:owasp-java-html-sanitizer:20260102.1'
@@ -63,6 +67,27 @@ tasks.named('bootRun') {
     systemProperty 'user.timezone', 'UTC'
 }
 
+// application-local.yml is intentionally gitignored and may contain local secrets. It must
+// never enter a production artifact even when a developer has created it under resources.
+tasks.named('bootJar') {
+    exclude('application-local.yml')
+}
+
+tasks.register('verifyBootJarNoLocalSecrets') {
+    group = 'verification'
+    description = 'Verify the executable jar contains no ignored local secret configuration.'
+    dependsOn tasks.named('bootJar')
+    doLast {
+        def jarFile = tasks.named('bootJar').get().archiveFile.get().asFile
+        def forbidden = zipTree(jarFile).files.findAll { file ->
+            file.name == 'application-local.yml'
+        }
+        if (!forbidden.isEmpty()) {
+            throw new GradleException('bootJar must not contain application-local.yml')
+        }
+    }
+}
+
 tasks.register('verifyPostSearchText', JavaExec) {
     group = 'verification'
     description = 'Verify M7 post search text cache using an offline JDBC connection.'
@@ -82,6 +107,20 @@ tasks.register('rebuildPostSearchText', JavaExec) {
                 || project.findProperty('m7TextOffline') != 'true') {
             throw new GradleException(
                     'rebuildPostSearchText requires -Pm7TextApply=true -Pm7TextOffline=true')
+        }
+    }
+}
+
+tasks.register('cleanupUploadIntents', JavaExec) {
+    group = 'operations'
+    description = 'List expired upload intents (or delete with -PuploadCleanupApply=true).'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.zeroverse.tools.UploadIntentCleanup'
+    systemProperty 'user.timezone', 'UTC'
+    args '--spring.main.web-application-type=none'
+    doFirst {
+        if (project.findProperty('uploadCleanupApply') == 'true') {
+            args '--upload.cleanup.apply=true'
         }
     }
 }

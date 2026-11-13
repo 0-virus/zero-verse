@@ -8,6 +8,7 @@ import com.zeroverse.security.NotificationCacheControlFilter;
 import com.zeroverse.security.jwt.JwtAuthenticationFilter;
 import com.zeroverse.security.jwt.JwtProperties;
 import java.util.List;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -61,6 +62,7 @@ public class SecurityConfig {
     }
 
     @Bean
+    @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 // Bearer 토큰 API는 CSRF 대상이 아니다. 쿠키를 쓰는 refresh·signout은
@@ -91,6 +93,7 @@ public class SecurityConfig {
                                 "/api/v1/blogs/slug/*/posts",
                                 "/api/v1/tags/*/posts",
                                 "/api/v1/uploads/*/content",
+                                "/api/v1/health/readiness",
                                 "/api/v1/feed/public",
                                 "/api/v1/search").permitAll()
 

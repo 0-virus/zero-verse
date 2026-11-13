@@ -23,3 +23,7 @@ Claude와 Codex는 역할별 `STATE.md`·`WORKLOG.md`와 통합 `JOURNAL.md`를 
 2026-11-11 사용자 `m9 완료를 목표로 착수해줘`로 M9 실행을 시작했다. M9 worklog와 `docs/governance/meetings/M9-20261111-admin.md`가 현재 계획·승인 상태의 정본이다. 구체 HIGH 계약 심의/사용자 승인 후 구현·독립 QA·dev 통합하며 M10·배포·사용자 DB 적용은 제외한다. 이전 문단의 M9 제외는 M8 실행 당시의 범위다.
 
 M9 사용자 `A-v2 전체 승인`을 확인했다. 회의 §11·ADR-0008·REQUIREMENTS §6.13-A에 따라 현재 실행은 구현·독립QA·실제인수·dev통합 진행이며, 승인 자체는 제품 PASS가 아니다.
+
+2026-11-13 사용자가 배포에 필요한 코드 수정 계획·진행을 요청했다. 배포 후속의 현행 안건·승인·실행 기록은 `docs/governance/meetings/X-20261113-deployment.md`다. 신규 `deploy/**`는 리더 소유다. M10 로컬 완료와 실제 운영 배포 완료는 구분하며 HIGH 계약은 독립 심의 및 구체 승인 상태를 확인한다.
+
+이후 사용자가 배포 A-v2 전체를 승인했다(회의 §12). T0~T5 코드·격리·개발 synthetic S3 검증을 구현하며 ADR-0009/REQUIREMENTS §6.12-A를 따른다. 실제 운영 자원·DB 적용 T6, 기존 로컬 데이터 이관은 자동 실행하지 않는다.

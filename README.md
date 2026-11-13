@@ -4,6 +4,8 @@ Spring Boot API와 React 웹 클라이언트로 구성된 블로그 프로젝트
 아래는 **내 PC에서만 사용하는 테스트·개발 환경**의 실행 방법입니다. 운영 배포용 설정이 아닙니다.
 현재 구현·검증 범위는 [마일스톤 기록](docs/worklog/)에서 확인하세요.
 
+운영 S3·same-origin 배포의 준비·환경 변수·release·백업/복구 절차는 [배포 안내](deploy/README.md)를 따릅니다. 실제 완료 상태와 승인 범위는 [배포 회의](docs/governance/meetings/X-20261113-deployment.md)에서 확인하며, 아래 로컬 실행과 구분합니다.
+
 ## 준비물
 
 - JDK **21** — `JAVA_HOME`과 `java`가 같은 JDK를 가리켜야 합니다. Gradle은 저장소의 wrapper를 사용합니다.

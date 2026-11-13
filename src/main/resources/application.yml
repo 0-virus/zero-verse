@@ -37,6 +37,7 @@ springdoc:
     path: /v3/api-docs
 
 zeroverse:
+  public-origin: ${PUBLIC_ORIGIN:}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
 
@@ -45,6 +46,15 @@ zeroverse:
   upload:
     viewer-hmac-secret: ${VIEWER_HMAC_SECRET}
     directory: ${UPLOAD_DIRECTORY:.local-data/uploads}
+    backend: ${UPLOAD_BACKEND:local}
+    s3:
+      bucket: ${S3_BUCKET:}
+      region: ${S3_REGION:ap-northeast-2}
+      prefix: ${S3_PREFIX:}
+      endpoint: ${S3_ENDPOINT:}
+      path-style: ${S3_PATH_STYLE:false}
+      attempt-timeout: ${S3_ATTEMPT_TIMEOUT:5s}
+      api-call-timeout: ${S3_API_CALL_TIMEOUT:10s}
 
   # JWT (ADR-0003). secret은 fallback 기본값을 두지 않는다 —
   # 미설정 시 기동에 실패해야 개발용 키가 운영으로 새지 않는다.

@@ -48,3 +48,10 @@ M4 현재 실행 판단에는 마지막 `M4-20261003-local`을 적용한다. 이
 | ID | 날짜 | 안건 | 등급 | 상태 | 결정 근거 | 문서 |
 |---|---|---|---|---|---|---|
 | M10-20261112-closeout | 2026-11-12 | current source 전체 회귀·결정성/wrapper/발행 폼 최소 수정·격리 실제 인수·독립 QA | MEDIUM | APPROVED | 사용자가 직전 제시된 로컬 M10 전체 DoD closeout·발견 결함 TDD 수정·배포/S3/U0/실사용 DB 제외 범위에 `착수하라`고 명시; 독립 3인 모두 APPROVE_WITH_CHANGES | [회의록](meetings/M10-20261112-closeout.md), [계획](../worklog/M10-closeout.md) |
+
+## 2026-11-13 배포 후속
+
+| ID | 날짜 | 안건 | 등급 | 상태 | 결정 근거 | 문서 |
+|---|---|---|---|---|---|---|
+| X-20261113-deployment | 2026-11-13 | A-v2: direct S3 upload·complete·canonical read 보존·신규 운영 DB·운영 설정/도구·개발 synthetic 검증 | HIGH | APPROVED | 독립 3인 보완을 반영한 §10에 사용자 “A-v2 전체 승인 (권장)” 명시 답변. T0~T5 승인, 실제 운영 적용 T6 별도 | [회의 §10~12](meetings/X-20261113-deployment.md#10-a-v2--사용자-승인-대상-보완본) |
+| X-20261113-deployment-fe-base | 2026-11-13 | 기존 계약의 FE production same-origin 기본값·빈 base 이미지 해석·회귀 | LOW | AUTO_APPROVED | 세 검토자 모두 HIGH S3 변경과 독립이며 API/DB/권한/디자인/새 의존성 변화 없음 확인, root 배정 | [회의 §11](meetings/X-20261113-deployment.md#11-독립-low--fe-same-origin-기본값) |

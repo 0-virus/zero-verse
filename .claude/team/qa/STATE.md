@@ -19,8 +19,17 @@
 
 ## 다음 작업
 
-1. M10은 추가 QA 작업 없이 사용자 후속 지시를 대기한다.
-2. 배포/S3/U0/실사용 DB/운영 bootstrap·모바일은 후속 범위로 남긴다.
+1. M10은 COMPLETE/DEV INTEGRATED이며 추가 QA 작업 없이 사용자 후속 지시를 대기한다.
+2. X-deployment T0~T5 QA는 FINAL CLOSEOUT PASS이며 추가 작업이 없다. T6 실제 운영 검증은 별도 범위·승인으로 시작한다.
+
+## X-deployment 후속 상태
+
+- `qa/X-deployment-review.md`에 X-20261113-deployment §10 A-v2의 배포 검증 매트릭스와 §11 FE LOW 독립 리뷰 슬롯을 기록했다.
+- 현재 단계: **T0~T5 FINAL QA CLOSEOUT PASS / PRODUCTION NOT CLAIMED**. 사용자 A-v2 전체 승인, backend 별도 reviewer 최종 PASS, final artifact·synthetic acceptance·teardown/shutdown을 확인했다. 실제 운영 인수는 별도 T6다.
+- 진행 중: `qa/X-deployment-review.md`에 final reviewed browser 41 checks/40 required, allHeaders·UUID 경계, final JAR `a7fb8fe0…` 17개 prod receipt, final backend 118 suites/670 tests `0/0/0`, final cleanup review, final source manifest, final archive verify, synthetic teardown 13/13·runtime shutdown 및 잔여 운영 matrix를 기록했다. `qa/X-deployment-backend-review.md`는 별도 reviewer 소유 artifact로 유지하며 덮어쓰지 않았다.
+- 다음 작업: T0~T5 범위에는 추가 작업이 없다. 실제 domain/Lightsail/Aiven/HTTPS refresh-cookie·rollback/T6와 bucket-level/prefix 밖 정책은 새 운영 범위·승인 시 별도 검증한다.
+- 차단 요인: T0~T5 내부 차단 없음. T6 착수에는 실제 Lightsail/domain/Aiven CA·운영 S3 identity/prefix·target DB inventory와 명시적 운영 실행 승인이 필요하다. 신규 Aiven 사용·기존 local 보존 및 이관 경계 결정은 A-v2로 확정됐다.
+- 갱신 시각: 2026-11-13 KST — FE LOW focused/build PASS, FE HIGH focused 3 files/40 tests 독립 PASS, CORS OPTIONS 200 부분 PASS, 배포 산출물 격리 Caddy/release PASS, final reviewed T5 41 checks/40 required PASS(allHeaders·UUID 8경계 포함), final JAR `a7fb8fe0…` memory peak `594480 KiB`, prod receipt 17/17 PASS, final backend 118 suites/670 tests `0/0/0`, final cleanup review PASS, final archive `9b38074b…` verify PASS, backend 별도 reviewer PASS, synthetic teardown 13/13·runtime shutdown PASS. bucket-level PAB/ownership/encryption/CORS/policy·실제 production DB/HTTPS/rollback/T6는 미실행이며 실제 배포 완료를 주장하지 않는다.
 
 ## 남은 gate / 차단 요인
 
@@ -34,11 +43,14 @@
 - `qa/m10-acceptance.mjs`: fail-closed M10 black-box acceptance harness; 현재 최종 evidence hash와 결속.
 - `qa/M10-task4-prep-review.md`: Task4 사전 검토와 수정 wave 이력.
 - M0~M9 QA review/worklog와 역사 evidence는 보존하되 M10 현재 수치에 합산하지 않는다.
+- `qa/X-deployment-review.md`: T0~T5 final matrix, final reviewed T5 41/40, prod smoke, artifact, teardown/shutdown 및 T6 경계.
+- `qa/x-deployment-s3-acceptance.mjs`: fail-closed API/S3/browser harness와 UUID/allHeaders checks.
+- `qa/deployment-artifacts-test.py`: 격리 Caddy/release artifact 검증 harness.
 
-## 갱신 시각
+## M10 historical 갱신 시각
 
 2026-11-12 KST — 독립 최종 M10 QA audit 82/82 PASS, backend 109/637/0, frontend 51/472·lint/build PASS, provenance/PNG/manifest 재대조, final scoped review CLEAN/READY TO MERGE 후 PR #16 `dev` merge 및 runtime stopped/preserved를 확인해 COMPLETE/DEV INTEGRATED로 갱신.
 
-## 소유권 준수
+## 현재 소유권 준수
 
-이번 갱신은 `qa/M10-review.md`, `.claude/team/qa/STATE.md`, `.claude/team/qa/WORKLOG.md`만 대상으로 한다. 제품 source/test·frontend·backend·governance·마일스톤 worklog·runtime·DB·사용자 데이터·업로드는 수정하지 않는다.
+이번 X-deployment 갱신은 `qa/X-deployment-review.md`, `qa/x-deployment-s3-acceptance.mjs`, `qa/AGENTS.md`, `.claude/team/qa/STATE.md`, `.claude/team/qa/WORKLOG.md`만 대상으로 한다. 제품 source/test·frontend·backend·governance·마일스톤 worklog·runtime·DB·사용자 데이터·업로드·AWS 설정은 수정하지 않는다.

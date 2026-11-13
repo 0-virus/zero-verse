@@ -11,11 +11,24 @@ import org.springframework.stereotype.Component;
 public class UploadProperties {
 
     private String directory = ".local-data/uploads";
+    private String backend = "local";
 
     public UploadProperties() {}
 
     public UploadProperties(String directory) {
         this.directory = directory;
+    }
+
+    public String getBackend() {
+        return backend;
+    }
+
+    public void setBackend(String backend) {
+        this.backend = backend;
+    }
+
+    public boolean isS3() {
+        return "s3".equalsIgnoreCase(backend);
     }
 
     public String getDirectory() {

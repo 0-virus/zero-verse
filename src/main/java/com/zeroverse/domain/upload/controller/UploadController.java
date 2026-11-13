@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.UUID;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -34,6 +35,11 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/v1/uploads")
 @Profile({"local", "test"})
+@ConditionalOnProperty(
+        prefix = "zeroverse.upload",
+        name = "backend",
+        havingValue = "local",
+        matchIfMissing = true)
 @Tag(name = "Uploads", description = "인증된 로컬 이미지 업로드와 권한 있는 이미지 읽기")
 public class UploadController {
 

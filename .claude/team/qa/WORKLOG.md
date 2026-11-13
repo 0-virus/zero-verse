@@ -1298,3 +1298,91 @@
 - 런타임 인계: M10 API/FE/MySQL은 정상 종료됐고 포트 `13320/18090/5180` 및 API/FE PID가 내려갔다. 합성 DB·uploads·evidence는 보존됐다. 배포/S3/U0/실사용 DB/운영 bootstrap/모바일/운영 SLA는 완료 범위가 아니다.
 - 최종 상태: **M10 QA COMPLETE / DEV INTEGRATED**. 잔여 Minor와 RISK-0010/0012/0013/0021은 local MVP PASS로 닫지 않고 후속 범위로 유지한다.
 - 검증: 편집 후 STATE/WORKLOG를 재독했고 `git diff --check -- .claude/team/qa/STATE.md .claude/team/qa/WORKLOG.md` 무출력 exit `0`이다. Git stage/commit/push는 수행하지 않았다.
+
+## 2026-11-13 KST — X-deployment A-v2 독립 Delivery & Risk 준비 검토
+
+- 한 일: `docs/governance/meetings/X-20261113-deployment.md` §10 A-v2·§11 LOW와 `docs/governance/AGENT-BRIEFS.md` 공통 형식을 읽고 배포 전용 QA 매트릭스를 작성했다.
+- 산출물: [`qa/X-deployment-review.md`](../../qa/X-deployment-review.md)에 API intent/state/expiry/동시성, 실제 AWS/browser, ACL, prod build/proxy/cookie/readiness, fresh/upgrade/restore, restart/rollback, backup gate와 현재 `NOT RUN` 사유를 기록했다. FE LOW 독립 슬롯 LOW-R1~R5를 분리했다.
+- 검증: 문서·코드·기존 M10 범위를 읽기 전용 대조했다. 실제 명령, AWS, 운영 DB, browser, deploy server는 실행하지 않았다. 따라서 PASS/운영 완료를 주장하지 않는다.
+- 미해결: A-v2 HIGH 사용자 승인, 운영 DB 신규/기존과 기존 이미지 이관 정책, prod S3 identity/prefix, domain/Lightsail/Aiven CA. FE LOW 구현 후 별도 QA review 필요.
+
+## 2026-11-13 KST — FE LOW same-origin 독립 재검토
+
+- 한 일: 사용자 A-v2 승인 후 frontend 관련 diff와 `build/x-deployment-fe-low-20261113/` source 시각·로그를 독립 대조하고, production API base·trailing slash·localhost/loopback guard·managed image resolver 경계를 재검토했다.
+- 검증: 구현자 로그는 focused 4 files/34 tests PASS, full 53 files/485 tests PASS, lint/build exit 0, production bundle `NO_LOCAL_API_ORIGIN`, invalid HTTP staging build expected exit 1을 기록한다. QA 독립 focused 실행은 `apiBase/apiClientEnvironment/uploadApi/ManagedImage` 4 files/27 tests, exit 0(15:16:51 KST); 독립 `npm run build`는 150 modules, exit 0이며 958.59 kB chunk warning만 남겼다. dist에서 `http://localhost:8080`·`127.0.0.1:18090`은 발견되지 않았고 `git diff --check`도 통과했다.
+- 판정: **LOW-R1~R5 APPROVE**. production 기본은 상대 `/api`, dev/test는 localhost, trailing slash는 정규화되고 loopback/HTTP production 값은 build에서 거부되며 빈 base managed image는 현재 origin을 사용한다. S3/API/DB/HTTPS 운영 gate는 검증하지 않았다.
+- 미해결: T1~T5 S3 제품 통합·실제 AWS/browser/격리 DB/rollback과 T6 운영 인수는 별도 NOT RUN이다. 제품 backend/AWS/DB/운영 서버·사용자 데이터는 변경하지 않았다.
+
+## 2026-11-13 KST — 개발 S3 read-only preflight
+
+- 한 일: `aws-storage` 지침과 S3 General Purpose reference를 읽고 `zeroverse-s3-dev`/`ap-northeast-2`/`zero-verse-s3`를 명시한 CLI read-only preflight를 수행했다. sandbox 네트워크 차단 후 read-only STS/S3 호출만 제한 해제하여 재시도했다.
+- 검증: AWS CLI `2.40.0`; STS identity `arn:aws:iam::555634208316:user/zeroverse-s3-dev`; `get-bucket-location`은 `ap-northeast-2` PASS. PAB/ownership/encryption/CORS/policy/policy-status는 모두 bucket-level `AccessDenied`; `head-bucket` 403 및 `ListObjectsV2`의 `s3:ListBucket` AccessDenied를 확인했다.
+- 산출물: `qa/X-deployment-review.md`에 AWS gate를 `NOT RUN`으로 유지하고, 개발 origin·presigned PUT signed headers를 전제로 한 최소 CORS 초안을 추가했다. CORS/IAM/bucket/object 설정은 변경하지 않았다.
+- 미해결: bucket owner/admin read context에서 PAB·ownership·encryption·CORS·policy를 확인해야 한다. 실제 PUT/complete/ACL/checksum/5MiB/browser gate와 운영 origin CORS는 backend/FE 제품 준비 및 별도 root 배정 후 실행한다.
+
+## 2026-11-13 KST — 개발 S3 CORS OPTIONS read-only preflight
+
+- 한 일: 지정된 개발 bucket endpoint에 `OPTIONS`만 보냈다. `Origin: http://localhost:5173`, requested method `PUT`, requested headers `content-type,if-none-match,x-amz-checksum-sha256`를 사용했고 객체·버킷·IAM mutation은 수행하지 않았다. 첫 sandbox DNS 실패 후 동일 read-only 요청만 제한 해제 환경에서 재시도했다.
+- 검증: `https://zero-verse-s3.s3.ap-northeast-2.amazonaws.com/zeroverse/dev/deployment-preflight` 응답은 `HTTP 403 Forbidden`; `Access-Control-Allow-Origin`, `Access-Control-Allow-Methods`, `Access-Control-Allow-Headers`는 없었다. 따라서 해당 조합은 preflight를 충족하지 않지만 403만으로 CORS 미구성과 origin/method/header 불일치를 구분할 수 없다.
+- 판정: `X-S3-02`는 전체 보안/CORS gate가 여전히 **NOT RUN**이다. CORS 최소 JSON 초안은 적용하지 않고 `qa/X-deployment-review.md`에 유지했다. bucket owner/admin read context의 CORS·policy 조회와, 제품 준비 후 별도 browser PUT은 root 배정 전까지 실행하지 않는다.
+
+## 2026-11-13 KST — 개발 S3 CORS OPTIONS 재검증
+
+- 한 일: 사용자가 CORS 규칙 추가를 완료한 뒤 동일 endpoint에 OPTIONS만 재실행했다. `Origin: http://localhost:5173`, requested method `PUT`, requested headers `content-type,if-none-match,x-amz-checksum-sha256`를 그대로 사용했으며 객체 PUT/GET/DELETE와 bucket/IAM mutation은 하지 않았다.
+- 검증: `https://zero-verse-s3.s3.ap-northeast-2.amazonaws.com/zeroverse/dev/deployment-preflight` 응답은 `HTTP 200 OK`; `Access-Control-Allow-Origin: http://localhost:5173`, `Access-Control-Allow-Methods: PUT`, `Access-Control-Allow-Headers: content-type, if-none-match, x-amz-checksum-sha256`가 반환됐다. 추가로 `Expose-Headers: ETag`, `Max-Age: 300`, `Allow-Credentials: true`, `Vary` 3개가 관측됐다.
+- 판정: 개발 preflight 조합은 **부분 PASS**다. private/anonymous GET·prefix ACL·signed PUT/5MiB/checksum·실제 브라우저 PUT은 검증하지 않았으므로 X-S3-01/X-S3-02 전체 gate는 **NOT RUN**으로 유지한다. bucket-level CORS/policy read와 제품 준비 후 object gate는 root 별도 배정 전 실행하지 않는다.
+
+## 2026-11-13 KST — 배포 산출물 격리 검증 harness
+
+- 한 일: TDD로 먼저 `NotImplementedError` RED를 확인한 뒤 QA 소유 `qa/deployment-artifacts-test.py`를 구현했다. 실제 `deploy/Caddyfile`·`release.py`·`test_release.py`를 읽고, 지정 Caddy digest와 `DOCKER_HOST=unix:///private/tmp/zeroverse-colima/docker.sock`을 고정했다. Caddyfile은 stdin, fixture config/static은 `docker cp`로 전달했으며 repository bind mount·AWS·DB·운영 서버는 사용하지 않았다.
+- 검증: `python3 qa/deployment-artifacts-test.py` 최종 exit 0. receipt `build/x-deployment-artifacts-20261113/20261113T064150Z-9813d8d2/receipt.json`에 source-contract, `deploy/test_release.py` 5 tests, Docker/image digest, 실제 Caddyfile validate, fixture validate, `127.0.0.1:18198` 가용성, 임시 container 및 HTTP checks가 모두 PASS로 기록됐다.
+- HTTP 결과: `/deep/spa` 200 HTML/no-store, `/assets/app.js` 200, missing asset 404 non-HTML, dummy API `/api/v1/feed/public` JSON 404 body 보존, health/docs 외부 404. 임시 container는 cleanup 후 `docker ps -a`에서 `zeroverse-caddy-*` 잔여가 없었다. Python compile check와 QA 문서 후행공백 검사도 통과했다.
+- 경계: isolated Caddy routing/release unit evidence일 뿐 실제 HTTPS/domain/TLS·Spring upstream·Aiven DB·S3 object/ACL/presigned PUT·restart/rollback의 PASS가 아니다. 해당 운영 gate는 계속 NOT RUN이다.
+
+## 2026-11-13 KST — FE HIGH 독립 검토 및 T5 S3 harness 준비
+
+- FE HIGH 독립성: 구현자 `build/x-deployment-fe-high-20261113/` 로그의 source 변경 시각(최대 15:41:24 KST) 이후 focused/full/lint/build 로그를 읽고, `apiClient`·`uploadApi`·`uploadTransport`·Vite production 설정과 관련 diff를 재검토했다. 구현자 focused 3 files/40 tests, full 54 files/499 tests, lint/build exit 0을 대조했고, QA가 `cd frontend && npm test -- --run src/test/apiClient.test.ts src/features/upload/uploadApi.test.ts src/features/upload/uploadTransport.test.ts --maxWorkers=1`를 15:45:22 KST에 독립 실행해 3 files/40 tests PASS를 확인했다.
+- FE HIGH 판정: normal refresh의 `tokenVersion`과 명시적 auth boundary의 `authSessionVersion` 분리, 계정 변경 뒤 늦은 refresh/complete 폐기, `credentials: omit`·`redirect: error`·`referrerPolicy: no-referrer`, complete intent/MIME 재검증과 retry 경계를 소스에서 확인했다. **Critical/Important finding 0, PASS(코드 범위 한정)**이며 실제 AWS/CORS/5MiB/checksum/ACL/브라우저 계정 전환 PASS로 확대하지 않는다.
+- TDD harness: `qa/x-deployment-s3-acceptance.mjs`를 먼저 `--self-check` 미구현 RED(`NotImplementedError`)로 확인한 뒤 구현했다. 도구는 public runtime config만 읽고 `13307`을 거부하며, 정확한 API `18092`·FE `5173`·synthetic MySQL `13337`·bucket/profile/region/prefix를 fail-closed 확인한다. local runtime availability는 prod-only readiness 대신 documented `GET /api/v1/feed/public?size=1` 성공 JSON envelope로 확인하고 production readiness 근거로 표시하지 않는다. owner/friend API fixture, prefix-bound presign, CORS OPTIONS, raw PUT·5MiB 경계·4회 동시 5MiB canonical read·서명 content-type tamper denial·MIME/checksum mismatch·If-None-Match replay·complete 멱등성·pending/ACL/anonymous deny·실제 FE `uploadImage` synthetic File·direct PUT auth/referrer 부재·oversize no-presign gate를 포함한다. 403/NoList를 404로 추정하지 않으며, token/cookie/credentials/presigned URL/object key는 receipt에 쓰지 않는다.
+- 검증: `node --check qa/x-deployment-s3-acceptance.mjs` PASS. 공개 runtime의 `runId`가 이미 `deployment-...`를 포함하는 것을 독립 대조해 prefix guard를 `zeroverse/dev/${runId}/`로 수정했다(중복 `deployment-` 제거). 이후 anonymous canonical read를 공유 refresh-cookie jar와 분리한 cookie-less request context로 고정하고 raw S3 응답 body 폐기·브라우저 canonical profile URL 반영 대기·CORS allow 토큰 exact 비교·public feed availability probe를 도구에 반영했다. 최신 `node qa/x-deployment-s3-acceptance.mjs --self-check`는 PASS(`build/x-deployment-s3-acceptance-mwemv8nyc083e216a4/evidence.json`), `env -u T5_AWS_WRITE_APPROVED node qa/x-deployment-s3-acceptance.mjs`는 API/browser/AWS를 호출하지 않고 exit 1 `NOT RUN`(`build/x-deployment-s3-acceptance-mwemv8on7d98a01aaf/evidence.json`)이다.
+- 경계: root가 public runtime에 대응하는 synthetic DB/API/FE를 기동하고 `T5_AWS_WRITE_APPROVED=1`을 명시하기 전에는 실제 API·browser·S3 object mutation을 실행하지 않는다. 현재 T5 제품 통합, AWS object/ACL, 운영 HTTPS/DB/restart/rollback은 **NOT RUN**이다. 제품 source/backend/frontend/AWS/IAM/DB/Git는 수정하지 않았다.
+
+## 2026-11-13 KST — 운영 cleanup CLI 설명 독립 대조
+
+- `deploy/README.md:56–67`을 읽고 `UploadIntentCleanup`/`UploadIntentCleanupService` source와 대조했다. `systemd-run`의 `EnvironmentFile`, `uid=zeroverse`, UTC, `PropertiesLauncher`, dry-run 기본·명시적 apply, 100건 제한, intent/PUT URL 양쪽 만료와 metadata 부재 조건, DELETING retry·LOCAL/READY 보존 설명이 source shape와 일치한다.
+- 판정: 문서·소스 정합성은 확인했지만 packaged JAR의 실제 CLI invocation, synthetic TLS Aiven DB dry-run/apply, DDL/Flyway 억제·retry receipt는 **NOT RUN**이다. 운영 DB·사용자 데이터·JAR/배포 산출물은 수정하지 않았다.
+
+## 2026-11-13 KST — T5 synthetic AWS·browser 실제 인수
+
+- 실행 경계: root가 API `18092`, FE `5173`, synthetic MySQL TLS `13337`, immutable backend JAR와 승인 prefix `zeroverse/dev/deployment-20261113-79bcf001/`를 준비하고 `T5_AWS_WRITE_APPROVED=1` 실행을 명시 승인했다. 첫 sandbox 실행은 workflow 전 local TCP `127.0.0.1:13337` `EPERM`으로 중단됐고, 동일 명령을 제한 해제 환경에서 재실행했다. 첫 실패 receipt `build/x-deployment-s3-acceptance-mwemwdjw47c17eb1d2/evidence.json`은 환경 권한 실패이며 제품 FAIL로 해석하지 않는다.
+- 최종 검증: `T5_AWS_WRITE_APPROVED=1 node qa/x-deployment-s3-acceptance.mjs` exit 0, receipt [`build/x-deployment-s3-acceptance-mwemwm8j32086f7b43/evidence.json`](../../build/x-deployment-s3-acceptance-mwemwm8j32086f7b43/evidence.json), status `PASS`, checks `33`, required `32/32`, failures `0`이다. local application availability는 `/api/v1/feed/public?size=1` 200 success envelope이며 prod readiness 근거로 기록하지 않았다.
+- PASS 내용: named dev S3 presign/prefix/CORS, small PUT, exact 5MiB PUT+complete, 4 concurrent 5MiB canonical reads, If-None-Match replay 412, complete idempotency, pending binding block, HeadObject 403 ambiguity→UPLOAD_008/503 보존, MIME/checksum mismatch, signed content-type tamper denial, API/browser >5MiB no-presign, owner/friend/anonymous ACL, unsigned S3 GET 403, browser production `uploadImage` profile binding, direct PUT의 Authorization/cookie/referrer 부재를 독립 확인했다.
+- receipt 경계: secret guard PASS, token/password/cookie/presigned URL/object key 미기록. synthetic object/metadata는 지정 prefix에 남아 있으며 자동 cleanup하지 않았다. bucket-level PAB/ownership/encryption/policy는 별도 AccessDenied 경계이고, prefix 밖·production HTTPS/domain/Caddy·운영 Aiven DB·refresh cookie·restart/rollback/T6는 PASS로 확대하지 않는다.
+- 최종 판정: **T5 synthetic dev AWS/browser acceptance PASS**. X-API expiry/concurrency/DB snapshot, bucket policy/prefix boundary, packaged cleanup CLI, production 운영 gate는 잔여 NOT RUN/PARTIAL이다. 제품 source/backend/frontend/AWS/IAM/운영 DB/Git는 수정하지 않았고 QA `X-deployment`·STATE·WORKLOG와 harness receipt만 갱신했다.
+
+## 2026-11-13 KST — 후보 release 독립 검증 및 브라우저 헤더 증거 보강
+
+- 후보 archive `build/releases/zeroverse-deployment-20261113-6066357.tar.gz`를 읽기 전용 독립 검증했다. `deploy/release.py verify` exit 0, 11 files, archive SHA-256 `c0d07972b74ab7585ea5df450021e2e9490d2c6f535cd9ab58e4216cf50725aa`; archive member와 manifest 각 SHA/size가 일치했고 packaged JAR SHA-256은 `6066357c093b0032741ce5bb275474f493f3457639ed8e065d5d244203cf7738`였다. 금지 path/keystore/비밀 패턴은 없었다. JAR의 `application-local.example.yml`은 허용된 example이며 실제 local config로 판정하지 않았다.
+- final JAR prod-valid/cleanup/restart/final-browser/memory receipt를 직접 대조했다. valid `200/UP/no-store`, cleanup dry-run/apply/empty 및 synthetic 보존 수치, restart `200/no-store/nosniff`, final browser required `32/32`, 4×5MiB memory peak `715712 KiB`가 결속된다. memory는 macOS API JVM process 관찰이고 production host SLA가 아니며, negative fail-fast receipt는 이전 JAR `964c6957…`, BE full pool 2 failures는 잔여다.
+- root 피드백에 따라 `qa/x-deployment-s3-acceptance.mjs`의 browser S3 PUT 감시를 async `request.allHeaders()`로 바꾸고 header task를 판정 전에 await했다. 실패는 auth/cookie/referrer true로 fail-closed하며 헤더 값은 저장하지 않는다. `node --check`와 `--self-check` PASS receipt `build/x-deployment-s3-acceptance-mwenklj462bfcb68ee/evidence.json`를 확인했다.
+- 실제 T5 재실행은 root final memory wrapper 승인 전 보류했다. 기존 final-browser receipt는 패치 전 실행이므로 allHeaders 기반 browser header evidence로 승격하지 않았고, root가 1회 재실행 후 결과를 제공하면 `X-deployment`/STATE를 재검토한다. QA 소유 파일만 수정했으며 AWS/DB/사용자 데이터/제품 source/Git는 변경하지 않았다.
+
+## 2026-11-13 KST — S3 UUID 오류 계약 검증 슬롯 추가
+
+- root 요청에 따라 QA harness `qa/x-deployment-s3-acceptance.mjs`에 API-only UUID 계약 checks를 추가했다. owner token으로 `/api/v1/uploads/{id}/complete`, `/api/v1/uploads/{id}/content` 양쪽에 `not-a-uuid`, shortened UUID, uppercase UUID를 보내 `VALIDATION_001/400`을 요구하고, canonical하지만 존재하지 않는 UUID는 양 endpoint에서 `UPLOAD_003/404`를 요구한다. malformed fixture 호출은 S3 object 연산을 수행하지 않는다.
+- 이 checks는 primary backend의 BE-X-001 mapping fix 이후 실제 T5 실행에서 판정한다. 현재 source/JAR의 mapping fix 전에는 FAIL이 예상되므로 PASS/운영 증거로 기록하지 않았다. `qa/X-deployment-backend-review.md`는 별도 2차 reviewer artifact로 `qa/AGENTS.md`에 참조를 추가했고, 기존 독립 리뷰 결과를 덮어쓰지 않았다.
+- 이번 단계는 `--check`/self-check만 수행하며 실제 API/AWS/browser는 실행하지 않는다. 제품 backend/frontend, AWS/DB/user data, Git는 수정하지 않았다.
+
+## 2026-11-13 KST — final reviewed T5·backend·prod smoke·release closeout 대조
+
+- root가 제공한 final reviewed browser receipt를 독립 대조했다. `build/x-deployment-runtime-20261113/final-reviewed-browser/evidence.json`은 `PASS`, 41 checks/40 required/0 failures이며 allHeaders 기반 direct PUT credentials 부재와 `/complete`·`/content` malformed/non-canonical 6건 `VALIDATION_001/400`, canonical missing 2건 `UPLOAD_003/404`를 모두 PASS로 기록한다. final memory receipt는 JAR `a7fb8fe0…`, 107 samples, peak RSS `594480 KiB`다(합성 macOS JVM 관찰, production host SLA 아님).
+- final backend summary `final-backend-test-results/summary.json`은 118 suites/670 tests, failures/errors/skipped `0/0/0`이다. `qa/X-deployment-backend-review.md`의 별도 reviewer가 BE-X-001~004를 최종 PASS로 승인했으며, QA는 그 artifact를 수정하거나 결과를 대신 재판정하지 않았다.
+- `prod-*-receipt.json` 17개를 읽어 모두 `pass=true`, JAR SHA `a7fb8fe0…`임을 확인했다. valid readiness, invalid origin/TLS/profile/CA/S3 timeout 경계, non-UTC/local-row guard, cleanup dry-run/apply/empty가 final identity로 결속된다. final cleanup review는 DELETED tombstones 8, 만료 전 PENDING 4·READY 9·image rows 9 보존, empty DB tables 0을 기록한다.
+- 최종 archive `build/releases/zeroverse-deployment-20261113-a7fb8fe.tar.gz`를 독립 검증했다. `deploy/release.py verify` exit 0, 11 files, archive SHA `9b38074bb2e6488634d5e9dd9356ab23a7b7f4db754a46ccd5f7b6f69086d542`, packaged JAR SHA `a7fb8fe0…`; 금지 path/keystore/secret marker가 없고 `application-local.example.yml`은 허용된 example로만 존재한다. final source manifest는 compiled class/resource diff `0`이다.
+- `qa/X-deployment-review.md`와 STATE를 최신 final T5/backend/prod smoke/release scope로 동기화했다. 최종 결론은 코드·합성 인수·artifact PASS이며, 실제 domain/Lightsail/Aiven/HTTPS/refresh-cookie/rollback/T6와 bucket-level/prefix 밖 정책은 운영 gate로 유지한다. signed URL TTL 후 root synthetic prefix teardown 결과만 closeout 대기다. 제품/AWS/DB/user data/Git는 변경하지 않았다.
+
+## 2026-11-13 KST — T0~T5 QA 최종 closeout 및 synthetic teardown 확인
+
+- root teardown receipt `build/x-deployment-runtime-20261113/synthetic-s3-teardown.json`을 독립 확인했다. signed URL 전부 만료 후 이 실행의 synthetic 13 keys가 delete acknowledged 13/failures 0이다. READY synthetic fixture도 포함한 명시적 테스트 정리이며 제품 cleanup 정책의 자동 동작으로 해석하지 않는다.
+- `runtime-shutdown.json`은 API `18092`·FE `5173` closed, MySQL owned container stopped, volume preserved, user database/local uploads untouched를 기록한다. AWS 추가 쓰기·운영 DB·사용자 데이터 변경은 없었다.
+- `qa/X-deployment-review.md`와 STATE를 **T0~T5 FINAL QA CLOSEOUT PASS / PRODUCTION NOT CLAIMED**로 갱신했다. 실제 domain/Lightsail/Aiven/HTTPS/refresh-cookie/rollback/T6와 bucket-level/prefix 밖 정책은 별도 운영 gate이며, 현재 범위에는 추가 작업이 없다.

@@ -21,6 +21,7 @@ public class DatabaseCleaner {
 
     /** 자식 → 부모 순서. FK 제약을 끄더라도 순서를 지켜 의도를 드러낸다. */
     private static final List<String> TABLES = List.of(
+            "upload_intents",
             "image_uploads",
             "post_view_records",
             "post_tags",

@@ -1,0 +1,9 @@
+[
+  {
+    "AllowedOrigins": ["http://localhost:5173"],
+    "AllowedMethods": ["PUT"],
+    "AllowedHeaders": ["content-type", "if-none-match", "x-amz-checksum-sha256"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 300
+  }
+]

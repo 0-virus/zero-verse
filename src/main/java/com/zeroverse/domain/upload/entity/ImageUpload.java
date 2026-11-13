@@ -3,6 +3,7 @@ package com.zeroverse.domain.upload.entity;
 import com.zeroverse.common.entity.BaseEntity;
 import com.zeroverse.domain.post.entity.Post;
 import com.zeroverse.domain.upload.UploadPurpose;
+import com.zeroverse.domain.upload.StorageBackend;
 import com.zeroverse.domain.user.entity.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -52,6 +53,22 @@ public class ImageUpload extends BaseEntity {
     @Column(name = "file_size", nullable = false)
     private Long fileSize;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "storage_backend", nullable = false, length = 10)
+    private StorageBackend storageBackend;
+
+    @Column(name = "object_bucket", length = 255)
+    private String objectBucket;
+
+    @Column(name = "object_region", length = 64)
+    private String objectRegion;
+
+    @Column(name = "object_key", length = 500)
+    private String objectKey;
+
+    @Column(name = "content_sha256", length = 44, columnDefinition = "CHAR(44)")
+    private String contentSha256;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "bound_post_id")
     private Post boundPost;
@@ -85,6 +102,7 @@ public class ImageUpload extends BaseEntity {
         this.imageUrl = imageUrl;
         this.contentType = contentType;
         this.fileSize = fileSize;
+        this.storageBackend = StorageBackend.LOCAL;
     }
 
     public static ImageUpload create(
@@ -96,6 +114,27 @@ public class ImageUpload extends BaseEntity {
             String contentType,
             long fileSize) {
         return new ImageUpload(id, owner, purpose, storageKey, imageUrl, contentType, fileSize);
+    }
+
+    public static ImageUpload createS3(
+            UUID id,
+            User owner,
+            UploadPurpose purpose,
+            String storageKey,
+            String imageUrl,
+            String contentType,
+            long fileSize,
+            String bucket,
+            String region,
+            String objectKey,
+            String contentSha256) {
+        ImageUpload image = new ImageUpload(id, owner, purpose, storageKey, imageUrl, contentType, fileSize);
+        image.storageBackend = StorageBackend.S3;
+        image.objectBucket = bucket;
+        image.objectRegion = region;
+        image.objectKey = objectKey;
+        image.contentSha256 = contentSha256;
+        return image;
     }
 
     public UUID getId() {
@@ -124,6 +163,26 @@ public class ImageUpload extends BaseEntity {
 
     public Long getFileSize() {
         return fileSize;
+    }
+
+    public StorageBackend getStorageBackend() {
+        return storageBackend == null ? StorageBackend.LOCAL : storageBackend;
+    }
+
+    public String getObjectBucket() {
+        return objectBucket;
+    }
+
+    public String getObjectRegion() {
+        return objectRegion;
+    }
+
+    public String getObjectKey() {
+        return objectKey;
+    }
+
+    public String getContentSha256() {
+        return contentSha256;
     }
 
     public Post getBoundPost() {

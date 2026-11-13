@@ -1,6 +1,7 @@
 package com.zeroverse.domain.upload.repository;
 
 import com.zeroverse.domain.upload.entity.ImageUpload;
+import com.zeroverse.domain.upload.StorageBackend;
 import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
@@ -11,6 +12,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ImageUploadRepository extends JpaRepository<ImageUpload, UUID> {
+
+    long countByStorageBackend(StorageBackend storageBackend);
 
     Optional<ImageUpload> findByImageUrl(String imageUrl);
 

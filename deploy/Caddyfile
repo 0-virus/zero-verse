@@ -1,0 +1,29 @@
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Readiness is accessible only from the application's loopback listener.
+	@internal path /api/v1/health /api/v1/health/* /actuator /actuator/* /swagger-ui* /v3/api-docs*
+	handle @internal {
+		respond 404
+	}
+
+	@api path /api /api/*
+	handle @api {
+		reverse_proxy {$BACKEND_ADDRESS:127.0.0.1:8080}
+	}
+
+	# Missing hashed assets must not become successful HTML responses.
+	handle /assets/* {
+		root * {$STATIC_ROOT:/opt/zeroverse/current/frontend}
+		file_server
+	}
+
+	handle {
+		root * {$STATIC_ROOT:/opt/zeroverse/current/frontend}
+		route {
+			try_files {path} /index.html
+			header /index.html Cache-Control "no-store"
+			file_server
+		}
+	}
+}

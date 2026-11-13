@@ -187,3 +187,9 @@ U0만 승인된 검증 의존성: `gradle/u0`의 AWS SDK Java2 S3/BOM `2.49.6`, 
 사용자 `m9 완료를 목표로 착수해줘`에 따라 M9 관리자 계획·독립 심의·승인된 구현·QA·dev 통합을 시작한다. 현재 실행/승인 상태는 `docs/worklog/M9-admin.md`와 `docs/governance/meetings/M9-20261111-admin.md`를 따른다. M8 당시의 M9 제외는 과거 실행 경계이며 이번 착수 지시로 대체된다. 구체 HIGH 계약은 심의 후 사용자 승인 전 구현하지 않는다. M10·배포·사용자 DB 적용은 이번 범위에 포함하지 않는다.
 
 사용자가 M9 `A-v2 전체 승인`으로 회의 §5·§10/10.1과 Task1~5 구현·독립QA·실제인수·dev통합을 승인했다. 현재 계약은 REQUIREMENTS §6.13-A·ADR-0008·PRD M9를 따른다. 사용자만 soft delete/하위이력 보존, 현재 ACTIVE ADMIN 검증, 자기권한회수/정지/삭제금지, lastAccess 미기록·승인된 삭제카피를 적용한다.
+
+### 2026-11-13 배포 후속 계획 착수
+
+사용자가 배포 완료에 필요한 코드 수정의 계획·진행을 요청했다. M10 로컬 완료 이후 배포 후속의 구체 안건·승인 상태·실행 기록은 `docs/governance/meetings/X-20261113-deployment.md`를 따른다. 조사·계획 요청을 아직 미확정인 S3 공개 API/DB/보안 계약의 승인으로 확대하지 않는다. 신규 `deploy/**` 산출물은 리더 소유, 제품 코드는 기존 backend/frontend 소유다. 실제 외부 자원·실사용 DB·기존 업로드 적용과 코드 준비 완료를 구분한다.
+
+사용자가 위 회의 §10의 **A-v2 전체 승인**을 명시했다. 신규 운영 DB·private S3 direct upload/서버 완료검증·canonical 현재권한 read·prod 설정·배포 도구·개발 synthetic S3 검증(T0~T5)을 진행한다. 계약은 ADR-0009와 REQUIREMENTS §6.12-A, 실행 상태는 회의 §12 이후를 따른다. 기존 로컬 데이터 보존·실제 운영 자원/DB 적용 T6 별도 경계는 유지한다.

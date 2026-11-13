@@ -19,10 +19,18 @@ public class ZeroverseServerApplication {
     }
 
     public static void main(String[] args) {
+        requireUtcJvm();
+        SpringApplication.run(ZeroverseServerApplication.class, args);
+    }
+
+    /**
+     * Enforce the deployment time-zone contract for every application entry point, including
+     * maintenance commands that bootstrap this application without invoking {@link #main}.
+     */
+    public static void requireUtcJvm() {
         if (!ZoneId.systemDefault().normalized().equals(ZoneOffset.UTC)) {
             throw new IllegalStateException(
                     "ZeroVerse requires a UTC JVM before startup. Restart with -Duser.timezone=UTC.");
         }
-        SpringApplication.run(ZeroverseServerApplication.class, args);
     }
 }

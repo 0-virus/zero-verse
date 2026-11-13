@@ -88,3 +88,13 @@ run-frontend.sh
 
 ### 로컬 배포 설계 문서 ###
 /zeroverse-deployment-plan.html
+
+### Deployment secrets / local backup outputs ###
+.env
+.env.*
+!.env.example
+!**/.env.example
+/deploy/*.env
+/deploy/*.cnf
+/deploy/*.cms
+__pycache__/

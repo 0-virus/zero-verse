@@ -1,4 +1,5 @@
 import type { ApiEnvelope, ApiError } from '../types/auth';
+import { resolveApiBaseUrl } from './apiBase';
 
 /**
  * API 클라이언트(PRD §8.2, REQUIREMENTS §8.3).
@@ -12,7 +13,11 @@ import type { ApiEnvelope, ApiError } from '../types/auth';
  * 메모리에만 있고 Refresh는 HttpOnly 쿠키라 JS가 접근할 수 없다.
  */
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
+const BASE_URL = resolveApiBaseUrl(
+  import.meta.env.VITE_API_BASE_URL,
+  import.meta.env.PROD,
+  import.meta.env.DEV ? 'http://localhost:8080' : '',
+);
 
 export function getApiBaseUrl(): string {
   return BASE_URL;
@@ -57,19 +62,44 @@ let accessToken: string | null = null;
  */
 let tokenVersion = 0;
 
+/**
+ * Auth session identity, separate from tokenVersion. A normal refresh rotates
+ * the access token but remains in the same account/session; sign-in, sign-out,
+ * account switch, or expiry starts a new generation for late-response guards.
+ */
+let authSessionVersion = 0;
+
 /** 진행 중인 refresh. 동시 401이 여러 개여도 갱신은 한 번만 돈다. */
 let refreshPromise: Promise<boolean> | null = null;
+let refreshPromiseSessionVersion: number | null = null;
+let refreshMarker: symbol | null = null;
 
 /** refresh까지 실패했을 때 호출된다(AuthContext가 상태를 정리하고 /signin으로 보낸다). */
 let onAuthExpired: (() => void) | null = null;
 
-export function setAccessToken(token: string | null): void {
+function assignAccessToken(token: string | null): void {
   accessToken = token;
   tokenVersion += 1;
 }
 
+/** Public auth boundary: every explicit login/logout/account switch starts a new session generation. */
+export function setAccessToken(token: string | null): void {
+  authSessionVersion += 1;
+  assignAccessToken(token);
+}
+
 export function getAccessToken(): string | null {
   return accessToken;
+}
+
+/** Internal token rotation generation used by the 401 delayed-response guard. */
+export function getAccessTokenVersion(): number {
+  return tokenVersion;
+}
+
+/** Uploads use this generation, which is stable across a normal 401 refresh. */
+export function getAuthSessionVersion(): number {
+  return authSessionVersion;
 }
 
 export function setAuthExpiredHandler(handler: (() => void) | null): void {
@@ -80,7 +110,10 @@ export function setAuthExpiredHandler(handler: (() => void) | null): void {
 export function resetApiClient(): void {
   accessToken = null;
   tokenVersion = 0;
+  authSessionVersion = 0;
   refreshPromise = null;
+  refreshPromiseSessionVersion = null;
+  refreshMarker = null;
   onAuthExpired = null;
 }
 
@@ -99,6 +132,7 @@ export function restoreSession(): Promise<boolean> {
 interface RequestOptions {
   method?: string;
   body?: unknown;
+  signal?: AbortSignal;
   /** true면 401이어도 refresh를 시도하지 않는다. */
   skipRefresh?: boolean;
 }
@@ -133,6 +167,7 @@ async function rawRequest(path: string, options: RequestOptions): Promise<Respon
     // Refresh 쿠키를 주고받으려면 필수다.
     credentials: 'include',
     body,
+    signal: options.signal,
   });
 }
 
@@ -159,30 +194,51 @@ async function parseEnvelope<T>(response: Response): Promise<T | null> {
  * 뒤늦은 요청이 이미 폐기된 토큰을 쓰게 되고, 서버는 정상적으로 `AUTH_003`을 준다.
  */
 function refreshOnce(): Promise<boolean> {
-  if (!refreshPromise) {
-    refreshPromise = (async () => {
-      try {
-        const response = await rawRequest('/api/v1/auth/refresh', { method: 'POST' });
-        if (!response.ok) {
-          return false;
-        }
-        const envelope = (await response.json()) as ApiEnvelope<{ accessToken: string }>;
-        if (!envelope.success || !envelope.data) {
-          return false;
-        }
-        // setAccessToken을 거쳐야 tokenVersion이 올라가고, 대기 중인 요청이
-        // "이미 갱신됨"을 알아볼 수 있다.
-        setAccessToken(envelope.data.accessToken);
-        return true;
-      } catch {
-        return false;
-      } finally {
-        // 성공·실패와 무관하게 다음 401은 새 refresh를 시작할 수 있어야 한다.
-        refreshPromise = null;
-      }
-    })();
+  const sessionVersionAtRefresh = authSessionVersion;
+  if (refreshPromise && refreshPromiseSessionVersion === sessionVersionAtRefresh) {
+    return refreshPromise;
   }
-  return refreshPromise;
+
+  const marker = Symbol('refresh');
+  const currentPromise = (async () => {
+    try {
+      const response = await rawRequest('/api/v1/auth/refresh', { method: 'POST' });
+      if (!response.ok || authSessionVersion !== sessionVersionAtRefresh) {
+        return false;
+      }
+      const envelope = (await response.json()) as ApiEnvelope<{ accessToken: string }>;
+      if (!envelope.success || !envelope.data || authSessionVersion !== sessionVersionAtRefresh) {
+        return false;
+      }
+      // Refresh rotates tokenVersion but deliberately keeps authSessionVersion
+      // stable so an upload does not mistake normal refresh for account switch.
+      if (authSessionVersion !== sessionVersionAtRefresh) return false;
+      assignAccessToken(envelope.data.accessToken);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      // A new account may have started a different refresh while this one was
+      // still in flight. Do not clear that newer single-flight promise.
+      if (refreshMarker === marker) {
+        refreshPromise = null;
+        refreshPromiseSessionVersion = null;
+        refreshMarker = null;
+      }
+    }
+  })();
+  refreshPromise = currentPromise;
+  refreshPromiseSessionVersion = sessionVersionAtRefresh;
+  refreshMarker = marker;
+  return currentPromise;
+}
+
+function expireSession(expectedSessionVersion: number): void {
+  if (authSessionVersion !== expectedSessionVersion) return;
+  accessToken = null;
+  tokenVersion += 1;
+  authSessionVersion += 1;
+  onAuthExpired?.();
 }
 
 /**
@@ -200,22 +256,25 @@ async function requestResponse(path: string, options: RequestOptions = {}): Prom
   const skipRefresh = options.skipRefresh || NO_REFRESH_PATHS.includes(path);
 
   const versionAtRequest = tokenVersion;
+  const sessionVersionAtRequest = authSessionVersion;
   let response = await rawRequest(path, options);
 
   if (response.status === 401 && !skipRefresh) {
     // 내 요청이 나간 뒤 토큰이 바뀌었다면 이미 누군가 갱신했다.
-    const alreadyRefreshed = tokenVersion !== versionAtRequest;
-    const refreshed = alreadyRefreshed || (await refreshOnce());
+    const sameSession = authSessionVersion === sessionVersionAtRequest;
+    const alreadyRefreshed = sameSession && tokenVersion !== versionAtRequest;
+    const refreshed = alreadyRefreshed || (sameSession && (await refreshOnce()));
 
     if (!refreshed) {
-      accessToken = null;
-      onAuthExpired?.();
+      // A stale request must not clear the token of the account that replaced
+      // it while its old response was in flight.
+      expireSession(sessionVersionAtRequest);
       return response;
     }
+    if (authSessionVersion !== sessionVersionAtRequest) return response;
     response = await rawRequest(path, options);
     if (response.status === 401) {
-      accessToken = null;
-      onAuthExpired?.();
+      expireSession(sessionVersionAtRequest);
     }
   }
 
@@ -238,8 +297,10 @@ export async function requestBlob(path: string): Promise<Blob> {
 
 export const apiClient = {
   get: <T>(path: string) => request<T>(path),
-  post: <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body }),
-  upload: <T>(path: string, body: FormData) => request<T>(path, { method: 'POST', body }),
+  post: <T>(path: string, body?: unknown, signal?: AbortSignal) =>
+    request<T>(path, { method: 'POST', body, signal }),
+  upload: <T>(path: string, body: FormData, signal?: AbortSignal) =>
+    request<T>(path, { method: 'POST', body, signal }),
   put: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT', body }),
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),

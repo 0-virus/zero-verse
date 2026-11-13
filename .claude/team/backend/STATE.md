@@ -2,34 +2,29 @@
 
 ## 현재 단계
 
-- M10 `COMPLETE / DEV INTEGRATED`다. PR #16 (`https://github.com/0-virus/zero-verse/pull/16`)이 `dev`에 merge되었고 merge SHA는 `288f29cffef0671c20a365921f087fe02d4dfcdb`다.
-- 검증된 feature head `b5843743c5b86f84cb0bb045e60dc063aa8cccae`와 merge tree `23ce12bc28c1613c04537587692b89ed9f1922e8`가 동일하며 head→merge diff는 비어 있다.
-- M9는 PR #15로 이미 `dev`에 통합된 COMPLETE 상태다. M10은 로컬 MVP 마감이며 배포/S3/U0/실사용 DB/운영 ADMIN bootstrap은 포함하지 않는다.
+- X-deployment T1/T2 backend 구현과 storage-mode/readiness/prod-preflight 경계를 완료하고 root의 immutable JAR·실제 AWS/browser gate 인계를 기다리는 상태다.
+- A-v2는 사용자 승인되어 `APPROVED`; 실제 운영 DB·AWS 자원 적용·기존 데이터 이관은 이번 범위에 포함하지 않았다.
 
-## 완료 산출물
+## 완료한 작업
 
-- `gradlew`는 표준 Gradle 8.10 POSIX wrapper와 executable mode `755`로 복구됐다. wrapper JAR·properties·bat와 dependency는 변경하지 않았다.
-- `PostConcurrencyTest`는 test-context에만 고정 Clock을 주입해 24시간 경계를 결정적으로 검증한다. `PostService`의 제품 정책은 변경하지 않았다.
-- 최종 backend gate는 JDK21·격리 Colima Docker socket·`JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=/private/tmp` 조건에서 `test check bootJar --rerun-tasks --no-daemon --max-workers=1` exit 0이다. JUnit XML 직접 집계는 `109 suites / 637 tests / failures 0 / errors 0 / skipped 0`이다.
-- acceptance가 실제 사용한 immutable JAR SHA-256은 `1ade616199bd0da11daa5856dcd5d88fe8fae4042c0ee8ab66725baa01188b21`이다. 최종 forced repackage에서 생성된 `9dedd8...`는 별도 backend gate 산출물이며 acceptance JAR로 대체하지 않는다.
+- AWS SDK Java2/BOM `2.49.6` S3 provider를 추가하고, `V7__s3_upload_intents.sql`로 LOCAL/S3 discriminator·고정 bucket/region/key/checksum·intent 상태/unique/index/check 제약을 additive 도입했다. 기존 V1~V6와 local multipart/canonical URL은 수정하지 않았다.
+- `POST /api/v1/uploads/presigned-url` → 5분 PUT intent → `POST /api/v1/uploads/{id}/complete`의 owner/user→intent 잠금, HEAD + 최대 5MiB+1 bounded GET/Tika/SHA-256 검증, READY 멱등 응답과 `GET .../content` 현재 ACL 검증을 구현했다. S3 403/권한상 부재는 UPLOAD_008, 명확한 404/NoSuchKey만 UPLOAD_005로 매핑한다.
+- S3 signed headers는 SDK `signedHeaders()`에서 추출해 Content-Type/checksum/If-None-Match를 반환하고, browser-controlled host/content-length는 제외한다. S3 client/presigner는 5초 attempt/10초 call timeout, row에 저장된 region별 client, shutdown close를 사용한다.
+- 24시간 만료 AND 5분 PUT 만료 AND image row 부재 조건의 dry-run 기본/명시 apply·최대100건 cleanup CLI와 DELETING 재시도/tombstone, prod fail-fast(UTC/HTTPS/single-origin/TLS CA/secrets/S3/LOCAL row/profile mix), loopback readiness, bootJar local-secret 제외를 추가했다.
+- S3 direct controller는 이제 `zeroverse.upload.backend=s3` 조건으로 prod뿐 아니라 격리된 local/test S3 synthetic runtime에서도 활성화되고, 기존 multipart controller는 local/test 프로필에서 `backend=local`(기본값 포함)일 때만 활성화된다. prod readiness는 `ApplicationAvailability`가 `ACCEPTING_TRAFFIC`이고 `SELECT 1`도 성공한 경우에만 `UP`을 반환한다.
+- `ProdConfigurationInitializer`를 Boot `spring.factories`에 등록해 prod raw environment를 context refresh 이전에 검증한다. HTTPS 단일 origin의 path/query/userinfo·local host, S3 endpoint/path-style/prefix, TLS truststore/secrets, UTC/loopback, JDBC URL의 중복·반대 `sslMode`/legacy TLS/timezone/force-session 옵션을 구조적으로 검사하며, 기존 component `@PostConstruct` 검증은 defense-in-depth로 남겼다.
+- 독립 review의 잔여 계약을 반영했다. S3 attempt/api timeout은 각각 `>0`, `<=5s`/`<=10s`, attempt `<=` api를 prod pre-context와 bound validator에서 검사한다. malformed/non-canonical UUID는 complete/content 모두 `VALIDATION_001`(400)으로 매핑하고 회귀를 추가했다. cleanup CLI도 공통 UTC guard를 거치며 Gradle maintenance task가 UTC JVM을 명시한다. prod profile은 생성된 기본 security password 로그를 막도록 `UserDetailsServiceAutoConfiguration`을 제외한다.
 
-## 범위·증거 경계
+## 검증과 다음 단계
 
-- 실제 M10 acceptance는 격리 MySQL `13320`, API `18090`, FE `5180`에서 `82/82 PASS`, failures `0`, 13개 고유 `1440×1000` PNG였다. 이 acceptance의 provenance는 실행 당시 feature head/tree와 source/JAR/FE/harness manifest에 결속되며, 이후 QA/PM 문서 커밋으로 재라벨링하지 않는다.
-- frontend 최종 gate는 `51 files / 472 tests`, lint/build PASS다. frontend bundle `958.38 kB` warning은 비차단으로 남겼다.
-- `qa/M10-review.md` 독립 QA verdict는 `APPROVED / READY TO MERGE`, whole-branch scoped review는 Critical0/Important0이며 I-1~I-4를 ADDRESSED로 판정했다.
-- backend가 실제 M10 acceptance에서 수정하거나 실행한 것은 격리 합성 환경뿐이다. 사용자 DB `13307`, 기존 업로드, S3, 배포 환경은 접근하지 않았다. M10 runtime API/FE/MySQL은 정상 종료됐고 합성 DB·업로드·증거는 보존됐다.
+- 집중 회귀(`S3UploadControllerTest`, `ProdConfigurationValidatorTest`, `UploadIntentCleanupTest`)는 `BUILD SUCCESSFUL`로 통과했다. Testcontainers/Colima 소켓을 명시한 단독 `./gradlew test --rerun-tasks`는 `build/x-deployment-backend-20261113/full-final-review4-docker.log` 기준 `BUILD SUCCESSFUL in 3m 11s`; JUnit XML 직접 집계는 `118 suites / 670 tests / failures 0 / errors 0 / skipped 0`이다. 첫 전체 실행의 Docker 소켓 누락 결과(`full-final-review4.log`, 428 infrastructure failures)는 제품 판정에 사용하지 않는다.
+- `./gradlew bootJar verifyBootJarNoLocalSecrets --rerun-tasks`는 `BUILD SUCCESSFUL`이며 `build/x-deployment-backend-20261113/artifact-review4.log`에 보존했다. 최신 `build/libs/zeroverse-server-0.0.1-SNAPSHOT.jar` SHA-256은 `a7fb8fe0f8ab3561a997bc8a4678ad109466b0a78f52462b87700943d4bc1f84`이고 `application-local.yml`은 archive에 없다. 별도 worker의 S3/MySQL 계약 통합 테스트와 root의 synthetic DB/AWS/browser·운영 readiness/CLI runtime gate는 각각 인계·독립 검토 범위로 남긴다.
 
-## 다음 작업
+## 차단 요인
 
-- backend 제품 구현·테스트·Gradle 변경은 사용자 또는 새 마일스톤의 명시 배정 전 대기한다.
-- 운영 배포, S3 전환/U0, 실사용 DB 시간대·기존 DATETIME provenance, 운영 ADMIN bootstrap, 전역 refresh revoke와 SLA는 별도 결정·검증 범위로 인계한다.
-
-## 차단 요인 / 잔여 위험
-
-- M10 backend 완료를 막는 차단 요인은 없다. macOS에서 upload 테스트를 실행할 때 `/private/tmp`와 전용 Docker socket 조건이 필요하다는 실행 환경 주의만 남는다.
-- RISK-0001/0003/0005/0006/0007/0008/0009/0010/0011/0012/0013 및 RISK-0021은 운영·기존 DB·S3/U0·추가 정책 위험으로 OPEN 또는 별도 상태다. local MVP PASS를 production readiness로 확대하지 않는다.
+- 운영 bucket/IAM/CORS/identity/CA/domain 및 신규 Aiven DB 적용은 별도 T6 승인 범위다. 이번 구현은 AWS 호출·운영 DB 변경·기존 local 파일/DB 이관을 수행하지 않았다.
+- presigned PUT의 실제 브라우저·S3 conditional/checksum 상호운용, 실제 403/404 권한 표, complete lock timeout/cleanup 경쟁 및 CLI runtime의 최종 acceptance는 root/QA가 최신 JAR로 확인해야 한다. backend source/test/build 검증과 artifact 생성은 완료했지만 이를 실제 운영 자원 적용 완료로 확대하지 않는다.
 
 ## 갱신 시각
 
-2026-11-12 KST · `/root/m10_backend_merge_record` · PR #16 dev 통합 후 기록 동기화
+2026-11-13 16:35 KST · X-deployment review 잔여 4건 반영, 집중·전체 회귀 및 최신 artifact 검증 후

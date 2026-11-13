@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   apiClient,
   ApiRequestError,
+  getAccessToken,
+  getAccessTokenVersion,
+  getAuthSessionVersion,
   resetApiClient,
   setAccessToken,
   setAuthExpiredHandler,
@@ -132,6 +135,8 @@ describe('apiClient', () => {
 
     it('401이면 refresh 후 원래 요청을 1회 재시도한다', async () => {
       setAccessToken('old-token');
+      const sessionBeforeRefresh = getAuthSessionVersion();
+      const tokenVersionBeforeRefresh = getAccessTokenVersion();
       fetchMock
         .mockResolvedValueOnce(failure(401, 'AUTH_002')) // 최초 요청
         .mockResolvedValueOnce(envelope({ accessToken: 'new-token' })) // refresh
@@ -143,6 +148,8 @@ describe('apiClient', () => {
       expect(fetchMock.mock.calls[1][0]).toContain('/api/v1/auth/refresh');
       // 재시도는 새 토큰을 쓴다.
       expect(fetchMock.mock.calls[2][1].headers.Authorization).toBe('Bearer new-token');
+      expect(getAuthSessionVersion()).toBe(sessionBeforeRefresh);
+      expect(getAccessTokenVersion()).toBeGreaterThan(tokenVersionBeforeRefresh);
     });
 
     it('동시 401 세 건이어도 refresh는 한 번만 돈다 (single-flight)', async () => {
@@ -191,6 +198,30 @@ describe('apiClient', () => {
 
       expect(onExpired).toHaveBeenCalledTimes(1);
       expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('계정 전환 중 도착한 이전 refresh 응답은 새 계정 토큰을 덮어쓰지 않는다', async () => {
+      setAccessToken('old-token');
+      const onExpired = vi.fn();
+      setAuthExpiredHandler(onExpired);
+      let releaseRefresh: ((response: Response) => void) | null = null;
+      fetchMock.mockImplementation(async (url: string) => {
+        if (url.includes('/auth/refresh')) {
+          return new Promise<Response>((resolve) => {
+            releaseRefresh = resolve;
+          });
+        }
+        return failure(401, 'AUTH_002');
+      });
+
+      const staleRequest = apiClient.get('/api/v1/auth/me');
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      setAccessToken('new-account-token');
+      releaseRefresh!(envelope({ accessToken: 'stale-refresh-token' }));
+
+      await expect(staleRequest).rejects.toBeInstanceOf(ApiRequestError);
+      expect(getAccessToken()).toBe('new-account-token');
+      expect(onExpired).not.toHaveBeenCalled();
     });
 
     it('옛 토큰으로 동시 출발한 요청 중 하나의 401이 지연돼도 refresh는 1회다', async () => {

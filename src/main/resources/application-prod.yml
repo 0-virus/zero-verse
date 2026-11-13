@@ -1,0 +1,60 @@
+server:
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  port: ${SERVER_PORT:8080}
+  forward-headers-strategy: framework
+
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      data-source-properties:
+        sslMode: VERIFY_IDENTITY
+        connectionTimeZone: UTC
+        forceConnectionTimeZoneToSession: true
+        trustCertificateKeyStoreUrl: ${DB_SSL_TRUSTSTORE_URL}
+        trustCertificateKeyStoreType: ${DB_SSL_TRUSTSTORE_TYPE:PKCS12}
+        trustCertificateKeyStorePassword: ${DB_SSL_TRUSTSTORE_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+zeroverse:
+  public-origin: ${PUBLIC_ORIGIN}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS}
+  upload:
+    backend: s3
+    viewer-hmac-secret: ${VIEWER_HMAC_SECRET}
+    directory: ${UPLOAD_DIRECTORY:/var/lib/zeroverse/uploads}
+    s3:
+      bucket: ${S3_BUCKET}
+      region: ${S3_REGION}
+      prefix: ${S3_PREFIX}
+      endpoint: ${S3_ENDPOINT:}
+      path-style: ${S3_PATH_STYLE:false}
+      attempt-timeout: ${S3_ATTEMPT_TIMEOUT:5s}
+      api-call-timeout: ${S3_API_CALL_TIMEOUT:10s}
+  jwt:
+    secret-base64: ${JWT_SECRET_BASE64}
+    access-ttl: PT1H
+    refresh-ttl: P14D
+  auth:
+    cookie:
+      name: refresh_token
+      path: /api/v1/auth
+      secure: true
+      same-site: Strict
+      allowed-origins: ${AUTH_ALLOWED_ORIGINS}

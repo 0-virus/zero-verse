@@ -2,6 +2,12 @@
 # datasource URL/계정은 Testcontainers가 @DynamicPropertySource로 주입한다(비밀값을 두지 않는다).
 
 spring:
+  datasource:
+    hikari:
+      # The suite may cache 16 Spring contexts; keep aggregate connections below MySQL's
+      # default max_connections while retaining enough slots for the 10-worker view test.
+      maximum-pool-size: 8
+      minimum-idle: 0
   jpa:
     hibernate:
       ddl-auto: validate

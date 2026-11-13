@@ -626,3 +626,50 @@
 - expected head를 고정해 merge했고 GitHub merge SHA는 `288f29cffef0671c20a365921f087fe02d4dfcdb`다. 로컬 dev fast-forward 후 tested head와 merge tree는 `23ce12bc28c1613c04537587692b89ed9f1922e8`로 동일하고 diff는 비어 있다.
 - 최종 근거는 backend 109 suites/637 tests 0/0/0, frontend 51 files/472 tests·lint/build PASS, 격리 acceptance 82/82 PASS·13 PNG, 독립 QA APPROVED 및 whole-branch Critical0/Important0이다. 실행 JAR과 후속 강제 재패키징 JAR의 hash는 서로 바꾸어 기록하지 않았다.
 - M10은 **LOCAL MVP CLOSEOUT COMPLETE / DEV INTEGRATED**다. 합성 runtime은 종료하고 데이터·업로드·증거를 보존했다. 사용자 DB13307·기존 업로드·배포/S3/U0/운영 bootstrap은 건드리지 않았으며, 다음 범위를 자동 시작하지 않는다.
+
+## 2026-11-13 KST — 배포 후속 조사·독립 심의 착수
+
+- 사용자 요청: 배포 완료를 위한 코드 수정 계획 및 진행. 시작 Git main/dev `8c29753`, clean을 직접 확인했다. `$brief` 대조 후 `$project-lead`로 배포 후속에 한정하여 진행한다.
+- root가 `docs/governance/meetings/X-20261113-deployment.md` 초안을 작성했다. 기존 M10 완료를 다시 열거나 기존 승인 결론을 바꾸지 않는다. 신규 deploy 경로는 root 소유로 지정했다.
+- deployment_backend/frontend/qa가 각각 읽기 전용 조사를 완료했다. 같은 안건으로 Architecture/Product/Delivery & Risk 독립 심의를 배정했고 중간결과 공유는 금지했다.
+- 현재 실행 상태: 심의 진행. S3/API/DB/운영 설정 HIGH 계약은 아직 미승인. 제품 코드·AWS·실사용 DB·기존 업로드·Git 쓰기 변경은 하지 않았다. 이후 독립 LOW 수정과 승인된 범위만 구현한다.
+
+### 2026-11-13 KST — 배포 A-v2 승인 요청·독립 LOW 수정 배정
+
+- 3인 모두 A안 APPROVE_WITH_CHANGES/HIGH. root가 상태·schema·오류·잠금·timeout·cleanup·신규 DB·S3 호환 rollback을 회의 §10에 구체화했다. A-v2 전체 승인 또는 기존 데이터 이관/대안 B 의사를 사용자 async 입력으로 요청했다. 무응답은 승인으로 간주하지 않는다.
+- FE production same-origin 기본값/빈 base resolver는 세 검토자 모두 독립 LOW로 판정, root 자동 승인 후 deployment_frontend에 코드·회귀를 배정했다. 원 조사에서 raw img 4곳을 모두 401이라 한 주장은 공개 프로필 guest GET 계약과 맞지 않아 제외했다.
+- backend에는 A-v2 잠금과 기존 U0 SDK 기능의 읽기 전용 추가 확인만 배정했다. HIGH 구현·AWS 쓰기·실사용 데이터 적용은 승인 전 보류다. root는 결정/위험 레지스터를 동기화했다.
+
+### 2026-11-13 KST — 사용자 A-v2 전체 승인·구현 시작
+
+- async 사용자 답변 “A-v2 전체 승인 (권장)” 수신. 신규 운영 DB, 기존 local 보존, private S3 direct PUT/complete/canonical 권한 read, V7 및 운영 도구·개발 synthetic 검증 T0~T5 승인이다. 실제 운영 적용 T6는 별도다.
+- backend T1/T2, frontend LOW 동결→QA 후 T3, qa LOW 독립검토→T5, pm PRD 동기화, root REQUIREMENTS/ADR/deploy/통합을 배정했다. 모든 코드 파일은 기존 역할 소유권을 유지한다.
+- root는 LOW focused RED/GREEN, full 53 files/485 tests, lint/build, 잘못된 staging build 거부 및 bundle localhost 부재 로그를 직접 읽었다. 독립 QA에서 tested source 동일성을 확인하도록 배정했다.
+
+### 2026-11-13 KST — 배포 구현·검증 중간 기록
+
+- LOW는 QA focused 27 tests·production build·source/log 대조 후 LOW-R1~5 APPROVE. FE T3 자체 구현은 54 files/494 tests였으나 root가 정상 token refresh를 계정전환으로 오인하는 문제, complete id 대조 등을 발견해 수정 재배정했다. 이 출력은 최종 인수로 승격하지 않는다.
+- root가 deploy/Caddyfile·systemd/env 예제·release pack/verify·encrypted backup·운영 README를 작성했다. package 테스트 5개, Caddy 구문 검증, 합성 SQL 암호화 roundtrip/변조 거부/실패 및 덮어쓰기 방지 시험 PASS. 실제 MySQL restore/운영 적용은 별도다. QA에 독립 HTTP proxy/SPA 검증 도구와 검토를 배정했다.
+- 검증 VM의 Docker socket EOF 원인은 Lima 로그의 `virtual machine is no longer live`였다. `/private/tmp/zeroverse-colima-lima`의 기존 colima VM stale 프로세스만 force-stop 후 같은 디스크로 기동했다. 데이터 삭제 없음. Docker29.5.2·running containers0·mysql8.4/ryuk cache 확인 후 backend에 재사용 경로를 전달했다.
+- QA named dev identity/location 읽기 성공, bucket 관리조회/ListBucket는 최소권한에 따라 AccessDenied였다. localhost5173 PUT OPTIONS403 확인 후 root가 최소 CORS 파일을 제시했고 사용자가 “규칙 추가 완료”로 답했다. QA 재검증을 배정했다. root/default identity나 bucket/IAM 변경은 실행하지 않았다.
+- backend 구현 중 root가 signed Cache-Control/반환 헤더 불일치, stored region 처리·bounded stream abort, prod preflight/profile/TLS/origin 경계, cleanup dry-run의 Flyway 무쓰기 보장을 검토 요청했다. 구현자 검증 및 독립 최종 QA가 남아 있다.
+
+### 2026-11-13 KST — CORS 해소·실제 격리 복원 확인
+
+- QA CORS 재검증200, deployment artifacts 실제 HTTP receipt PASS를 root가 확인했다. root 합성 MySQL TLS dump→암호화→인증 복호화→별도 DB 복원도 row/hash 일치 PASS다. 근거와 한계는 배포 회의 §13에 추가했다.
+- FE 자체499 tests와 backend 실제 MySQL 계약7tests PASS는 독립 최종승인과 구분한다. backend 계약 worker에 rollback·cleanup경쟁·timeout lock 해제 gate를 추가 배정했으며 같은 테스트 파일의 단일 소유권을 유지한다.
+- 현재 진행: backend prod fail-fast·CLI 보완, QA FE HIGH 리뷰/실제 S3 harness 준비, root immutable runtime 준비. 기존 사용자 DB가 아닌 새 합성DB13337와 전용 prefix만 사용한다. T6/실제운영/Git 쓰기는 미실행이다.
+
+### 2026-11-13 KST — 배포 코드 T0~T5 완료·최종 독립 PASS
+
+- 승인된 A-v2의 S3 intent/PUT/complete/canonical ACL, V7, prod fail-fast/TLS/UTC/readiness, FE transport 및 배포·백업·정리 도구 구현과 독립 검증을 완료했다. backend670 tests(118suites)·FE499 tests(54files)·lint/build PASS를 root가 실제 로그/XML로 확인했다.
+- 독립 backend의 UUID400·S3 timeout·CLI UTC·generated password 지적4건을 반영하고 최종 a7fb8fe JAR의17 runtime 경계·40 required AWS/browser 항목 PASS를 확인했다. final-source-manifest는277classes·설정과 현재소스 일치다. 상세 증거/실패 이력/경계는 배포 회의 §13~14 및 두 QA 문서에 보존했다.
+- 최종 release `build/releases/zeroverse-deployment-20261113-a7fb8fe.tar.gz`, SHA256 `9b38074bb2e6488634d5e9dd9356ab23a7b7f4db754a46ccd5f7b6f69086d542`. 실제 서버에 배포하지 않았다. Git commit/PR/merge도 수행하지 않았다.
+- 이번 prefix에서 제품cleanup 적용8건(누적) 외 남은 합성 fixture키13개는 서명만료·소유자 검증 후 DeleteObject 성공응답을 받았다. API/FE/전용MySQL을 종료하고 volume/evidence를 보존했다. 기존 사용자 DB·local uploads는 보존했다.
+- 현재 실행 상태: **승인 범위 완료 / T6 미실행**. 다음 실제 운영 적용에는 domain·Lightsail·Aiven 접속값/CA·운영 AWS identity/prefix와 별도 T6 실행 결정이 필요하다. 새 기능/유료 자원/운영 데이터 변경을 자동으로 시작하지 않는다.
+
+### 2026-11-13 KST — 사용자 요청에 따른 배포 작업 커밋
+
+- 사용자가 “작업 내용을 커밋해줄래?”라고 명시 요청했다. 리더가 현재 main에서 배포 A-v2 구현·테스트·운영 도구·승인/QA/역할 기록 85개 파일의 커밋을 담당한다. 브랜치 변경·원격 push·운영 배포는 이번 요청으로 수행하지 않는다.
+- 최종 검증 manifest의 소스452개를 현재 파일과 재대조하여 변경0을 확인했다. 기존 backend670/FE499·실제 AWS/browser40 required PASS와 독립 QA 결과가 적용되는 소스다. 코드 변경이 없어 전체 테스트를 반복하지 않았다.
+- 명시한 파일 목록으로 stage하며 자격증명 패턴 검사와 diff whitespace 검사를 통과한 파일만 포함한다. Git 제외 비밀/로컬 설정·build 산출물·PRD/REQUIREMENTS의 기존 ignore 정책은 유지하고, 새로 발견한 `docs/governance/.DS_Store`는 포함하지 않는다.

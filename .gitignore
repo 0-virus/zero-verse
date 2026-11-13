@@ -98,3 +98,6 @@ run-frontend.sh
 /deploy/*.cnf
 /deploy/*.cms
 __pycache__/
+
+### macOS ###
+.DS_Store

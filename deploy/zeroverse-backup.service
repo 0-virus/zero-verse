@@ -1,0 +1,18 @@
+[Unit]
+Description=ZeroVerse encrypted database backup
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/bin/python3 /usr/local/lib/zeroverse/scheduled-backup.py
+UMask=0077
+Nice=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/backups/zeroverse
+TimeoutStartSec=30min

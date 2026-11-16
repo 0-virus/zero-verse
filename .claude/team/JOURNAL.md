@@ -673,3 +673,34 @@
 - 사용자가 “작업 내용을 커밋해줄래?”라고 명시 요청했다. 리더가 현재 main에서 배포 A-v2 구현·테스트·운영 도구·승인/QA/역할 기록 85개 파일의 커밋을 담당한다. 브랜치 변경·원격 push·운영 배포는 이번 요청으로 수행하지 않는다.
 - 최종 검증 manifest의 소스452개를 현재 파일과 재대조하여 변경0을 확인했다. 기존 backend670/FE499·실제 AWS/browser40 required PASS와 독립 QA 결과가 적용되는 소스다. 코드 변경이 없어 전체 테스트를 반복하지 않았다.
 - 명시한 파일 목록으로 stage하며 자격증명 패턴 검사와 diff whitespace 검사를 통과한 파일만 포함한다. Git 제외 비밀/로컬 설정·build 산출물·PRD/REQUIREMENTS의 기존 ignore 정책은 유지하고, 새로 발견한 `docs/governance/.DS_Store`는 포함하지 않는다.
+
+
+### 2026-11-16 KST — 사용자 T6 실제 운영 배포 실행 승인
+
+- 사용자 “그렇게 해”로 실제 대상 zeroverse.co.kr/Lightsail54.116.133.220/신규Aiven defaultdb 배포를 승인했다. root가 실제 운영 작업, deployment_qa가 독립 판정을 담당한다. 상세 범위·기준artifact·비밀입력 gate는 배포 회의 §15를 따른다. 기존 local DB/업로드·추가유료자원·Git 쓰기는 제외한다.
+- archive checksum 및 verify PASS, SSH Java21/Caddyactive/2GB 확인. 현재 main4186e0e 제품 변경 없음. 운영 비밀과 IAM은 준비 중이며 실제 migration/서비스 시작 전이다.
+
+### 2026-11-16 KST — T6 서버 배치·HTTPS 준비, 운영 비밀 입력 대기
+
+- 승인된 release를 원격 verify/JARchecksum 대조 후 새 경로에 배치했다. systemd 정의 설치·미기동, HTTPS cert·HTTP308·maintenance503 PASS. DB 접속/migration은 미실행이다.
+- 운영 IAM/CORS 최소정책을 준비하고 사용자 콘솔 작업 및 서버 숨김 DB/AWS 입력을 안내했다. 원격 파일권한/symlink 점검 PASS. 현재 입력값 없음. QA 사전검토 완료, 실제인수는 pending. 회의 §15.1과 build/t6-deployment-20261116/server-prepared.json을 재개 기준으로 쓴다.
+
+### 2026-11-16 KST — T6 신규 DB migration·실제 도메인 앱 기동
+
+- 사용자 IAM/CORS 및 비밀입력 완료 답변 후 실제 Aiven empty0/TLS/UTC·prebackup·격리복원 PASS를 확인했다. 운영 IAM identity/객체CRUD/익명차단/목록거부 PASS, probe객체삭제 완료.
+- systemd로 검증된 release 기동, V1~V7 success/readinessUP 후 zeroverse.co.kr 공개 앱 전환. HTTPS·SPA/API·내부endpoint차단·loopback8080·서울리전 확인. 회의 §15.2와 redacted receipts를 기록했다.
+- deployment_qa가 승인된 synthetic 계정·prod prefix의 실제 브라우저 인수를 준비/진행한다. root는 그 후 restart·동일artifact release-switch rehearsal·최종백업복원을 확인한다. 사용자 bucket설정확인·정기백업 선호 답변 대기다. 기존local 데이터·Git은 무변경이다.
+
+### 2026-11-16 KST — T6 실제 운영 인수·백업·정리 완료
+
+- root가 실제 zeroverse.co.kr HTTPS에서 core28 + supplemental27 checks PASS, 동일artifact 경로 전환2회/readiness/글·이미지4개 hash 보존, peak약634MiB/NRestarts0을 확인했다. 첫 배포의 역사적 버전rollback은 N/A다.
+- 신규 Aiven pre/post 암호화백업의 격리복원 PASS(빈DB/16tables 및 metadata/S3 bytes). 사용자 선택04:00KST/7일정기백업 timer active와 실제1회 성공을 확인했다. 최종 정리후 ready백업도 Mac에 복사했으며 개인키는 Mac에만 있다.
+- exact synthetic3계정 soft-delete/token0/S3 DeleteACK4, child row/hash보존, 실제signin401 PASS. 이메일collation 정리도구 오류는 commit전 실패/무변경 확인 후 binary guard로 수정·rollback진단·apply 통과했다. 복원전용컨테이너중지/데이터보존 완료.
+- root가 QA 산출물·실측 receipts를 직접 확인하고 배포회의 §15.4 및 deploy README 인수정보를 기록한다. deployment_qa의 독립 최종 판정은 qa/X-deployment-review.md에 기록한다. 현 상태 **T6 운영 배포 검증 PASS**, 기존local자료보존·Git commit/push미수행. 후속 제품범위나 유료자원을 자동 확대하지 않는다.
+
+- 최종 독립 QA: deployment_qa가 **T6 FINAL QA PASS(첫 배포 범위)**로 판정했다. root가 갱신된 QA 문서/STATE와 7개 최종 receipt PASS·0600, core28/보조27 전부 ok, snapshot3종 동일, diff whitespace clean을 직접 확인했다. 남은 필수 작업은 없다.
+
+### 2026-11-16 KST — 사용자 요청에 따른 T6 운영 배포 작업 커밋
+
+- 사용자 “작업 내용 커밋 해줄래?”에 따라 리더가 운영 S3 정책 템플릿·정기 암호화 백업 도구·QA production harness·운영 인수/승인/역할 기록의 명시한18개 파일을 main에 커밋한다. 기존 독립 T6 FINAL QA PASS를 유지하며 제품 소스와 운영 서비스는 추가 변경하지 않는다.
+- 커밋 전 deploy unit10/QA harness guard5 총15 tests PASS, diff whitespace clean, 변경18파일 비밀 패턴 검사와 JSON 파싱 PASS. 비밀·복구 개인키·백업·build 증거는 Git 제외를 유지한다. 원격 push는 수행하지 않는다.

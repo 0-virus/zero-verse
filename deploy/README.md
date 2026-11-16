@@ -27,6 +27,8 @@ JAR 파일명은 `build/libs`의 실제 `bootJar` 출력으로 확인한다. pro
 
 패키지는 JAR, FE dist, 명시된 운영 템플릿, 파일별 SHA-256 manifest만 담는다. local 설정/키 저장소·symlink를 거부하고 기존 archive를 덮어쓰지 않는다. manifest의 sourceRevision/sourceDirty는 포장 시 Git 정보이지 테스트 통과 증명이 아니다. 같은 소스/빌드에 대한 QA 로그·배포 승인과 archive 전체 checksum을 함께 보관한다. 서버에서 npm/Gradle build하지 않는다.
 
+archive는 최상위 `RELEASE_ID/` 디렉터리를 포함한다. `/opt/zeroverse/releases/RELEASE_ID/`를 먼저 만든 경우에는 검증 후 `tar --strip-components=1 -xzf ARCHIVE -C /opt/zeroverse/releases/RELEASE_ID`로 해제하여 이중 중첩을 피한다. 기존 release 디렉터리에 덮어쓰지 않는다.
+
 archive 안의 운영 도구는 `ops/`에 있다. 검증기는 신뢰된 저장소의 `deploy/release.py`를 먼저 사용하고, 서버로 전송한 archive의 전체 SHA-256도 전달 전 값과 대조한다. 이 안내의 `docs/`, `qa/` 링크는 소스 저장소를 기준으로 하며 운영 archive에 정본 문서나 QA 자료를 함께 넣지는 않는다.
 
 ## 2. 운영 환경과 CA
@@ -115,7 +117,7 @@ mysql --defaults-extra-file=/secure/restore-client.cnf \
   --ssl-mode=VERIFY_IDENTITY --ssl-ca=/secure/aiven-ca.pem RESTORE_DB < /secure/restore/verified.sql
 ```
 
-복원 후 Flyway history, 주요 row counts, 이미지 metadata와 S3 bytes/read ACL, UTC audit를 검증한다. 복구 키 분실·인증 실패 시 복원을 성공으로 기록하지 않는다. 실제 운영 적용 전에 Aiven 자동 백업 범위와 수동 암호화 dump의 주기(주 1회 권고)·보관 기간·복원 목표를 운영자와 확정하고 스케줄을 활성화한다. 이 코드 작업은 cron/timer나 bucket lifecycle을 자동 설치하지 않는다.
+복원 후 Flyway history, 주요 row counts, 이미지 metadata와 S3 bytes/read ACL, UTC audit를 검증한다. 복구 키 분실·인증 실패 시 복원을 성공으로 기록하지 않는다. Aiven 자동 백업 범위는 별도로 확인한다. 이 저장소의 수동 암호화 dump는 아래 §7의 사용자 결정에 따라 매일04:00KST/7일보관 timer로 운영한다. bucket lifecycle이나 외부 백업 자동 복제는 설치하지 않았다.
 
 ## 6. 롤백과 인수
 
@@ -124,3 +126,27 @@ S3 row가 생긴 뒤 M10 pre-S3 JAR로 돌아갈 수 없다. 현재 schema와 �
 실제 HTTPS에서 가입→로그인→새로고침/refresh rotation→글·프로필/본문/대표 이미지→댓글·알림→로그아웃을 확인한다. PUBLIC/친구/PRIVATE/draft ACL, anonymous S3 deny, 권한 철회 후 read 차단, 앱 재시작 보존, backup restore, rollback을 통과해야 운영 배포 완료다. 아직 도메인·서버·DB·운영 identity가 없으면 코드 준비 결과만 보고한다.
 
 기술 근거: [Caddy SPA/API 분리](https://caddyserver.com/docs/caddyfile/patterns), [systemd 서비스 격리](https://freedesktop.org/software/systemd/man/latest/systemd.exec.html), [ADR-0009](../docs/governance/decisions/ADR-0009-deployment-s3-contract.md).
+
+## 7. 2026-11-16 첫 운영 대상
+
+사용자가 T6 실행을 명시 승인했다(배포 회의 §15). 도메인은 `zeroverse.co.kr`, Lightsail IPv4는 `54.116.133.220`, 신규 DB는 제공된 Aiven 서비스 `defaultdb`다. 실제 비밀은 서버의 root-only 설정에만 입력한다.
+
+- 운영 앱 IAM 사용자 예: `zeroverse-s3-prod`. [최소 객체 정책](s3-iam-production.json)을 해당 사용자에 적용한다. 콘솔 로그인·관리 권한·ListBucket는 필요하지 않다. 개발 identity를 운영 서버에 복사하지 않는다.
+- [운영 CORS 규칙](s3-cors-production.json)은 기존 버킷 CORS 배열에 객체를 추가하여 병합한다. 개발 규칙 등 기존 항목을 통째로 대체하지 않는다. public access block은 유지한다.
+- [HTTPS 전용 버킷 정책](s3-bucket-https-only.json)은 기존 정책이 없을 때 전체를 적용한다. 기존 정책이 있으면 Statement를 보존하고 DenyInsecureTransport만 병합한다. AWS 서비스 주체는 이 전송 조건의 Deny에서 제외하며, 별도 접근 권한을 부여하지 않는다. 근거: AWS S3 policy keys의 SecureTransport/PrincipalIsAWSService 예제.
+- 환경·DB·HTTPS·S3 및 backup/restore/rollback의 실제 통과 여부는 배포 회의의 후속 증거로 확인한다.
+
+### 정기 백업 — 2026-11-16 사용자 선택
+
+매일 04:00 Asia/Seoul에 암호화 backup을 `/var/backups/zeroverse/`에 생성하고 정기 생성 파일을 7일 보관한다. `zeroverse-backup.timer`가 root oneshot `zeroverse-backup.service`를 실행한다. `scheduled-backup.py`와 검증된 `backup-db.sh`는 `/usr/local/lib/zeroverse/`에 root 소유로 설치한다. 복호화 개인 키는 서버에 설치하지 않는다.
+
+새 백업 성공 후에만 `scheduled-UTCSTAMP-HEX.cms` 중 이름 시각과 mtime이 모두 7일보다 오래된 root 소유 regular/single-link 파일을 정리한다. 마이그레이션 전·수동 백업과 symlink는 삭제하지 않는다. 동시 실행은 flock으로 차단한다. 상태는 `systemctl list-timers zeroverse-backup.timer`, 결과는 `journalctl -u zeroverse-backup.service`로 확인한다. 서버 내 정기 백업은 서버 자체 장애에 대한 별도 외부 사본을 대신하지 않는다. 중요한 변경 전 수동 암호화 백업은 Mac 등 별도 위치에도 복사한다.
+
+### 운영 인수 결과 — 2026-11-16
+
+`https://zeroverse.co.kr`에서 운영 중이다. 실제 HTTPS/browser/API·비공개 S3·권한·refresh rotation, 재시작 후 데이터 보존, 암호화 DB 백업의 격리 복원을 확인했다. 상세 증거와 범위는 [배포 회의 §15.4](../docs/governance/meetings/X-20261113-deployment.md#154-실제-운영-인수복원정리-완료--2026-11-16-kst), [독립 QA](../qa/X-deployment-review.md)를 따른다.
+
+- 현재 release: `/opt/zeroverse/releases/zeroverse-deployment-20261113-a7fb8fe`, 앱/웹 서비스는 `zeroverse`/`caddy`다. 첫 배포의 이전 버전 rollback 대상은 없으며, 동일 artifact의 경로 전환과 복귀·데이터 보존을 실제 검증했다.
+- DB 백업: 서버 `/var/backups/zeroverse/`. 배포 전·검증 후·최종 정리 후 암호화 사본은 Mac `/Users/zerovirus/.zeroverse-recovery/20261116/`에도 보관했다. `backup-private-key.pem`은 복원에 필요하므로 안전하게 보존한다. 서버에 이 개인키를 복사하지 않는다.
+- 최종 기준 사본은 `ready-20261116.cms`다. 과거 post-migration 백업은 검증용 계정·이미지 메타데이터가 포함된 이전 시점이며, 이후 삭제한 테스트 S3 바이트를 포함하지 않는다. DB 백업과 S3 객체 보존은 별개다.
+- 운영 검증 계정3개는 비활성화하고 토큰을 제거했으며 정확한 테스트 객체4개를 정리했다. 하위 DB 이력은 보존했다. 실제 사용자는 홈페이지에서 회원가입해 사용한다.

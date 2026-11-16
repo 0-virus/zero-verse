@@ -1,0 +1,11 @@
+[Unit]
+Description=ZeroVerse daily backup at 04:00 Asia/Seoul
+
+[Timer]
+OnCalendar=*-*-* 04:00:00 Asia/Seoul
+Persistent=true
+AccuracySec=1min
+Unit=zeroverse-backup.service
+
+[Install]
+WantedBy=timers.target

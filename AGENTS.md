@@ -193,3 +193,9 @@ U0만 승인된 검증 의존성: `gradle/u0`의 AWS SDK Java2 S3/BOM `2.49.6`, 
 사용자가 배포 완료에 필요한 코드 수정의 계획·진행을 요청했다. M10 로컬 완료 이후 배포 후속의 구체 안건·승인 상태·실행 기록은 `docs/governance/meetings/X-20261113-deployment.md`를 따른다. 조사·계획 요청을 아직 미확정인 S3 공개 API/DB/보안 계약의 승인으로 확대하지 않는다. 신규 `deploy/**` 산출물은 리더 소유, 제품 코드는 기존 backend/frontend 소유다. 실제 외부 자원·실사용 DB·기존 업로드 적용과 코드 준비 완료를 구분한다.
 
 사용자가 위 회의 §10의 **A-v2 전체 승인**을 명시했다. 신규 운영 DB·private S3 direct upload/서버 완료검증·canonical 현재권한 read·prod 설정·배포 도구·개발 synthetic S3 검증(T0~T5)을 진행한다. 계약은 ADR-0009와 REQUIREMENTS §6.12-A, 실행 상태는 회의 §12 이후를 따른다. 기존 로컬 데이터 보존·실제 운영 자원/DB 적용 T6 별도 경계는 유지한다.
+
+### 2026-11-16 T6 운영 배포 승인
+
+사용자가 실제 서버 설정·파일 전송·신규 Aiven defaultdb 테이블 생성·운영 S3 연결·HTTPS 및 동작 검증을 승인했다. 대상은 zeroverse.co.kr/Lightsail54.116.133.220이며 회의 X-20261113-deployment §15 이후와 deploy/README.md를 따른다. deploy/s3-iam-production.json·s3-cors-production.json은 리더 소유 운영 정책 템플릿이다. 과거 T6 별도 경계는 이번 명시 승인으로 해소되며 실제 완료는 운영 인수 증거로 판정한다. 기존 local DB/업로드 이관·추가 유료 자원·Git 쓰기는 포함하지 않는다.
+
+사용자는 운영 S3의 PAB/ACL 비활성화/SSE-S3를 확인하고 HTTPS-only bucket policy 추가를 완료했다. 정기 백업은 매일04:00 KST·7일 보관으로 선택했으며 수동/마이그레이션 전 백업은 자동 삭제에서 제외한다. deploy/s3-bucket-https-only.json 및 scheduled-backup.py·test_scheduled_backup.py·zeroverse-backup.service/timer는 리더 소유다.

@@ -2,11 +2,11 @@
 
 ## 현재 판정
 
-- 상태: **FE LOW·HIGH REVIEW PASS / T5 SYNTHETIC DEV AWS·BROWSER FINAL REVIEW PASS / PACKAGED PROD SMOKE PASS(운영 전) / PRODUCTION GATES NOT RUN**
+- 상태: **T0~T5 FINAL QA CLOSEOUT PASS / T6 FINAL QA PASS (첫 배포·범위 제한 명시)**
 - 기준 안건: [`X-20261113-deployment`](../docs/governance/meetings/X-20261113-deployment.md) §10 A-v2, §11 LOW
 - 검토자: Codex QA 독립 컨텍스트
-- 범위: 코드 준비·격리 검증·개발용 synthetic AWS 검증과 실제 운영 인수의 경계를 정의한다.
-- 이 문서는 개발 synthetic AWS/browser 인수 증거와 production 미실행 경계를 함께 기록한다. 실제 운영 DB, 사용자 데이터, 기존 업로드, 배포 서버와 production HTTPS는 사용하지 않았다.
+- 범위: 코드 준비·격리 검증·개발용 synthetic AWS 검증과 실제 운영 인수를 독립 대조한다.
+- 이 문서는 개발 synthetic AWS/browser와 실제 운영 HTTPS/Aiven/S3/browser 인수 증거를 함께 기록한다. QA는 운영 비밀을 읽거나 직접 AWS/DB/서버 mutation을 수행하지 않았고, root가 제공한 비밀 없는 receipt만 독립 재집계했다.
 
 M10의 로컬 MVP QA PASS는 아래 배포 gate를 충족하지 않는다. `qa/M10-review.md:12`, `docs/PRD.md §10 M10`에서 배포·S3/AWS·실사용 DB·운영 SLA를 제외한 범위를 확인했다.
 
@@ -30,15 +30,15 @@ M10의 로컬 MVP QA PASS는 아래 배포 gate를 충족하지 않는다. `qa/M
 | X-FE-LOW-03 | FE URL 보안 경계 | cross-origin, query/hash/userinfo, 외부·blob·data URL을 계속 거부 | uploadApi/ManagedImage 회귀 | **PASS (LOW scope)** — URL 경계 회귀 PASS |
 | X-FE-LOW-04 | LOW 회귀/범위 | FE test/lint/build PASS; API shape·DB·인증·디자인·dependency diff 없음 | focused/full FE output, `git diff` ownership review | **PASS (LOW scope)** — 구현자 full/lint/build 및 QA 독립 focused/build PASS; 운영 gate 제외 |
 | X-FE-HIGH-01 | direct PUT UI | presigned→S3 PUT→complete, account switch/abort/retry/stale response가 canonical state를 보존 | 실제 API + browser, no app Authorization to S3 | **PARTIAL PASS** — FE source/independent 40-test review와 final T5 synthetic `uploadImage` browser path/no-app-auth/oversize gate PASS; account switch/abort/stale runtime scenarios remain |
-| X-OPS-01 | same-origin HTTPS | Caddy가 `/` 정적 파일·`/api` reverse proxy·SPA deep link을 분리, Spring loopback | 실제 HTTPS domain smoke, `/api` JSON vs HTML content-type | **NOT RUN** — isolated Caddy route subset PASS; 실제 domain/TLS/server는 미실행 |
-| X-OPS-02 | refresh cookie | Secure/HttpOnly/SameSite=Strict/Path 유지, rotation·logout replay·재시작 복구 | HTTPS browser cookie headers + protected HTTP | **NOT RUN** — 운영 HTTPS 없음 |
-| X-OPS-03 | readiness | prod-only `/api/v1/health/readiness`가 DB SELECT 1·preflight 성공 시 200, 실패 시 503, no-store | DB down/misconfig/healthy HTTP | **PARTIAL PASS (final JAR synthetic smoke)** — final JAR `a7fb8fe0…` valid receipt 200/`UP`/`no-store`와 invalid/preflight negative binding receipts가 PASS; 실제 Aiven/운영 HTTPS에서 healthy·503 전환은 미실행 |
-| X-OPS-04 | release/rollback | artifact checksum·FE/BE same release 기록; rollback은 S3 지원·migration 호환 release 사이에서만 | release manifest + stop/start + rollback rehearsal | **PARTIAL PASS (final artifact)** — final archive verify가 11 files/archive SHA `9b38074b…`와 JAR `a7fb8fe0…`를 확인하고 FE/BE package paths가 일치; 실제 rollback rehearsal는 미실행 |
-| X-DB-01 | fresh/upgrade/restore | 신규 Aiven DB migration과 백업 복원이 데이터·audit·image metadata를 보존 | 격리 MySQL dump/restore + Flyway report | **PARTIAL PASS (synthetic)** — final backend 118/670 `0/0/0`와 synthetic TLS VERIFY_IDENTITY·암호화 dump/restore receipt PASS; 실제 Aiven fresh/upgrade/운영 restore는 미실행 |
-| X-DB-02 | 기존 데이터 경계 | 기존 DB/.local-data 자동 이관·삭제 없음; 기존 데이터가 있으면 별도 이관 승인 전 배포 차단 | target inventory + explicit migration decision | **NOT RUN** — 신규 Aiven 사용·기존 local 보존 정책은 A-v2로 확정됐으나 실제 target 접속값/inventory와 운영 적용은 미실행 |
-| X-REC-01 | restart durability | 앱 재시작/서버 교체 후 Aiven rows·S3 bytes·canonical refs 유지 | process restart/instance replacement smoke | **PARTIAL PASS (synthetic runtime)** — restart receipt 200, same SHA-256/no-store/nosniff; 실제 Aiven/서버 교체·운영 restart는 미실행 |
-| X-REC-02 | backup/restore | 앱 IAM과 backup IAM 분리, 암호화 dump를 별도 위치에 보관하고 복원 1회 성공 | dump checksum/restore evidence, secret scan | **PARTIAL PASS** — root receipt가 synthetic MySQL TLS VERIFY_IDENTITY·CMS AES-GCM dump/restore/hash 일치를 기록; production backup IAM/schedule/location은 미실행 |
-| X-T6-01 | 실제 운영 인수 | signup→login→refresh→post/image→notification→logout, anonymous S3 deny, ACL revoke, restart, rollback 전부 PASS | 실제 domain/Lightsail/Aiven CA/prod identity | **NOT RUN** — T5와 실제 대상 선행 필요 |
+| X-OPS-01 | same-origin HTTPS | Caddy가 `/` 정적 파일·`/api` reverse proxy·SPA deep link을 분리, Spring loopback | 실제 HTTPS domain smoke, `/api` JSON vs HTML content-type | **PASS** — `https-boundaries.json`과 `final-external-check.json`에서 TLS/SAN, root/login 200·no-store, asset/API/health/docs 경계를 확인했고 restart 후 외부 점검도 PASS |
+| X-OPS-02 | refresh cookie | Secure/HttpOnly/SameSite=Strict/Path 유지, rotation·logout replay·재시작 복구 | HTTPS browser cookie headers + protected HTTP | **PASS** — rootcheck02 actual HTTPS/browser receipt에서 cookie 계약·rotation·stale/current replay·logout과 재시작 후 readiness를 확인 |
+| X-OPS-03 | readiness | prod-only `/api/v1/health/readiness`가 DB SELECT 1·preflight 성공 시 200, 실패 시 503, no-store | DB down/misconfig/healthy HTTP | **PASS (healthy path 범위)** — Aiven TLS/UTC preflight, live readiness `UP`, final postcheck 및 immutable final-JAR negative/fail-fast receipts를 확인했다. 실제 운영 DB를 고의 중단해 503을 주입한 증거는 만들지 않았으며 그 경로는 주장하지 않는다 |
+| X-OPS-04 | release/rollback | artifact checksum·FE/BE same release 기록; rollback은 S3 지원·migration 호환 release 사이에서만 | release manifest + stop/start + rollback rehearsal | **PASS (same-artifact 범위)** — final archive/JAR identity와 두 차례 stop/start·readiness·복귀를 PASS로 확인했다. 첫 배포라 역사적 이전 버전 rollback은 N/A이며 이를 실제 version rollback으로 표현하지 않는다 |
+| X-DB-01 | fresh/upgrade/restore | 신규 Aiven DB migration과 백업 복원이 데이터·audit·image metadata를 보존 | 격리 MySQL dump/restore + Flyway report | **PASS** — Aiven fresh inventory/TLS/UTC, Flyway 1~7, post-migration encrypted restore 16 tables·row counts·image metadata hash·live S3 4개 byte hash 일치를 확인했다 |
+| X-DB-02 | 기존 데이터 경계 | 기존 DB/.local-data 자동 이관·삭제 없음; 기존 데이터가 있으면 별도 이관 승인 전 배포 차단 | target inventory + explicit migration decision | **PASS (신규 DB/기존 보존 범위)** — 운영 Aiven pre-migration inventory가 empty 0 tables였고 기존 local DB/업로드는 이관·삭제하지 않았음을 receipt와 운영 결정에서 확인했다 |
+| X-REC-01 | restart durability | 앱 재시작/서버 교체 후 Aiven rows·S3 bytes·canonical refs 유지 | process restart/instance replacement smoke | **PASS** — snapshot-before/candidate/restored의 post/profile 및 이미지 4개 크기·SHA가 동일하고 두 switch receipt/readiness·NRestarts=0, final postcheck row/metadata preservation이 PASS다 |
+| X-REC-02 | backup/restore | 앱 IAM과 backup IAM 분리, 암호화 dump를 별도 위치에 보관하고 복원 1회 성공 | dump checksum/restore evidence, secret scan | **PASS** — post-migration encrypted Aiven dump의 network-none 격리 복원과 Flyway/row/image/S3 hash 일치, scheduled backup oneshot success/exit0·root600·timer·Mac final copy를 확인했다 |
+| X-T6-01 | 실제 운영 인수 | signup→login→refresh→post/image→notification→logout, anonymous S3 deny, ACL revoke, restart, rollback 전부 PASS | 실제 domain/Lightsail/Aiven CA/prod identity | **PASS (첫 배포 범위)** — rootcheck02 28 checks, supplement 27 checks, external/final postcheck, backup/restore, same-artifact switch/return, exact teardown이 PASS다. 역사적 이전 release rollback과 고의 live DB failure injection은 해당 대상 부재/안전 경계로 N/A·미주장이다 |
 
 ## 개발 S3 read-only preflight — 2026-11-13 KST
 
@@ -178,6 +178,29 @@ git diff -- frontend/src/lib/apiClient.ts frontend/src/features/upload/uploadApi
 - 확인된 경계: production 기본값은 빈 base여서 `/api/...` 상대 요청을 만들고, dev/test 기본값은 `http://localhost:8080`이다. explicit trailing slash는 제거되고 `//api`가 생기지 않는다. `localhost`, `localhost.`, `.localhost`, IPv4/IPv6 loopback과 HTTP production base는 build guard에서 거부된다. managed image 빈 base는 현재 browser origin을 사용하며 query/hash/userinfo/external origin은 계속 거부한다.
 - 판정: **LOW-R1~R5 APPROVE**. 이 판정은 FE 설정·resolver·회귀 범위에 한정하며 S3, HTTPS proxy, backend, 운영 배포 PASS를 의미하지 않는다.
 
+## T6 실제 production core acceptance — 2026-11-16 KST
+
+- rootcheck01은 owner 가입·로그인·cookie/refresh rotation까지 실제 HTTPS에서 PASS한 뒤 APIRequestContext에 `addCookies`가 없다는 QA harness 결함으로 viewer/S3 전에 중단됐다. 이 run의 owner fixture는 보존 대상으로 남겼고, 제품 실패로 판정하지 않았다.
+- 수정된 QA harness가 rootcheck02에서 실행됐다. 실행 당시 source snapshot `build/t6-deployment-20261116/executed-production-acceptance-rootcheck02.mjs`의 SHA-256은 `2b7163011d2b3e90397b4452b46e0970eaf81df6a9b9b89a872004a4c0a0e2bd`였다. 이후 현재 QA harness에는 이미 PASS한 viewer signin을 `requiredChecks`에 포함하는 metadata-only 보정이 있었고 현재 SHA는 `43890b5e…`다. receipt `build/t6-deployment-20261116/production-acceptance-deployment-20261116-rootcheck02/evidence.json`은 실행 당시 source에 결속된 `PASS`, 전체 28 checks/required 27, 0 failures다.
+- 이후 receipt 집계 정합성을 위해 `requiredChecks`에 이미 PASS한 `api-signin-viewer`를 추가했다. 보정 후 현재 harness SHA는 `43890b5e…`이고 self-check required list는 28개다. rootcheck02의 실행 snapshot/receipt는 과거 실행 증거로 보존하며, 이 metadata-only 수정 후 production을 재실행하거나 기존 PASS를 새 SHA로 재결속하지 않았다.
+- 독립 재집계한 core checks: HTTPS signup/signin, `Secure; HttpOnly; SameSite=Strict; Path=/api/v1/auth`, refresh rotation/stale replay/signout/current replay 거부, browser signin/reload refresh, profile exact 5MiB S3 PUT+complete/binding, direct PUT의 app Authorization·Cookie·Referer 부재, strict `zeroverse/prod/` scope, 4-way authenticated 5MiB read, production CORS, anonymous direct S3 deny, post-image PUT+complete, PUBLIC anonymous read, PRIVATE owner read/non-owner post/image deny, browser signout가 모두 PASS다.
+- `fixture-private.json`은 synthetic owner/viewer 2명·upload UUID 2개·post 1개만 포함하고 mode 0600이다. `credentials-private.json`은 별도 mode 0600이며 public evidence/fixture에는 password/token/cookie/presigned URL/object key가 없다. evidence의 정밀 value-pattern scan도 clean이다. 이 run의 synthetic rows/objects는 root의 restart·보조 gate·exact teardown 전까지 보존한다.
+- 범위 결론(보조 flow 전 receipt 기준의 historical snapshot): **T6-FLOW-01 PASS, T6-FLOW-02 PARTIAL PASS**. 댓글/알림 및 UNIVERSE friend grant→revoke는 아래 동일 fixture 보조 receipt에서 후속 PASS로 확인됐고, 나머지 gate는 아래 최종 closeout에서 갱신했다.
+
+### T6 동일 fixture 보조 flow
+
+- `build/t6-deployment-20261116/supplement-flow-receipt.json`은 `PASS`, 27/27 checks, `fixtureRunId=deployment-20261116-rootcheck02`다. owner/viewer 재인증·fixture identity, thumbnail presign/PUT/complete, PUBLIC thumbnail read, viewer comment→owner notification/read, PUBLIC→UNIVERSE 전환, 관계 신청·수락 후 post/image read, 관계 revoke 후 post/image deny, draft owner/viewer ACL, PRIVATE owner ACL을 모두 PASS로 기록한다.
+- attempt1의 thumbnail presign 전 FAIL receipt는 후속 PASS run으로 대체된 이력으로 보존한다. supplemental private fixture와 최종 supplemental evidence receipt는 mode 0600이며 token/password/presigned URL/object key 값을 포함하지 않는다. 이전 점검에서 발견한 0644 권한은 root의 최종 receipt 보정으로 해소됐다.
+- 이에 따라 **T6-FLOW-02는 PASS (flow scope)**로 승격한다. 아래 최종 closeout이 restart/data preservation, backup restore/retention metadata, same-artifact switch/return, exact teardown 및 T6-FINAL의 현재 판정을 갱신한다.
+
+## T6 최종 독립 QA closeout — 2026-11-16 KST
+
+- 최종 production acceptance는 `build/t6-deployment-20261116/production-acceptance-deployment-20261116-rootcheck02/evidence.json`의 **28/28 checks PASS**, `supplement-flow-receipt.json`의 **27/27 PASS**, `final-external-check.json`의 TLS/root/login/API 경계·정리 계정 401 PASS로 재집계했다. core 실행은 당시 source snapshot `2b716301…`에 결속되며, 이후 현재 harness SHA `43890b5e…`의 required-check metadata-only 보정은 `node --check`·5개 unit guard·self-check만 PASS했고 운영 결과를 새 SHA로 재실행/재결속하지 않았다.
+- 운영 경계와 보존은 `https-boundaries.json`, `startup-readiness.json`, `final-postcheck.json`, `snapshot-before.json`/`snapshot-candidate.json`/`snapshot-restored.json`에서 PASS다. 두 `switch-*.json` 모두 같은 JAR SHA·readiness `UP`·`NRestarts=0`을 기록하고, before/candidate/restored의 이미지 4개와 글/프로필 metadata가 byte/hash 동일하다. 첫 배포에 역사적 이전 release가 없으므로 **historical-version rollback은 N/A**이며, 실제로 검증한 것은 **same-artifact pointer switch 및 원래 release 복귀**다.
+- `post_migration_restore-receipt.json`은 Aiven MySQL 8.4.11의 암호화 백업을 network-none 격리 DB에 인증 복호화 후 16 tables, 전체 row counts, Flyway 1~7, image metadata SHA, live S3 이미지 4개 checksum을 일치시켰고 운영 DB 미접속을 기록한다. `scheduled-backup-receipt.json`은 실제 oneshot `success/exit0`, root `0600`·27,484 bytes, daily 04:00 KST/7일, timer active를 기록하며 `ready-backup-receipt.json`과 `restore-shutdown.json`도 PASS다.
+- `teardown-receipt.json`과 `final-postcheck.json`은 정확히 합성 사용자 3명/발급 객체 4개만 정리하고 refresh token 0, DeleteObject ACK 4, child rows·image metadata 보존, 서비스 3개 active/readiness `UP`를 확인한다. 사용자/기존 object/전체 prod prefix/제품 cleanup 정책은 건드리지 않았다.
+- 따라서 현재 T6 QA 판정은 **PASS (첫 운영 배포·검증 범위)**다. 고의로 운영 DB를 중단하는 live `503` 주입과 역사적 버전 rollback은 안전 경계/대상 부재로 실행·주장하지 않았다. 이는 healthy readiness, immutable final-JAR fail-fast/negative receipts, same-artifact recovery evidence와 구분한다. 모든 최종 JSON 및 private fixture/credentials는 root가 `0600`으로 보관했으며 secret scan은 clean이다.
+
 ## 운영 완료와 코드 준비의 분리
 
 - 코드 준비 PASS는 backend/frontend 회귀, 격리 MySQL, S3 adapter/intent 테스트, 배포 설정 검증을 의미한다.
@@ -185,14 +208,63 @@ git diff -- frontend/src/lib/apiClient.ts frontend/src/features/upload/uploadApi
 - 운영 배포 PASS는 실제 domain/Lightsail/Aiven CA/prod identity에서 HTTPS·refresh·이미지·알림·restart·backup restore·rollback을 의미한다.
 - 어느 단계도 다음 단계의 PASS를 대신하지 않는다. 과거 LocalStack/SeaweedFS U0 `BLOCKED` 기록을 이번 제품·AWS PASS로 재라벨링하지 않는다.
 
-## 현재 미실행·차단 정보
+## T6 실행 전 미실행·차단 정보 (historical snapshot)
+
+> 아래 bullet은 root preflight와 rootcheck02 core acceptance 이전에 기록한 경계다. 현재 core 상태는 위 `T6 실제 production core acceptance`와 최소 게이트 표를 따른다.
 
 - 사용자 A-v2 전체 승인 메시지는 도착했고 FE LOW/HIGH 독립 검토, final reviewed T5 synthetic AWS/browser, final backend 독립 reviewer PASS를 확보했다. 회의 상태·PRD/REQUIREMENTS/ADR 정본과 신규 Aiven/기존 local 보존 결정도 동기화됐다. production 운영 gate는 여전히 별도 범위다.
-- 신규 Aiven 사용과 기존 local 데이터 보존은 확정됐다. 실제 Aiven 접속값/CA, domain/Lightsail, prod S3 identity/prefix와 운영 실행 승인은 아직 제공되지 않았다.
+- 신규 Aiven 사용과 기존 local 데이터 보존은 확정됐다. root가 Aiven/CA, domain/Lightsail, prod S3 identity/prefix를 구성하고 sanitized preflight receipts를 제공했으며, 당시 QA의 계정·브라우저·운영 object acceptance는 별도 gate로 남아 있었다. 현재 core acceptance는 별도 actual section에서 PASS/partial로 판정한다.
 - final JAR `a7fb8fe0…`의 prod valid/readiness, 17개 prod smoke receipt, cleanup apply/empty/non-UTC/local-row, final reviewed browser 41/40, bounded-memory peak `594480 KiB`, final backend 118 suites/670 tests `0/0/0`, final source manifest compiled class/resource diff `0`를 확인했다. final archive `a7fb8fe`도 독립 verify PASS다.
 - `qa/X-deployment-backend-review.md`의 별도 독립 reviewer가 BE-X-001~004를 최종 PASS로 승인했으며 QA는 그 문서를 덮어쓰지 않았다. synthetic prefix teardown/shutdown도 완료됐고, 실제 domain/Lightsail/Aiven/HTTPS/rollback/T6는 운영 gate로 미실행이다.
-- 개발 S3 preflight는 location/identity와 지정 CORS OPTIONS를 확인했지만 bucket-level 보안·CORS·policy 조회는 권한 부족으로 미실행이다. T5는 root 승인 synthetic prefix에만 객체를 생성했으며 운영 bucket/prefix·운영 DB·사용자 데이터·운영 서버는 변경하지 않았다. QA 소유 review·상태·worklog와 FE 검증 산출물만 갱신됐다.
+- 개발 S3 preflight는 location/identity와 지정 CORS OPTIONS를 확인했지만 bucket-level 보안·CORS·policy 조회는 권한 부족으로 미실행이다. T5는 root 승인 synthetic prefix에만 객체를 생성했으며 운영 bucket/prefix·운영 DB·사용자 데이터·운영 서버는 변경하지 않았다. T6 root preflight는 별도 receipt로 대조했으며 QA는 운영 object/DB mutation을 하지 않았다.
 
-## 독립 QA 검토 결론
+## T6 운영 preflight 독립 대조 및 production harness 실행 경계 — 2026-11-16 KST (준비 시점 기록)
 
-현재 배포 QA 결론은 **T0~T5 FINAL QA CLOSEOUT PASS** — FE LOW·HIGH 독립 검토, final T5 synthetic dev AWS/browser 40/40, final backend 독립 reviewer 및 118/670 회귀, final artifact·prod smoke·cleanup, synthetic teardown/shutdown을 모두 독립 대조했다. final archive와 final JAR identity도 검증했다. 이는 실제 배포 완료나 production 운영 승인으로 해석할 수 없다. 실제 domain/Lightsail/Aiven/HTTPS refresh-cookie·rollback/T6, bucket-level/prefix 밖 정책은 별도 운영 gate다.
+- root가 제공한 sanitized receipts를 읽기 전용으로 재집계했다. `db-preflight.json`은 Aiven MySQL 8.4.11/defaultdb, `VERIFY_IDENTITY`, `TLS_AES_256_GCM_SHA384`, UTC, empty database와 secret permission을 PASS로 기록한다. `pre_migration_restore-receipt.json`은 암호화 backup의 인증 복호화 선행, 격리 restore 0 tables, production DB 미접속, 서버 private key 미전송을 PASS로 기록한다. 이는 backup/restore 절차 증거이며, 아직 실제 restart 뒤 보존 증거는 아니다.
+- `s3-preflight.json`은 named production identity, `ap-northeast-2`, `zeroverse/prod/`, PUT/SSE-S3/GET bytes/anonymous deny/ListBucket deny/delete acknowledgement를 PASS로 기록한다. `https-boundaries.json`은 `/`·`/login` HTML 200/no-store, asset 404, 외부 health/swagger 404, API missing JSON 401 및 hostname SAN TLS를 PASS로 기록한다. `startup-readiness.json`은 readiness `UP`, `runtime-security.json`은 backend loopback-only·database port not listening·0 restarts를 기록한다.
+- 위 receipts의 독립 대조 범위는 **preflight/경계 PASS**다. fresh account, refresh rotation/logout replay, browser S3 PUT/complete, private/public ACL, comment/notification, restart preservation, historical-version rollback은 아직 PASS로 확대하지 않는다. `https-boundaries.json`의 `/api/v1/health/readiness` 외부 404와 내부 `startup-readiness.json`의 UP은 서로 다른 경계이며 혼동하지 않는다.
+- QA 소유 `qa/x-deployment-production-acceptance.mjs`는 exact target/run-id/production prefix, mode-600 private fixture, token/cookie/presigned URL/object key 비기록, `allHeaders()` fail-closed, signup/login/refresh rotation/stale replay/logout, real Chrome profile/post S3 PUT, CORS/anonymous deny, canonical ACL, 4×5MiB read를 요구한다. `node --check`, 5개 가드 테스트, self-check는 PASS했다. 첫 실제 명령(`T6_WRITE_APPROVED=1`, 고유 run ID)은 public feed read 직전 `getaddrinfo ENOTFOUND zeroverse.co.kr`로 중단되어 synthetic account/S3 mutation 0건이며, receipt `build/t6-deployment-20261116/production-acceptance-deployment-20261116-qa7f3c1a/evidence.json`는 FAIL/NOT RUN 세부를 보존한다. 이 환경 제한 결과를 제품 FAIL이나 production PASS로 해석하지 않는다. 하네스는 parent/root가 네트워크가 열린 실행 환경에서 새 고유 run ID로 재실행해야 한다.
+- 준비 시점 판정(실행 전): **T6 production acceptance NOT RUN / PRODUCTION NOT CLAIMED**. 당시 T6-FLOW-01·02, T6-REC-01, T6-ROLL-01, T6-CLEAN-01은 unchanged-code 및 preflight receipt만으로 닫지 않았다. T6-FLOW-01의 cookie 계약은 `Path=/api/v1/auth`가 정본이다. 현재 core receipt는 위 actual section에서 별도로 판정한다.
+
+## 독립 QA 검토 결론 (T0~T5 closeout snapshot)
+
+해당 시점의 QA 결론은 **T0~T5 FINAL QA CLOSEOUT PASS** — FE LOW·HIGH 독립 검토, final T5 synthetic dev AWS/browser 40/40, final backend 독립 reviewer 및 118/670 회귀, final artifact·prod smoke·cleanup, synthetic teardown/shutdown을 모두 독립 대조했다. final archive와 final JAR identity도 검증했다. 이는 실제 배포 완료나 production 운영 승인으로 해석할 수 없었고, 이후 T6 actual section에서 core 운영 인수를 추가 판정했다.
+
+## T6 실제 운영 QA 준비 및 최소 게이트 — 2026-11-16 KST (준비 시점 snapshot)
+
+> 준비 시점 상태: **PREPARED / NOT RUN — PRODUCTION NOT CLAIMED**. 사용자의 T6 명시 승인과 회의 `X-20261113-deployment.md` §15를 확인했지만, 이 section은 실행 전 계획 snapshot이다. 실제 core acceptance와 현재 판정은 위 actual section을 따른다.
+
+- 정본: 회의 §10 A-v2·§12·§14·§15, `deploy/README.md` §2~§6, `zeroverse-deployment-plan.html`의 Aiven/S3/복구 흐름을 대조했다. 신규 Aiven `defaultdb`를 첫 운영 DB로 사용하고 기존 local DB/`.local-data/`/기존 업로드는 자동 이관하지 않는 경계가 확정됐다.
+- 대상: `https://zeroverse.co.kr` → `54.116.133.220`, Ubuntu 24.04/Java 21/Caddy 2.11.9; Aiven `zeroverse-mysql-zero-verse.b.aivencloud.com:14326/defaultdb`; S3 `zero-verse-s3`, `ap-northeast-2`, 운영 prefix `zeroverse/prod/`.
+- 기준 산출물: `build/releases/zeroverse-deployment-20261113-a7fb8fe.tar.gz`, archive SHA-256 `9b38074bb2e6488634d5e9dd9356ab23a7b7f4db754a46ccd5f7b6f69086d542`, packaged JAR SHA `a7fb8fe0…`. 로컬 archive verify는 기존 T0~T5 증거로 PASS지만, 서버 설치 경로·실제 서비스 기동은 QA가 아직 독립 검증하지 않았다. root가 보고한 HTTPS probe/새 배치도 receipt 대조 전에는 PASS로 승격하지 않는다.
+- 현재 외부 실행 경계: DB 비밀번호·운영 AWS 자격증명은 QA에 제공되거나 기록되지 않았고, `build/t6-deployment-20261116/`에는 QA 인수 receipt가 없다. root가 준비한 `configure-secrets.py`는 읽기 전용 보안 검토만 했다. `getpass`·root+TTY·비밀 미출력·temp `0600`/atomic replace·keytool 비밀번호 env 전달은 적절하나, CA/env/truststore 권한·심볼릭링크·`zeroverse` group preflight, keytool 성공 후 env 저장 실패 시 truststore/env 불일치, root-only `mysql-client.cnf`와 backup 실행 주체를 확인해야 한다.
+
+### T6 최소 실제 인수·복원·롤백 매트릭스
+
+| ID | gate | 합격 기준 / 필수 증거 | 현재 상태 |
+|---|---|---|---|
+| T6-PRE-01 | release provenance | 서버에 archive SHA와 JAR/FE manifest가 일치한 동일 release를 추출하고, 서버에서 Gradle/npm build를 하지 않으며 secret/credential/keystore scan이 clean | **PASS** — archive/JAR identity·452 source diff 0·final current release와 secret scan을 최종 receipt에서 확인 |
+| T6-PRE-02 | root-only secret input | `/etc/zeroverse` 디렉터리·CA·env·truststore·MySQL CNF의 owner/mode/symlink를 확인하고 비밀은 채팅·로그·receipt에 없음; systemd가 env를 읽고 service user가 직접 secret 파일을 읽지 않는지 확인 | **PASS (receipt 범위)** — `db-preflight.json`의 truststore/secret permissions, private-key 미전송, 최종 JSON `0600`과 secret-free evidence를 확인 |
+| T6-PRE-03 | fresh Aiven + migration | Flyway 전 `defaultdb` schema/row inventory를 보존하고, Aiven CA + hostname `VERIFY_IDENTITY` + UTC 연결을 증명한다. V1~V6를 수정/repair하지 않고 V7 additive만 적용하며, 기존 local DB/`.local-data/`는 건드리지 않는다 | **PASS** — fresh empty/TLS/UTC preflight, 실제 Flyway 1~7, post-migration restore, 기존 local/업로드 미이관·미삭제 경계를 확인 |
+| T6-PRE-04 | production S3 preflight | 운영 identity·bucket·region·`zeroverse/prod/<runUUID>/`를 exact guard; PAB/BucketOwnerEnforced/SSE/HTTPS policy/CORS actual origin을 read-only 확인하고 앱 IAM은 prefix Get/Put/Delete만 보유(ListBucket/ACL/backup 권한 없음) | **PASS (preflight scope)** — `s3-preflight.json`의 named identity/region/prefix, SSE-S3, GET bytes, anonymous/List deny와 delete acknowledgement 독립 대조; full application object flow는 별도 gate |
+| T6-OPS-01 | HTTPS/Caddy/API boundary | DNS가 대상 IP를 가리키고 certificate hostname/chain 검증, HTTP→HTTPS redirect, deep link는 HTML/no-store, 유효 asset은 200/cache, missing asset은 non-HTML 404, `/api/*`는 JSON 404/응답을 SPA fallback하지 않으며 외부 health/docs는 차단 | **PASS** — `https-boundaries.json`·`final-external-check.json`에서 TLS/SAN, redirect, root/login, asset/API/health/docs 경계를 확인 |
+| T6-OPS-02 | readiness | 운영 DB preflight 완료 후 `/api/v1/health/readiness`가 200/`UP`/`no-store`; controlled DB failure에서는 503이며 CA/JWT/S3 누락을 200으로 숨기지 않음 | **PASS (healthy path 범위)** — live `UP`과 immutable final-JAR fail-fast/negative receipts를 확인했다. 운영 DB 고의 중단에 의한 503 주입은 실행·주장하지 않음 |
+| T6-FLOW-01 | HTTPS auth/session | fresh test account로 signup→login→refresh rotation→보호 API를 수행하고 `Secure; HttpOnly; SameSite=Strict; Path=/api/v1/auth` cookie, access token memory-only, logout 후 old/new refresh replay 거부를 실제 HTTPS에서 확인 | **PASS (core)** — `production-acceptance-deployment-20261116-rootcheck02/evidence.json`의 signup/signin, cookie, rotation, stale replay, signout, browser reload refresh가 required PASS |
+| T6-FLOW-02 | post/image/ACL | post draft/public 생성, S3 signed PUT·complete·canonical content read, profile/post image MIME·checksum·5MiB 경계, notification/comment, PUBLIC/UNIVERSE/PRIVATE/draft owner predicate와 권한 철회 후 404/deny를 확인. anonymous direct S3 GET은 403 | **PASS (flow scope)** — rootcheck02 core receipt의 signed PUT/complete·exact 5MiB/4-way read·CORS·anonymous deny·PUBLIC→PRIVATE ACL과 `supplement-flow-receipt.json` 27/27의 comment/notification·UNIVERSE grant/revoke·draft/private ACL이 PASS |
+| T6-REC-01 | restart/data preservation | app/Caddy 재시작 후 Aiven rows·image metadata/canonical refs·S3 bytes/checksum이 동일하고 local fallback이 생기지 않음; restart 전후 readiness/HTTPS smoke receipt | **PASS** — 두 same-artifact switch/return, snapshot 3종 동일 hash, final postcheck row/image preservation·readiness를 확인 |
+| T6-DB-01 | encrypted backup/restore | migration 전 암호화 dump를 별도 위치에 생성(평문·private key는 서버/버킷에 없음), 인증 복호화 후 별도 빈 fixture DB에 restore; Flyway history·row counts·image metadata·S3 byte/checksum·UTC audit 비교 | **PASS** — post-migration encrypted Aiven backup의 network-none 격리 복원과 16 tables/row/Flyway/image/S3 hash 일치, scheduled/ready backup을 확인 |
+| T6-ROLL-01 | compatible rollback | S3 row가 생긴 뒤 M10 pre-S3 release로 되돌리지 않는다. 이전 release가 S3 지원·migration 호환임을 manifest로 증명하고 stop→swap→start→readiness/API/image read를 rehearsal한 뒤 현재 SHA로 복귀; DB reverse migration/object delete 없음 | **PASS (same-artifact recovery)** — 동일 artifact 경로 전환·원래 release 복귀와 readiness PASS; 첫 배포라 historical-version rollback은 N/A |
+| T6-CLEAN-01 | exact teardown | signed URL TTL 만료를 확인한 뒤 이번 runUUID prefix만 정리하고, 운영 사용자·기존 객체·READY/bound/image metadata는 product cleanup 조건 없이 삭제하지 않음. 서비스 종료/volume 보존 receipt | **PASS** — exact synthetic 3 users/4 issued objects만 soft-delete/DeleteObject ACK, child rows·metadata 보존, services/shutdown receipts PASS |
+| T6-FINAL-01 | release decision | 위 required gates와 secret scan/receipt provenance가 모두 PASS일 때만 production PASS. 하나라도 미실행·partial이면 `NOT READY/NOT CLAIMED`로 유지 | **PASS (범위 제한)** — 첫 운영 배포 인수·복원·정리·same-artifact recovery 모두 PASS; historical rollback 및 live DB-failure injection은 N/A/미주장 |
+
+### 기존 harness 재사용 경계
+
+- `qa/x-deployment-s3-acceptance.mjs`는 presign/prefix, raw PUT, exact 5MiB, MIME/checksum, `If-None-Match`, 4-way read, complete idempotency, 403 ambiguity, CORS, anonymous deny, browser direct PUT의 `allHeaders()` 경계를 재사용할 수 있다. 그러나 이 harness는 `zeroverse-s3-dev`·localhost `18092/5173`·synthetic MySQL `13337`·`zeroverse/dev/`를 fail-closed로 고정하므로 T6에 그대로 실행하지 않는다.
+- T6용 QA runner가 필요하면 sanitized public config(HTTPS base, bucket/region, runUUID prefix만)와 `T6_WRITE_APPROVED=1`·exact target guard를 요구하고, access token/cookie/password/presigned URL/object key를 evidence에 기록하지 않아야 한다. 실제 test account와 object는 root가 승인한 단일 runUUID로 한정하고 teardown도 같은 prefix만 대상으로 한다. 현재는 새 runner를 만들거나 실행하지 않았다.
+- `qa/m9-acceptance.mjs`/`qa/m10-acceptance.mjs`의 auth/notification/route assertion 패턴, `qa/deployment-artifacts-test.py`의 격리 Caddy/release 검증, `deploy/backup-db.sh`의 encrypted dump 절차는 참고·재사용하되 각각 실제 운영 HTTPS, Aiven restore, rollback PASS를 대신하지 않는다. QA는 root가 제공한 redacted receipt를 독립 재집계하고, 운영 DB에 복원하지 않는다.
+
+### 실패 시나리오와 중단 조건
+
+- `/api`가 HTML SPA로 응답하거나 deep link/asset 404가 뒤섞임, refresh cookie가 Secure/HttpOnly/SameSite/rotation을 잃음, Aiven CA/hostname 검증 없이 200 readiness, S3 anonymous GET·prefix 밖 접근 허용, 잘못된 bytes/MIME/checksum complete 수용, 권한 철회 후 canonical read 허용이면 즉시 T6 FAIL/중단이다.
+- 신규 Aiven inventory에 예상하지 않은 기존 row가 있거나 `.local-data/`/기존 사용자 S3 객체가 변경되면 “신규 DB·기존 보존” 계약을 위반한 것이므로 원인·복원 계획·추가 사용자 승인 전 진행하지 않는다.
+- 이전 release가 S3 지원·migration 호환임을 증명할 수 없으면 rollback rehearsal을 PASS로 만들지 않는다. M10 pre-S3 rollback이나 DB reverse migration/object bulk delete는 허용하지 않는다.

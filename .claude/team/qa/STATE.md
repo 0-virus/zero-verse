@@ -4,7 +4,7 @@
 
 ## 현재 단계
 
-- **M10 테스트·마감 QA — COMPLETE / DEV INTEGRATED**다.
+- **T6 실제 운영 QA — FINAL PASS (첫 배포·범위 제한 명시)**다. T0~T5와 M10은 최종 PASS/DEV INTEGRATED로 닫혔고, root의 Aiven/S3/HTTPS preflight, rootcheck02 fresh account·browser·object flow, same-fixture comment/notification/UNIVERSE/draft flow, restart 보존, 암호화 백업/격리 복원, exact teardown을 독립 대조했다. 첫 배포라 historical-version rollback은 N/A이며 same-artifact switch/return만 실제 검증했다. 운영 DB 고의 중단 live 503 주입은 실행·주장하지 않는다.
 - 최종 acceptance는 `feature/M10-closeout` tested head `b5843743c5b86f84cb0bb045e60dc063aa8cccae`의 product/harness 상태에서 실행됐고, PR #16으로 `dev` merge SHA `288f29cffef0671c20a365921f087fe02d4dfcdb`에 통합됐다. tested tree `23ce12bc28c1613c04537587692b89ed9f1922e8`와 merge tree가 동일하며 diff는 비어 있다. acceptance의 실행 commit/tree는 기록 commit으로 재표기하지 않는다. M9 A-v2는 PR #15로 `dev`에 통합된 COMPLETE 상태다.
 - M10 local MVP closeout은 배포·S3/AWS/U0·실사용 DB·기존 업로드·운영 ADMIN bootstrap·모바일·운영 SLA/peak memory를 포함하지 않는다.
 
@@ -16,25 +16,28 @@
 - Acceptance provenance는 source manifest `a188b0dcc6278010b9298300d15474be98450035ca846948e5a44382ea717c27`, acceptance JAR `1ade616199bd0da11daa5856dcd5d88fe8fae4042c0ee8ab66725baa01188b21`, FE dist `992d0e1dc72c094afb13754473d07dd3944c1209f3cb0b3331addd83ffb802ef`, harness `9864b13181cab9e3563f5effc1f951546f9e30bb5a8597363d4989e4c5af9ecb`, Git tree `90e7657a6ccd6e101abcfa46ffee22c375c6e9c8`이며 before/after가 일치한다.
 - QA는 현재 431-file manifest를 재계산해 missing/mismatch `0/0`, PNG 13개를 재계산해 모두 고유·nonzero·1440×1000임을 확인했다. backend XML은 109 suites/637 tests/failures/errors/skips `0/0/0`으로 재집계했고, frontend는 51 files/472 tests, lint/build exit 0 기록을 대조했다.
 - 최종 whole-branch scoped review는 I-1~I-4 `ADDRESSED`, 새 Critical/Important `0`, `Ready to merge: Yes`로 판정했다. Chrome에서 실행하지 않은 DraftPicker 선택·TopBar profile/search mutation·category mutation·admin select/confirm/paging은 Chrome PASS로 확대하지 않고 unit/API/source/runtime mapping으로 남겼다.
+- T6 실제 운영은 회의 §15.4와 `deploy/README.md`를 읽기 전용 대조해 `qa/X-deployment-review.md`에 최종 acceptance·복원·정리·same-artifact recovery와 범위 제한을 기록했다. 7개 최종 receipt 및 rootcheck02/supplement evidence를 독립 재집계했으며 QA는 운영 S3/DB/server mutation을 직접 하지 않았다.
 
 ## 다음 작업
 
-1. M10은 COMPLETE/DEV INTEGRATED이며 추가 QA 작업 없이 사용자 후속 지시를 대기한다.
-2. X-deployment T0~T5 QA는 FINAL CLOSEOUT PASS이며 추가 작업이 없다. T6 실제 운영 검증은 별도 범위·승인으로 시작한다.
+1. 현재 T6 required receipt 검토는 종료됐다. 새로운 운영 변경·장애·release 전환이 생길 때에만 QA 재검토를 연다.
+2. historical rollback N/A와 live DB-failure injection 미실행을 운영 기록의 명시적 범위 제한으로 유지한다.
+3. M10·T0~T5는 COMPLETE/FINAL CLOSEOUT PASS로 유지한다.
 
 ## X-deployment 후속 상태
 
 - `qa/X-deployment-review.md`에 X-20261113-deployment §10 A-v2의 배포 검증 매트릭스와 §11 FE LOW 독립 리뷰 슬롯을 기록했다.
-- 현재 단계: **T0~T5 FINAL QA CLOSEOUT PASS / PRODUCTION NOT CLAIMED**. 사용자 A-v2 전체 승인, backend 별도 reviewer 최종 PASS, final artifact·synthetic acceptance·teardown/shutdown을 확인했다. 실제 운영 인수는 별도 T6다.
-- 진행 중: `qa/X-deployment-review.md`에 final reviewed browser 41 checks/40 required, allHeaders·UUID 경계, final JAR `a7fb8fe0…` 17개 prod receipt, final backend 118 suites/670 tests `0/0/0`, final cleanup review, final source manifest, final archive verify, synthetic teardown 13/13·runtime shutdown 및 잔여 운영 matrix를 기록했다. `qa/X-deployment-backend-review.md`는 별도 reviewer 소유 artifact로 유지하며 덮어쓰지 않았다.
-- 다음 작업: T0~T5 범위에는 추가 작업이 없다. 실제 domain/Lightsail/Aiven/HTTPS refresh-cookie·rollback/T6와 bucket-level/prefix 밖 정책은 새 운영 범위·승인 시 별도 검증한다.
-- 차단 요인: T0~T5 내부 차단 없음. T6 착수에는 실제 Lightsail/domain/Aiven CA·운영 S3 identity/prefix·target DB inventory와 명시적 운영 실행 승인이 필요하다. 신규 Aiven 사용·기존 local 보존 및 이관 경계 결정은 A-v2로 확정됐다.
-- 갱신 시각: 2026-11-13 KST — FE LOW focused/build PASS, FE HIGH focused 3 files/40 tests 독립 PASS, CORS OPTIONS 200 부분 PASS, 배포 산출물 격리 Caddy/release PASS, final reviewed T5 41 checks/40 required PASS(allHeaders·UUID 8경계 포함), final JAR `a7fb8fe0…` memory peak `594480 KiB`, prod receipt 17/17 PASS, final backend 118 suites/670 tests `0/0/0`, final cleanup review PASS, final archive `9b38074b…` verify PASS, backend 별도 reviewer PASS, synthetic teardown 13/13·runtime shutdown PASS. bucket-level PAB/ownership/encryption/CORS/policy·실제 production DB/HTTPS/rollback/T6는 미실행이며 실제 배포 완료를 주장하지 않는다.
+- 현재 단계: **T0~T5 FINAL QA CLOSEOUT PASS / T6 FINAL QA PASS (첫 배포·범위 제한)**. 사용자 T6 명시 승인(회의 §15), backend 별도 reviewer 최종 PASS, final artifact·production acceptance·teardown/shutdown, Aiven/S3/HTTPS preflight, rootcheck02 core browser/API/S3 및 same-fixture comment/notification/UNIVERSE/draft receipt, restart/restore/backup final metadata를 확인했다.
+- 진행 중: `qa/X-deployment-review.md`에 T6 대상(`zeroverse.co.kr`/`54.116.133.220`, 신규 Aiven `defaultdb`, S3 `zeroverse/prod/`)과 release SHA, fresh inventory·CA `VERIFY_IDENTITY`·private S3·HTTPS cookie·ACL·restart·encrypted backup/restore·S3-compatible rollback 매트릭스, 기존 harness 재사용 경계를 기록했다. `qa/X-deployment-backend-review.md`는 별도 reviewer 소유 artifact로 유지하며 덮어쓰지 않았다.
+- rootcheck02 PASS는 실행 snapshot SHA `2b716301…`에 결속된다. 이후 QA harness의 `requiredChecks`에 `api-signin-viewer`를 추가한 metadata-only 보정 후 현재 SHA `43890b5e…`가 달라졌으며, syntax/unit/self-check만 재실행하고 운영 PASS를 새 SHA로 재결속하지 않았다.
+- 다음 작업: 현 배포 범위의 QA 필수 작업은 없다. 새 release/운영 장애/데이터 변경이 생기면 동일 receipt·secret-free·소유권 경계를 재검토한다.
+- 차단 요인: 없음. 첫 배포 historical-version rollback은 대상 release 부재로 N/A이며 same-artifact switch/return은 PASS다. live DB failure 503 주입은 안전상 수행하지 않은 비주장 범위다. 신규 Aiven 사용·기존 local 보존/이관 경계는 A-v2/§15로 확정됐다.
+- 갱신 시각: 2026-11-16 KST — 7개 최종 receipt(`final-postcheck`, `final-external-check`, `teardown`, `ready-backup`, `restore-shutdown`, `post_migration_restore`, `scheduled-backup`) 모두 PASS/0600을 독립 확인했다. rootcheck02 28 checks/27 required 실행 snapshot과 supplement 27/27, switch 두 건, snapshot 3종, Aiven 16-table 복원·S3 4개 hash 일치를 확인했으며 현재 QA harness metadata-only 보정은 운영 결과와 분리했다.
 
 ## 남은 gate / 차단 요인
 
 - M10 QA gate와 dev 통합은 차단되지 않았다. PR #16이 `dev`에 병합됐고 root가 마일스톤/JOURNAL 기록을 완료하는 단계까지 닫혔다.
-- 비차단 Minor: archive copy 원자성, FE origin 문자열 검사, 추적되지 않은 listener에 대한 `stop-fe` 상태 문구, attempt parent symlink/동시 실행 방어, 일부 artifact 상수 기록, 958.38 kB bundle warning, 선택적 trim-positive 테스트.
+- 비차단 Minor: archive copy 원자성, FE origin 문자열 검사, 추적되지 않은 listener에 대한 `stop-fe` 상태 문구, attempt parent symlink/동시 실행 방어, 일부 artifact 상수 기록, 958.38 kB bundle warning, 선택적 trim-positive 테스트. T6의 historical rollback/live DB-failure injection 비실행은 기록된 범위 제한이며 현재 차단 요인이 아니다.
 - RISK-0010/0012/0013/0021 및 운영·배포 관련 기존 위험은 local MVP PASS로 닫지 않는다.
 
 ## 산출물
@@ -53,4 +56,4 @@
 
 ## 현재 소유권 준수
 
-이번 X-deployment 갱신은 `qa/X-deployment-review.md`, `qa/x-deployment-s3-acceptance.mjs`, `qa/AGENTS.md`, `.claude/team/qa/STATE.md`, `.claude/team/qa/WORKLOG.md`만 대상으로 한다. 제품 source/test·frontend·backend·governance·마일스톤 worklog·runtime·DB·사용자 데이터·업로드·AWS 설정은 수정하지 않는다.
+이번 T6 준비 갱신은 `qa/X-deployment-review.md`, `.claude/team/qa/STATE.md`, `.claude/team/qa/WORKLOG.md`만 대상으로 한다. 제품 source/test·frontend·backend·governance·마일스톤 worklog·runtime·DB·사용자 데이터·업로드·AWS 설정·운영 helper는 수정하지 않는다.

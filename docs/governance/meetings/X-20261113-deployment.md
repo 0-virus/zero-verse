@@ -266,3 +266,50 @@ DB lock 이후 READY 중복 완료는 정상 멱등 성공이며 DB unique 예�
 
 - 최종 실제 서명 URL 만료를 확인한 뒤 DB의 이번 합성 `t5-owner/t5-friend @example.test` 소유와 정확한 승인 prefix를 교차 검사했다. 제품 cleanup 처리분 외 남은 테스트 객체 키13개에 DeleteObject 성공 응답13/실패0을 받았다. 이는 이번 합성 fixture의 명시적 teardown이며 READY 이미지 자동 정리 정책을 만든 것이 아니다. bucket listing이나 다른 prefix 접근은 하지 않았다.
 - `build/x-deployment-runtime-20261113/synthetic-s3-teardown.json`과 `runtime-shutdown.json`에 근거를 남겼다. root가 시작한 API18092·FE5173 포트는 닫혔고 전용 MySQL 컨테이너는 중지했다. 테스트 DB volume·증거·암호화 백업은 보존했다. 사용자 DB·기존 `.local-data/`·기존 S3 객체·IAM/bucket 설정은 변경하지 않았다.
+
+
+## 15. 2026-11-16 KST — T6 실제 운영 배포 승인·착수
+
+- 사용자에게 서버 설정·파일 전송, 신규 Aiven defaultdb 테이블 생성, 운영 S3, HTTPS와 동작 검증 범위를 제시했고 사용자가 **“그렇게 해”**로 명시 승인했다. T0~T5와 구분했던 T6 실행을 이 승인으로 시작한다. 기존 local DB/업로드 자동 이관, 추가 유료 자원 생성, Git commit/push는 포함하지 않는다.
+- 대상: zeroverse.co.kr → Lightsail 54.116.133.220, Ubuntu24.04/Java21/Caddy2.11.9/2GB. Aiven endpoint zeroverse-mysql-zero-verse.b.aivencloud.com:14326/defaultdb, 제공 CA 사용. 비밀은 저장소·채팅·로그에 기록하지 않는다.
+- root: 서버·설정·릴리스·백업·운영 검증 실행 및 통합 기록. deployment_qa: qa 기록·최종 독립 검증. 제품 변경 필요 시 원 소유 역할에 배정한다.
+- 기준 release: zeroverse-deployment-20261113-a7fb8fe, archive SHA256 9b38074bb2e6488634d5e9dd9356ab23a7b7f4db754a46ccd5f7b6f69086d542. 현 main4186e0e, 작업트리 clean에서 archive11파일 verify 및 checksum 재검증 PASS. 역할별 오래된 STATE의 진행 중 문구는 §14/최종 QA 및 실제 artifact로 보완한다.
+- 초기 gate: 운영 S3 identity/prefix/CORS, DB 비밀 입력, 신규 DB inventory와 migration 전 암호화 백업, CA VERIFY_IDENTITY 연결을 먼저 확인한다. 증거는 build/t6-deployment-20261116/에 보관한다.
+
+### 15.1 서버 준비·HTTPS 및 비밀 입력 대기
+
+- root가 SSH로 zeroverse 시스템 사용자, root-owned release/환경 디렉터리, MySQL8 client를 준비했다. archive11파일 verify와 서버 archive SHA 및 JAR a7fb8fe 동일성을 확인했다. archive 최상위 release명으로 생긴 경로 중첩1회를 이번 신규 배치 내에서 정정하고 README 추출 안내를 보완했다.
+- Caddy 원본 설정은 서버에 보존하고 DOMAIN=zeroverse.co.kr 서비스 환경을 설정했다. 외부 HTTPS 인증서 검증 성공·HTTP308→HTTPS·준비중503/no-store 응답 확인. 운영 앱은 아직 시작하지 않았고 DB에 접속하거나 migration하지 않았다.
+- deploy/s3-iam-production.json과 s3-cors-production.json을 만들었다. 사용자 운영 IAM 미생성 답변에 따라 콘솔 생성·기존 CORS 병합을 안내했다. 기존 default AWS login은 만료되었고 root 세션으로 실제 AWS 관리 작업을 수행하지 않았다.
+- root-only 숨김 입력 helper를 서버 /var/lib/zeroverse-deploy/configure-secrets.py에0700으로 설치했다. env600/MySQLcnf600/truststore0640을 생성하며 비밀은 화면/로그에 출력하지 않는다. serialization6종·control거부3종·서버syntax PASS, QA 사전 검토 완료. 비밀번호와 운영 AWS키 값은 아직 입력되지 않았다.
+- 백업 개인키는 Mac의 /Users/zerovirus/.zeroverse-recovery/20261116/에0600으로 보관하며 서버에는 공개 recipient cert만 전송했다. 복원용 새 로컬 MySQL8.4 격리 환경(network none/no port)을 준비했다. 기존 local DB/데이터는 무변경이다.
+- 증거: build/t6-deployment-20261116/preflight.json, server-prepared.json. 현재 **SERVER PREPARED / WAITING FOR SECRETS / 운영 완료 아님**. 다음은 사용자 DB·AWS 숨김 입력 및 IAM/CORS 완료 후 TLS DB inventory·migration전백업·실제배포·인수다. 추가 실행 승인을 다시 요구하지 않는다.
+
+### 15.2 비밀 입력 완료·신규 DB 적용·공개 앱 활성화
+
+- 사용자가 운영 IAM/CORS 생성과 DB/AWS `configuration saved`를 모두 확인했다. root가 값 미출력 방식으로 env600/CNF600/truststore0640/root소유, CA alias·비밀번호 일치, Aiven MySQL8.4.11 VERIFY_IDENTITY/TLS_AES_256_GCM_SHA384/UTC/기존테이블0을 확인했다.
+- 마이그레이션 전 암호화 백업 `pre-migration-20261116.cms` SHA256 `4bf3998c81ce5e2473e6a1861c82bac02cfb8d2d036c7a5e8444cd169f08ba80`을 서버와 Mac 복구 폴더에 보관했다. 인증 복호화 완료 후 격리 local MySQL의 새 pre_migration_restore에 실제 복원, table0 일치 PASS. 복호화 키는 앱 서버로 전송하지 않았으며 로컬 복원 컨테이너 내 임시 키·평문 SQL은 제거했다.
+- 운영 사용자 `zeroverse-s3-prod` STS identity, prod/이번UUID 객체 PUT/GET bytes/SSE-S3/anonymous403/ListBucket403/DeleteAcknowledged PASS. 이번 probe객체는 삭제했으며 기존 객체는 건드리지 않았다. Ubuntu apt의 awscli 후보 부재를 확인하고 AWS 공식 installer를 공식 PGP 지문·서명 검증 후 설치했다.
+- zeroverse systemd 활성화, Flyway1~7 전부 success1, 최초 사용자0/readinessUP 확인 후 준비중Caddy를 검증된 final Caddyfile로 전환했다. Flyway의 MySQL8.4 tested-version 경고는 남지만 실제7 migrations·기존8.4회귀가 통과했다. 앱 메모리 약553MB/NRestarts0, 실제 서울리전, Java IPv4-mapped loopback8080만 수신하며 DB포트는 열리지 않았다.
+- 외부 TLS 인증서 검증/zeroverse.co.kr SAN, root/login200·no-store, 없는asset404, health/Swagger404, 잘못된API401 JSON PASS. 실제 사용자 흐름 인수·restart/rollback·postmigration백업복원은 아직 진행 중이다. 사용자 콘솔 bucket PAB/ownership/default encryption/HTTPS정책 확인과 정기백업 선호를 요청했다.
+- 증거: `build/t6-deployment-20261116/{db-preflight,pre_migration_restore-receipt,s3-preflight,startup-readiness,runtime-security,https-boundaries}.json`. 과거 §15.1의 입력 대기는 해소됐다. 현재 **APP RUNNING / T6 ACCEPTANCE IN PROGRESS**다.
+
+### 15.3 사용자 S3 설정 확인·정기 백업 선택
+
+- 사용자 콘솔 확인 답변: 공개 액세스 차단4개/버킷 소유자 적용(ACL비활성화)/기본SSE-S3가 모두 설정돼 있다. `s3-bucket-https-only.json`의 HTTPS전용 Deny 정책을 추가했다고 답했다. 이는 사용자 확인 증거이며 앱 IAM으로 bucket관리 API를 읽었다고 주장하지 않는다. IAM 권한을 넓히지 않았고 HTTPS S3 실제 CRUD/익명403/CORS는 별도 실측했다.
+- 사용자 선택: **매일 새벽4시KST, 정기백업7일 보관**, 수동·마이그레이션 전 백업은 자동삭제 제외. root가 `scheduled-backup.py`, `zeroverse-backup.service/timer`를 구현했다. 새 암호화백업 성공 후 strict이름/UTC생성시각·mtime/regular/root소유/single-link 조건을 만족하는 정기파일만 정리하며 flock으로 겹침을 막는다.
+- 정기백업5개 테스트(실패/empty시 보존, 수동/사전/최근파일 보존, symlink/hardlink/owner보존, 성공후한정정리)와 기존release5개 테스트 총10 PASS. 서버 systemd verify/calendar는04:00 Asia/Seoul=19:00UTC로 해석됐다. 실제실행·최종QA 결과는 후속 receipt로 판정한다.
+
+### 15.4 실제 운영 인수·복원·정리 완료 — 2026-11-16 KST
+
+- **T6 실제 운영 검증 PASS**, 서비스 `https://zeroverse.co.kr` 공개 운영 중. 최종 `final-postcheck.json`에서 zeroverse/Caddy/backup timer 모두 active, readiness UP, current 원래 release, JAR a7fb8fe 동일성을 확인했다. 외부 `final-external-check.json`은 TLS 검증·root/login200·내부 readiness/Swagger404·정리한 synthetic 계정3개 signin401 PASS다. 본 절의 실측은 §15.1~15.2의 과거 대기 상태를 해소한다. 독립 최종 판정은 `qa/X-deployment-review.md`의 T6 기록을 따른다.
+- 실제 Chrome/API 인수 `production-acceptance-deployment-20261116-rootcheck02/evidence.json`: **28 checks PASS**. 가입/로그인, HttpOnly/Secure/SameSiteStrict 및 cookie Path `/api/v1/auth`, refresh rotation/stale replay/logout, 브라우저 reload, 정확한5MiB 프로필·4회 동시read, 본문 이미지 업로드, PUBLIC→PRIVATE 권한 차단, S3로 앱 Authorization/cookie/referrer 미전달, CORS·S3익명차단을 검증했다. `supplement-flow-receipt.json`은 대표이미지, 댓글/알림/읽음, 친구 요청/수락/철회에 따른 글·이미지 ACL, draft 접근 등 **27 checks PASS**다.
+- runner 초기 DNS sandbox 실패는 쓰기 전 종료했다. rootcheck01은 refresh replay 검증의 APIRequestContext 메서드 오류로 중단했으며 QA가 storageState 방식으로 수정했다. rootcheck02 실행본을 별도 보존했다. 후속 required-check 목록에 viewer signin을 명시한 수정은 기존 실제28개 결과를 바꾸지 않으며, 현재 runner hash를 과거 실행본 hash로 주장하지 않는다. 보충 runner 경로/응답상태와 합성 PNG CRC 오류도 검증 도구/자료에서 정정했고 제품 소스는 무변경이다.
+- 원래 release→동일 artifact 복제 경로→원래 release의 두 차례 stop/start/current 전환과 readiness 모두 PASS. snapshot-before/candidate/restored에서 글·프로필 경로·이미지4개의 크기/SHA 일치. 동시read 포함 systemd MemoryPeak **664354816 bytes(약634MiB)**, NRestarts0. 첫 배포이므로 **이전 버전으로의 실제 rollback은 N/A**이며 동일artifact 경로 전환을 역사적 버전 rollback으로 표현하지 않는다. 실패 복구 분기 전체를 강제 장애 주입으로 검증했다고도 주장하지 않는다.
+- post-migration 암호화 백업 SHA256 `61faa30c6219b7d23b2aab7606ad30713ff1568134ac256708baf418d5c79fa7`을 Mac에 복사하고 network-none/no-port 격리 MySQL8.4의 새 DB에 인증 복호화 후 실제 복원했다. **16 tables, 전체 row counts, Flyway1~7, 이미지 metadata hash, live S3 이미지4개 바이트 hash 일치 PASS**. 운영 DB에 복원하지 않았다. 로컬 복원 컨테이너 내 임시 개인키·평문SQL 제거와 컨테이너 중지 확인, 데이터는 보존했다.
+- 정기 백업 실제 oneshot Result=success/exit0, root600 암호화 파일27484bytes 생성 PASS. timer active, 다음 실행은 **2026-11-17 04:00 KST**. 매일04시/7일보관이며 수동·사전백업 제외. 서버 자체 장애를 대비한 외부 정기 복제는 이번 범위에 없다. 복호화 개인키는 Mac `/Users/zerovirus/.zeroverse-recovery/20261116/backup-private-key.pem`에만 보관하며 앱 서버에 전송하지 않았다.
+- QA가 검토한 exact manifest의 synthetic 사용자3명/이미지UUID4개/post1개를 DB 소유권·bucket/region/key·intent·PUT서명만료+10초로 재검증한 뒤 정리했다. 첫 apply의 이메일 collation1267은 commit 전 실패했고 deletedBefore0 확인 후 정확한 `BINARY email=UNHEX(...)` 비교로 수정, rollback 진단→apply PASS. 사용자3명 soft-delete/해당 refresh token0, S3 DeleteObject ACK4. 전체 하위 row 수·이미지 metadata hash 보존을 별도 postcheck로 확인했다. bucket 전체/다른prefix/기존 사용자자료를 지우지 않았고 객체 버전 영구삭제를 주장하지 않는다. 완료이미지 자동 회수 정책을 추가한 것도 아니다.
+- 정리 후 운영 기준 수동 백업 `ready-20261116.cms` SHA256 `2ecb475af74b8eb70ec51f81d9f0e4fbf609d5a616c4f45a993b570e44573845`을 서버와 Mac에 보관했다. 실제 격리 복원 검증은 앞선 post-migration 파일에 수행했고 최종 파일은 같은 검증된 생성 절차와 복사 hash를 확인했다. 과거 검증용 계정/이미지 메타데이터가 들어 있는 이전 백업은 역사적 시점 자료이며, 삭제된 테스트 S3 객체를 복구하지 않는다.
+- 증거: `build/t6-deployment-20261116/`의 위 receipts와 `scheduled-backup-receipt.json`, `teardown-receipt.json`, `ready-backup-receipt.json`, `restore-shutdown.json`, `switch-*.json`. private fixture/credentials와 모든 JSON 증거는0600, Git 제외. 기존 local DB/업로드는 보존했고 이번 T6 변경의 commit/push는 수행하지 않았다.
+
+- 최종 독립 QA: deployment_qa가 **T6 FINAL QA PASS(첫 배포 범위)**로 판정했다. root가 갱신된 QA 문서/STATE와 7개 최종 receipt PASS·0600, core28/보조27 전부 ok, snapshot3종 동일, diff whitespace clean을 직접 확인했다. 남은 필수 작업은 없다.

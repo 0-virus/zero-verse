@@ -9,6 +9,7 @@ import {
 } from '../../features/notifications/NotificationProvider';
 import type { NotificationItem } from '../../features/notifications/types';
 import { ApiRequestError } from '../../lib/apiClient';
+import { useOptionalAuth } from '../../lib/authContext';
 
 type NotificationRetry = () => Promise<void>;
 const READ_ONLY_NOTIFICATION_MESSAGE = '정지된 계정은 알림을 읽기 전용으로 확인할 수 있습니다.';
@@ -52,8 +53,10 @@ export function TopBar({ nickname }: { nickname?: string | null }) {
   const [notificationRetry, setNotificationRetry] = useState<NotificationRetry | null>(null);
   const [notificationBusyId, setNotificationBusyId] = useState<number | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [signoutBusy, setSignoutBusy] = useState(false);
   const notifications = useNotificationPreview();
   const adminAccess = useOptionalAdminAccess();
+  const auth = useOptionalAuth();
 
   useEffect(() => {
     setKeyword(searchParams.get('keyword') ?? '');
@@ -117,6 +120,21 @@ export function TopBar({ nickname }: { nickname?: string | null }) {
     setProfileOpen(nextOpen);
     if (nextOpen && isSignedIn && adminAccess) {
       void adminAccess.probe();
+    }
+  };
+
+  const handleSignout = async () => {
+    if (!auth || signoutBusy) return;
+    setSignoutBusy(true);
+    try {
+      await auth.signout();
+    } catch {
+      // AuthContext clears the local session even when the server request fails.
+    } finally {
+      setProfileOpen(false);
+      setNotificationOpen(false);
+      setSignoutBusy(false);
+      navigate('/signin', { replace: true });
     }
   };
 
@@ -289,6 +307,18 @@ export function TopBar({ nickname }: { nickname?: string | null }) {
                 )}
                 {adminAccess && (adminAccess.status === 'loading' || adminAccess.status === 'idle') && (
                   <span className="block px-3.5 py-2.5 text-xs text-text-muted">관리자 권한 확인 중...</span>
+                )}
+                {auth?.isAuthenticated && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={signoutBusy}
+                    aria-busy={signoutBusy}
+                    onClick={() => void handleSignout()}
+                    className="block w-full border-t border-line px-3.5 py-2.5 text-left text-[13px] text-ink hover:bg-surface-soft disabled:cursor-wait disabled:opacity-60"
+                  >
+                    로그아웃
+                  </button>
                 )}
               </div>
             )}

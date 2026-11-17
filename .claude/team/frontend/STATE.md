@@ -2,12 +2,13 @@
 
 > 덮어쓰기 스냅샷. 시간순 이력은 `WORKLOG.md`, 배포 심의·실행 기준은 `docs/governance/meetings/X-20261113-deployment.md`를 본다.
 
-마지막 갱신: 2026-11-13 15:43:00 KST
+마지막 갱신: 2026-11-17 14:32:00 KST
 
 ## 현재 단계
 
 - M10 frontend는 **DEV INTEGRATED / COMPLETE**다.
 - X-deployment A-v2 사용자 승인 후 T3 HIGH 프론트 범위까지 구현했다. production same-origin API base와 S3 직접 업로드 intent→raw PUT→complete, local dev/test fallback, 계정 전환·abort·재시도 경계를 검증한다.
+- 운영 후속 UI 보완으로 인증 사용자의 TopBar 프로필 메뉴에 FR-AUTH-03 로그아웃 액션을 연결했다. 기존 `AuthContext.signout()`의 서버 Refresh 폐기·로컬 세션 정리를 재사용하고 성공/실패 모두 `/signin`으로 이동한다.
 
 ## 진행한 작업
 
@@ -18,6 +19,9 @@
 - `frontend/vite.config.ts`: API base와 `VITE_UPLOAD_TRANSPORT=local` production build를 command 전체(`--mode staging` 포함)에서 fail-fast 한다.
 - `frontend/src/features/upload/uploadApi.test.ts`, `uploadTransport.test.ts`, `src/test/apiClient.test.ts`, 기존 API base/client 회귀: 실제 fetch 순서·서명 헤더·raw exact File body·S3에 앱 인증정보 미전송·redirect/referrer guard·412/network/complete retry·intent id/MIME mismatch·401 refresh success·stale refresh/account switch·abort를 검증한다.
 - `frontend/src/AGENTS.md`: helper/transport ownership을 문서에 반영했다.
+- `frontend/src/components/layout/TopBar.tsx`: `useOptionalAuth()`의 `signout`을 인증된 프로필 메뉴에 연결했다. 요청 중 disabled/`aria-busy`로 중복 클릭을 막고 완료 뒤 `/signin`으로 replace 이동한다.
+- `frontend/src/test/TopBar.test.tsx`: guest 숨김, 성공 이동, 요청 중 중복 차단, 서버 오류 후 이동을 검증한다.
+- `frontend/src/test/logoutBehavior.test.tsx`: 실제 `AuthProvider`·메모리 Access Token·mock fetch로 signout 204/500의 user/access clear와 `/signin` 이동을 검증한다.
 
 ## 검증
 
@@ -37,17 +41,20 @@
 - T3 review-fix full: `build/x-deployment-fe-high-20261113/full-test-r2.log` — **54 files / 499 tests PASS**, exit 0.
 - T3 review-fix lint/build: `lint-r2.log`, `build-r2.log` — `oxlint`·TypeScript/Vite exit 0, Vite 151 modules. Existing >500 kB chunk warning remains non-blocking.
 - T3 review-fix production checks: `production-invalid-upload-transport-r2.log` exit 1 as expected for production local transport; `production-bundle-local-api-r2.log` records `NO_LOCAL_API_ORIGIN`.
+- logout focused: `npm test -- --run src/test/TopBar.test.tsx src/test/logoutBehavior.test.tsx --maxWorkers=1` → **2 files / 7 tests PASS**, exit 0.
+- focused clean rerun: `build/logout-20261117/focused-tests-clean.log` — `TopBar.test.tsx` + `logoutBehavior.test.tsx`, **2 files / 7 tests PASS**, exit 0; deferred resolver wrapped in `act`, no act warning.
+- logout full: `npm test -- --run --maxWorkers=1` → **55 files / 504 tests PASS**, exit 0.
+- logout lint/build: `npm run lint` exit 0; `npm run build` TypeScript/Vite exit 0, **151 modules**. 기존 500 kB 초과 chunk warning은 비차단이다.
 - 모든 검증은 사용자 DB·`.local-data`·AWS·실제 배포 대상에 접근하지 않았다.
 
 ## 다음 작업
 
-- 독립 QA가 T3 diff와 `build/x-deployment-fe-high-20261113/` 로그를 재검토한다. backend presign/complete 응답·서명 헤더 구현과 실제 AWS browser gate를 교차 대조한다.
-- root가 frontend 변경을 통합하고, T5에서 실제 named dev identity·private bucket·CORS·checksum·owner ACL·complete retry를 검증한다.
+- root가 logout diff를 독립 검토하고 필요한 QA 기록·커밋을 판단한다.
 
 ## 차단 요인
 
-- FE 자동 검증은 jsdom/mock 경계다. 실제 S3 URL/서명 헤더/CORS/5MiB·checksum/권한·운영 배포는 backend T2와 QA T5의 named dev AWS gate가 남아 있다.
+- 없음. 실제 브라우저 1440px 시각 검증과 운영 재배포는 root의 통합/배포 범위에서 판단한다.
 
 ## 소유권·통합
 
-- 이번 제품 변경은 `frontend/**`와 frontend 역할 기록만 포함한다. Git stage/commit/branch/push/merge는 수행하지 않았다.
+- 이번 변경은 `frontend/src/components/layout/TopBar.tsx`, `frontend/src/test/TopBar.test.tsx`, `frontend/src/test/logoutBehavior.test.tsx`, `.claude/team/frontend/STATE.md`, `.claude/team/frontend/WORKLOG.md`만 frontend 역할이 편집했다. Git stage/commit/branch/push/merge는 수행하지 않았다.

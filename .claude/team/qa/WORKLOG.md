@@ -1431,3 +1431,14 @@
 - 복구 범위: `switch-*.json` 두 건과 snapshot before/candidate/restored를 확인해 동일 JAR의 경로 전환·원래 release 복귀·readiness UP·NRestarts 0·이미지/글/프로필 hash 보존을 PASS로 판정했다. 첫 배포라 historical-version rollback은 N/A이며 same-artifact recovery만 검증했다.
 - 보안/정합성: 운영 DB/S3/서버를 QA가 직접 변경하지 않았고, evidence에 토큰·쿠키·비밀번호·presigned URL을 남기지 않았다. 현재 harness `43890b5e…`는 required-check metadata-only 보정이며 실제 production PASS는 실행 snapshot `2b716301…`에 결속된 것으로 유지했다.
 - 최종 판정: **T6 FINAL QA PASS (첫 운영 배포·범위 제한)**. 고의 live DB failure/503 주입과 historical rollback은 실행·주장하지 않으며, immutable final-JAR fail-fast/negative receipts·healthy readiness·same-artifact switch/return과 구분한다. QA 소유 문서/STATE만 갱신했고 제품·운영 자원·Git는 수정하지 않았다.
+
+## 2026-11-17 KST — 로그아웃 버튼 좁은 독립 검토
+
+- 범위: frontend 최종 `TopBar` 로그아웃 diff와 `FR-AUTH-03`/기존 `AuthContext.signout()` 계약만 검토했다. 성공·실패 모두 세션 정리 후 `/signin` replace, 중복 클릭 guard, `aria-busy`, guest 숨김을 확인했으며 API/schema 변경은 없었다.
+- 검증: `frontend/src/test/TopBar.test.tsx` 및 `frontend/src/test/logoutBehavior.test.tsx` focused 실행 결과 **2 files / 7 tests PASS**, stdout는 `build/logout-20261117/focused-tests.log`에 보관했다. 중복 클릭 케이스에 React `act(...)` 경고가 출력됐지만 테스트 실패나 기능 blocker는 아니며 원 구현 역할의 비차단 정리 항목으로 보고한다.
+- 브라우저: 로컬 Vite `http://127.0.0.1:5174`와 기존 Chrome을 사용하고 모든 `/api/v1/**`를 Playwright route mock했다. 인증 profile 메뉴→로그아웃에서 `signout` 1회, 즉시 `disabled=true`/`aria-busy=true`, 최종 `/signin`, guest 로그인 링크 표시·로그아웃 메뉴 0개를 확인했다. stdout `build/logout-20261117/mock-browser.log`, screenshot `build/logout-20261117/mock-browser-final.png`.
+- 경계/판정: 운영 URL·AWS·DB·신규 계정·실제 API mutation은 사용하지 않았고 로컬 Vite는 smoke 후 종료했다. **QA 판정 PASS**, `act(...)` 경고만 비차단 후속으로 남긴다. QA 소유 STATE/WORKLOG만 갱신했으며 frontend 제품 코드는 수정하지 않았다.
+
+## 2026-11-17 KST — 로그아웃 테스트 경고 해소 확인
+
+- 구현자의 test-only `act(...)` 보정 후 `build/logout-20261117/focused-tests-clean.log`를 읽기 전용 확인했다. **2 files / 7 tests PASS, 경고 0**으로 이전 테스트 품질 minor가 해소됐다. 제품 코드·운영 자원·브라우저 smoke는 재실행하지 않았다.

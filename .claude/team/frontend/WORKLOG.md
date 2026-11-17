@@ -692,3 +692,17 @@
 - backend DTO를 직접 재확인한 결과 `PresignedUploadResponse.headers`는 `Map<String, String>`이며 `S3ObjectStore`가 `Content-Type`, `x-amz-checksum-sha256`, `If-None-Match`를 같은 형태로 발급한다. FE strict AWS S3 URL/header 경계와 일치한다.
 - 재검증: `focused-test-r2.log` **3 files/40 tests PASS**, `full-test-r2.log` **54 files/499 tests PASS**, `lint-r2.log` oxlint PASS, `build-r2.log` TypeScript/Vite 151 modules PASS. `production-invalid-upload-transport-r2.log`는 production local transport를 exit 1로 차단했고 `production-bundle-local-api-r2.log`는 `NO_LOCAL_API_ORIGIN`이다. 기존 >500 kB chunk warning만 비차단이다.
 - 인계: 이 수정은 실제 AWS/CORS/브라우저 signed PUT을 대체하지 않는다. T5 named dev identity gate에서 signed header·5MiB/checksum·owner ACL·complete 경쟁 및 AWS 응답을 확인해야 하며, root/QA 독립 재검토 대상으로 넘긴다. Git 조작·backend/DB/AWS 변경은 하지 않았다.
+
+## 2026-11-17 14:24:00 KST — TopBar 로그아웃 버튼 구현·검증
+
+- 담당/범위: 사용자 요청으로 `frontend/src/components/layout/TopBar.tsx`에 인증 사용자의 프로필 메뉴 로그아웃 버튼을 추가했다. FR-AUTH-03의 기존 `AuthContext.signout()` API를 재사용하고, backend/API/schema/auth 계약·운영 서버·DB·S3는 변경하지 않았다.
+- 구현: `useOptionalAuth()`에서 `signout`을 받아 `로그아웃` menuitem을 렌더링한다. `disabled`/`aria-busy`로 요청 중 중복 클릭을 막고, signout 완료 또는 서버 오류 뒤 프로필·알림 메뉴를 닫은 후 `/signin`으로 replace 이동한다. 서버 요청 오류도 현재 AuthContext의 local clear 보장을 유지한다.
+- TDD RED: 먼저 guest 숨김·인증 메뉴 항목·이동·중복 차단 테스트를 추가하고 구현 전 `TopBar.test.tsx`에서 로그아웃 menuitem 미존재로 2건 실패했다.
+- GREEN: `TopBar.test.tsx`에 guest hidden/success/busy/server-failure UI 회귀를, `logoutBehavior.test.tsx`에 실제 `AuthProvider`와 mock fetch의 signout 204/500 응답을 추가했다. user와 메모리 Access Token이 정리되고 `/signin`으로 이동하는 것을 검증한다.
+- 검증: focused `2 files / 7 tests PASS`; full `55 files / 504 tests PASS`; `npm run lint` exit0; `npm run build` TypeScript/Vite exit0, 151 modules. 기존 500kB 초과 chunk warning은 비차단이다. `git diff --check`는 root 최종 통합 시 재확인한다.
+- 미해결: 없음. Git stage/commit/branch/push/merge와 운영 재배포는 수행하지 않았으며 root가 독립 diff/QA 후 판단한다.
+
+## 2026-11-17 14:32:00 KST — 로그아웃 테스트 act 경고 정리
+
+- QA가 지적한 `TopBar.test.tsx`의 deferred signout resolver를 `act` 밖에서 호출하던 테스트 경고를 `await act(async () => resolveSignout())`로 수정했다. 프로덕션 코드는 변경하지 않았고, 완료 후 프로필 메뉴가 닫히는 assertion을 추가했다.
+- 검증: `build/logout-20261117/focused-tests-clean.log` — `TopBar.test.tsx` + `logoutBehavior.test.tsx`, **2 files / 7 tests PASS**, exit 0. 출력에 React act 경고가 없다. `git diff --check` PASS.

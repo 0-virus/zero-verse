@@ -704,3 +704,26 @@
 
 - 사용자 “작업 내용 커밋 해줄래?”에 따라 리더가 운영 S3 정책 템플릿·정기 암호화 백업 도구·QA production harness·운영 인수/승인/역할 기록의 명시한18개 파일을 main에 커밋한다. 기존 독립 T6 FINAL QA PASS를 유지하며 제품 소스와 운영 서비스는 추가 변경하지 않는다.
 - 커밋 전 deploy unit10/QA harness guard5 총15 tests PASS, diff whitespace clean, 변경18파일 비밀 패턴 검사와 JSON 파싱 PASS. 비밀·복구 개인키·백업·build 증거는 Git 제외를 유지한다. 원격 push는 수행하지 않는다.
+
+### 2026-11-17 KST — 사용자 지정 운영 계정 관리자 권한 부여
+
+- 사용자가 이메일로 지정한 운영 계정의 ADMIN 승격을 명시 요청했다. 배포 회의 §10의 단일 지정 사용자 offline bootstrap 경계에 따라 root가 운영 DB에서 해당 계정 ID4/USER/ACTIVE/미삭제를 읽기 전용으로 확인했다.
+- 정확한 ID·이메일 바이트·기존 USER·ACTIVE·미삭제 조건과 row lock을 적용한 트랜잭션에서 역할만 ADMIN으로 변경하고 updated_at을 UTC로 기록했다. 변경1행/commit 후 ID4·ADMIN·ACTIVE·미삭제를 확인했다. 계정 생성·비밀번호 변경·다른 사용자 변경·서비스 재배포는 수행하지 않았다. 이메일·비밀은 이 추적 기록에 남기지 않는다.
+
+### 2026-11-17 KST — 프로필 메뉴 로그아웃 버튼 구현 착수
+
+- 사용자가 누락된 로그아웃 버튼 구현을 요청했다. FR-AUTH-03 및 기존 AuthContext.signout을 재사용하는 FE 연결 수정으로 범위를 한정한다. 프로필 메뉴의 로그인 사용자에게 로그아웃을 제공하고 처리 중 중복 실행을 막으며 완료 후 메뉴를 닫고 /signin으로 이동한다. 새 API/DB/권한 계약은 추가하지 않는다.
+- logout_frontend가 frontend 소스·회귀 테스트·역할 기록을 소유하고 root는 작업 기록·통합 확인, 독립 QA는 최종 diff/검증 대조를 맡는다. 기존 관리자 승격 기록은 보존한다. 이번 요청으로 Git commit/push나 운영 release 교체를 자동 수행하지 않는다.
+
+### 2026-11-17 KST — 로그아웃 버튼 구현·검증 결과
+
+- logout_frontend가 TopBar 프로필 메뉴에 로그인 사용자용 로그아웃 버튼을 연결했다. 기존 AuthContext.signout을 재사용하며 요청 중 disabled/aria-busy, 완료 후 메뉴 닫기 및 /signin replace 이동을 적용했다. 기존 API/DB/권한 정책은 무변경이다.
+- 구현 역할 검증: focused2files7tests, full55files504tests, lint/build PASS(기존 bundle 크기 경고). 독립 QA focused 출력의7/7 PASS를 root가 직접 읽고, 실제 AuthProvider+mock fetch의204/500에서 사용자·메모리토큰 정리와 이동을 확인하는 테스트 소스를 대조했다.
+- root가 build/logout-20261117/mock-browser.log와1440×1000 최종 스크린샷을 직접 확인했다. 로컬 Vite+Playwright route-mocked API에서 프로필 메뉴·busy·POST signout1회·/signin 이동·guest 로그인 표시/로그아웃 숨김 PASS다. 운영 서버 세션 검증으로 확대하지 않는다.
+- 이전 관리자 승격 작업 기록을 보존했고 이번 변경의 Git commit/push와 운영 release 교체는 미수행이다. 운영 사이트에는 후속 배포가 필요하다.
+
+- 독립 QA 최종 PASS 후 중복 클릭 테스트의 deferred resolve를 await act로 감싸고 메뉴 닫힘 assertion을 추가했다(제품 소스 무변경). root가 focused-tests-clean.log의2files7PASS·경고 없음, 수정 테스트와 diff whitespace clean을 직접 확인했다. 로컬 QA preview는 종료됐다.
+
+### 2026-11-17 KST — 사용자 요청에 따른 로그아웃 버튼 커밋
+
+- 사용자 “일단 커밋을 해봐”에 따라 리더가 로그아웃 제품 변경·테스트·역할 검증 기록과 기존 관리자 승격 기록을 포함한 명시적8파일을 커밋한다. 독립 QA PASS와 최종 focused7tests 경고0을 재확인했고 diff whitespace·비밀 패턴 검사를 통과했다. 원격 push 및 운영 배포는 수행하지 않는다.

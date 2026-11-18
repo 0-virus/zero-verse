@@ -199,3 +199,7 @@ U0만 승인된 검증 의존성: `gradle/u0`의 AWS SDK Java2 S3/BOM `2.49.6`, 
 사용자가 실제 서버 설정·파일 전송·신규 Aiven defaultdb 테이블 생성·운영 S3 연결·HTTPS 및 동작 검증을 승인했다. 대상은 zeroverse.co.kr/Lightsail54.116.133.220이며 회의 X-20261113-deployment §15 이후와 deploy/README.md를 따른다. deploy/s3-iam-production.json·s3-cors-production.json은 리더 소유 운영 정책 템플릿이다. 과거 T6 별도 경계는 이번 명시 승인으로 해소되며 실제 완료는 운영 인수 증거로 판정한다. 기존 local DB/업로드 이관·추가 유료 자원·Git 쓰기는 포함하지 않는다.
 
 사용자는 운영 S3의 PAB/ACL 비활성화/SSE-S3를 확인하고 HTTPS-only bucket policy 추가를 완료했다. 정기 백업은 매일04:00 KST·7일 보관으로 선택했으며 수동/마이그레이션 전 백업은 자동 삭제에서 제외한다. deploy/s3-bucket-https-only.json 및 scheduled-backup.py·test_scheduled_backup.py·zeroverse-backup.service/timer는 리더 소유다.
+
+### 2026-11-17 CI/CD 계획 작성
+
+사용자는 자동 CI·운영자 승인 후 Lightsail pull 배포 방향으로 상세 계획과 가이드를 요청했다. 정본은 `docs/governance/meetings/X-20261117-cicd.md`, 운영자 절차는 `deploy/CICD.md`다. 이번 범위는 문서 작성이며 실제 workflow/App/서버 변경·배포 승인이 아니다. 신규 `.github/**`와 `deploy/**` CI/CD 도구는 리더 소유, `qa/**` 독립 검증은 QA 소유로 배정한다. 구현·설치·최초 활성화 상태와 증거는 회의 T1~T7에서 확인한다.

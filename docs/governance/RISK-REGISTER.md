@@ -39,3 +39,11 @@
 | RISK-0021 | 2026-11-11 | 역사 DATETIME의 기록 JVM 시간대 출처가 없어 UTC 실행만으로 과거 시각 호환성을 보장할 수 없음 | 과거 시각·주간 통계의 잘못된 해석 | 미확정(실사용 DB 조사 제외) | UTC 실행 전제·비UTC 기동차단과 합성 신규 가입 검증. 기존 DB/실환경 적용 전 기록 환경·백업·호환성 별도 점검, 자동 ±9h 보정 금지 | 리더·backend·운영 담당 | 기존 DB 또는 실환경 최초 적용 전 | OPEN(운영 적용 별도) | [M9 회의 §12](meetings/M9-20261111-admin.md) |
 | RISK-0022 | 2026-11-13 | direct S3 PUT의 signed length/checksum/conditional header가 실제 browser/CORS와 호환되지 않음 | 업로드 차단 또는 검증 경계 완화 유혹 | 낮음(개발 identity/browser 실측) | 실제 개발 prefix에서 CORS·signed headers·5MiB·조건부 PUT·checksum·browser/ACL 32 required checks PASS. 운영 origin/identity의 T6 검증은 별도 | backend·frontend·QA | 운영 origin/identity 적용 시 | MITIGATED(개발 AWS/browser PASS; 운영 별도) | [배포 회의 §10](meetings/X-20261113-deployment.md) |
 | RISK-0023 | 2026-11-13 | S3 데이터가 생긴 뒤 pre-S3 release로 rollback하거나 LOCAL row를 prod에서 사용 | 이미지 404·잘못된 복구 판단 | 중간 | 신규 운영 DB 사용자 확정·기존 local 데이터 보존·별도 이관 승인; S3 지원 release 사이만 rollback, 첫 배포 실패는 복원/수정 절차 | 리더·backend·QA | 첫 운영 적용 전 | OPEN | [배포 회의 §10](meetings/X-20261113-deployment.md) |
+
+## 2026-11-17 CI/CD 설계 위험
+
+| ID | 등록일 | 위험 | 영향 | 가능성 | 완화책 | 담당 | 검토 시점 | 상태 | 관련 문서 |
+|---|---|---|---|---|---|---|---|---|---|
+| RISK-0024 | 2026-11-17 | 가짜/다른 artifact 배포 요청 또는 과도한 서버 token 권한 | 검증하지 않은 코드 운영 실행 | 미실측 | 승인 요청 artifact와 exact ID/SHA/run/attempt 결속, 비특권 puller·고정 root helper·축소 token | root·QA | T3~T6 | OPEN(설계만) | [계획 §5](meetings/X-20261117-cicd.md) |
+| RISK-0025 | 2026-11-17 | 배포 중단·중복·백업 경쟁·startup migration·잘못된 rollback | 서비스 장애·데이터 불일치 | 미실측 | durable journal/공용 lock, SQL·Java migration fingerprint, startup Flyway 비활성화, 모호하면 수동 개입 | root·QA | T5~T7 | OPEN(설계만) | [계획 §6](meetings/X-20261117-cicd.md) |
+| RISK-0026 | 2026-11-17 | 정기/매배포 암호화 백업과 배포 journal이 Lightsail에만 보관 | 호스트 상실 시 최신 복구 사본·이력 손실 | 미확정 | 최초 활성화 전 외부 사본/복원 확인, 이후 외부 자동 복제는 별도 결정; Aiven 외부 DB를 재해 복구 보장으로 오인하지 않음 | 사용자·root | 최초 활성화 및 백업 후속 결정 | OPEN | [계획 §9](meetings/X-20261117-cicd.md), [가이드](../../deploy/CICD.md) |

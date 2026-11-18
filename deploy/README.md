@@ -4,6 +4,8 @@
 
 대상은 Lightsail 서울의 Java 21 + Caddy 2 + systemd, 신규 Aiven MySQL, private S3다. 기존 로컬 DB와 `.local-data/`는 자동 이관하지 않는다. 예시 도메인·호스트·비밀값은 실제 값으로 교체한다.
 
+CI/CD 도입 계획과 최초 설정·일상 배포 절차는 [CICD.md](CICD.md)를 참고한다. 현재는 계획 단계이며 해당 workflow/서버 도구는 아직 설치되지 않았다.
+
 ## 1. 검증과 release 생성
 
 개발 머신에서 JDK 21, Node 22, Python 3.9 이상과 테스트용 Docker를 사용한다. 저장소 루트에서 실행한다. Gradle 테스트는 격리 MySQL을 생성하므로 사용자 DB를 지정하지 않는다.

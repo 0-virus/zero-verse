@@ -9,3 +9,5 @@ These files prepare a release; they do not authorize executing it against a real
 Root also owns s3-bucket-https-only.json: merge its DenyInsecureTransport statement with existing bucket policy, never replace existing statements blindly. This implements the approved HTTPS transport boundary without granting access.
 
 The user chose daily 04:00 Asia/Seoul encrypted backups with 7-day retention on 2026-11-16. Root owns scheduled-backup.py, test_scheduled_backup.py, zeroverse-backup.service, and zeroverse-backup.timer. Prune only expired regular root-owned single-link scheduled-UTCSTAMP-HEX.cms files after a new backup succeeds; preserve manual/pre-migration files and symlinks. Private recovery keys remain off the app server.
+
+2026-11-17: root owns CICD.md and proposed CI/CD tooling described in docs/governance/meetings/X-20261117-cicd.md. The user requested the plan and operating guidelines; workflows/App/host changes remain unimplemented. A nonprivileged puller, fixed root broker/executor, immutable approval receipt, migration fingerprint and disabled startup Flyway are proposed boundaries. Do not treat the guide as installation or activation authorization.

@@ -727,3 +727,11 @@
 ### 2026-11-17 KST — 사용자 요청에 따른 로그아웃 버튼 커밋
 
 - 사용자 “일단 커밋을 해봐”에 따라 리더가 로그아웃 제품 변경·테스트·역할 검증 기록과 기존 관리자 승격 기록을 포함한 명시적8파일을 커밋한다. 독립 QA PASS와 최종 focused7tests 경고0을 재확인했고 diff whitespace·비밀 패턴 검사를 통과했다. 원격 push 및 운영 배포는 수행하지 않는다.
+
+### 2026-11-17 KST — CI/CD 상세 계획·운영 가이드 작성
+
+- 사용자 “그렇게 해줘. 계획 세운 뒤 가이드라인도 제시해줘”에 따라 root가 자동 CI·수동 승인·Lightsail pull 배포 방향을 구체화했다. writing-plans 스킬을 적용하고 Product/Architecture/Delivery 독립3인 읽기 전용 심의를 취합했다(모두 APPROVE_WITH_CHANGES/HIGH).
+- 산출물: docs/governance/meetings/X-20261117-cicd.md 및 deploy/CICD.md. T1~T7, 권한 분리·immutable 요청 artifact·실제 Deployment 상태·공용 백업 잠금·장애 복구·최초 비활성 설치/활성화 절차를 기록했다. 승인 시각 API 가정은 배제하고 기존 V5 Java migration/helper도 fingerprint에 포함했다.
+- 새 문서/예정 도구의 root 소유권과 QA 경계를 AGENTS/deploy AGENTS·README·결정/위험 등록부에 연결했다. 기존 결론·역할 기록은 삭제/대체하지 않았다. 제품 계약/PRD/제품 코드는 무변경이다.
+- GitHub 공식 문서와 현재 prod Flyway 설정·실제 migration 소스를 대조했다. 문서 검증 결과는 아래에 이어 기록한다. 실제 CI/CD 구현·GitHub 설정·서버 접속/변경·Git commit/push는 수행하지 않았다. 외부 백업 자동 복제는 미포함이며 RISK-0026 OPEN을 유지한다.
+- 작성 후 root가 두 신규 문서와 추적 문서 diff를 재독했다. 상대 Markdown 링크 검사: 두 문서 missing_links=[]; 소유권/가이드/등록부 참조6곳 확인, git diff --check PASS. 변경은 문서8파일이며 제품 테스트는 문서 변경에 실행하지 않았다. 실제 CI/CD 성공을 주장하지 않는다.
